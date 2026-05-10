@@ -39,7 +39,7 @@ Write-Host "`n========== 步骤 3：hvigorw 编译 Harmony HAP ==========" -Fore
 Push-Location $HarmonyDir
 
 $NodeExe = "C:\Users\94023\Documents\commandline-tools-windows-x64\command-line-tools\tool\node\node.exe"
-$HvigorwJs = "C:\Users\94023\Documents\commandline-tools-windows-x64\command-line-tools\hvigor\hvigor\bin\hvigorw.js"
+$HvigorwJs = "C:\Users\94023\Documents\commandline-tools-windows-x64\command-line-tools\hvigor\bin\hvigorw.js"
 
 & $NodeExe $HvigorwJs assembleHap --mode module -p product=default
 
