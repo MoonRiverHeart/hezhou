@@ -15,7 +15,12 @@ param(
     [ValidateSet("connect", "send", "install", "uninstall", "run", "log", "status", "all")]
     [string]$Action = "all",
     
-    [switch]$Reinstall
+    [switch]$Reinstall,
+    
+    [ValidateSet("tmp", "docs", "custom")]
+    [string]$Dest = "tmp",          # 目标位置: tmp=临时目录, docs=文档文件夹, custom=自定义
+    
+    [string]$CustomPath = ""        # 自定义目标路径（Dest=custom 时使用）
 )
 
 $ErrorActionPreference = "Stop"
@@ -65,10 +70,10 @@ function Hdc-Connect {
     
     Write-Host "连接目标: $Target" -ForegroundColor Yellow
     
-    & $HdcExe disconnect $Target 2>&1 | Out-Null
-    $result = & $HdcExe connect $Target 2>&1
+    # tconn 命令连接
+    $result = & $HdcExe tconn $Target 2>&1
     
-    if ($result -match "connect successfully|already connected") {
+    if ($result -match "connect|connected|success|already") {
         Write-Host "连接成功: $Target" -ForegroundColor Green
         Write-Host "`n设备列表:" -ForegroundColor Yellow
         & $HdcExe list targets 2>&1 | ForEach-Object { Write-Host "  $_" }
@@ -88,30 +93,49 @@ function Hdc-Send {
     $hapPath = Find-HapFile
     if (-not $hapPath) {
         Write-Host "错误: 未找到 HAP 文件" -ForegroundColor Red
-        return $false
+        return $false, ""
     }
     
     $fileSize = [math]::Round((Get-Item $hapPath).Length / 1KB, 2)
+    $hapName = Split-Path -Leaf $hapPath
     Write-Host "HAP: $hapPath ($fileSize KB)" -ForegroundColor Cyan
     
-    $remotePath = "/data/local/tmp/app.hap"
-    
-    Write-Host "发送到: $remotePath" -ForegroundColor Yellow
-    $result = & $HdcExe -t $Target file send $hapPath $remotePath 2>&1
-    
-    if ($result -match "error|fail" -or $LASTEXITCODE -ne 0) {
-        Write-Host "发送失败: $result" -ForegroundColor Red
-        return $false
+    # 根据参数选择目标路径
+    switch ($Dest) {
+        "tmp" {
+            $remotePath = "/data/local/tmp/$hapName"
+            Write-Host "目标: 临时目录（用于安装）" -ForegroundColor Yellow
+        }
+        "docs" {
+            $remotePath = "/storage/media/100/local/files/Docs/$hapName"
+            Write-Host "目标: 文档文件夹（文件管理器可见）" -ForegroundColor Yellow
+        }
+        "custom" {
+            if ($CustomPath -eq "") {
+                Write-Host "错误: CustomPath 参数为空" -ForegroundColor Red
+                return $false, ""
+            }
+            $remotePath = "$CustomPath/$hapName"
+            Write-Host "目标: 自定义路径" -ForegroundColor Yellow
+        }
     }
     
-    Write-Host "发送成功" -ForegroundColor Green
-    return $true
+    Write-Host "路径: $remotePath" -ForegroundColor Gray
+    $result = & $HdcExe -t $Target file send $hapPath $remotePath 2>&1
+    
+    if ($result -match "FileTransfer finish|finish|success") {
+        Write-Host "发送成功" -ForegroundColor Green
+        return $true, $remotePath
+    } else {
+        Write-Host "发送失败: $result" -ForegroundColor Red
+        return $false, ""
+    }
 }
 
 function Hdc-Install {
-    Write-Host "`n========== 安装 HAP ==========`n" -ForegroundColor Cyan
+    param([string]$RemotePath)
     
-    $remotePath = "/data/local/tmp/app.hap"
+    Write-Host "`n========== 安装 HAP ==========`n" -ForegroundColor Cyan
     
     if ($Reinstall) {
         Write-Host "卸载旧版本..." -ForegroundColor Yellow
@@ -120,7 +144,8 @@ function Hdc-Install {
     }
     
     Write-Host "安装中..." -ForegroundColor Yellow
-    $result = & $HdcExe -t $Target install $remotePath 2>&1
+    Write-Host "HAP路径: $RemotePath" -ForegroundColor Gray
+    $result = & $HdcExe -t $Target install $RemotePath 2>&1
     
     if ($result -match "success|Success") {
         Write-Host "安装成功" -ForegroundColor Green
@@ -182,12 +207,24 @@ if (-not (Test-Hdc)) { exit 1 }
 switch ($Action) {
     "connect" { Hdc-Connect }
     "send" { if (Hdc-Connect) { Hdc-Send } }
-    "install" { if (Hdc-Connect) { Hdc-Send; Hdc-Install } }
+    "install" { 
+        if (Hdc-Connect) { 
+            $success, $path = Hdc-Send
+            if ($success) { Hdc-Install -RemotePath $path }
+        }
+    }
     "uninstall" { if (Hdc-Connect) { Hdc-Uninstall } }
     "run" { if (Hdc-Connect) { Hdc-Run } }
     "log" { if (Hdc-Connect) { Hdc-Log } }
     "status" { if (Hdc-Connect) { Hdc-Status } }
-    "all" { if (Hdc-Connect) { if (Hdc-Send) { if (Hdc-Install) { Hdc-Run } } } }
+    "all" { 
+        if (Hdc-Connect) { 
+            $success, $path = Hdc-Send
+            if ($success) { 
+                if (Hdc-Install -RemotePath $path) { Hdc-Run }
+            }
+        }
+    }
 }
 
 Write-Host "`n========== 完成 ==========`n" -ForegroundColor Cyan
