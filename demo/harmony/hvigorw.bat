@@ -8,6 +8,8 @@ set PROJECT_DIR=%~dp0
 set TOOLS_DIR=C:\Users\94023\Documents\commandline-tools-windows-x64\command-line-tools
 set NODE_EXE=%TOOLS_DIR%\tool\node\node.exe
 set HVIGORW_JS=%TOOLS_DIR%\hvigor\bin\hvigorw.js
+set DEVECO_SDK_HOME=%TOOLS_DIR%\sdk
+set PATH=%TOOLS_DIR%\tool\node;%PATH%
 
 if not exist "%NODE_EXE%" (
     echo ERROR: Node.js not found at %NODE_EXE%
