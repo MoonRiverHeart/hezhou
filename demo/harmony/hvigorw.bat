@@ -9,7 +9,21 @@ set TOOLS_DIR=C:\Users\94023\Documents\commandline-tools-windows-x64\command-lin
 set NODE_EXE=%TOOLS_DIR%\tool\node\node.exe
 set HVIGORW_JS=%TOOLS_DIR%\hvigor\bin\hvigorw.js
 set DEVECO_SDK_HOME=%TOOLS_DIR%\sdk
+
+@rem Add Node to PATH
 set PATH=%TOOLS_DIR%\tool\node;%PATH%
+
+@rem Add Java to PATH if JAVA_HOME is set
+if defined JAVA_HOME (
+    set PATH=%JAVA_HOME%\bin;%PATH%
+) else (
+    @rem Check if java is available
+    where java >nul 2>&1
+    if errorlevel 1 (
+        echo WARNING: Java not found in PATH. HAP packaging requires Java.
+        echo Please install JDK or set JAVA_HOME environment variable.
+    )
+)
 
 if not exist "%NODE_EXE%" (
     echo ERROR: Node.js not found at %NODE_EXE%
