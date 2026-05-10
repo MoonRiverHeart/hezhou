@@ -26,29 +26,53 @@ function Find-JavaHome {
         return $env:JAVA_HOME
     }
     
-    # 3. 查找常见安装路径
+    # 3. 查找 Java 安装目录（真正的 JDK）
+    $javaDirs = @()
+    
+    # 检查 Program Files\Java 下的 JDK
+    $pfJava = Get-ChildItem "C:\Program Files\Java" -Directory -ErrorAction SilentlyContinue
+    if ($pfJava) {
+        $javaDirs += $pfJava | Where-Object { $_.Name -match "jdk" } | Select-Object -ExpandProperty FullName
+    }
+    
+    # 通过 java 命令反推
+    $javaCmd = Get-Command java -ErrorAction SilentlyContinue
+    if ($javaCmd) {
+        $javaBin = Split-Path -Parent $javaCmd.Source
+        # javapath 是链接目录，需要找到真实路径
+        if ($javaBin -match "javapath") {
+            # 尝试读取链接目标
+            $linkTarget = (Get-Item $javaCmd.Source).Target
+            if ($linkTarget) {
+                $realBin = Split-Path -Parent $linkTarget
+                $javaDirs += Split-Path -Parent $realBin
+            }
+        } elseif ($javaBin.EndsWith("\bin")) {
+            $javaDirs += Split-Path -Parent $javaBin
+        }
+    }
+    
+    # 验证每个路径是否是有效的 JDK（包含 bin\java.exe）
+    foreach ($dir in $javaDirs) {
+        $javaExe = Join-Path $dir "bin\java.exe"
+        if (Test-Path $javaExe) {
+            return $dir
+        }
+    }
+    
+    # 4. 检查常见安装路径
     $commonPaths = @(
         "C:\Program Files\Java\jdk-25",
         "C:\Program Files\Java\jdk-25.0.3",
         "C:\Program Files\Java\jdk-21",
-        "C:\Program Files\Java\jdk-17"
+        "C:\Program Files\Java\jdk-17",
+        "C:\Program Files\Java\latest"
     )
     
     foreach ($path in $commonPaths) {
         if (Test-Path $path) {
             return $path
         }
-    }
-    
-    # 4. 通过 where 命令查找
-    $javaPath = Get-Command java -ErrorAction SilentlyContinue
-    if ($javaPath) {
-        $javaDir = Split-Path -Parent $javaPath.Source
-        # 可能是 bin 目录，取父目录
-        if ($javaDir.EndsWith("\bin")) {
-            return Split-Path -Parent $javaDir
-        }
-        return $javaDir
     }
     
     return $null
@@ -80,7 +104,7 @@ Push-Location $HarmonyDir
 $NodeExe = "$ToolsDir\tool\node\node.exe"
 $HvigorwJs = "$ToolsDir\hvigor\bin\hvigorw.js"
 
-if (Test-Path $NodeExe -and Test-Path $HvigorwJs) {
+if ((Test-Path $NodeExe) -and (Test-Path $HvigorwJs)) {
     & $NodeExe $HvigorwJs --stop-daemon 2>&1 | Out-Null
     Write-Host "  守护进程已停止" -ForegroundColor Green
 } else {
