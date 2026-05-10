@@ -1,6 +1,5 @@
 # build_harmony.ps1
 # 鸿蒙应用完整构建脚本（命令行方式）
-# 功能：自动检测 Java -> 编译 Rust SO -> 编译 Harmony HAP
 
 param(
     [string]$JavaHome = "",
@@ -17,60 +16,45 @@ $ToolsDir = "C:\Users\94023\Documents\commandline-tools-windows-x64\command-line
 
 function Find-JavaHome {
     # 1. 检查参数传入
-    if ($JavaHome -ne "" -and (Test-Path $JavaHome)) {
-        return $JavaHome
-    }
-    
-    # 2. 检查环境变量
-    if ($env:JAVA_HOME -ne "" -and (Test-Path $env:JAVA_HOME)) {
-        return $env:JAVA_HOME
-    }
-    
-    # 3. 查找 Java 安装目录（真正的 JDK）
-    $javaDirs = @()
-    
-    # 检查 Program Files\Java 下的 JDK
-    $pfJava = Get-ChildItem "C:\Program Files\Java" -Directory -ErrorAction SilentlyContinue
-    if ($pfJava) {
-        $javaDirs += $pfJava | Where-Object { $_.Name -match "jdk" } | Select-Object -ExpandProperty FullName
-    }
-    
-    # 通过 java 命令反推
-    $javaCmd = Get-Command java -ErrorAction SilentlyContinue
-    if ($javaCmd) {
-        $javaBin = Split-Path -Parent $javaCmd.Source
-        # javapath 是链接目录，需要找到真实路径
-        if ($javaBin -match "javapath") {
-            # 尝试读取链接目标
-            $linkTarget = (Get-Item $javaCmd.Source).Target
-            if ($linkTarget) {
-                $realBin = Split-Path -Parent $linkTarget
-                $javaDirs += Split-Path -Parent $realBin
-            }
-        } elseif ($javaBin.EndsWith("\bin")) {
-            $javaDirs += Split-Path -Parent $javaBin
+    if ($JavaHome -ne "") {
+        if (Test-Path "$JavaHome\bin\java.exe") {
+            return $JavaHome
+        }
+        if (Test-Path "$JavaHome\java.exe") {
+            # 已经是 bin 目录级别
+            return Split-Path -Parent $JavaHome
         }
     }
     
-    # 验证每个路径是否是有效的 JDK（包含 bin\java.exe）
-    foreach ($dir in $javaDirs) {
-        $javaExe = Join-Path $dir "bin\java.exe"
-        if (Test-Path $javaExe) {
-            return $dir
+    # 2. 检查环境变量（必须包含 bin\java.exe）
+    if ($env:JAVA_HOME -ne "") {
+        if (Test-Path "$env:JAVA_HOME\bin\java.exe") {
+            return $env:JAVA_HOME
         }
     }
     
-    # 4. 检查常见安装路径
+    # 3. 搜索 Program Files\Java 目录（优先）
+    $javaInstallDir = Get-ChildItem "C:\Program Files\Java" -Directory -ErrorAction SilentlyContinue |
+        Where-Object { $_.Name -match "jdk" } |
+        Where-Object { Test-Path "$($_.FullName)\bin\java.exe" } |
+        Sort-Object Name -Descending |
+        Select-Object -First 1
+    
+    if ($javaInstallDir) {
+        return $javaInstallDir.FullName
+    }
+    
+    # 4. 检查常见路径
     $commonPaths = @(
         "C:\Program Files\Java\jdk-25",
         "C:\Program Files\Java\jdk-25.0.3",
         "C:\Program Files\Java\jdk-21",
         "C:\Program Files\Java\jdk-17",
-        "C:\Program Files\Java\latest"
+        "C:\Program Files\Eclipse Adoptium\jdk-21"
     )
     
     foreach ($path in $commonPaths) {
-        if (Test-Path $path) {
+        if (Test-Path "$path\bin\java.exe") {
             return $path
         }
     }
@@ -85,17 +69,17 @@ Write-Host "步骤 0: 检测 Java 环境..." -ForegroundColor Yellow
 
 $javaHome = Find-JavaHome
 if ($javaHome) {
-    Write-Host "  找到 Java: $javaHome" -ForegroundColor Green
+    Write-Host "  找到 JDK: $javaHome" -ForegroundColor Green
     $env:JAVA_HOME = $javaHome
 } else {
-    Write-Host "  错误: 未找到 Java，请安装 JDK 或手动指定 -JavaHome 参数" -ForegroundColor Red
-    Write-Host "  示例: .\build_harmony.ps1 -JavaHome 'C:\Program Files\Java\jdk-25'" -ForegroundColor Yellow
+    Write-Host "  错误: 未找到有效的 JDK（需要包含 bin\java.exe）" -ForegroundColor Red
+    Write-Host "  请手动指定: .\build_harmony.ps1 -JavaHome 'C:\Program Files\Java\jdk-25'" -ForegroundColor Yellow
     exit 1
 }
 
 # 验证 Java 版本
 Write-Host "  Java 版本:" -ForegroundColor Gray
-& "$env:JAVA_HOME\bin\java.exe" -version 2>&1 | Select-String "version" | ForEach-Object { Write-Host "    $_" }
+& "$env:JAVA_HOME\bin\java.exe" -version 2>&1 | ForEach-Object { Write-Host "    $_" }
 
 # ========== 步骤 1：停止旧的 hvigor 守护进程 ==========
 Write-Host "`n步骤 1: 停止旧的 hvigor 守护进程..." -ForegroundColor Yellow
@@ -124,7 +108,6 @@ if (-not $SkipRust) {
     
     Push-Location $RustDir
     
-    # 设置 RUSTFLAGS
     $env:RUSTFLAGS = "-C linker=$OhosSdk\llvm\bin\clang++.exe -C link-arg=--target=aarch64-linux-ohos -C link-arg=--sysroot=$OhosSdk\sysroot"
     
     Write-Host "  编译中..." -ForegroundColor Gray
@@ -136,7 +119,6 @@ if (-not $SkipRust) {
     if (Test-Path $SoFile) {
         Write-Host "  Rust SO 编译成功" -ForegroundColor Green
         
-        # 复制到 Harmony 项目
         $DestDir = "$HarmonyDir\entry\src\main\libs\arm64-v8a"
         if (-not (Test-Path $DestDir)) {
             New-Item -ItemType Directory -Path $DestDir -Force | Out-Null
@@ -159,11 +141,7 @@ if ($Clean) {
     Write-Host "`n步骤 3: 清理构建缓存..." -ForegroundColor Yellow
     Push-Location $HarmonyDir
     
-    $cacheDirs = @(
-        "entry\.cxx",
-        "entry\build",
-        ".hvigor\cache"
-    )
+    $cacheDirs = @("entry\.cxx", "entry\build", ".hvigor\cache")
     
     foreach ($dir in $cacheDirs) {
         if (Test-Path $dir) {
@@ -179,7 +157,6 @@ if ($Clean) {
 Write-Host "`n步骤 4: 编译 Harmony HAP..." -ForegroundColor Yellow
 Push-Location $HarmonyDir
 
-# 再次确保 JAVA_HOME 已设置（守护进程需要）
 $env:JAVA_HOME = $javaHome
 
 Write-Host "  编译中..." -ForegroundColor Gray
@@ -199,7 +176,6 @@ Write-Host "  编译中..." -ForegroundColor Gray
 if ($LASTEXITCODE -eq 0) {
     Write-Host "`n========== 构建成功！ ==========`n" -ForegroundColor Green
     
-    # 查找生成的 HAP 文件
     $HapFiles = Get-ChildItem -Path "$HarmonyDir\entry\build\default\outputs" -Filter "*.hap" -Recurse -ErrorAction SilentlyContinue
     if ($HapFiles) {
         foreach ($hap in $HapFiles) {
@@ -207,11 +183,11 @@ if ($LASTEXITCODE -eq 0) {
             Write-Host "  文件大小: $([math]::Round($hap.Length / 1KB, 2)) KB" -ForegroundColor Gray
         }
     } else {
-        Write-Host "  注意: 未找到 HAP 文件，请检查构建输出" -ForegroundColor Yellow
+        Write-Host "  注意: 未找到 HAP 文件" -ForegroundColor Yellow
     }
 } else {
     Write-Host "`n========== 构建失败 ==========`n" -ForegroundColor Red
-    Write-Host "  请查看日志: $HarmonyDir\.hvigor\outputs\build-logs\build.log" -ForegroundColor Yellow
+    Write-Host "  日志: $HarmonyDir\.hvigor\outputs\build-logs\build.log" -ForegroundColor Yellow
 }
 
 Pop-Location
