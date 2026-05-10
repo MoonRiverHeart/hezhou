@@ -1,0 +1,54 @@
+﻿[package]
+name = "csharptorust_lib"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+crate-type = ["cdylib"]
+name = "csharptorust_lib"
+path = "src/lib.rs"
+
+[[bin]]
+name = "test_app"
+path = "src/main.rs"
+# 只在 Windows 宿主编译时包含
+target = ["x86_64-pc-windows-msvc"]
+required-features = []     # 条件编译
+doc = false                # 不为这个 bin 生成文档
+test = false               # 不运行测试（如果有 #[test] 函数）
+bench = false              # 不运行 benchmark
+
+[dependencies]
+wrapped_mono = "0.3.1"
+libloading = "0.8"
+
+[build-dependencies]
+csbindgen = "1.9.7"
+
+[target.x86_64-pc-windows-msvc]
+rustflags = [
+    "-C", "link-arg=/LIBPATH:C:\\PROGRA~2\\WI3CF2~1\\10\\Lib\\100261~1.0\\um\\x64",
+    "-C", "link-arg=advapi32.lib",
+    "-C", "link-arg=bcrypt.lib",
+    "-C", "link-arg=user32.lib",
+    "-C", "link-arg=shell32.lib",
+    "-C", "link-arg=ole32.lib",
+    "-C", "link-arg=oleaut32.lib",
+]
+
+[target.x86_64-unknown-linux-ohos]
+linker = "C:\\Users\\94023\\Documents\\commandline-tools-windows-x64\\command-line-tools\\sdk\\default\\openharmony\\native\\llvm\\bin\\clang++.exe"
+rustflags = [
+    "-C", "link-arg=--target=x86_64-linux-ohos",
+    "-C", "link-arg=--sysroot=C:\\Users\\94023\\Documents\\commandline-tools-windows-x64\\command-line-tools\\sdk\\default\\openharmony\\native\\sysroot",
+]
+
+[target.aarch64-unknown-linux-ohos]
+linker = "C:\\Users\\94023\\Documents\\commandline-tools-windows-x64\\command-line-tools\\sdk\\default\\openharmony\\native\\llvm\\bin\\clang++.exe"
+ar = "C:\\Users\\94023\\Documents\\commandline-tools-windows-x64\\command-line-tools\\sdk\\default\\openharmony\\native\\llvm\\bin\\llvm-ar.exe"
+
+rustflags = [
+    "-C", "link-arg=--target=aarch64-unknown-linux-ohos",
+    "-C", "link-arg=--sysroot=C:\\Users\\94023\\Documents\\commandline-tools-windows-x64\\command-line-tools\\sdk\\default\\openharmony\\native\\sysroot",
+    "-C", "link-arg=-LC:\\Users\\94023\\Documents\\commandline-tools-windows-x64\\command-line-tools\\sdk\\default\\openharmony\\native\\sysroot\\usr\\lib\\aarch64-linux-ohos"
+]
