@@ -8,7 +8,6 @@ set PROJECT_DIR=%~dp0
 set TOOLS_DIR=C:\Users\94023\Documents\commandline-tools-windows-x64\command-line-tools
 set NODE_EXE=%TOOLS_DIR%\tool\node\node.exe
 set HVIGORW_JS=%TOOLS_DIR%\hvigor\bin\hvigorw.js
-set DEVECO_SDK_HOME=%TOOLS_DIR%\sdk
 
 @rem Add Node to PATH
 set PATH=%TOOLS_DIR%\tool\node;%PATH%
@@ -17,7 +16,6 @@ set PATH=%TOOLS_DIR%\tool\node;%PATH%
 if defined JAVA_HOME (
     set PATH=%JAVA_HOME%\bin;%PATH%
 ) else (
-    @rem Check if java is available
     where java >nul 2>&1
     if errorlevel 1 (
         echo WARNING: Java not found in PATH. HAP packaging requires Java.
