@@ -1,0 +1,35 @@
+# .NET 编译产物
+/bin/
+/obj/
+*.user
+*.userosscache
+*.userprefs
+
+# 发布产物
+/publish/
+
+# 包管理
+/packages/
+*.nupkg
+
+# Rider/ReSharper 相关
+*.sln.ide/
+_ReSharper*/
+
+# Visual Studio 相关
+.vs/
+*.csproj.user
+*.suo
+*.userprefs
+
+# 测试结果
+/TestResults/
+
+# 性能分析
+*.diagsession
+*.etl
+*.perfview
+
+# 本地配置文件
+appsettings.Development.json
+secrets.json

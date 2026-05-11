@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <PlatformTarget>x64</PlatformTarget>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- csbindgen NuGet 包（用于代码生成工具） -->
+    <PackageReference Include="csbindgen" Version="1.9.7" />
+  </ItemGroup>
+
+  <!-- 自动复制 Rust DLL -->
+  <Target Name="CopyRustDll" AfterTargets="Build">
+    <Copy SourceFiles="..\rust\target\release\csharptorust_lib.dll" 
+          DestinationFolder="$(OutputPath)" 
+          SkipUnchangedFiles="true" 
+          Condition="Exists('..\rust\target\release\csharptorust_lib.dll')" />
+  </Target>
+
+</Project>
