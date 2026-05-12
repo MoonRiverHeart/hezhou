@@ -1,0 +1,27 @@
+[package]
+name = "hezhou-dfx"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "hezhou_dfx"
+path = "src/lib.rs"
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+hezhou-scripting = { path = "../scripting" }
+parking_lot = "0.12"
+chrono = "0.4"
+backtrace = "0.3"
+
+[target.'cfg(windows)'.dependencies]
+winapi = { version = "0.3", features = ["processthreadsapi", "psapi", "memoryapi"] }
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
+[dev-dependencies]
+
+[[test]]
+name = "dfx_test"
+path = "tests/dfx_test.rs"

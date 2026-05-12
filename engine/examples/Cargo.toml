@@ -1,0 +1,17 @@
+[package]
+name = "hezhou-examples"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+hezhou-scripting = { path = "../scripting" }
+hezhou-core = { path = "../core" }
+hezhou-platform = { path = "../platform", features = ["glfw"] }
+
+[[bin]]
+name = "engine_demo"
+path = "src/engine_demo.rs"
+
+[[bin]]
+name = "glfw_demo"
+path = "src/glfw_demo.rs"

@@ -1,0 +1,22 @@
+[package]
+name = "hezhou-platform"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "hezhou_platform"
+path = "src/lib.rs"
+
+[dependencies]
+hezhou-scripting = { path = "../scripting" }
+parking_lot = "0.12"
+
+[target.'cfg(not(target_os = "harmony"))'.dependencies]
+glfw = { version = "0.9", optional = true }
+
+[features]
+default = ["glfw"]
+glfw = ["dep:glfw"]
+harmony = []
+
+[dev-dependencies]

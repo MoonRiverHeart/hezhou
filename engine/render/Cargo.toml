@@ -1,0 +1,15 @@
+[package]
+name = "hezhou-render"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "hezhou_render"
+path = "src/lib.rs"
+
+[dependencies]
+hezhou-core = { path = "../core" }
+hezhou-harmony = { path = "../harmony" }
+parking_lot = "0.12"
+
+[dev-dependencies]

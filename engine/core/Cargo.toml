@@ -1,0 +1,14 @@
+[package]
+name = "hezhou-core"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "hezhou_core"
+path = "src/lib.rs"
+
+[dependencies]
+hezhou-scripting = { path = "../scripting" }
+parking_lot = "0.12"
+
+[dev-dependencies]

@@ -1,0 +1,18 @@
+[package]
+name = "hezhou-scripting"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "hezhou_scripting"
+path = "src/lib.rs"
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+parking_lot = "0.12"
+
+[dev-dependencies]
+
+[[test]]
+name = "registry_test"
+path = "tests/registry_test.rs"

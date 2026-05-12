@@ -1,0 +1,17 @@
+[package]
+name = "hezhou-harmony"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "hezhou_harmony"
+path = "src/lib.rs"
+crate-type = ["cdylib", "staticlib", "rlib"]
+
+[dependencies]
+hezhou-scripting = { path = "../scripting" }
+parking_lot = "0.12"
+
+[build-dependencies]
+
+[dev-dependencies]

@@ -1,0 +1,19 @@
+[workspace]
+members = [
+    "scripting",
+    "harmony",
+    "core",
+    "render",
+    "platform",
+    "dfx",
+    "examples",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+
+[workspace.dependencies]
+parking_lot = "0.12"
+tokio = { version = "1", features = ["rt", "sync", "time"] }
+wrapped_mono = "0.3.1"

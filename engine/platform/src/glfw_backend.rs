@@ -1,0 +1,326 @@
+use crate::event::*;
+use crate::traits::*;
+use crate::window::*;
+use parking_lot::Mutex;
+use std::sync::Arc;
+use glfw::Context;
+
+pub struct GLFWPlatform {
+    glfw: Option<glfw::Glfw>,
+    window: Option<glfw::Window>,
+    event_receiver: Option<std::sync::mpsc::Receiver<(f64, glfw::WindowEvent)>>,
+    event_callbacks: Arc<Mutex<Vec<EventCallback>>>,
+    running: bool,
+    last_mouse_x: f64,
+    last_mouse_y: f64,
+}
+
+impl GLFWPlatform {
+    pub fn new() -> Self {
+        Self {
+            glfw: None,
+            window: None,
+            event_receiver: None,
+            event_callbacks: Arc::new(Mutex::new(Vec::new())),
+            running: false,
+            last_mouse_x: 0.0,
+            last_mouse_y: 0.0,
+        }
+    }
+}
+
+impl Default for GLFWPlatform {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl Platform for GLFWPlatform {
+    fn name(&self) -> &'static str {
+        "GLFW"
+    }
+    
+    fn init(&mut self) -> Result<(), String> {
+        let glfw = glfw::init::<()>(None)
+            .map_err(|e| format!("GLFW init failed: {}", e))?;
+        self.glfw = Some(glfw);
+        self.running = true;
+        Ok(())
+    }
+    
+    fn shutdown(&mut self) {
+        if let Some(window) = self.window.take() {
+            window.close();
+        }
+        self.glfw = None;
+        self.running = false;
+    }
+    
+    fn create_window(&mut self, title: &str, width: i32, height: i32) -> Result<WindowHandle, String> {
+        let glfw = self.glfw.as_mut().ok_or("GLFW not initialized")?;
+        
+        let (mut window, events) = glfw
+            .create_window(width as u32, height as u32, title, glfw::WindowMode::Windowed)
+            .expect("Failed to create GLFW window");
+        
+        window.set_all_polling(true);
+        window.make_current();
+        
+        let handle = WindowHandle::new(
+            NativeWindowType::GLFW,
+            window.window_ptr() as usize,
+            width,
+            height,
+        );
+        
+        self.window = Some(window);
+        self.event_receiver = Some(events);
+        
+        Ok(handle)
+    }
+    
+    fn destroy_window(&mut self, _window: &WindowHandle) {
+        if let Some(window) = self.window.take() {
+            window.close();
+        }
+    }
+    
+    fn get_window_handle(&self) -> Option<WindowHandle> {
+        self.window.as_ref().map(|w| {
+            let (width, height) = w.get_size();
+            WindowHandle::new(
+                NativeWindowType::GLFW,
+                w.window_ptr() as usize,
+                width,
+                height,
+            )
+        })
+    }
+    
+    fn set_window_title(&mut self, _window: &WindowHandle, title: &str) {
+        if let Some(window) = &mut self.window {
+            window.set_title(title);
+        }
+    }
+    
+    fn set_window_size(&mut self, _window: &WindowHandle, width: i32, height: i32) {
+        if let Some(window) = &mut self.window {
+            window.set_size(width, height);
+        }
+    }
+    
+    fn get_window_size(&self, _window: &WindowHandle) -> (i32, i32) {
+        self.window.as_ref().map(|w| {
+            let (width, height) = w.get_size();
+            (width, height)
+        }).unwrap_or((0, 0))
+    }
+    
+    fn poll_events(&mut self) -> Vec<PlatformEvent> {
+        let mut events = Vec::new();
+        
+        if let Some(glfw) = &mut self.glfw {
+            glfw.poll_events();
+            
+            let time = self.get_time();
+            
+            if let Some(receiver) = &self.event_receiver {
+                for (_, event) in glfw::flush_messages(&receiver) {
+                    let platform_event = GLFWPlatform::convert_glfw_event_static(event, time, &mut self.last_mouse_x, &mut self.last_mouse_y);
+                    events.push(platform_event);
+                }
+            }
+            
+            if let Some(window) = &self.window {
+                if window.should_close() {
+                    self.running = false;
+                    events.push(PlatformEvent {
+                        kind: PlatformEventKind::WindowClose,
+                        timestamp: (time * 1000.0) as u64,
+                    });
+                }
+            }
+        }
+        
+        for callback in self.event_callbacks.lock().iter() {
+            for event in &events {
+                callback(event);
+            }
+        }
+        
+        events
+    }
+    
+    fn wait_events(&mut self) -> Vec<PlatformEvent> {
+        if let Some(glfw) = &mut self.glfw {
+            glfw.wait_events();
+        }
+        self.poll_events()
+    }
+    
+    fn register_event_callback(&mut self, callback: EventCallback) {
+        self.event_callbacks.lock().push(callback);
+    }
+    
+    fn get_time(&self) -> f64 {
+        self.glfw.as_ref().map(|g| g.get_time()).unwrap_or(0.0)
+    }
+    
+    fn sleep(&self, seconds: f64) {
+        std::thread::sleep(std::time::Duration::from_secs_f64(seconds));
+    }
+    
+    fn is_running(&self) -> bool {
+        self.running
+    }
+    
+    fn request_quit(&mut self) {
+        self.running = false;
+        if let Some(window) = &mut self.window {
+            window.set_should_close(true);
+        }
+    }
+    
+    fn get_native_display(&self) -> Option<usize> {
+        None
+    }
+}
+
+impl GLFWPlatform {
+    fn convert_glfw_event_static(
+        event: glfw::WindowEvent,
+        time: f64,
+        last_mouse_x: &mut f64,
+        last_mouse_y: &mut f64,
+    ) -> PlatformEvent {
+        let timestamp = (time * 1000.0) as u64;
+        
+        match event {
+            glfw::WindowEvent::Key(key, _scancode, action, _mods) => {
+                let _keycode = GLFWPlatform::convert_glfw_key(key);
+                let _key_action = match action {
+                    glfw::Action::Press => KeyAction::Press,
+                    glfw::Action::Release => KeyAction::Release,
+                    glfw::Action::Repeat => KeyAction::Repeat,
+                };
+                
+                PlatformEvent {
+                    kind: PlatformEventKind::Key,
+                    timestamp,
+                }
+            }
+            
+            glfw::WindowEvent::MouseButton(button, action, _mods) => {
+                let _mouse_button = match button {
+                    glfw::MouseButtonLeft => MouseButton::Left,
+                    glfw::MouseButtonRight => MouseButton::Right,
+                    glfw::MouseButtonMiddle => MouseButton::Middle,
+                    _ => MouseButton::Left,
+                };
+                
+                let _mouse_action = match action {
+                    glfw::Action::Press => MouseAction::Press,
+                    glfw::Action::Release => MouseAction::Release,
+                    _ => MouseAction::Move,
+                };
+                
+                PlatformEvent {
+                    kind: PlatformEventKind::Mouse,
+                    timestamp,
+                }
+            }
+            
+            glfw::WindowEvent::CursorPos(x, y) => {
+                let _dx = x - *last_mouse_x;
+                let _dy = y - *last_mouse_y;
+                *last_mouse_x = x;
+                *last_mouse_y = y;
+                
+                PlatformEvent {
+                    kind: PlatformEventKind::Mouse,
+                    timestamp,
+                }
+            }
+            
+            glfw::WindowEvent::Scroll(_x, _y) => {
+                PlatformEvent {
+                    kind: PlatformEventKind::Mouse,
+                    timestamp,
+                }
+            }
+            
+            glfw::WindowEvent::Size(_width, _height) => {
+                PlatformEvent {
+                    kind: PlatformEventKind::WindowResize,
+                    timestamp,
+                }
+            }
+            
+            glfw::WindowEvent::Close => {
+                PlatformEvent {
+                    kind: PlatformEventKind::WindowClose,
+                    timestamp,
+                }
+            }
+            
+            _ => PlatformEvent {
+                kind: PlatformEventKind::Touch,
+                timestamp,
+            }
+        }
+    }
+    
+    fn convert_glfw_key(key: glfw::Key) -> KeyCode {
+        match key {
+            glfw::Key::A => KeyCode::A,
+            glfw::Key::B => KeyCode::B,
+            glfw::Key::C => KeyCode::C,
+            glfw::Key::D => KeyCode::D,
+            glfw::Key::E => KeyCode::E,
+            glfw::Key::F => KeyCode::F,
+            glfw::Key::G => KeyCode::G,
+            glfw::Key::H => KeyCode::H,
+            glfw::Key::I => KeyCode::I,
+            glfw::Key::J => KeyCode::J,
+            glfw::Key::K => KeyCode::K,
+            glfw::Key::L => KeyCode::L,
+            glfw::Key::M => KeyCode::M,
+            glfw::Key::N => KeyCode::N,
+            glfw::Key::O => KeyCode::O,
+            glfw::Key::P => KeyCode::P,
+            glfw::Key::Q => KeyCode::Q,
+            glfw::Key::R => KeyCode::R,
+            glfw::Key::S => KeyCode::S,
+            glfw::Key::T => KeyCode::T,
+            glfw::Key::U => KeyCode::U,
+            glfw::Key::V => KeyCode::V,
+            glfw::Key::W => KeyCode::W,
+            glfw::Key::X => KeyCode::X,
+            glfw::Key::Y => KeyCode::Y,
+            glfw::Key::Z => KeyCode::Z,
+            glfw::Key::Space => KeyCode::Space,
+            glfw::Key::Enter => KeyCode::Enter,
+            glfw::Key::Escape => KeyCode::Escape,
+            glfw::Key::Backspace => KeyCode::Backspace,
+            glfw::Key::Tab => KeyCode::Tab,
+            glfw::Key::LeftShift | glfw::Key::RightShift => KeyCode::Shift,
+            glfw::Key::LeftControl | glfw::Key::RightControl => KeyCode::Ctrl,
+            glfw::Key::LeftAlt | glfw::Key::RightAlt => KeyCode::Alt,
+            glfw::Key::Left => KeyCode::Left,
+            glfw::Key::Right => KeyCode::Right,
+            glfw::Key::Up => KeyCode::Up,
+            glfw::Key::Down => KeyCode::Down,
+            glfw::Key::Num0 => KeyCode::Num0,
+            glfw::Key::Num1 => KeyCode::Num1,
+            glfw::Key::Num2 => KeyCode::Num2,
+            glfw::Key::Num3 => KeyCode::Num3,
+            glfw::Key::Num4 => KeyCode::Num4,
+            glfw::Key::Num5 => KeyCode::Num5,
+            glfw::Key::Num6 => KeyCode::Num6,
+            glfw::Key::Num7 => KeyCode::Num7,
+            glfw::Key::Num8 => KeyCode::Num8,
+            glfw::Key::Num9 => KeyCode::Num9,
+            _ => KeyCode::Unknown,
+        }
+    }
+}

@@ -15,3 +15,21 @@ desktop.ini
 
 # vscode C#拓展配置
 hezhou.sln
+
+# Rust 编译产物
+target/
+Cargo.lock
+**/*.pdb
+**/*.exe
+**/*.dll
+**/*.so
+**/*.dylib
+
+# HarmonyOS 编译产物
+build/
+oh_modules/
+.node_modules/
+
+# C# 编译产物
+bin/
+obj/

@@ -1,0 +1,38 @@
+=== Crash Report ===
+Time: 2026-05-12 21:21:16
+Type: Panic
+Message: Panic at dfx\tests\dfx_test.rs:201: assertion failed: monitor.get_fps() > 0.0
+
+Stack Trace:
+#0 backtrace::backtrace::win64::trace @ C:\Users\94023\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\backtrace-0.3.76\src\backtrace\win64.rs:85 (0x7ff687967290)
+#1 backtrace::backtrace::trace_unsynchronized<backtrace::capture::impl$4::create::closure_env$0> @ C:\Users\94023\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\backtrace-0.3.76\src\backtrace\mod.rs:66 (0x7ff687967290)
+#2 backtrace::backtrace::trace<backtrace::capture::impl$4::create::closure_env$0> @ C:\Users\94023\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\backtrace-0.3.76\src\backtrace\mod.rs:53 (0x7ff687967508)
+#3 backtrace::capture::Backtrace::create @ C:\Users\94023\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\backtrace-0.3.76\src\capture.rs:294 (0x7ff68796f78e)
+#4 backtrace::capture::Backtrace::new @ C:\Users\94023\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\backtrace-0.3.76\src\capture.rs:259 (0x7ff68796f70e)
+#5 hezhou_dfx::crash::CrashHandler::capture_crash @ C:\Users\94023\Documents\vscode\hezhou\engine\dfx\src\crash.rs:118 (0x7ff68794f3ea)
+#6 hezhou_dfx::crash::impl$0::setup_panic_hook::closure$0 @ C:\Users\94023\Documents\vscode\hezhou\engine\dfx\src\crash.rs:85 (0x7ff68794c1ac)
+#7 std::panicking::panic_with_hook @ /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library\std\src\panicking.rs:833 (0x7ff6879bea34)
+#8 std::panicking::panic_handler::closure$0 @ /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library\std\src\panicking.rs:691 (0x7ff6879ad67a)
+#9 std::sys::backtrace::__rust_end_short_backtrace<std::panicking::panic_handler::closure_env$0,never$> @ /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library\std\src\sys\backtrace.rs:182 (0x7ff6879ab69f)
+#10 std::panicking::panic_handler @ /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library\std\src\panicking.rs:689 (0x7ff6879adeee)
+#11 core::panicking::panic_fmt @ /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library\core\src\panicking.rs:80 (0x7ff6879df3bd)
+#12 core::panicking::panic @ /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library\core\src\panicking.rs:150 (0x7ff6879df387)
+#13 dfx_test::test_perf_monitor_frames @ C:\Users\94023\Documents\vscode\hezhou\engine\dfx\tests\dfx_test.rs:201 (0x7ff6878f4c93)
+#14 dfx_test::test_perf_monitor_frames::closure$0 @ C:\Users\94023\Documents\vscode\hezhou\engine\dfx\tests\dfx_test.rs:190 (0x7ff6878f1bc8)
+#15 core::ops::function::FnOnce::call_once<dfx_test::test_perf_monitor_frames::closure_env$0,tuple$<> > @ C:\Users\94023\.rustup\toolchains\stable-x86_64-pc-windows-msvc\lib\rustlib\src\rust\library\core\src\ops\function.rs:250 (0x7ff6878f16a2)
+#16 core::ops::function::FnOnce::call_once @ /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library\core\src\ops\function.rs:250 (0x7ff6878f75f0)
+#17 test::__rust_begin_short_backtrace<enum2$<core::result::Result<tuple$<>,alloc::string::String> >,enum2$<core::result::Result<tuple$<>,alloc::string::String> > (*)()> @ /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library\test\src\lib.rs:663 (0x7ff6878f75f0)
+#18 test::run_test_in_process @ /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library\test\src\lib.rs:686 (0x7ff687904c66)
+#19 test::run_test::closure$0 @ /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library\test\src\lib.rs:607 (0x7ff687904c66)
+#20 test::run_test::closure$1 @ /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library\test\src\lib.rs:637 (0x7ff6878ff16d)
+#21 std::sys::backtrace::__rust_begin_short_backtrace<test::run_test::closure_env$1,tuple$<> > @ /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library\std\src\sys\backtrace.rs:166 (0x7ff6878ff16d)
+#22 std::thread::lifecycle::spawn_unchecked::closure$1::closure$0 @ /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library\std\src\thread\lifecycle.rs:91 (0x7ff687908933)
+#23 core::panic::unwind_safe::impl$25::call_once @ /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library\core\src\panic\unwind_safe.rs:274 (0x7ff687908933)
+#24 std::panicking::catch_unwind::do_call @ /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library\std\src\panicking.rs:581 (0x7ff687908933)
+#25 std::panicking::catch_unwind @ /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library\std\src\panicking.rs:544 (0x7ff687908933)
+#26 std::panic::catch_unwind @ /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library\std\src\panic.rs:359 (0x7ff687908933)
+#27 std::thread::lifecycle::spawn_unchecked::closure$1 @ /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library\std\src\thread\lifecycle.rs:89 (0x7ff687908933)
+#28 core::ops::function::FnOnce::call_once<std::thread::lifecycle::spawn_unchecked::closure_env$1<test::run_test::closure_env$1,tuple$<> >,tuple$<> > @ /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library\core\src\ops\function.rs:250 (0x7ff687908933)
+#29 std::sys::thread::windows::impl$0::new::thread_start @ /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library\std\src\sys\thread\windows.rs:58 (0x7ff6879c3d1c)
+#30 BaseThreadInitThunk @ Unknown:0 (0x7ffa9dbae8d7)
+#31 RtlUserThreadStart @ Unknown:0 (0x7ffa9f0cc3fc)
