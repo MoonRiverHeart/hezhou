@@ -42,20 +42,20 @@ namespace HezhouScripts
             return angleIncrement;
         }
         
-        [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
+        [UnmanagedCallersOnly(EntryPoint = "csharp_set_rotation_speed", CallConvs = new[] { typeof(CallConvCdecl) })]
         public static void SetRotationSpeed(float speed)
         {
             _rotationSpeed = speed;
             Console.WriteLine($"[C#] SetRotationSpeed: {speed}°/s");
         }
         
-        [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
+        [UnmanagedCallersOnly(EntryPoint = "csharp_get_rotation_speed", CallConvs = new[] { typeof(CallConvCdecl) })]
         public static float GetRotationSpeed()
         {
             return _rotationSpeed;
         }
         
-        [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
+        [UnmanagedCallersOnly(EntryPoint = "csharp_reset_rotation", CallConvs = new[] { typeof(CallConvCdecl) })]
         public static void ResetRotation()
         {
             _currentAngle = 0.0f;

@@ -1,7 +1,7 @@
 use ash::vk::{self, Handle};
 use ash::khr::surface::Instance as SurfaceLoader;
 use ash::khr::swapchain::Device as SwapchainLoader;
-use glfw::{Glfw, PWindow, GlfwReceiver, WindowEvent, WindowMode};
+use glfw::{Glfw, PWindow, GlfwReceiver, WindowEvent, WindowMode, Key, Action};
 use std::ffi::CString;
 use libloading::Library;
 
@@ -33,9 +33,14 @@ pub struct RotationRenderer {
     surface_loader: SurfaceLoader,
     swapchain_loader: SwapchainLoader,
     last_time: f64,
-    use_scripting: bool,
     _scripting_library: Library,
+    csharp_library: Library,
     trigger_rotation_callback: extern "C" fn(f32) -> f32,
+    set_rotation_speed: extern "C" fn(f32),
+    get_rotation_speed: extern "C" fn() -> f32,
+    reset_rotation: extern "C" fn(),
+    dll_version: u64,
+    r_key_pressed: bool,
 }
 
 impl RotationRenderer {
@@ -419,7 +424,7 @@ impl RotationRenderer {
                 })
                 .collect::<Result<Vec<_>, _>>()?;
             
-            let (scripting_library, trigger_rotation_callback) = Self::load_and_init_csharp()?;
+            let (scripting_library, csharp_library, trigger_rotation_callback, set_rotation_speed, get_rotation_speed, reset_rotation) = Self::load_and_init_csharp()?;
             
             Ok(Self {
                 glfw,
@@ -449,14 +454,19 @@ impl RotationRenderer {
                 surface_loader,
                 swapchain_loader,
                 last_time: 0.0,
-                use_scripting: true,
                 _scripting_library: scripting_library,
+                csharp_library,
                 trigger_rotation_callback,
+                set_rotation_speed,
+                get_rotation_speed,
+                reset_rotation,
+                dll_version: 0,
+                r_key_pressed: false,
             })
         }
     }
     
-    unsafe fn load_and_init_csharp() -> Result<(Library, extern "C" fn(f32) -> f32), String> {
+    unsafe fn load_and_init_csharp() -> Result<(Library, Library, extern "C" fn(f32) -> f32, extern "C" fn(f32), extern "C" fn() -> f32, extern "C" fn()), String> {
         println!("[Rust] Loading scripting DLL...");
         
         let scripting_dll_path = std::env::current_dir()
@@ -493,11 +503,99 @@ impl RotationRenderer {
             .get(b"csharp_initialize")
             .map_err(|e| format!("Failed to get csharp_initialize: {}", e))?;
         
+        let set_rotation_speed: extern "C" fn(f32) = *csharp_library
+            .get(b"csharp_set_rotation_speed")
+            .map_err(|e| format!("Failed to get csharp_set_rotation_speed: {}", e))?;
+        
+        let get_rotation_speed: extern "C" fn() -> f32 = *csharp_library
+            .get(b"csharp_get_rotation_speed")
+            .map_err(|e| format!("Failed to get csharp_get_rotation_speed: {}", e))?;
+        
+        let reset_rotation: extern "C" fn() = *csharp_library
+            .get(b"csharp_reset_rotation")
+            .map_err(|e| format!("Failed to get csharp_reset_rotation: {}", e))?;
+        
         println!("[Rust] Calling csharp_initialize()...");
         csharp_initialize();
         println!("[Rust] C# initialization complete!");
         
-        Ok((scripting_library, trigger_rotation_callback))
+        Ok((scripting_library, csharp_library, trigger_rotation_callback, set_rotation_speed, get_rotation_speed, reset_rotation))
+    }
+    
+    fn recompile_csharp(version: u64) -> Result<std::path::PathBuf, String> {
+        println!("[HotReload] Recompiling C# DLL (version {})...", version);
+        
+        let scripts_dir = std::env::current_dir()
+            .map(|p| p.join("scripts"))
+            .map_err(|e| format!("Failed to get scripts dir: {}", e))?;
+        
+        let output_dir = scripts_dir.join("bin").join(format!("v{}", version));
+        std::fs::create_dir_all(&output_dir)
+            .map_err(|e| format!("Failed to create output dir: {}", e))?;
+        
+        let output = std::process::Command::new("dotnet")
+            .arg("publish")
+            .arg("-c")
+            .arg("Release")
+            .arg("-r")
+            .arg("win-x64")
+            .arg("--self-contained")
+            .arg("false")
+            .arg("-o")
+            .arg(&output_dir)
+            .current_dir(&scripts_dir)
+            .output()
+            .map_err(|e| format!("Failed to run dotnet publish: {}", e))?;
+        
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            return Err(format!("dotnet publish failed: {}", stderr));
+        }
+        
+        let dll_path = output_dir.join("RotationScript.dll");
+        println!("[HotReload] Compiled: {}", dll_path.display());
+        
+        Ok(dll_path)
+    }
+    
+    unsafe fn reload_csharp_dll(&mut self) -> Result<(), String> {
+        self.dll_version += 1;
+        
+        let dll_path = Self::recompile_csharp(self.dll_version)?;
+        
+        println!("[HotReload] Loading new DLL: {}", dll_path.display());
+        
+        let library = Library::new(&dll_path)
+            .map_err(|e| format!("Failed to load new DLL: {}", e))?;
+        
+        let csharp_initialize: extern "C" fn() = *library
+            .get(b"csharp_initialize")
+            .map_err(|e| format!("Failed to get csharp_initialize: {}", e))?;
+        
+        let set_rotation_speed: extern "C" fn(f32) = *library
+            .get(b"csharp_set_rotation_speed")
+            .map_err(|e| format!("Failed to get csharp_set_rotation_speed: {}", e))?;
+        
+        let get_rotation_speed: extern "C" fn() -> f32 = *library
+            .get(b"csharp_get_rotation_speed")
+            .map_err(|e| format!("Failed to get csharp_get_rotation_speed: {}", e))?;
+        
+        let reset_rotation: extern "C" fn() = *library
+            .get(b"csharp_reset_rotation")
+            .map_err(|e| format!("Failed to get csharp_reset_rotation: {}", e))?;
+        
+        println!("[HotReload] Calling csharp_initialize()...");
+        csharp_initialize();
+        
+        self.csharp_library = library;
+        self.set_rotation_speed = set_rotation_speed;
+        self.get_rotation_speed = get_rotation_speed;
+        self.reset_rotation = reset_rotation;
+        
+        let speed = (self.get_rotation_speed)();
+        println!("[HotReload] Reload complete! Current speed: {}°/s", speed);
+        
+        Ok(())
     }
     
     unsafe fn select_physical_device(
@@ -552,7 +650,17 @@ impl RotationRenderer {
                 return Ok(false);
             }
             
-            // 获取当前时间
+            let r_key_state = self.window.get_key(Key::R);
+            if r_key_state == Action::Press && !self.r_key_pressed {
+                self.r_key_pressed = true;
+                println!("[HotReload] R key pressed, recompiling...");
+                if let Err(e) = self.reload_csharp_dll() {
+                    println!("[HotReload] Error: {}", e);
+                }
+            } else if r_key_state == Action::Release {
+                self.r_key_pressed = false;
+            }
+            
             let current_time = self.glfw.get_time();
             let delta_time = current_time - self.last_time;
             self.last_time = current_time;
