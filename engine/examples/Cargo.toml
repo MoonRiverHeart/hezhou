@@ -20,3 +20,7 @@ path = "src/glfw_demo.rs"
 [[bin]]
 name = "vulkan_triangle_demo"
 path = "src/vulkan_triangle_demo.rs"
+
+[[bin]]
+name = "vulkan_render_demo"
+path = "src/vulkan_render_demo.rs"

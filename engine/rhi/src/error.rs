@@ -5,9 +5,6 @@ pub enum RhiError {
     #[error("Device creation failed: {0}")]
     DeviceCreationFailed(String),
     
-    #[error("Swapchain creation failed: {0}")]
-    SwapchainCreationFailed(String),
-    
     #[error("Buffer creation failed: {0}")]
     BufferCreationFailed(String),
     
@@ -37,6 +34,12 @@ pub enum RhiError {
     
     #[error("Invalid operation: {0}")]
     InvalidOperation(String),
+    
+    #[error("Swapchain creation failed: {0}")]
+    SwapchainCreationFailed(String),
+    
+    #[error("Surface creation failed: {0}")]
+    SurfaceCreationFailed(String),
     
     #[error("Surface lost")]
     SurfaceLost,

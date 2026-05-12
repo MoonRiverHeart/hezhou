@@ -1,5 +1,4 @@
 use ash::vk;
-use std::ffi::CString;
 
 pub struct VulkanDemo {
     entry: ash::Entry,
@@ -49,6 +48,18 @@ impl VulkanDemo {
                 pipeline,
             })
         }
+    }
+    
+    pub fn entry(&self) -> &ash::Entry {
+        &self.entry
+    }
+    
+    pub fn instance(&self) -> &ash::Instance {
+        &self.instance
+    }
+    
+    pub fn physical_device(&self) -> vk::PhysicalDevice {
+        self.physical_device
     }
     
     pub fn device(&self) -> &ash::Device {
