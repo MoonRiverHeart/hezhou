@@ -7,6 +7,7 @@ edition = "2021"
 hezhou-scripting = { path = "../scripting" }
 hezhou-core = { path = "../core" }
 hezhou-platform = { path = "../platform", features = ["glfw"] }
+hezhou-rhi-vulkan = { path = "../rhi-vulkan" }
 
 [[bin]]
 name = "engine_demo"
@@ -15,3 +16,7 @@ path = "src/engine_demo.rs"
 [[bin]]
 name = "glfw_demo"
 path = "src/glfw_demo.rs"
+
+[[bin]]
+name = "vulkan_triangle_demo"
+path = "src/vulkan_triangle_demo.rs"
