@@ -1,16 +1,28 @@
 use hezhou_rhi_vulkan::RotationRenderer;
 
 fn main() {
-    println!("=== Rust -> C# 旋转三角形 Demo ===\n");
+    println!("=== Rust -> C# 函数指针调用 Demo ===\n");
     
-    println!("[1] 创建 Vulkan Renderer + ScriptManager...");
-    let mut renderer = RotationRenderer::new(800, 600, "Rotation Demo - Rust calls C#")
+    println!("[架构说明]");
+    println!("  C# 端:");
+    println!("    - 定义静态字段 rotation_speed = 90°/s");
+    println!("    - 定义函数指针 CalculateRotationPtr");
+    println!("    - [UnmanagedCallersOnly] 标记方法可被非托管代码调用");
+    println!("    - CLR 自动生成 Thunk (跳板函数)");
+    println!("  Rust 端:");
+    println!("    - ROTATION_CALLBACK: Mutex<Option<extern \"C\" fn(f32) -> f32>>");
+    println!("    - register_rotation_callback(thunk_ptr) 保存函数指针");
+    println!("    - trigger_rotation_callback(dt) -> thunk(dt) -> C# CalculateRotation");
+    println!("  调用路径:");
+    println!("    Rust -> Thunk -> CLR 上下文切换 -> C# CalculateRotation -> 返回值\n");
+    
+    println!("[1] 创建 Vulkan Renderer...");
+    let mut renderer = RotationRenderer::new(800, 600, "Rotation Demo - Rust calls C# thunk")
         .expect("Failed to create renderer");
-    println!("    Renderer 和脚本系统初始化成功!\n");
+    println!("    Renderer 初始化成功!\n");
     
     println!("[2] 运行渲染循环...");
-    println!("    每帧调用 C# callback 'calculate_rotation' 计算旋转角度");
-    println!("    旋转速度: 90 度/秒\n");
+    println!("    每帧调用 C# thunk 计算旋转角度\n");
     
     let mut current_angle = 0.0f32;
     let mut frame_count = 0u32;
@@ -32,9 +44,4 @@ fn main() {
     }
     
     println!("\n=== Demo Complete ===");
-    println!("\n说明:");
-    println!("  - Rust 每帧调用 scripting callback 'calculate_rotation'");
-    println!("  - Callback 模拟 C# 代码，返回角度增量 (90°/秒)");
-    println!("  - Vulkan 使用 push constant 将角度传递给 shader");
-    println!("  - Shader 在顶点着色器中应用旋转");
 }

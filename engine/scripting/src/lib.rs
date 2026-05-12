@@ -11,6 +11,12 @@ pub use callback_registry::*;
 
 use script_manager_lite::ScriptManager;
 use std::os::raw::c_char;
+use parking_lot::Mutex;
+use std::sync::LazyLock;
+
+type RotationCallback = extern "C" fn(f32) -> f32;
+
+static ROTATION_CALLBACK: LazyLock<Mutex<Option<RotationCallback>>> = LazyLock::new(|| Mutex::new(None));
 
 #[unsafe(no_mangle)]
 pub extern "C" fn scripting_init() -> *mut ScriptManager {
@@ -172,5 +178,25 @@ pub extern "C" fn scripting_unregister_callback(
         let mgr = &mut *manager;
         let name_str = std::ffi::CStr::from_ptr(name).to_str().unwrap();
         mgr.unregister_callback(name_str);
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn register_rotation_callback(callback: RotationCallback) {
+    let mut cb = ROTATION_CALLBACK.lock();
+    *cb = Some(callback);
+    println!("[Rust] Registered rotation callback from C#: {:?}", callback);
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn trigger_rotation_callback(delta_time: f32) -> f32 {
+    let cb = ROTATION_CALLBACK.lock();
+    if let Some(callback) = *cb {
+        let result = callback(delta_time);
+        println!("[Rust] Called C# rotation callback: dt={:.4}s -> increment={:.2}°", delta_time, result);
+        result
+    } else {
+        println!("[Rust] No rotation callback registered, using default (90°/s)");
+        90.0 * delta_time
     }
 }

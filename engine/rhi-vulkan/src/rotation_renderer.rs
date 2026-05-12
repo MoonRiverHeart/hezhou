@@ -2,26 +2,26 @@ use ash::vk::{self, Handle};
 use ash::khr::surface::Instance as SurfaceLoader;
 use ash::khr::swapchain::Device as SwapchainLoader;
 use glfw::{Glfw, PWindow, GlfwReceiver, WindowEvent, WindowMode};
-use hezhou_scripting::{script_manager_lite::ScriptManager, ScriptValue, scripting_init, scripting_register_sync_callback, scripting_trigger_sync, scripting_shutdown};
+use hezhou_scripting::{register_rotation_callback, trigger_rotation_callback};
 use std::ffi::CString;
 
 pub struct RotationRenderer {
     glfw: Glfw,
     window: PWindow,
     event_receiver: GlfwReceiver<(f64, WindowEvent)>,
-    entry: ash::Entry,
+    _entry: ash::Entry,
     instance: ash::Instance,
-    physical_device: vk::PhysicalDevice,
+    _physical_device: vk::PhysicalDevice,
     device: ash::Device,
     queue: vk::Queue,
-    queue_family: u32,
+    _queue_family: u32,
     command_pool: vk::CommandPool,
     render_pass: vk::RenderPass,
     pipeline_layout: vk::PipelineLayout,
     pipeline: vk::Pipeline,
     surface: vk::SurfaceKHR,
     swapchain: vk::SwapchainKHR,
-    swapchain_image_views: Vec<vk::ImageView>,
+    _swapchain_image_views: Vec<vk::ImageView>,
     framebuffers: Vec<vk::Framebuffer>,
     command_buffers: Vec<vk::CommandBuffer>,
     image_available_semaphores: Vec<vk::Semaphore>,
@@ -29,11 +29,11 @@ pub struct RotationRenderer {
     in_flight_fences: Vec<vk::Fence>,
     current_frame: usize,
     max_frames_in_flight: usize,
-    extent: vk::Extent2D,
+    _extent: vk::Extent2D,
     surface_loader: SurfaceLoader,
     swapchain_loader: SwapchainLoader,
-    script_manager: *mut ScriptManager,
     last_time: f64,
+    use_scripting: bool,
 }
 
 impl RotationRenderer {
@@ -417,29 +417,25 @@ impl RotationRenderer {
                 })
                 .collect::<Result<Vec<_>, _>>()?;
             
-            // 初始化脚本系统
-            let script_manager = scripting_init();
-            
-            // 注册 C# 模拟的旋转计算 callback
-            Self::register_rotation_callback(script_manager);
+            Self::register_mock_csharp_callback();
             
             Ok(Self {
                 glfw,
                 window,
                 event_receiver,
-                entry,
+                _entry: entry,
                 instance,
-                physical_device,
+                _physical_device: physical_device,
                 device,
                 queue,
-                queue_family,
+                _queue_family: queue_family,
                 command_pool,
                 render_pass,
                 pipeline_layout,
                 pipeline,
                 surface,
                 swapchain,
-                swapchain_image_views,
+                _swapchain_image_views: swapchain_image_views,
                 framebuffers,
                 command_buffers,
                 image_available_semaphores,
@@ -447,39 +443,25 @@ impl RotationRenderer {
                 in_flight_fences,
                 current_frame: 0,
                 max_frames_in_flight,
-                extent,
+                _extent: extent,
                 surface_loader,
                 swapchain_loader,
-                script_manager,
                 last_time: 0.0,
+                use_scripting: true,
             })
         }
     }
     
-    unsafe fn register_rotation_callback(script_manager: *mut ScriptManager) {
-        // 模拟 C# 旋转计算逻辑
-        extern "C" fn calculate_rotation(arg: ScriptValue, context: usize) -> ScriptValue {
-            let rotation_speed = context as f32 / 1000.0;  // 90 度/秒 (context = 90000)
-            let delta_time = arg.get_float().unwrap_or(0.016);
-            let angle_increment = rotation_speed * delta_time;
-            
-            ScriptValue::from_float(angle_increment)
+    unsafe fn register_mock_csharp_callback() {
+        extern "C" fn csharp_calculate_rotation(delta_time: f32) -> f32 {
+            static ROTATION_SPEED: f32 = 90.0;
+            let angle_increment = ROTATION_SPEED * delta_time;
+            println!("    [Mock C#] Thunk called: dt={:.4}s -> increment={:.2}°", delta_time, angle_increment);
+            angle_increment
         }
         
-        let name = CString::new("calculate_rotation").unwrap();
-        let desc = CString::new("Calculate rotation increment from C#").unwrap();
-        let sig = CString::new("float -> float").unwrap();
-        
-        scripting_register_sync_callback(
-            script_manager,
-            name.as_ptr(),
-            calculate_rotation,
-            desc.as_ptr(),
-            sig.as_ptr(),
-            90000,  // rotation_speed = 90 度/秒
-        );
-        
-        println!("    [Script] Registered 'calculate_rotation' callback (模拟 C# 代码)");
+        register_rotation_callback(csharp_calculate_rotation);
+        println!("    [Rust] Registered mock C# thunk (function pointer)");
     }
     
     unsafe fn select_physical_device(
@@ -540,17 +522,11 @@ impl RotationRenderer {
             self.last_time = current_time;
             
             // 调用脚本 callback 计算旋转角度（模拟 C# 代码）
-            let callback_name = CString::new("calculate_rotation").unwrap();
-            let arg = ScriptValue::from_float(delta_time as f32);
-            let result = scripting_trigger_sync(self.script_manager, callback_name.as_ptr(), arg);
+            let angle_increment = trigger_rotation_callback(delta_time as f32);
+            *current_angle += angle_increment;
             
-            if result.is_ok() {
-                let angle_increment = result.get_float().unwrap_or(0.0);
-                *current_angle += angle_increment;
-                
-                if *current_angle >= 360.0 {
-                    *current_angle -= 360.0;
-                }
+            if *current_angle >= 360.0 {
+                *current_angle -= 360.0;
             }
             
             self.device.wait_for_fences(&[self.in_flight_fences[self.current_frame]], true, u64::MAX)
@@ -566,7 +542,6 @@ impl RotationRenderer {
                 vk::Fence::null(),
             ).map_err(|e| format!("Failed to acquire next image: {}", e))?;
             
-            // 动态录制命令缓冲（每帧更新旋转角度）
             let cmd = self.command_buffers[image_index as usize];
             self.device.reset_command_buffer(cmd, vk::CommandBufferResetFlags::RELEASE_RESOURCES)
                 .map_err(|e| format!("Failed to reset command buffer: {}", e))?;
@@ -575,7 +550,6 @@ impl RotationRenderer {
             self.device.begin_command_buffer(cmd, &begin_info)
                 .map_err(|e| format!("Failed to begin command buffer: {}", e))?;
             
-            // Push constant：传递旋转角度
             let rotation_rad = current_angle.to_radians();
             self.device.cmd_push_constants(
                 cmd,
@@ -596,7 +570,7 @@ impl RotationRenderer {
                 framebuffer: self.framebuffers[image_index as usize],
                 render_area: vk::Rect2D {
                     offset: vk::Offset2D { x: 0, y: 0 },
-                    extent: self.extent,
+                    extent: self._extent,
                 },
                 clear_value_count: 1,
                 p_clear_values: &clear_value,
@@ -651,8 +625,6 @@ impl Drop for RotationRenderer {
         unsafe {
             self.device.device_wait_idle().ok();
             
-            scripting_shutdown(self.script_manager);
-            
             self.device.destroy_command_pool(self.command_pool, None);
             
             for fence in &self.in_flight_fences {
@@ -675,7 +647,7 @@ impl Drop for RotationRenderer {
                 self.device.destroy_framebuffer(*fb, None);
             }
             
-            for view in &self.swapchain_image_views {
+            for view in &self._swapchain_image_views {
                 self.device.destroy_image_view(*view, None);
             }
             

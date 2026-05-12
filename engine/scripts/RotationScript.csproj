@@ -6,5 +6,6 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <PublishAot>true</PublishAot>
     <OptimizationPreference>Speed</OptimizationPreference>
+    <NativeLib>Shared</NativeLib>
   </PropertyGroup>
 </Project>
