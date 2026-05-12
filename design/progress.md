@@ -4,7 +4,9 @@
 
 ---
 
-## Phase 1 MVP - ✅ 完成
+## Phase 1 MVP - ✅ 完成 & 已提交
+
+**提交**: `7fe4b5c` - 特性：完成引擎 Phase 1 MVP
 
 ### 模块状态
 
@@ -251,6 +253,8 @@ cargo build --release -p hezhou-harmony
 
 ## 下一步 (Phase 2)
 
+**状态**: ✅ Phase 1 MVP 已提交到 main 分支，准备开始 Phase 2
+
 ### 待实现模块
 
 | 模块 | 功能 | 预计时间 |
@@ -276,4 +280,4 @@ cargo build --release -p hezhou-harmony
 
 ---
 
-*文档版本: 1.0 | 创建时间: 2026-05-12*
+*文档版本: 1.1 | 创建时间: 2026-05-12 | 最后更新: 2026-05-12 (Phase 1 MVP 已提交)*
