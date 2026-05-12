@@ -1,0 +1,22 @@
+[package]
+name = "hezhou-physics"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "hezhou_physics"
+path = "src/lib.rs"
+
+[dependencies]
+hezhou-core = { path = "../core" }
+rapier3d = { version = "0.22", optional = true }
+rapier2d = { version = "0.22", optional = true }
+nalgebra = "0.32"
+parking_lot = "0.12"
+
+[features]
+default = ["3d"]
+2d = ["rapier2d"]
+3d = ["rapier3d"]
+
+[dev-dependencies]

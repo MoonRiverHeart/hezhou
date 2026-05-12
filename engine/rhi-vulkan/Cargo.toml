@@ -1,0 +1,15 @@
+[package]
+name = "hezhou-rhi-vulkan"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "hezhou_rhi_vulkan"
+path = "src/lib.rs"
+
+[dependencies]
+hezhou-core = { path = "../core" }
+hezhou-geometry = { path = "../geometry" }
+hezhou-rhi = { path = "../rhi" }
+
+[dev-dependencies]

@@ -1,0 +1,15 @@
+[package]
+name = "hezhou-geometry"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "hezhou_geometry"
+path = "src/lib.rs"
+
+[dependencies]
+hezhou-core = { path = "../core" }
+nalgebra = "0.32"
+bytemuck = { version = "1.14", features = ["derive"] }
+
+[dev-dependencies]

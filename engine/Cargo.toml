@@ -7,6 +7,10 @@ members = [
     "platform",
     "dfx",
     "examples",
+    "geometry",
+    "rhi",
+    "rhi-vulkan",
+    "physics",
 ]
 
 [workspace.package]

@@ -197,3 +197,108 @@ impl Vec4 {
         Vec3::new(self.x, self.y, self.z)
     }
 }
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct Vec2u {
+    pub x: u32,
+    pub y: u32,
+}
+
+impl Vec2u {
+    pub fn new(x: u32, y: u32) -> Self {
+        Self { x, y }
+    }
+    
+    pub fn zero() -> Self {
+        Self::new(0, 0)
+    }
+    
+    pub fn width(&self) -> u32 {
+        self.x
+    }
+    
+    pub fn height(&self) -> u32 {
+        self.y
+    }
+}
+
+impl std::ops::Add for Vec2u {
+    type Output = Self;
+    fn add(self, other: Self) -> Self {
+        Self::new(self.x + other.x, self.y + other.y)
+    }
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct Vec3u {
+    pub x: u32,
+    pub y: u32,
+    pub z: u32,
+}
+
+impl Vec3u {
+    pub fn new(x: u32, y: u32, z: u32) -> Self {
+        Self { x, y, z }
+    }
+    
+    pub fn zero() -> Self {
+        Self::new(0, 0, 0)
+    }
+    
+    pub fn width(&self) -> u32 {
+        self.x
+    }
+    
+    pub fn height(&self) -> u32 {
+        self.y
+    }
+    
+    pub fn depth(&self) -> u32 {
+        self.z
+    }
+}
+
+impl std::ops::Add for Vec3u {
+    type Output = Self;
+    fn add(self, other: Self) -> Self {
+        Self::new(self.x + other.x, self.y + other.y, self.z + other.z)
+    }
+}
+
+impl From<[f32; 3]> for Vec3 {
+    fn from(arr: [f32; 3]) -> Self {
+        Self::new(arr[0], arr[1], arr[2])
+    }
+}
+
+impl From<Vec3> for [f32; 3] {
+    fn from(v: Vec3) -> Self {
+        [v.x, v.y, v.z]
+    }
+}
+
+impl From<[f32; 2]> for Vec2 {
+    fn from(arr: [f32; 2]) -> Self {
+        Self::new(arr[0], arr[1])
+    }
+}
+
+impl From<Vec2> for [f32; 2] {
+    fn from(v: Vec2) -> Self {
+        [v.x, v.y]
+    }
+}
+
+impl From<[f32; 4]> for Vec4 {
+    fn from(arr: [f32; 4]) -> Self {
+        Self::new(arr[0], arr[1], arr[2], arr[3])
+    }
+}
+
+impl From<Vec4> for [f32; 4] {
+    fn from(v: Vec4) -> Self {
+        [v.x, v.y, v.z, v.w]
+    }
+}
