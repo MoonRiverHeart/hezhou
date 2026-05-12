@@ -12,5 +12,6 @@ hezhou-core = { path = "../core" }
 hezhou-geometry = { path = "../geometry" }
 hezhou-rhi = { path = "../rhi" }
 ash = "0.38"
+glfw = { version = "0.62", default-features = false, features = ["src-build", "vulkan", "raw-window-handle-v0-6", "native-handles"] }
 
 [dev-dependencies]

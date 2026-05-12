@@ -1,18 +1,13 @@
-use ash::vk::{self, Handle};
+use ash::vk;
 use ash::khr::surface::Instance as SurfaceLoader;
 use ash::khr::swapchain::Device as SwapchainLoader;
-use glfw::{Glfw, PWindow, GlfwReceiver, WindowEvent, WindowMode};
 
-pub struct VulkanRenderer {
-    glfw: Glfw,
-    window: PWindow,
-    event_receiver: GlfwReceiver<(f64, WindowEvent)>,
+pub struct TriangleDemo {
     entry: ash::Entry,
     instance: ash::Instance,
     physical_device: vk::PhysicalDevice,
     device: ash::Device,
     queue: vk::Queue,
-    queue_family: u32,
     command_pool: vk::CommandPool,
     render_pass: vk::RenderPass,
     pipeline_layout: vk::PipelineLayout,
@@ -33,21 +28,12 @@ pub struct VulkanRenderer {
     swapchain_loader: SwapchainLoader,
 }
 
-impl VulkanRenderer {
-    pub fn new(width: u32, height: u32, title: &str) -> Result<Self, String> {
+impl TriangleDemo {
+    pub fn new(width: u32, height: u32) -> Result<Self, String> {
         unsafe {
-            let mut glfw = glfw::init(glfw::fail_on_errors)
-                .map_err(|e| format!("GLFW init failed: {}", e))?;
-            
-            glfw.window_hint(glfw::WindowHint::ClientApi(glfw::ClientApiHint::NoApi));
-            
-            let (window, event_receiver) = glfw
-                .create_window(width, height, title, WindowMode::Windowed)
-                .expect("Failed to create GLFW window");
-            
             let entry = ash::Entry::load().map_err(|e| format!("Failed to load Vulkan: {}", e))?;
             
-            let app_name = std::ffi::CString::new(title).unwrap();
+            let app_name = std::ffi::CString::new("Triangle Demo").unwrap();
             let engine_name = std::ffi::CString::new("Hezhou").unwrap();
             
             let app_info = vk::ApplicationInfo {
@@ -59,16 +45,10 @@ impl VulkanRenderer {
                 ..Default::default()
             };
             
-            let glfw_extensions = glfw.get_required_instance_extensions()
-                .expect("Failed to get required instance extensions");
-            let extension_names: Vec<std::ffi::CString> = glfw_extensions
-                .iter()
-                .map(|s| std::ffi::CString::new(s.as_str()).expect("Invalid extension name"))
-                .collect();
-            let extensions: Vec<*const i8> = extension_names
-                .iter()
-                .map(|s| s.as_ptr())
-                .collect();
+            let extensions = [
+                vk::KHR_SURFACE_NAME.as_ptr(),
+                vk::KHR_WIN32_SURFACE_NAME.as_ptr(),
+            ];
             
             let create_info = vk::InstanceCreateInfo {
                 p_application_info: &app_info,
@@ -82,29 +62,30 @@ impl VulkanRenderer {
             
             let surface_loader = SurfaceLoader::new(&entry, &instance);
             
-            let mut surface: vk::SurfaceKHR = vk::SurfaceKHR::null();
-            let result = window.create_window_surface(
-                instance.handle().as_raw() as glfw::ffi::VkInstance,
-                std::ptr::null(),
-                &mut surface as *mut vk::SurfaceKHR as *mut glfw::ffi::VkSurfaceKHR,
-            );
-            if result != 0 {
-                return Err(format!("Failed to create surface: {}", result));
-            }
+            let win32_surface_loader = ash::khr::win32_surface::Instance::new(&entry, &instance);
+            
+            let surface_info = vk::Win32SurfaceCreateInfoKHR {
+                hinstance: 0,
+                hwnd: 0,
+                ..Default::default()
+            };
+            
+            let surface = win32_surface_loader.create_win32_surface(&surface_info, None)
+                .map_err(|e| format!("Failed to create surface: {}", e))?;
             
             let physical_devices = instance.enumerate_physical_devices()
                 .map_err(|e| format!("Failed to enumerate physical devices: {}", e))?;
             
-            let (physical_device, queue_family) = Self::select_physical_device(
-                &instance,
-                &physical_devices,
-                surface,
-                &surface_loader,
-            )?;
+            let physical_device = physical_devices[0];
+            
+            let queue_families = instance.get_physical_device_queue_family_properties(physical_device);
+            let graphics_queue_family = queue_families.iter()
+                .position(|q| q.queue_flags.contains(vk::QueueFlags::GRAPHICS))
+                .unwrap() as u32;
             
             let queue_priority = 1.0f32;
             let queue_create_info = vk::DeviceQueueCreateInfo {
-                queue_family_index: queue_family,
+                queue_family_index: graphics_queue_family,
                 queue_count: 1,
                 p_queue_priorities: &queue_priority,
                 ..Default::default()
@@ -125,7 +106,7 @@ impl VulkanRenderer {
             
             let swapchain_loader = SwapchainLoader::new(&instance, &device);
             
-            let queue = device.get_device_queue(queue_family, 0);
+            let queue = device.get_device_queue(graphics_queue_family, 0);
             
             let surface_formats = surface_loader.get_physical_device_surface_formats(physical_device, surface)
                 .map_err(|e| format!("Failed to get surface formats: {}", e))?;
@@ -304,8 +285,8 @@ impl VulkanRenderer {
                 rasterizer_discard_enable: vk::FALSE,
                 polygon_mode: vk::PolygonMode::FILL,
                 line_width: 1.0,
-                cull_mode: vk::CullModeFlags::NONE,
-                front_face: vk::FrontFace::COUNTER_CLOCKWISE,
+                cull_mode: vk::CullModeFlags::BACK,
+                front_face: vk::FrontFace::CLOCKWISE,
                 ..Default::default()
             };
             
@@ -357,7 +338,7 @@ impl VulkanRenderer {
             device.destroy_shader_module(frag_shader_module, None);
             
             let command_pool_create_info = vk::CommandPoolCreateInfo {
-                queue_family_index: queue_family,
+                queue_family_index: graphics_queue_family,
                 flags: vk::CommandPoolCreateFlags::RESET_COMMAND_BUFFER,
                 ..Default::default()
             };
@@ -383,7 +364,7 @@ impl VulkanRenderer {
                 
                 let clear_value = vk::ClearValue {
                     color: vk::ClearColorValue {
-                        float32: [0.1, 0.1, 0.2, 1.0],
+                        float32: [0.1, 0.1, 0.1, 1.0],
                     },
                 };
                 
@@ -438,15 +419,11 @@ impl VulkanRenderer {
                 .collect::<Result<Vec<_>, _>>()?;
             
             Ok(Self {
-                glfw,
-                window,
-                event_receiver,
                 entry,
                 instance,
                 physical_device,
                 device,
                 queue,
-                queue_family,
                 command_pool,
                 render_pass,
                 pipeline_layout,
@@ -469,35 +446,6 @@ impl VulkanRenderer {
         }
     }
     
-    unsafe fn select_physical_device(
-        instance: &ash::Instance,
-        devices: &[vk::PhysicalDevice],
-        surface: vk::SurfaceKHR,
-        surface_loader: &SurfaceLoader,
-    ) -> Result<(vk::PhysicalDevice, u32), String> {
-        for device in devices {
-            let queue_families = instance.get_physical_device_queue_family_properties(*device);
-            
-            for (i, queue_family) in queue_families.iter().enumerate() {
-                if !queue_family.queue_flags.contains(vk::QueueFlags::GRAPHICS) {
-                    continue;
-                }
-                
-                let supported = surface_loader.get_physical_device_surface_support(
-                    *device,
-                    i as u32,
-                    surface,
-                ).map_err(|e| format!("Failed to check surface support: {}", e))?;
-                
-                if supported {
-                    return Ok((*device, i as u32));
-                }
-            }
-        }
-        
-        Err("No suitable physical device found".to_string())
-    }
-    
     unsafe fn create_shader_module(device: &ash::Device, code: &[u8]) -> Result<vk::ShaderModule, String> {
         let spirv: Vec<u32> = code.chunks_exact(4)
             .map(|chunk| u32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]))
@@ -515,12 +463,6 @@ impl VulkanRenderer {
     
     pub fn draw_frame(&mut self) -> Result<bool, String> {
         unsafe {
-            self.glfw.poll_events();
-            
-            if self.window.should_close() {
-                return Ok(false);
-            }
-            
             self.device.wait_for_fences(&[self.in_flight_fences[self.current_frame]], true, u64::MAX)
                 .map_err(|e| format!("Failed to wait for fence: {}", e))?;
             
@@ -569,7 +511,7 @@ impl VulkanRenderer {
     }
 }
 
-impl Drop for VulkanRenderer {
+impl Drop for TriangleDemo {
     fn drop(&mut self) {
         unsafe {
             self.device.device_wait_idle().ok();

@@ -7,8 +7,8 @@ use glfw::Context;
 
 pub struct GLFWPlatform {
     glfw: Option<glfw::Glfw>,
-    window: Option<glfw::Window>,
-    event_receiver: Option<std::sync::mpsc::Receiver<(f64, glfw::WindowEvent)>>,
+    window: Option<glfw::PWindow>,
+    event_receiver: Option<glfw::GlfwReceiver<(f64, glfw::WindowEvent)>>,
     event_callbacks: Arc<Mutex<Vec<EventCallback>>>,
     running: bool,
     last_mouse_x: f64,
@@ -41,7 +41,7 @@ impl Platform for GLFWPlatform {
     }
     
     fn init(&mut self) -> Result<(), String> {
-        let glfw = glfw::init::<()>(None)
+        let glfw = glfw::init(glfw::fail_on_errors)
             .map_err(|e| format!("GLFW init failed: {}", e))?;
         self.glfw = Some(glfw);
         self.running = true;
@@ -49,9 +49,7 @@ impl Platform for GLFWPlatform {
     }
     
     fn shutdown(&mut self) {
-        if let Some(window) = self.window.take() {
-            window.close();
-        }
+        self.window = None;
         self.glfw = None;
         self.running = false;
     }
@@ -80,9 +78,7 @@ impl Platform for GLFWPlatform {
     }
     
     fn destroy_window(&mut self, _window: &WindowHandle) {
-        if let Some(window) = self.window.take() {
-            window.close();
-        }
+        self.window = None;
     }
     
     fn get_window_handle(&self) -> Option<WindowHandle> {

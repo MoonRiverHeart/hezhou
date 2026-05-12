@@ -24,3 +24,7 @@ path = "src/vulkan_triangle_demo.rs"
 [[bin]]
 name = "vulkan_render_demo"
 path = "src/vulkan_render_demo.rs"
+
+[[bin]]
+name = "triangle_demo"
+path = "src/triangle_demo.rs"

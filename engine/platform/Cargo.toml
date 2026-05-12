@@ -12,7 +12,7 @@ hezhou-scripting = { path = "../scripting" }
 parking_lot = "0.12"
 
 [target.'cfg(not(target_os = "harmony"))'.dependencies]
-glfw = { version = "0.9", optional = true }
+glfw = { version = "0.62", optional = true, default-features = false, features = ["src-build", "vulkan", "raw-window-handle-v0-6", "native-handles"] }
 
 [features]
 default = ["glfw"]
