@@ -1,5 +1,6 @@
 using System;
 using System.Runtime.InteropServices;
+using System.Runtime.CompilerServices;
 
 namespace HezhouScripts
 {
@@ -17,6 +18,12 @@ namespace HezhouScripts
             NativeMethods.register_rotation_callback(CalculateRotationPtr);
             
             Console.WriteLine($"[C#] Initialized, rotation_speed = {_rotationSpeed}°/s");
+        }
+        
+        [UnmanagedCallersOnly(EntryPoint = "csharp_initialize")]
+        public static void ExportInitialize()
+        {
+            Initialize();
         }
         
         [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]

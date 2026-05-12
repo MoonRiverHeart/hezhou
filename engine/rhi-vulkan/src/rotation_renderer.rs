@@ -2,8 +2,8 @@ use ash::vk::{self, Handle};
 use ash::khr::surface::Instance as SurfaceLoader;
 use ash::khr::swapchain::Device as SwapchainLoader;
 use glfw::{Glfw, PWindow, GlfwReceiver, WindowEvent, WindowMode};
-use hezhou_scripting::{register_rotation_callback, trigger_rotation_callback};
 use std::ffi::CString;
+use libloading::Library;
 
 pub struct RotationRenderer {
     glfw: Glfw,
@@ -34,6 +34,8 @@ pub struct RotationRenderer {
     swapchain_loader: SwapchainLoader,
     last_time: f64,
     use_scripting: bool,
+    _scripting_library: Library,
+    trigger_rotation_callback: extern "C" fn(f32) -> f32,
 }
 
 impl RotationRenderer {
@@ -417,7 +419,7 @@ impl RotationRenderer {
                 })
                 .collect::<Result<Vec<_>, _>>()?;
             
-            Self::register_mock_csharp_callback();
+            let (scripting_library, trigger_rotation_callback) = Self::load_and_init_csharp()?;
             
             Ok(Self {
                 glfw,
@@ -448,20 +450,54 @@ impl RotationRenderer {
                 swapchain_loader,
                 last_time: 0.0,
                 use_scripting: true,
+                _scripting_library: scripting_library,
+                trigger_rotation_callback,
             })
         }
     }
     
-    unsafe fn register_mock_csharp_callback() {
-        extern "C" fn csharp_calculate_rotation(delta_time: f32) -> f32 {
-            static ROTATION_SPEED: f32 = 90.0;
-            let angle_increment = ROTATION_SPEED * delta_time;
-            println!("    [Mock C#] Thunk called: dt={:.4}s -> increment={:.2}°", delta_time, angle_increment);
-            angle_increment
-        }
+    unsafe fn load_and_init_csharp() -> Result<(Library, extern "C" fn(f32) -> f32), String> {
+        println!("[Rust] Loading scripting DLL...");
         
-        register_rotation_callback(csharp_calculate_rotation);
-        println!("    [Rust] Registered mock C# thunk (function pointer)");
+        let scripting_dll_path = std::env::current_dir()
+            .map(|p| p.join("target/release/hezhou_scripting.dll"))
+            .map_err(|e| format!("Failed to get current dir: {}", e))?;
+        
+        println!("[Rust] Scripting DLL path: {}", scripting_dll_path.display());
+        
+        let scripting_library = Library::new(&scripting_dll_path)
+            .map_err(|e| format!("Failed to load scripting DLL: {}", e))?;
+        
+        println!("[Rust] Scripting DLL loaded!");
+        
+        let trigger_rotation_callback: extern "C" fn(f32) -> f32 = *scripting_library
+            .get(b"trigger_rotation_callback")
+            .map_err(|e| format!("Failed to get trigger_rotation_callback: {}", e))?;
+        
+        println!("[Rust] Got trigger_rotation_callback function pointer");
+        
+        println!("[Rust] Loading C# NativeAOT DLL...");
+        
+        let csharp_dll_path = std::env::current_dir()
+            .map(|p| p.join("scripts/bin/Release/net8.0/win-x64/native/RotationScript.dll"))
+            .map_err(|e| format!("Failed to get current dir: {}", e))?;
+        
+        println!("[Rust] C# DLL path: {}", csharp_dll_path.display());
+        
+        let csharp_library = Library::new(&csharp_dll_path)
+            .map_err(|e| format!("Failed to load C# DLL: {}", e))?;
+        
+        println!("[Rust] C# DLL loaded!");
+        
+        let csharp_initialize: extern "C" fn() = *csharp_library
+            .get(b"csharp_initialize")
+            .map_err(|e| format!("Failed to get csharp_initialize: {}", e))?;
+        
+        println!("[Rust] Calling csharp_initialize()...");
+        csharp_initialize();
+        println!("[Rust] C# initialization complete!");
+        
+        Ok((scripting_library, trigger_rotation_callback))
     }
     
     unsafe fn select_physical_device(
@@ -522,7 +558,7 @@ impl RotationRenderer {
             self.last_time = current_time;
             
             // 调用脚本 callback 计算旋转角度（模拟 C# 代码）
-            let angle_increment = trigger_rotation_callback(delta_time as f32);
+            let angle_increment = (self.trigger_rotation_callback)(delta_time as f32);
             *current_angle += angle_increment;
             
             if *current_angle >= 360.0 {
