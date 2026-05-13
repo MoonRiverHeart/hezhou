@@ -14,6 +14,9 @@ pub enum ScriptError {
     AsyncTimeout,
     InvalidArgument,
     NotInitialized,
+    LoadFailed(String),
+    SymbolNotFound(String),
+    UnsupportedOperation(String),
 }
 
 impl fmt::Display for ScriptError {
@@ -31,6 +34,9 @@ impl fmt::Display for ScriptError {
             Self::AsyncTimeout => write!(f, "Async operation timeout"),
             Self::InvalidArgument => write!(f, "Invalid argument"),
             Self::NotInitialized => write!(f, "ScriptManager not initialized"),
+            Self::LoadFailed(msg) => write!(f, "Load failed: {}", msg),
+            Self::SymbolNotFound(msg) => write!(f, "Symbol not found: {}", msg),
+            Self::UnsupportedOperation(msg) => write!(f, "Unsupported operation: {}", msg),
         }
     }
 }
