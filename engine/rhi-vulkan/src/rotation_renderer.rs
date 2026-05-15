@@ -39,7 +39,6 @@ pub struct RotationRenderer {
     set_rotation_speed: extern "C" fn(f32),
     get_rotation_speed: extern "C" fn() -> f32,
     reset_rotation: extern "C" fn(),
-    dll_version: u64,
     r_key_pressed: bool,
 }
 
@@ -459,10 +458,9 @@ impl RotationRenderer {
                 trigger_rotation_callback,
                 set_rotation_speed,
                 get_rotation_speed,
-                reset_rotation,
-                dll_version: 0,
-                r_key_pressed: false,
-            })
+reset_rotation,
+    r_key_pressed: false,
+})
         }
     }
     
@@ -489,7 +487,7 @@ impl RotationRenderer {
         println!("[Rust] Loading C# NativeAOT DLL...");
         
         let csharp_dll_path = std::env::current_dir()
-            .map(|p| p.join("scripts/bin/Release/net8.0/win-x64/native/RotationScript.dll"))
+            .map(|p| p.join("scripts/bin/v0/RotationScript.dll"))
             .map_err(|e| format!("Failed to get current dir: {}", e))?;
         
         println!("[Rust] C# DLL path: {}", csharp_dll_path.display());
@@ -522,16 +520,22 @@ impl RotationRenderer {
         Ok((scripting_library, csharp_library, trigger_rotation_callback, set_rotation_speed, get_rotation_speed, reset_rotation))
     }
     
-    fn recompile_csharp(version: u64) -> Result<std::path::PathBuf, String> {
-        println!("[HotReload] Recompiling C# DLL (version {})...", version);
+    fn recompile_csharp() -> Result<std::path::PathBuf, String> {
+        use std::time::{SystemTime, UNIX_EPOCH};
         
-        let scripts_dir = std::env::current_dir()
-            .map(|p| p.join("scripts"))
-            .map_err(|e| format!("Failed to get scripts dir: {}", e))?;
+        let timestamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map_err(|e| format!("Failed to get timestamp: {}", e))?
+            .as_millis();
         
-        let output_dir = scripts_dir.join("bin").join(format!("v{}", version));
-        std::fs::create_dir_all(&output_dir)
-            .map_err(|e| format!("Failed to create output dir: {}", e))?;
+        println!("[HotReload] Recompiling (timestamp {})...", timestamp);
+        
+        let current_dir = std::env::current_dir()
+            .map_err(|e| format!("Failed to get current dir: {}", e))?;
+        
+        let scripts_dir = current_dir.join("scripts");
+        
+        let output_dir = scripts_dir.join("bin").join(format!("tmp_{}", timestamp));
         
         let output = std::process::Command::new("dotnet")
             .arg("publish")
@@ -545,28 +549,37 @@ impl RotationRenderer {
             .arg(&output_dir)
             .current_dir(&scripts_dir)
             .output()
-            .map_err(|e| format!("Failed to run dotnet publish: {}", e))?;
+            .map_err(|e| format!("Failed to run dotnet: {}", e))?;
         
         if !output.status.success() {
-            let stderr = String::from_utf8_lossy(&output.stderr);
-            return Err(format!("dotnet publish failed: {}", stderr));
+            return Err(format!("dotnet failed"));
         }
         
-        let dll_path = output_dir.join("RotationScript.dll");
-        println!("[HotReload] Compiled: {}", dll_path.display());
-        
-        Ok(dll_path)
+        Ok(output_dir)
     }
     
     unsafe fn reload_csharp_dll(&mut self) -> Result<(), String> {
-        self.dll_version += 1;
+        println!("[HotReload] R key pressed, recompiling...");
         
-        let dll_path = Self::recompile_csharp(self.dll_version)?;
+        let output_dir = Self::recompile_csharp()?;
         
+        let dll_path = output_dir.join("RotationScript.dll");
         println!("[HotReload] Loading new DLL: {}", dll_path.display());
         
+        let scripting_dll_path = std::env::current_dir()
+            .map_err(|e| format!("Failed to get current dir: {}", e))?
+            .join("target/release/hezhou_scripting.dll");
+        
+        std::fs::copy(&scripting_dll_path, output_dir.join("hezhou_scripting.dll"))
+            .map_err(|e| format!("Failed to copy hezhou_scripting.dll: {}", e))?;
+        println!("[HotReload] Copied hezhou_scripting.dll");
+        
+        if !dll_path.exists() {
+            return Err(format!("DLL file does not exist: {}", dll_path.display()));
+        }
+        
         let library = Library::new(&dll_path)
-            .map_err(|e| format!("Failed to load new DLL: {}", e))?;
+            .map_err(|e| format!("Failed to load new DLL {} ({}): {}", dll_path.display(), std::fs::metadata(&dll_path).map(|m| m.len()).unwrap_or(0), e))?;
         
         let csharp_initialize: extern "C" fn() = *library
             .get(b"csharp_initialize")
