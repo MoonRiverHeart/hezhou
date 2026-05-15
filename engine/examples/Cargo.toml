@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-hezhou-scripting = { path = "../scripting" }
+hezhou-scripting = { path = "../scripting", features = ["mono"] }
 hezhou-core = { path = "../core" }
 hezhou-platform = { path = "../platform", features = ["glfw"] }
 hezhou-rhi-vulkan = { path = "../rhi-vulkan" }
@@ -32,3 +32,7 @@ path = "src/triangle_demo.rs"
 [[bin]]
 name = "rotation_demo"
 path = "src/rotation_demo.rs"
+
+[[bin]]
+name = "mono_rotation_demo"
+path = "src/mono_rotation_demo.rs"

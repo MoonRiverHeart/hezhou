@@ -4,9 +4,8 @@
     <ImplicitUsings>disable</ImplicitUsings>
     <Nullable>disable</Nullable>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-    <PublishAot>true</PublishAot>
-    <OptimizationPreference>Speed</OptimizationPreference>
-    <NativeLib>Shared</NativeLib>
-    <DefineConstants>NATIVEAOT</DefineConstants>
+    <OutputType>Library</OutputType>
+    <DefineConstants>MONO</DefineConstants>
+    <BaseOutputPath>bin/Mono</BaseOutputPath>
   </PropertyGroup>
 </Project>

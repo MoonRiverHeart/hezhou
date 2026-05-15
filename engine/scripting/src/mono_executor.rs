@@ -5,7 +5,7 @@ use crate::script_manager::ScriptManager;
 
 pub struct MonoExecutor {
     manager: ScriptManager,
-    assembly_name: String,
+    pub assembly_name: String,
     dll_path: String,
     namespace: String,
     class_name: String,
@@ -46,12 +46,19 @@ impl ScriptExecutor for MonoExecutor {
             _ => (0, 0),
         };
         
+        let param_count = match method {
+            "GetRotationSpeed" | "GetCurrentAngle" => 0,
+            "UpdateRotation" | "SetRotationSpeed" => 1,
+            _ => 1,
+        };
+        
         self.manager.execute(
             &self.assembly_name,
             &self.namespace,
             &self.class_name,
             method,
             (arg1, arg2),
+            param_count,
         )
     }
     

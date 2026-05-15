@@ -63,6 +63,7 @@ impl ScriptManager {
         class_name: &str,
         method_name: &str,
         args: (i32, i32),
+        param_count: i32,
     ) -> ScriptResult<ScriptValue> {
         let assembly = self.assemblies.get(assembly_name)
             .ok_or_else(|| ScriptError::AssemblyNotFound(assembly_name.to_string()))?;
@@ -71,7 +72,7 @@ impl ScriptManager {
         let class = Class::from_name(&image, namespace, class_name)
             .ok_or_else(|| ScriptError::ClassNotFound(format!("{}.{}", namespace, class_name)))?;
         
-        let method = Method::get_from_name(&class, method_name, 2)
+        let method = Method::get_from_name(&class, method_name, param_count)
             .ok_or_else(|| ScriptError::MethodNotFound(method_name.to_string()))?;
         
         let result = method.invoke(None, args)
