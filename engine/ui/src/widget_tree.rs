@@ -12,19 +12,12 @@ pub struct WidgetTree {
 
 struct WidgetNode {
     widget: Box<dyn Widget>,
-    flags: WidgetFlags,
+    flags: crate::widget::WidgetFlags,
     render_data: Option<RenderData>,
 }
 
 #[repr(C)]
-pub struct WidgetFlags {
-    dirty_layout: bool,
-    dirty_style: bool,
-    dirty_render: bool,
-    dirty_children: bool,
-}
-
-#[repr(C)]
+#[derive(Clone)]
 pub struct RenderData {
     draw_commands: Vec<crate::canvas::DrawCommand>,
     bounds: Rect,
@@ -46,7 +39,7 @@ impl WidgetTree {
         self.root = Some(id);
         self.nodes.insert(id, WidgetNode {
             widget,
-            flags: WidgetFlags::default(),
+            flags: crate::widget::WidgetFlags::default(),
             render_data: None,
         });
         self.children_map.insert(id, Vec::new());
@@ -57,7 +50,7 @@ impl WidgetTree {
         
         self.nodes.insert(id, WidgetNode {
             widget,
-            flags: WidgetFlags::default(),
+            flags: crate::widget::WidgetFlags::default(),
             render_data: None,
         });
         
@@ -192,26 +185,5 @@ impl WidgetTree {
 impl Default for WidgetTree {
     fn default() -> Self {
         Self::new()
-    }
-}
-
-impl Clone for RenderData {
-    fn clone(&self) -> Self {
-        Self {
-            draw_commands: self.draw_commands.clone(),
-            bounds: self.bounds,
-            z_index: self.z_index,
-        }
-    }
-}
-
-impl Default for WidgetFlags {
-    fn default() -> Self {
-        Self {
-            dirty_layout: true,
-            dirty_style: false,
-            dirty_render: true,
-            dirty_children: false,
-        }
     }
 }

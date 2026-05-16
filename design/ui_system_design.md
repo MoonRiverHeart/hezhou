@@ -493,7 +493,432 @@ pub fn find_descendants(tree: &WidgetTree, id: WidgetId) -> Vec<WidgetId>;
 
 ---
 
-## 5. 事件系统
+## 5. 布局系统详细设计
+
+### 5.1 布局引擎架构
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  LayoutEngine                                                    │
+│  ┌─────────────────────────────────────────────────────────────┐│
+│  │  Input: WidgetTree + Parent Layout                          ││
+│  │                                                              ││
+│  │  Layout Strategies:                                         ││
+│  │    ├─ AbsoluteLayout (固定位置)                              ││
+│  │    ├─ FlexLayout (弹性布局)                                  ││
+│  │    ├─ GridLayout (网格布局)                                  ││
+│  │    └─ StackLayout (堆叠布局)                                 ││
+│  │                                                              ││
+│  │  Layout Process:                                             ││
+│  │    1. Measure Phase: 计算控件期望尺寸                        ││
+│  │       └─ 递归遍历子控件                                       ││
+│  │       ─ 紧凑内容尺寸 vs 显式尺寸                              ││
+│  │                                                              ││
+│  │    2. Layout Phase: 分配实际位置和尺寸                       ││
+│  │       ─ 应用父控件约束                                        ││
+│  │       ─ 计算子控件位置                                        ││
+│  │       ─ 处理对齐和边距                                        ││
+│  │                                                              ││
+│  │  Output: Updated Layout for each Widget                     ││
+│  │    ├─ x, y (绝对坐标)                                        ││
+│  │    ├─ width, height (实际尺寸)                               ││
+│  │    └─ dirty_layout = false                                  ││
+│  └─────────────────────────────────────────────────────────────┘│
+│                          ↓                                       │
+│  Constraints System                                              │
+│  ┌─────────────────────────────────────────────────────────────┐│
+│  │  min_width, max_width                                        ││
+│  │  min_height, max_height                                      ││
+│  │  preferred_width, preferred_height                           ││
+│  │  aspect_ratio (可选)                                         ││
+│  └─────────────────────────────────────────────────────────────┘│
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### 5.2 Flex布局算法（类似CSS Flexbox）
+
+```rust
+// ui/src/layout_engine.rs
+
+pub struct FlexLayoutEngine;
+
+impl FlexLayoutEngine {
+    pub fn layout(container: &Layout, children: &[WidgetId], tree: &mut WidgetTree) {
+        let direction = container.flex_direction;
+        let main_axis = Self::get_main_axis(direction);
+        let cross_axis = Self::get_cross_axis(direction);
+        
+        // Phase 1: Measure all children
+        let child_sizes: Vec<Size> = children.iter()
+            .map(|id| Self::measure_child(*id, tree))
+            .collect();
+        
+        // Phase 2: Calculate total main size
+        let total_main_size = child_sizes.iter()
+            .map(|s| Self::get_size_axis(s, main_axis))
+            .sum::<f32>() + container.gap * (children.len() - 1) as f32;
+        
+        // Phase 3: Distribute available space (justify)
+        let available_main = Self::get_size_axis(&container.size(), main_axis);
+        let extra_space = available_main - total_main_size;
+        
+        let positions = Self::distribute_positions(
+            children.len(),
+            container.justify,
+            child_sizes,
+            main_axis,
+            extra_space,
+            container.gap,
+        );
+        
+        // Phase 4: Align items on cross axis
+        let cross_size = Self::get_size_axis(&container.size(), cross_axis);
+        
+        for (i, child_id) in children.iter().enumerate() {
+            let child_layout = tree.get_widget_mut(*child_id).unwrap();
+            
+            // Set position
+            let x = if main_axis == Axis::X {
+                positions[i]
+            } else {
+                Self::align_cross_axis(
+                    child_sizes[i],
+                    cross_size,
+                    container.align,
+                    cross_axis,
+                )
+            };
+            
+            let y = if main_axis == Axis::Y {
+                positions[i]
+            } else {
+                Self::align_cross_axis(
+                    child_sizes[i],
+                    cross_size,
+                    container.align,
+                    cross_axis,
+                )
+            };
+            
+            child_layout.set_layout(Layout::new(x, y, child_sizes[i].width, child_sizes[i].height));
+        }
+    }
+    
+    fn measure_child(id: WidgetId, tree: &mut WidgetTree) -> Size {
+        let widget = tree.get_widget(id).unwrap();
+        let layout = widget.layout();
+        
+        // 如果有显式尺寸，直接使用
+        if layout.width > 0.0 && layout.height > 0.0 {
+            return layout.size();
+        }
+        
+        // 否则计算紧凑尺寸（基于内容）
+        let children = tree.get_children(id).to_vec();
+        if children.is_empty() {
+            // 叶子节点：返回最小尺寸
+            Size::new(10.0, 10.0) // 默认最小尺寸
+        } else {
+            // 容器节点：递归计算子控件尺寸
+            Self::measure_container(id, &children, tree)
+        }
+    }
+    
+    fn measure_container(id: WidgetId, children: &[WidgetId], tree: &mut WidgetTree) -> Size {
+        // 递归布局子控件
+        let child_sizes: Vec<Size> = children.iter()
+            .map(|child| Self::measure_child(*child, tree))
+            .collect();
+        
+        // 根据布局方向计算总尺寸
+        let widget = tree.get_widget(id).unwrap();
+        match widget.layout().layout_type {
+            LayoutType::Flex => {
+                let flex = widget.layout().flex_layout;
+                let main_size = child_sizes.iter()
+                    .map(|s| Self::get_size_axis(s, Self::get_main_axis(flex.direction)))
+                    .sum::<f32>();
+                
+                let cross_size = child_sizes.iter()
+                    .map(|s| Self::get_size_axis(s, Self::get_cross_axis(flex.direction)))
+                    .max()
+                    .unwrap_or(0.0);
+                
+                Size::new(main_size, cross_size)
+            }
+            _ => Size::new(100.0, 100.0)
+        }
+    }
+    
+    fn distribute_positions(
+        count: usize,
+        justify: FlexJustify,
+        sizes: Vec<Size>,
+        axis: Axis,
+        extra: f32,
+        gap: f32,
+    ) -> Vec<f32> {
+        let mut positions = Vec::with_capacity(count);
+        
+        match justify {
+            FlexJustify::Start => {
+                let mut pos = 0.0;
+                for (i, size) in sizes.iter().enumerate() {
+                    positions.push(pos);
+                    pos += Self::get_size_axis(size, axis) + gap;
+                }
+            }
+            
+            FlexJustify::Center => {
+                let start_offset = extra / 2.0;
+                let mut pos = start_offset;
+                for size in &sizes {
+                    positions.push(pos);
+                    pos += Self::get_size_axis(size, axis) + gap;
+                }
+            }
+            
+            FlexJustify::End => {
+                let mut pos = extra;
+                for size in &sizes {
+                    positions.push(pos);
+                    pos += Self::get_size_axis(size, axis) + gap;
+                }
+            }
+            
+            FlexJustify::SpaceBetween => {
+                let space_between = if count > 1 {
+                    extra / (count - 1) as f32
+                } else {
+                    0.0
+                };
+                
+                let mut pos = 0.0;
+                for (i, size) in sizes.iter().enumerate() {
+                    positions.push(pos);
+                    pos += Self::get_size_axis(size, axis);
+                    if i < count - 1 {
+                        pos += space_between + gap;
+                    }
+                }
+            }
+            
+            FlexJustify::SpaceAround => {
+                let space = extra / count as f32;
+                let mut pos = space / 2.0;
+                for size in &sizes {
+                    positions.push(pos);
+                    pos += Self::get_size_axis(size, axis) + space + gap;
+                }
+            }
+            
+            FlexJustify::SpaceEvenly => {
+                let space = extra / (count + 1) as f32;
+                let mut pos = space;
+                for size in &sizes {
+                    positions.push(pos);
+                    pos += Self::get_size_axis(size, axis) + space + gap;
+                }
+            }
+        }
+        
+        positions
+    }
+}
+
+enum Axis { X, Y }
+```
+
+### 5.3 Grid布局算法
+
+```rust
+pub struct GridLayoutEngine;
+
+impl GridLayoutEngine {
+    pub fn layout(container: &Layout, children: &[WidgetId], tree: &mut WidgetTree) {
+        let grid = container.grid_layout;
+        let cols = grid.columns as usize;
+        let rows = grid.rows as usize;
+        
+        let cell_width = (container.width - (cols - 1) as f32 * grid.column_gap) / cols as f32;
+        let cell_height = (container.height - (rows - 1) as f32 * grid.row_gap) / rows as f32;
+        
+        for (i, child_id) in children.iter().enumerate() {
+            let col = i % cols;
+            let row = i / cols;
+            
+            let x = col as f32 * (cell_width + grid.column_gap);
+            let y = row as f32 * (cell_height + grid.row_gap);
+            
+            let child_layout = tree.get_widget_mut(*child_id).unwrap();
+            child_layout.set_layout(Layout::new(x, y, cell_width, cell_height));
+        }
+    }
+}
+```
+
+### 5.4 布局约束系统
+
+```rust
+#[repr(C)]
+pub struct LayoutConstraints {
+    pub min_width: Option<f32>,
+    pub max_width: Option<f32>,
+    pub min_height: Option<f32>,
+    pub max_height: Option<f32>,
+    pub preferred_width: f32,
+    pub preferred_height: f32,
+    pub aspect_ratio: Option<f32>,
+}
+
+impl LayoutConstraints {
+    pub fn clamp_size(&self, size: Size) -> Size {
+        let width = size.width.clamp(
+            self.min_width.unwrap_or(0.0),
+            self.max_width.unwrap_or(f32::MAX),
+        );
+        
+        let height = size.height.clamp(
+            self.min_height.unwrap_or(0.0),
+            self.max_height.unwrap_or(f32::MAX),
+        );
+        
+        // 应用 aspect_ratio
+        if let Some(ratio) = self.aspect_ratio {
+            let current_ratio = width / height;
+            if current_ratio > ratio {
+                Size::new(width, width / ratio)
+            } else {
+                Size::new(height * ratio, height)
+            }
+        } else {
+            Size::new(width, height)
+        }
+    }
+    
+    pub fn unconstrained() -> Self {
+        Self {
+            min_width: None,
+            max_width: None,
+            min_height: None,
+            max_height: None,
+            preferred_width: 0.0,
+            preferred_height: 0.0,
+            aspect_ratio: None,
+        }
+    }
+    
+    pub fn fixed(width: f32, height: f32) -> Self {
+        Self {
+            min_width: Some(width),
+            max_width: Some(width),
+            min_height: Some(height),
+            max_height: Some(height),
+            preferred_width: width,
+            preferred_height: height,
+            aspect_ratio: None,
+        }
+    }
+}
+```
+
+### 5.5 布局性能优化
+
+```rust
+pub struct LayoutOptimizer {
+    dirty_widgets: HashSet<WidgetId>,
+    dfx: Arc<Mutex<DfxSystem>>,
+}
+
+impl LayoutOptimizer {
+    pub fn mark_dirty(&mut self, id: WidgetId) {
+        self.dirty_widgets.insert(id);
+        
+        // 标记所有祖先为 dirty
+        let tree = self.widget_tree.lock();
+        let ancestors = tree.find_ancestors(id);
+        for ancestor in ancestors {
+            self.dirty_widgets.insert(ancestor);
+        }
+    }
+    
+    pub fn update_layout(&mut self, tree: &mut WidgetTree) {
+        let _trace = ScopedTrace::new("ui_layout_update");
+        
+        // 只更新 dirty 的控件
+        for id in &self.dirty_widgets {
+            Self::layout_widget(*id, tree);
+        }
+        
+        self.dirty_widgets.clear();
+        
+        self.dfx.lock().get_perf_monitor().lock().record_counter(
+            "ui_layout_updates",
+            self.dirty_widgets.len() as f32
+        );
+    }
+    
+    fn layout_widget(id: WidgetId, tree: &mut WidgetTree) {
+        let widget = tree.get_widget(id).unwrap();
+        let layout_type = widget.layout().layout_type;
+        
+        let children = tree.get_children(id).to_vec();
+        
+        match layout_type {
+            LayoutType::Flex => FlexLayoutEngine::layout(widget.layout(), &children, tree),
+            LayoutType::Grid => GridLayoutEngine::layout(widget.layout(), &children, tree),
+            LayoutType::Stack => StackLayoutEngine::layout(widget.layout(), &children, tree),
+            LayoutType::Absolute => {} // 子控件自己决定位置
+        }
+    }
+}
+```
+
+### 5.6 响应式布局支持
+
+```rust
+#[repr(C)]
+pub struct ResponsiveLayout {
+    breakpoints: Vec<Breakpoint>,
+}
+
+#[repr(C)]
+pub struct Breakpoint {
+    pub min_width: f32,
+    pub layout_config: LayoutConfig,
+}
+
+#[repr(C)]
+pub struct LayoutConfig {
+    pub columns: u32,
+    pub direction: FlexDirection,
+    pub gap: f32,
+}
+
+impl ResponsiveLayout {
+    pub fn get_layout_for_width(&self, width: f32) -> &LayoutConfig {
+        self.breakpoints.iter()
+            .filter(|bp| width >= bp.min_width)
+            .last()
+            .map(|bp| &bp.layout_config)
+            .unwrap_or(&self.breakpoints[0].layout_config)
+    }
+}
+
+// 预定义断点（类似CSS媒体查询）
+pub fn default_breakpoints() -> Vec<Breakpoint> {
+    vec![
+        Breakpoint { min_width: 0.0, layout_config: LayoutConfig { columns: 1, direction: FlexDirection::Column, gap: 8.0 } },
+        Breakpoint { min_width: 600.0, layout_config: LayoutConfig { columns: 2, direction: FlexDirection::Row, gap: 16.0 } },
+        Breakpoint { min_width: 900.0, layout_config: LayoutConfig { columns: 3, direction: FlexDirection::Row, gap: 24.0 } },
+        Breakpoint { min_width: 1200.0, layout_config: LayoutConfig { columns: 4, direction: FlexDirection::Row, gap: 32.0 } },
+    ]
+}
+```
+
+---
+
+## 6. 事件系统
 
 ### 5.1 事件分发流程
 

@@ -70,7 +70,7 @@ impl Canvas {
     pub fn draw_shadow(&mut self, bounds: Rect, shadow: &Shadow) {
         self.commands.push(DrawCommand::Shadow {
             bounds,
-            shadow: shadow.clone(),
+            shadow: *shadow,
         });
     }
     
