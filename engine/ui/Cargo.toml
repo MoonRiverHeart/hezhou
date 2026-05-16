@@ -13,6 +13,10 @@ uuid = { version = "1.10", features = ["v4", "serde"] }
 [lib]
 crate-type = ["cdylib", "rlib"]
 
+[[example]]
+name = "ui_demo"
+path = "examples/ui_demo.rs"
+
 [features]
 default = []
 debug_visualization = []

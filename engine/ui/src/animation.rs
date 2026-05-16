@@ -2,7 +2,7 @@ use crate::types::*;
 use crate::widget::*;
 
 #[repr(C)]
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy)]
 pub enum AnimationCurve {
     Linear,
     EaseIn,

@@ -114,6 +114,7 @@ impl Default for Canvas {
 }
 
 #[repr(C)]
+#[derive(Clone)]
 pub enum DrawCommand {
     Rect {
         bounds: Point,

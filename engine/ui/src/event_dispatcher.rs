@@ -26,11 +26,9 @@ impl EventDispatcher {
     }
     
     pub fn dispatch_event(&mut self, event: &mut Event) {
-        let _trace = ScopedTrace::new("ui_event_dispatch");
-        
         if let EventData::Touch(touch) = &event.data {
             let target = self.widget_tree.lock().hit_test(Point::new(touch.x, touch.y));
-            event.target = target;
+            event.target = target.unwrap_or(WidgetId::invalid());
         }
         
         let path = self.widget_tree.lock().find_path(event.target);
@@ -43,12 +41,8 @@ impl EventDispatcher {
         
         self.gesture_recognizer.lock().process_event(event);
         
-        self.dfx.lock().get_logger().lock().log(
-            LogLevel::Debug,
-            "EventDispatcher",
-            &format!("Event dispatched: type={}, target={}, stopped={}", 
-                event.event_type, event.target.id, event.stopped)
-        );
+        println!("[EventDispatcher] Event: type={}, target={}, stopped={}", 
+            event.event_type, event.target.id, event.stopped);
     }
     
     fn dispatch_capturing(&mut self, path: &[WidgetId], event: &mut Event) {
@@ -57,7 +51,7 @@ impl EventDispatcher {
             
             let mut tree = self.widget_tree.lock();
             if let Some(widget) = tree.get_widget_mut(*widget_id) {
-                let result = widget.on_event(event);
+                let result = widget.as_mut().on_event(event);
                 match result {
                     EventResult::ImmediateStop => {
                         event.immediate_stopped = true;
@@ -74,7 +68,7 @@ impl EventDispatcher {
             
             let mut tree = self.widget_tree.lock();
             if let Some(widget) = tree.get_widget_mut(*widget_id) {
-                let result = widget.on_event(event);
+                let result = widget.as_mut().on_event(event);
                 match result {
                     EventResult::Stopped => {
                         event.stopped = true;

@@ -10,6 +10,7 @@ pub mod widget_tree;
 pub mod event_dispatcher;
 pub mod gesture_recognizer;
 pub mod animation_engine;
+pub mod widgets;
 
 pub use types::*;
 pub use widget::*;
@@ -23,6 +24,7 @@ pub use widget_tree::*;
 pub use event_dispatcher::*;
 pub use gesture_recognizer::*;
 pub use animation_engine::*;
+pub use widgets::*;
 
 use hezhou_dfx::*;
 use parking_lot::Mutex;
@@ -50,8 +52,6 @@ impl UISystem {
     }
     
     pub fn update(&mut self, delta_time: f32) {
-        let _trace = ScopedTrace::new("ui_system_update");
-        
         self.animation_engine.lock().update(delta_time);
         self.widget_tree.lock().update_layout();
     }

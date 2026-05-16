@@ -4,7 +4,7 @@ use crate::canvas::*;
 use std::collections::HashMap;
 
 pub struct WidgetTree {
-    root: Option<WidgetId>,
+    pub root: Option<WidgetId>,
     nodes: HashMap<WidgetId, WidgetNode>,
     parent_map: HashMap<WidgetId, WidgetId>,
     children_map: HashMap<WidgetId, Vec<WidgetId>>,
@@ -19,9 +19,9 @@ struct WidgetNode {
 #[repr(C)]
 #[derive(Clone)]
 pub struct RenderData {
-    draw_commands: Vec<crate::canvas::DrawCommand>,
-    bounds: Rect,
-    z_index: i32,
+    pub draw_commands: Vec<crate::canvas::DrawCommand>,
+    pub bounds: Rect,
+    pub z_index: i32,
 }
 
 impl WidgetTree {
@@ -86,8 +86,8 @@ impl WidgetTree {
         self.nodes.get(&id).map(|node| node.widget.as_ref())
     }
     
-    pub fn get_widget_mut(&mut self, id: WidgetId) -> Option<&mut dyn Widget> {
-        self.nodes.get_mut(&id).map(|node| node.widget.as_mut())
+    pub fn get_widget_mut(&mut self, id: WidgetId) -> Option<&mut Box<dyn Widget>> {
+        self.nodes.get_mut(&id).map(|node| &mut node.widget)
     }
     
     pub fn get_children(&self, id: WidgetId) -> &[WidgetId] {
@@ -104,7 +104,7 @@ impl WidgetTree {
     
     fn hit_test_recursive(&self, id: WidgetId, point: Point) -> Option<WidgetId> {
         if let Some(node) = self.nodes.get(&id) {
-            if node.widget.hit_test(point) {
+            if node.widget.as_ref().hit_test(point) {
                 for child in self.get_children(id) {
                     if let Some(hit) = self.hit_test_recursive(*child, point) {
                         return Some(hit);
@@ -161,13 +161,13 @@ impl WidgetTree {
     
     fn generate_render_data_recursive(&mut self, id: WidgetId, render_data: &mut Vec<RenderData>) {
         if let Some(node) = self.nodes.get_mut(&id) {
-            if node.widget.state() != WidgetState::Disabled {
+            if node.widget.as_ref().state() != WidgetState::Disabled {
                 let mut canvas = Canvas::new();
-                node.widget.draw(&mut canvas);
+                node.widget.as_mut().draw(&mut canvas);
                 
                 render_data.push(RenderData {
                     draw_commands: canvas.get_commands().to_vec(),
-                    bounds: node.widget.layout().bounds(),
+                    bounds: node.widget.as_ref().layout().bounds(),
                     z_index: 0,
                 });
                 

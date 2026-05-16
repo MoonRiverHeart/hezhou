@@ -1,4 +1,5 @@
 use crate::types::*;
+use std::fmt;
 
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -23,6 +24,28 @@ pub enum EventType {
     
     LayoutChanged,
     StyleChanged,
+}
+
+impl fmt::Display for EventType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            EventType::TouchBegin => write!(f, "TouchBegin"),
+            EventType::TouchMove => write!(f, "TouchMove"),
+            EventType::TouchEnd => write!(f, "TouchEnd"),
+            EventType::TouchCancel => write!(f, "TouchCancel"),
+            EventType::Click => write!(f, "Click"),
+            EventType::LongPress => write!(f, "LongPress"),
+            EventType::DoubleClick => write!(f, "DoubleClick"),
+            EventType::KeyDown => write!(f, "KeyDown"),
+            EventType::KeyUp => write!(f, "KeyUp"),
+            EventType::MouseEnter => write!(f, "MouseEnter"),
+            EventType::MouseLeave => write!(f, "MouseLeave"),
+            EventType::FocusGain => write!(f, "FocusGain"),
+            EventType::FocusLost => write!(f, "FocusLost"),
+            EventType::LayoutChanged => write!(f, "LayoutChanged"),
+            EventType::StyleChanged => write!(f, "StyleChanged"),
+        }
+    }
 }
 
 #[repr(C)]

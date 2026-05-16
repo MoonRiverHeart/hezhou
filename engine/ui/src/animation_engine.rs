@@ -36,23 +36,14 @@ impl AnimationEngine {
                 self.running_animations.push(id);
             }
             
-            self.dfx.lock().get_logger().lock().log(
-                LogLevel::Info,
-                "AnimationEngine",
-                &format!("Animation started: id={}, duration={}s", id.id, anim.duration)
-            );
+            println!("[AnimationEngine] Animation started: id={}, duration={}s", id.id, anim.duration);
         }
     }
     
     pub fn pause_animation(&mut self, id: AnimationId) {
         if let Some(anim) = self.animations.get_mut(&id) {
             anim.paused = true;
-            
-            self.dfx.lock().get_logger().lock().log(
-                LogLevel::Debug,
-                "AnimationEngine",
-                &format!("Animation paused: id={}", id.id)
-            );
+            println!("[AnimationEngine] Animation paused: id={}", id.id);
         }
     }
     
@@ -62,18 +53,11 @@ impl AnimationEngine {
             anim.paused = false;
             
             self.running_animations.retain(|running_id| *running_id != id);
-            
-            self.dfx.lock().get_logger().lock().log(
-                LogLevel::Debug,
-                "AnimationEngine",
-                &format!("Animation cancelled: id={}", id.id)
-            );
+            println!("[AnimationEngine] Animation cancelled: id={}", id.id);
         }
     }
     
     pub fn update(&mut self, delta_time: f32) {
-        let _trace = ScopedTrace::new("ui_animation_update");
-        
         for id in &self.running_animations {
             let anim = self.animations.get_mut(id).unwrap();
             
@@ -83,12 +67,8 @@ impl AnimationEngine {
             
             let current_value = anim.current_value();
             
-            self.dfx.lock().get_logger().lock().log(
-                LogLevel::Trace,
-                "AnimationEngine",
-                &format!("Animation {} updated: progress={}, value={}", id.id, 
-                    anim.elapsed_time / anim.duration, current_value)
-            );
+            println!("[AnimationEngine] Animation {} updated: progress={}, value={}", id.id, 
+                anim.elapsed_time / anim.duration, current_value);
             
             if anim.is_complete() {
                 if anim.repeat_count > 1 {
@@ -102,12 +82,7 @@ impl AnimationEngine {
                     }
                 } else {
                     anim.running = false;
-                    
-                    self.dfx.lock().get_logger().lock().log(
-                        LogLevel::Info,
-                        "AnimationEngine",
-                        &format!("Animation completed: id={}", id.id)
-                    );
+                    println!("[AnimationEngine] Animation completed: id={}", id.id);
                 }
             }
         }
@@ -115,11 +90,6 @@ impl AnimationEngine {
         self.running_animations.retain(|id| {
             self.animations.get(id).map(|a| a.running).unwrap_or(false)
         });
-        
-        self.dfx.lock().get_perf_monitor().lock().record_counter(
-            "ui_running_animations",
-            self.running_animations.len() as f32
-        );
     }
     
     pub fn get_animation_value(&self, id: AnimationId) -> Option<f32> {
