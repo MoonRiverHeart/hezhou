@@ -7,6 +7,7 @@ pub mod demo;
 pub mod triangle_demo;
 pub mod renderer;
 pub mod rotation_renderer;
+pub mod ui_renderer;
 
 #[cfg(feature = "mono")]
 pub mod mono_rotation_renderer;
@@ -16,6 +17,7 @@ pub use demo::VulkanDemo;
 pub use triangle_demo::TriangleDemo;
 pub use renderer::VulkanRenderer;
 pub use rotation_renderer::RotationRenderer;
+pub use ui_renderer::VulkanUIRenderer;
 
 #[cfg(feature = "mono")]
 pub use mono_rotation_renderer::MonoRotationRenderer;

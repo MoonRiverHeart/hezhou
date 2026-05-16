@@ -9,6 +9,7 @@ pub mod shader;
 pub mod pass;
 pub mod framebuffer;
 pub mod error;
+pub mod ui;
 
 pub use handle::*;
 pub use device::{Device, DeviceCapabilities};
@@ -21,5 +22,6 @@ pub use shader::{ShaderDesc, ShaderSource};
 pub use pass::{RenderPassDesc, AttachmentDesc, AttachmentLoadOp, AttachmentStoreOp, ImageLayout};
 pub use framebuffer::FramebufferDesc;
 pub use error::RhiError;
+pub use ui::{UIRenderTarget, UIDrawData, UIVertex, UIPipelineDesc, UIRenderer};
 
 pub type RhiResult<T> = Result<T, RhiError>;
