@@ -246,6 +246,165 @@ public static class RotationController {
 
 ---
 
+### 原生 DLL vs JIT DLL 技术对比
+
+| 维度 | 原生 DLL (NativeAOT) | JIT DLL (Mono/.NET) |
+|------|---------------------|---------------------|
+| **编译方式** | AOT 预编译为机器码 | 运行时 JIT 编译 |
+| **文件内容** | 原生 x86/x64 指令 | IL 中间语言 + 元数据 |
+| **运行时依赖** | 无（自包含） | 需 CLR/Mono 运行时 |
+| **启动时间** | 极快（直接执行） | 较慢（JIT 预热） |
+| **调用性能** | ~20ns（函数指针） | ~100μs（反射调用） |
+| **内存占用** | 小（无运行时） | 大（运行时 + JIT缓存） |
+| **跨平台** | 平台特定（需分别编译） | IL 跨平台（运行时适配） |
+| **热更新** | ❌ 不支持 | ✅ 支持 |
+| **调试能力** | 有限（无反射） | 强（完整反射） |
+| **文件大小** | 较大（包含所有依赖） | 较小（依赖运行时） |
+
+#### 核心区别
+
+**原生 DLL 编译与运行**：
+```
+编译时：C# 源码 → IL 中间语言 → Native 机器码 → .dll/.so 文件
+运行时：CPU 直接执行机器码，无需 CLR/Mono 运行时
+        Rust: libloading::Library → get("func") → 函数指针 → 直接调用
+```
+
+**JIT DLL 编译与运行**：
+```
+编译时：C# 源码 → IL 中间语言 → .dll 文件（含元数据）
+运行时：CLR/Mono 加载 DLL → JIT 编译热点代码 → 机器码 → CPU 执行
+        Rust: Mono 嵌入 → assembly_open → 反射查找方法 → mono_runtime_invoke
+```
+
+#### 使用场景选择
+
+| 场景 | 推荐 | 原因 |
+|------|------|------|
+| 游戏主逻辑（每帧调用） | **NativeAOT** | 20ns vs 100μs，5000倍性能差距 |
+| 开发期快速迭代 | **Mono JIT** | 热更新实时生效，无需重启 |
+| 插件系统（动态加载） | **Mono JIT** | 支持动态加载/卸载 Assembly |
+| 发布版游戏 | **NativeAOT** | 无运行时依赖，启动快，内存小 |
+| 跨平台工具链 | **NativeAOT** | 每平台编译一次，无运行时配置 |
+| 反射/动态特性需求 | **Mono JIT** | 完整反射 API 支持 |
+
+#### 性能对比示例
+
+**NativeAOT 原生调用**：
+```rust
+// Rust 端加载原生 DLL
+let lib = Library::new("RotationScript.NativeAOT.dll");
+let calculate: Symbol<extern "C" fn(f32) -> f32> = 
+    unsafe { lib.get("csharp_update_rotation".as_bytes())? };
+    
+// 直接函数指针调用
+let result = calculate(0.016);  // ~20ns，无上下文切换
+```
+
+**Mono JIT 反射调用**：
+```rust
+// Rust 端通过 Mono 嵌入
+let assembly = domain.assembly_open("RotationScript.Mono.dll");
+let image = assembly.get_image();
+let class = Class::from_name(&image, "HezhouScripts", "RotationController");
+let method = find_method_by_name(&class, "UpdateRotation");
+
+// 反射调用（需查找方法 + 参数封送）
+let result = mono_runtime_invoke(method, args);  // ~100μs
+```
+
+**性能差距来源**：
+- **NativeAOT**：编译时已确定函数地址，调用时直接跳转执行
+- **Mono JIT**：每次调用需查找方法表、封送参数、切换 CLR/Mono 运行时上下文
+
+---
+
+### Thunk 跳板函数定位
+
+Thunk 跳板函数 **更像 NativeAOT 原生 DLL**，而非 Mono JIT 反射调用。
+
+#### 三种调用方式对比
+
+| 维度 | NativeAOT DLL | Thunk 跳板函数 | Mono JIT 反射 |
+|------|---------------|----------------|---------------|
+| **调用方式** | 函数指针 | 函数指针 | 反射 API |
+| **调用开销** | ~20ns | ~10-20ns | ~100μs |
+| **运行时依赖** | 无 CLR | **需 CLR 运行时** | 需 CLR/Mono |
+| **上下文切换** | 无切换 | 有（轻量切换） | 有（重量切换） |
+| **查找方法** | 无（编译时确定） | 无（固定入口地址） | 有（运行时反射查找） |
+| **参数封送** | 无（直接传参） | 无（直接传参） | 有（ScriptValue 封送） |
+
+#### Thunk 工作原理
+
+Thunk 是 CLR 为 `[UnmanagedCallersOnly]` 方法自动生成的跳板函数：
+
+```
+Rust 调用 Thunk 跳板：
+┌─────────────────────────────────────────────────┐
+│  Rust: extern "C" fn(f32) -> f32                │
+│    ↓ 函数指针直接调用（~10ns）                    │
+│                                                  │
+│  CLR Thunk（跳板函数，自动生成）                  │
+│    ├─ push context    （保存非托管上下文）        │
+│    ├─ switch to CLR   （切换到托管环境，轻量）    │
+│    ├─ call C# Method  （执行 JIT 编译的机器码）   │
+│    ├─ switch back     （切换回非托管环境）        │
+│    └─ return result   （返回值）                 │
+└─────────────────────────────────────────────────┘
+```
+
+#### 为什么更像 NativeAOT？
+
+**调用代码对比**：
+
+```rust
+// NativeAOT 原生 DLL
+let func: Symbol<extern "C" fn(f32) -> f32> = lib.get("calculate");
+func(0.016);  // ← 函数指针直接调用
+
+// Thunk 跳板函数（几乎一样！）
+type Callback = extern "C" fn(f32) -> f32;
+callback(0.016);  // ← 函数指针直接调用，完全相同的语法
+
+// Mono JIT 反射（完全不同）
+mono_runtime_invoke(method, args);  // ← 反射 API 调用
+```
+
+**调用路径对比**：
+
+```
+NativeAOT：Rust → 函数指针 → 机器码 → CPU 执行（无运行时）
+Thunk：    Rust → 函数指针 → Thunk跳板 → CLR轻量切换 → JIT机器码 → CPU
+Mono JIT： Rust → 反射查找 → 参数封送 → CLR重量切换 → JIT机器码 → CPU
+```
+
+Thunk **省略了 Mono JIT 的两个重量级步骤**：
+1. **反射查找方法**：Thunk 在编译时已固定入口地址
+2. **参数封送**：Thunk 直接传参，无需 ScriptValue 桥接
+
+#### 性能数值对比
+
+| 调用路径 | 详细步骤 | 总开销 |
+|---------|---------|--------|
+| **NativeAOT** | Rust → 函数指针(5ns) → 机器码(15ns) | **~20ns** |
+| **Thunk** | Rust → 函数指针(5ns) → Thunk(10ns) → CLR切换(5ns) | **~20ns** |
+| **Mono JIT** | Rust → 反射查找(50μs) → 参数封送(20μs) → CLR切换(30μs) | **~100μs** |
+
+#### Thunk 定位总结
+
+Thunk 是 **"有 CLR 运行时的 NativeAOT"**：
+- **调用方式** = NativeAOT（函数指针直接调用）
+- **调用开销** = NativeAOT（~20ns，无反射查找）
+- **运行时依赖** = Mono JIT（需要 CLR 运行时支持）
+- **适用场景** = 每帧高频调用（游戏逻辑、物理计算）
+
+**选择建议**：
+- 需要最高性能 + 无运行时依赖 → **NativeAOT**
+- 需要高性能 + CLR 特性（GC、异常处理）→ **Thunk**
+- 需要热更新 + 开发期灵活性 → **Mono JIT 反射**
+
+---
+
 ### 最佳实践
 
 **开发阶段**：
