@@ -9,10 +9,35 @@ namespace HezhouScripts
 {
     public class RotationController
     {
-        private static float _rotationSpeed = 90.0f;
-        private static float _currentAngle = 0.0f;
+        // ===== 修改这里的值来改变旋转速度 =====
+        private const float DefaultRotationSpeed = 9.0f;
+        // ====================================
+        
+        private static RotationController _instance;
+        private float _rotationSpeed;
+        private float _currentAngle;
+        
+        private RotationController()
+        {
+            _rotationSpeed = DefaultRotationSpeed;
+            _currentAngle = 0.0f;
+        }
+        
+        private static RotationController GetInstance()
+        {
+            if (_instance == null)
+            {
+                _instance = new RotationController();
+            }
+            return _instance;
+        }
         
         public static float UpdateRotation(float deltaTime)
+        {
+            return GetInstance()._UpdateRotation(deltaTime);
+        }
+        
+        private float _UpdateRotation(float deltaTime)
         {
             float angleIncrement = _rotationSpeed * deltaTime;
             _currentAngle += angleIncrement;
@@ -27,24 +52,31 @@ namespace HezhouScripts
         
         public static float GetRotationSpeed()
         {
-            return _rotationSpeed;
+            return GetInstance()._rotationSpeed;
         }
         
         public static void SetRotationSpeed(float speed)
         {
-            _rotationSpeed = speed;
+            GetInstance()._rotationSpeed = speed;
             Console.WriteLine($"[C#] SetRotationSpeed: {speed}°/s");
         }
         
         public static void ResetRotation()
         {
-            _currentAngle = 0.0f;
+            GetInstance()._currentAngle = 0.0f;
             Console.WriteLine($"[C#] ResetRotation: angle=0°");
+        }
+        
+        public static void ResetAll()
+        {
+            _instance = null;
+            GetInstance();
+            Console.WriteLine($"[C#] ResetAll complete, speed={GetInstance()._rotationSpeed}°/s");
         }
         
         public static float GetCurrentAngle()
         {
-            return _currentAngle;
+            return GetInstance()._currentAngle;
         }
         
 #if NATIVEAOT
@@ -75,7 +107,7 @@ namespace HezhouScripts
         [UnmanagedCallersOnly(EntryPoint = "csharp_initialize", CallConvs = new[] { typeof(CallConvCdecl) })]
         public static void ExportInitialize()
         {
-            Console.WriteLine($"[C# NativeAOT] Initialized, rotation_speed = {_rotationSpeed}°/s");
+            Console.WriteLine($"[C# NativeAOT] Initialized, rotation_speed = {GetInstance()._rotationSpeed}°/s");
         }
 #endif
     }

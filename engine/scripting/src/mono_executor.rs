@@ -35,15 +35,14 @@ impl ScriptExecutor for MonoExecutor {
         if self.dll_path.is_empty() {
             return Err(ScriptError::NotInitialized);
         }
-        self.manager.reload(&self.dll_path)?;
+        self.assembly_name = self.manager.reload(&self.dll_path)?;
         Ok(())
     }
     
     fn call(&self, method: &str, args: ScriptValue) -> Result<ScriptValue, ScriptError> {
-        let (arg1, arg2) = match args.type_tag {
-            1 => (args.int_value, 0),  // Int
-            2 => (args.float_value as i32, 0),  // Float
-            _ => (0, 0),
+        let arg_float = match args.type_tag {
+            2 => Some(args.float_value),  // Float
+            _ => None,
         };
         
         let param_count = match method {
@@ -57,7 +56,7 @@ impl ScriptExecutor for MonoExecutor {
             &self.namespace,
             &self.class_name,
             method,
-            (arg1, arg2),
+            arg_float,
             param_count,
         )
     }

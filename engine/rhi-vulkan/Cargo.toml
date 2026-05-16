@@ -7,11 +7,15 @@ edition = "2021"
 name = "hezhou_rhi_vulkan"
 path = "src/lib.rs"
 
+[features]
+default = []
+mono = ["hezhou-scripting/mono"]
+
 [dependencies]
 hezhou-core = { path = "../core" }
 hezhou-geometry = { path = "../geometry" }
 hezhou-rhi = { path = "../rhi" }
-hezhou-scripting = { path = "../scripting" }
+hezhou-scripting = { path = "../scripting", default-features = false }
 ash = "0.38"
 bytemuck = "1.14"
 glfw = { version = "0.62", default-features = false, features = ["src-build", "vulkan", "raw-window-handle-v0-6", "native-handles"] }

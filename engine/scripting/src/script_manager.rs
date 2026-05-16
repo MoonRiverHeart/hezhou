@@ -30,14 +30,16 @@ impl ScriptManager {
         let assembly = domain.assembly_open(dll_path)
             .ok_or_else(|| ScriptError::AssemblyNotFound(dll_path.to_string()))?;
         
-        let name = PathBuf::from(dll_path)
+        let path_buf = PathBuf::from(dll_path);
+        let name = path_buf
             .file_name()
             .and_then(|n| n.to_str())
-            .unwrap_or("unknown")
-            .to_string();
+            .unwrap_or("unknown");
         
-        self.assemblies.insert(name.clone(), assembly);
-        Ok(name)
+        let name_without_ext = name.strip_suffix(".dll").unwrap_or(name);
+        
+        self.assemblies.insert(name_without_ext.to_string(), assembly);
+        Ok(name_without_ext.to_string())
     }
 
     pub fn unload(&mut self, name: &str) {
@@ -46,14 +48,27 @@ impl ScriptManager {
     }
 
     pub fn reload(&mut self, dll_path: &str) -> ScriptResult<String> {
-        let name = PathBuf::from(dll_path)
+        let path_buf = PathBuf::from(dll_path);
+        let name = path_buf
             .file_name()
             .and_then(|n| n.to_str())
-            .unwrap_or("unknown")
-            .to_string();
+            .unwrap_or("unknown");
         
-        self.assemblies.remove(&name);
-        self.load_script(dll_path)
+        let name_without_ext = name.strip_suffix(".dll").unwrap_or(name);
+        
+        self.assemblies.remove(name_without_ext);
+        
+        // Copy DLL to temp path to bypass Mono's assembly cache
+        let temp_dir = std::env::temp_dir();
+        let temp_dll_name = format!("{}_{}.dll", name_without_ext, std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_millis());
+        let temp_dll_path = temp_dir.join(&temp_dll_name);
+        
+        std::fs::copy(dll_path, &temp_dll_path)
+            .map_err(|e| ScriptError::InvokeFailed(format!("Failed to copy DLL to temp: {}", e)))?;
+        
+        let new_name = self.load_script(temp_dll_path.to_str().unwrap())?;
+        
+        Ok(new_name)
     }
 
     pub fn execute(
@@ -62,23 +77,68 @@ impl ScriptManager {
         namespace: &str,
         class_name: &str,
         method_name: &str,
-        args: (i32, i32),
+        arg_float: Option<f32>,
         param_count: i32,
     ) -> ScriptResult<ScriptValue> {
+        let _domain = self.domain.as_ref().ok_or(ScriptError::NotInitialized)?;
         let assembly = self.assemblies.get(assembly_name)
             .ok_or_else(|| ScriptError::AssemblyNotFound(assembly_name.to_string()))?;
         
         let image = assembly.get_image();
+        
         let class = Class::from_name(&image, namespace, class_name)
+            .or_else(|| Class::from_name_case(&image, namespace, class_name))
             .ok_or_else(|| ScriptError::ClassNotFound(format!("{}.{}", namespace, class_name)))?;
         
-        let method = Method::get_from_name(&class, method_name, param_count)
-            .ok_or_else(|| ScriptError::MethodNotFound(method_name.to_string()))?;
+        let mut iter = std::ptr::null_mut::<std::os::raw::c_void>();
+        let mut found_method_ptr: *mut wrapped_mono::binds::MonoMethod = std::ptr::null_mut();
+        loop {
+            let method_ptr = unsafe { wrapped_mono::binds::mono_class_get_methods(class.get_ptr(), &mut iter as *mut *mut std::os::raw::c_void) };
+            if method_ptr.is_null() {
+                break;
+            }
+            let name_cstr = unsafe { wrapped_mono::binds::mono_method_get_name(method_ptr) };
+            let name = unsafe { std::ffi::CStr::from_ptr(name_cstr) }.to_str().unwrap_or("?");
+            if name == method_name {
+                found_method_ptr = method_ptr;
+                break;
+            }
+        }
         
-        let result = method.invoke(None, args)
-            .map_err(|e| ScriptError::InvokeFailed(format!("{:?}", e)))?;
+        if found_method_ptr.is_null() {
+            return Err(ScriptError::MethodNotFound(format!("{} ({} params)", method_name, param_count)));
+        }
         
-        Ok(result.map_or(ScriptValue::null(), |_| ScriptValue::from_int(0)))
+        let mut params: Vec<*mut std::os::raw::c_void> = Vec::new();
+        if param_count > 0 {
+            if let Some(float_val) = arg_float {
+                let float_ptr = &float_val as *const f32 as *mut std::os::raw::c_void;
+                params.push(float_ptr);
+            }
+        }
+        
+        let mut exc_ptr: *mut wrapped_mono::binds::MonoObject = std::ptr::null_mut();
+        let result_obj = unsafe {
+            wrapped_mono::binds::mono_runtime_invoke(
+                found_method_ptr,
+                std::ptr::null_mut(),
+                if params.is_empty() { std::ptr::null_mut() } else { params.as_mut_ptr() as *mut *mut std::os::raw::c_void },
+                &mut exc_ptr as *mut *mut wrapped_mono::binds::MonoObject,
+            )
+        };
+        
+        if !exc_ptr.is_null() {
+            return Err(ScriptError::InvokeFailed("Exception during method call".to_string()));
+        }
+        
+        if result_obj.is_null() {
+            Ok(ScriptValue::null())
+        } else {
+            let boxed_value = unsafe { wrapped_mono::binds::mono_object_unbox(result_obj) };
+            let float_ptr = boxed_value as *const f32;
+            let float_value = unsafe { *float_ptr };
+            Ok(ScriptValue::from_float(float_value))
+        }
     }
 
     pub fn register_sync_callback(

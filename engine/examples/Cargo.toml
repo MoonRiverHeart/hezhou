@@ -5,7 +5,7 @@ edition = "2021"
 
 [features]
 default = ["mono"]
-mono = ["hezhou-scripting/mono"]
+mono = ["hezhou-scripting/mono", "hezhou-rhi-vulkan/mono"]
 native-aot = ["hezhou-scripting/native-aot"]
 
 [dependencies]
@@ -42,4 +42,14 @@ required-features = ["native-aot"]
 [[bin]]
 name = "mono_rotation_demo"
 path = "src/mono_rotation_demo.rs"
+required-features = ["mono"]
+
+[[bin]]
+name = "mono_hot_reload_test"
+path = "src/mono_hot_reload_test.rs"
+required-features = ["mono"]
+
+[[bin]]
+name = "mono_triangle_demo"
+path = "src/mono_triangle_demo.rs"
 required-features = ["mono"]

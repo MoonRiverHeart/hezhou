@@ -15,7 +15,13 @@ fn main() {
     
     println!("[2] 加载 C# DLL...");
     let dll_path = std::env::current_dir()
-        .map(|p| p.join("scripts/bin/Mono/Release/net8.0/RotationScript.Mono.dll"))
+        .map(|p| {
+            if p.ends_with("examples") {
+                p.parent().unwrap().join("scripts/bin/Mono/Release/net8.0/RotationScript.Mono.dll")
+            } else {
+                p.join("scripts/bin/Mono/Release/net8.0/RotationScript.Mono.dll")
+            }
+        })
         .expect("Failed to get current dir");
     
     println!("    DLL path: {}", dll_path.display());
@@ -29,9 +35,13 @@ fn main() {
         .expect("Failed to load DLL");
     
     println!("    assembly_name: {}", executor.assembly_name);
+    println!("    DLL 加载成功!\n");
+    
+    println!("[3] 测试 Mono 调用...");
+    println!("    尝试调用 GetRotationSpeed...\n");
     
     let speed = executor.get_rotation_speed().expect("Failed to get speed");
-    println!("    DLL 加载成功! rotation_speed = {}°/s\n", speed);
+    println!("    ✅ 成功! rotation_speed = {}°/s\n", speed);
     
     println!("[3] 运行渲染循环...");
     println!("    每 60 帧输出一次\n");
@@ -43,7 +53,7 @@ fn main() {
         std::thread::sleep(std::time::Duration::from_millis(16));
         
         let dt = 0.016f32;
-        let increment = executor.call("UpdateRotation", ScriptValue::from_float(dt))
+        let _increment = executor.call("UpdateRotation", ScriptValue::from_float(dt))
             .expect("Call failed");
         
         frame_count += 1;
@@ -95,22 +105,31 @@ fn main() {
 
 fn recompile_mono_dll() {
     let scripts_dir = std::env::current_dir()
-        .map(|p| p.join("scripts"))
+        .map(|p| {
+            if p.ends_with("examples") {
+                p.parent().unwrap().join("scripts")
+            } else {
+                p.join("scripts")
+            }
+        })
         .expect("Failed to get scripts dir");
     
-    let output = std::process::Command::new("dotnet")
-        .arg("build")
-        .arg("RotationScript.Mono.csproj")
-        .arg("-c")
-        .arg("Release")
+    let build_script = scripts_dir.join("build_mono.ps1");
+    
+    let output = std::process::Command::new("powershell")
+        .arg("-ExecutionPolicy")
+        .arg("Bypass")
+        .arg("-File")
+        .arg(&build_script)
         .current_dir(&scripts_dir)
         .output()
-        .expect("Failed to run dotnet build");
+        .expect("Failed to run build script");
     
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
         println!("[HotReload] 编译失败: {}", stderr);
     } else {
-        println!("[HotReload] 编译成功!");
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        println!("[HotReload] {}", stdout.lines().last().unwrap_or("编译成功"));
     }
 }

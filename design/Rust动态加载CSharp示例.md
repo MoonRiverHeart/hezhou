@@ -10,6 +10,266 @@
 
 ---
 
+## 实际实现总结
+
+### 已完成：Mono JIT 热更新系统（开发模式）
+
+#### 核心架构
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│  Rust MonoExecutor                                                  │
+│  ┌─────────────────────────────────────────────────────────────┐   │
+│  │  ScriptManager                                               │   │
+│  │    ├── Domain (mono jit::init())                            │   │
+│  │    ├── Assemblies HashMap<String, Assembly>                 │   │
+│  │    └── execute(assembly, ns, class, method, args)           │   │
+│  │                                                              │   │
+│  │  热更新流程:                                                  │   │
+│  │    1. recompile_mono_dll() → mcs 编译新 DLL                   │   │
+│  │       └── 生成带时间戳的 Assembly 名称: RotationScript_12345.dll│   │
+│  │    2. executor.load(new_dll_path) → 加载新 Assembly          │   │
+│  │    3. call("ResetAll") → 重置 C# 静态实例                     │   │
+│  │    4. 新常量值生效                                            │   │
+│  └─────────────────────────────────────────────────────────────┘   │
+│                              ↓ mono_runtime_invoke                  │
+├─────────────────────────────────────────────────────────────────────┤
+│  C# RotationController                                              │
+│  ┌─────────────────────────────────────────────────────────────┐   │
+│  │  private const float DefaultRotationSpeed = 90.0f;          │   │
+│  │  private static RotationController _instance;               │   │
+│  │                                                              │   │
+│  │  ResetAll():                                                 │   │
+│  │    _instance = null;                                         │   │
+│  │    GetInstance(); // 重新创建实例，读取新常量                   │   │
+│  └─────────────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+#### 关键技术点
+
+**1. Mono Assembly 缓存问题**
+
+问题：`mono_domain_assembly_open` 会缓存已加载的 Assembly，即使文件更新也返回旧版本。
+
+**解决方案**：每次编译生成不同名称的 Assembly
+- 编译脚本使用时间戳命名：`RotationScript_{timestamp}.dll`
+- Mono 从 DLL 文件名推导 Assembly 名称
+- 每次热更新加载新 Assembly，绕过缓存
+
+**2. C# 静态变量重新初始化**
+
+问题：Mono 不重新初始化静态字段（`_instance` 保持旧值）。
+
+**解决方案**：实例模式 + `ResetAll()` 方法
+```csharp
+public static void ResetAll() {
+    _instance = null;           // 清除旧实例
+    GetInstance();              // 创建新实例，读取新常量
+}
+```
+
+**3. wrapped_mono Method 查找问题**
+
+问题：`Method::get_from_name` 返回 null。
+
+**解决方案**：迭代方法列表 + 名称匹配
+```rust
+let mut iter = std::ptr::null_mut();
+loop {
+    let method_ptr = mono_class_get_methods(class.get_ptr(), &mut iter);
+    if method_ptr.is_null() { break; }
+    let name = mono_method_get_name(method_ptr);
+    if name == method_name {
+        found_method_ptr = method_ptr;
+        break;
+    }
+}
+```
+
+#### 热更新测试结果
+
+```
+[修改 RotationScript.cs 第 13 行: DefaultRotationSpeed = 900.0f]
+
+Frame 600: angle=188.9°, speed=90°/s
+[HotReload] R pressed, recompiling...
+[Info] Compiling: RotationScript.cs
+[Success] RotationScript_1747000000.dll compiled
+AssemblyName: RotationScript_1747000000
+
+[HotReload] Compile success! New DLL: .../RotationScript_1747000000.dll
+[HotReload] Assembly loaded, calling ResetAll...
+[C#] ResetAll complete, speed=900°/s
+[HotReload] Speed after reload: 900°/s
+
+Frame 840: angle=113.9°, speed=900°/s  ← 新速度生效！
+```
+
+#### 文件结构
+
+```
+engine/
+├ scripting/src/
+│   ├── script_manager.rs      ← Mono Assembly 加载/调用
+│   ├── mono_executor.rs       ← MonoExecutor 封装
+│   └── value_bridge.rs        ← ScriptValue 桥接
+│
+├ scripts/
+│   ├── RotationScript.cs      ← C# 脚本（单文件 + 条件编译）
+│   ├── build_mono.ps1         ← Mono 编译脚本（mcs + 时间戳命名）
+│   └── bin/Mono/Release/net8.0/
+│       └── RotationScript_{timestamp}.dll  ← 编译产物
+│
+├ rhi-vulkan/src/
+│   └── mono_rotation_renderer.rs  ← Vulkan + Mono 渲染器
+│       └── recompile_mono_dll()   ← 热更新触发
+│       └── load(new_dll_path)     ← 加载新 Assembly
+│
+└ examples/src/
+    └── mono_triangle_demo.rs      ← Demo 入口（按 R 热更新）
+```
+
+#### 优缺点
+
+| 维度 | Mono JIT 热更新 | 评分 |
+|------|-----------------|------|
+| **热重载** | 支持（实时生效） | ⭐⭐⭐⭐⭐ |
+| **开发体验** | 极佳（无需重启） | ⭐⭐⭐⭐⭐ |
+| **性能** | 低（反射调用 ~100μs） | ⭐⭐ |
+| **内存占用** | 较大（Mono 运行时） | ⭐⭐ |
+| **跨平台** | 需配置 Mono SDK | ⭐⭐⭐ |
+| **部署复杂度** | 高（依赖 Mono 环境） | ⭐⭐ |
+
+---
+
+### 待实现：NativeAOT 静态编译（发布模式）
+
+#### 架构设计
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│  Rust Renderer                                                      │
+│  ┌─────────────────────────────────────────────────────────────┐   │
+│  │  libloading::Library                                         │   │
+│  │    ├── load("RotationScript.NativeAOT.dll")                 │   │
+│  │    ├── get("csharp_update_rotation")                        │   │
+│  │    └── 函数指针调用：extern "C" fn(f32) -> f32              │   │
+│  │                                                              │   │
+│  │  性能：~20ns 调用开销（直接函数指针）                          │   │
+│  └─────────────────────────────────────────────────────────────┘   │
+│                              ↓ 直接函数指针调用                      │
+├─────────────────────────────────────────────────────────────────────┤
+│  C# NativeAOT DLL                                                   │
+│  ┌─────────────────────────────────────────────────────────────┐   │
+│  │  [UnmanagedCallersOnly(EntryPoint = "csharp_update_rotation")]│   │
+│  │  public static float UpdateRotation(float deltaTime)         │   │
+│  │                                                              │   │
+│  │  编译为原生机器码（无 CLR 运行时）                             │   │
+│  └─────────────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+#### 条件编译方案
+
+**单 C# 源文件**：`RotationScript.cs`
+
+```csharp
+#if MONO
+// Mono JIT 版本（开发模式）
+public class RotationController {
+    private const float DefaultRotationSpeed = 90.0f;
+    private static RotationController _instance;
+    
+    public static float UpdateRotation(float deltaTime) {
+        return GetInstance()._UpdateRotation(deltaTime);
+    }
+    
+    public static void ResetAll() {
+        _instance = null;
+        GetInstance();
+    }
+}
+#endif
+
+#if NATIVEAOT
+// NativeAOT 版本（发布模式）
+using System.Runtime.InteropServices;
+using System.Runtime.CompilerServices;
+
+public static class RotationController {
+    private static float _rotationSpeed = 90.0f;
+    
+    [UnmanagedCallersOnly(EntryPoint = "csharp_update_rotation", CallConvs = new[] { typeof(CallConvCdecl) })]
+    public static float UpdateRotation(float deltaTime) {
+        return _rotationSpeed * deltaTime;
+    }
+    
+    [UnmanagedCallersOnly(EntryPoint = "csharp_set_rotation_speed", CallConvs = new[] { typeof(CallConvCdecl) })]
+    public static void SetRotationSpeed(float speed) {
+        _rotationSpeed = speed;
+    }
+}
+#endif
+```
+
+**编译脚本分离**：
+- `build_mono.ps1`：`mcs -define:MONO RotationScript.cs`
+- `build_nativeaot.ps1`：`dotnet publish -p:PublishAot=true -define:NATIVEAOT`
+
+#### 优缺点
+
+| 维度 | NativeAOT 静态编译 | 评分 |
+|------|-------------------|------|
+| **性能** | 最高（~20ns 调用） | ⭐⭐⭐⭐⭐ |
+| **内存占用** | 最小（无 CLR 运行时） | ⭐⭐⭐⭐⭐ |
+| **跨平台** | 完全一致（原生 DLL） | ⭐⭐⭐⭐⭐ |
+| **部署复杂度** | 低（单一 DLL） | ⭐⭐⭐⭐⭐ |
+| **热重载** | 不支持（需重启） | ⭐ |
+| **开发体验** | 差（每次修改需重新编译） | ⭐⭐ |
+
+---
+
+### 两种模式对比
+
+| 特性 | Mono JIT (开发) | NativeAOT (发布) |
+|------|-----------------|------------------|
+| **编译器** | `mcs` (Mono SDK) | `dotnet publish` |
+| **DLL 类型** | 标准 .NET DLL | 原生机器码 DLL |
+| **加载方式** | Mono 反射加载 | `libloading` 动态加载 |
+| **调用方式** | `mono_runtime_invoke` | 函数指针直接调用 |
+| **调用开销** | ~100μs (反射) | ~20ns (函数指针) |
+| **热重载** | ✅ 支持（按 R 键） | ❌ 不支持 |
+| **内存占用** | 较大（Mono 运行时） | 最小（无运行时） |
+| **部署依赖** | Mono SDK | 无额外依赖 |
+| **适用场景** | 开发期快速迭代 | 生产环境高性能 |
+
+---
+
+### 最佳实践
+
+**开发阶段**：
+1. 使用 Mono JIT 模式
+2. 运行 `mono_triangle_demo`（按 R 热更新）
+3. 修改 `RotationScript.cs` 常量值
+4. 立即验证效果，无需重启
+
+**发布阶段**：
+1. 使用 NativeAOT 模式编译
+2. 集成到生产环境渲染器
+3. 享受最高性能和最小内存占用
+
+**切换方式**：
+```bash
+# 开发模式（Mono JIT）
+cargo run --bin mono_triangle_demo --features mono
+
+# 发布模式（NativeAOT）
+cargo run --bin rotation_demo --features native-aot
+```
+
+---
+
 ## 方式一：Thunk 函数指针（第一优先级）
 
 ### 概述
