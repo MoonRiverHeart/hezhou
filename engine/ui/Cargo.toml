@@ -1,0 +1,18 @@
+[package]
+name = "hezhou-ui"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+hezhou-core = { path = "../core" }
+hezhou-dfx = { path = "../dfx" }
+hezhou-rhi = { path = "../rhi" }
+parking_lot = "0.12"
+uuid = { version = "1.10", features = ["v4", "serde"] }
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[features]
+default = []
+debug_visualization = []

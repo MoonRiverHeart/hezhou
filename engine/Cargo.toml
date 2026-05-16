@@ -11,6 +11,7 @@ members = [
     "rhi",
     "rhi-vulkan",
     "physics",
+    "ui",
 ]
 
 [workspace.package]
