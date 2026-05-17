@@ -181,6 +181,27 @@ impl WidgetTree {
 pub fn perform_layout(&mut self, font_atlas: &FontAtlas) {
         if let Some(root_id) = self.root {
             let _ = self.measure_and_layout(root_id, font_atlas);
+            self.convert_to_absolute_coordinates(root_id, 0.0, 0.0);
+        }
+    }
+    
+    fn convert_to_absolute_coordinates(&mut self, id: WidgetId, parent_x: f32, parent_y: f32) {
+        if let Some(node) = self.nodes.get_mut(&id) {
+            let child_layout = *node.widget.layout();
+            let absolute_x = parent_x + child_layout.x;
+            let absolute_y = parent_y + child_layout.y;
+            
+            node.widget.set_layout(crate::layout::Layout::new(
+                absolute_x,
+                absolute_y,
+                child_layout.width,
+                child_layout.height,
+            ));
+            
+            let children = self.get_children(id).to_vec();
+            for &child_id in &children {
+                self.convert_to_absolute_coordinates(child_id, absolute_x, absolute_y);
+            }
         }
     }
     
@@ -301,12 +322,6 @@ pub fn perform_layout(&mut self, font_atlas: &FontAtlas) {
         children: &[WidgetId],
         child_sizes: &[(f32, f32)],
     ) {
-        let parent_layout = self
-            .nodes
-            .get(&parent_id)
-            .map(|n| *n.widget.layout())
-            .unwrap_or_default();
-
         let spacing = self
             .nodes
             .get(&parent_id)
@@ -319,14 +334,14 @@ pub fn perform_layout(&mut self, font_atlas: &FontAtlas) {
             })
             .unwrap_or(8.0);
 
-        let mut current_x = parent_layout.x;
+        let mut current_x = 0.0;
 
         for (i, &child_id) in children.iter().enumerate() {
             let (w, h) = child_sizes[i];
 
             if let Some(node) = self.nodes.get_mut(&child_id) {
                 let child_layout = *node.widget.layout();
-                let y = parent_layout.y;
+                let y = 0.0;
 
                 node.widget.set_layout(crate::layout::Layout::new(
                     current_x,
@@ -346,12 +361,6 @@ pub fn perform_layout(&mut self, font_atlas: &FontAtlas) {
         children: &[WidgetId],
         child_sizes: &[(f32, f32)],
     ) {
-        let parent_layout = self
-            .nodes
-            .get(&parent_id)
-            .map(|n| *n.widget.layout())
-            .unwrap_or_default();
-
         let spacing = self
             .nodes
             .get(&parent_id)
@@ -364,21 +373,14 @@ pub fn perform_layout(&mut self, font_atlas: &FontAtlas) {
             })
             .unwrap_or(8.0);
         
-        let max_child_width = child_sizes.iter().map(|(w, _)| *w).fold(0.0f32, f32::max);
-        
-        let mut current_y = parent_layout.y;
+        let mut current_y = 0.0;
 
         for (i, &child_id) in children.iter().enumerate() {
             let (w, h) = child_sizes[i];
 
             if let Some(node) = self.nodes.get_mut(&child_id) {
                 let child_layout = *node.widget.layout();
-                let container_width = if parent_layout.width > 0.0 {
-                    parent_layout.width
-                } else {
-                    max_child_width
-                };
-                let x = parent_layout.x;
+                let x = 0.0;
 
                 node.widget.set_layout(crate::layout::Layout::new(
                     x,

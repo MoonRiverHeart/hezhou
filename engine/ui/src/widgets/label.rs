@@ -120,6 +120,25 @@ impl Widget for Label {
         canvas.draw_text(bounds, &self.text, &self.text_style);
     }
 
+    fn measure(&self, font_atlas: &crate::font_atlas::FontAtlas) -> (f32, f32) {
+        let (text_width, text_height) =
+            font_atlas.measure_text(0, &self.text, self.text_style.font_size * 2.0);
+
+        let width = if self.layout.width > 0.0 {
+            self.layout.width.max(text_width)
+        } else {
+            text_width
+        };
+        
+        let height = if self.layout.height > 0.0 {
+            self.layout.height.max(text_height)
+        } else {
+            text_height
+        };
+
+        (width, height)
+    }
+
     fn on_event(&mut self, event: &Event) -> EventResult {
         EventResult::Ignored
     }
