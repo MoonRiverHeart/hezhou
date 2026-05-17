@@ -93,6 +93,7 @@ pub struct UIVulkanRenderer {
     new_extent: vk::Extent2D,
     swapchain_format: vk::Format,
     physical_device: vk::PhysicalDevice,
+    triangle_angle: f32,
 }
 
 impl UIVulkanRenderer {
@@ -571,6 +572,7 @@ impl UIVulkanRenderer {
                 new_extent: extent,
                 swapchain_format: format,
                 physical_device,
+                triangle_angle: 0.0,
             })
         }
     }
@@ -1302,6 +1304,38 @@ DrawCommand::Text { bounds, width, height, font_color, text, text_len, font_size
                     DrawCommand::ResetTransform => {}
                 }
             }
+            
+            // 添加旋转三角形（在预览区域中心）
+            let preview_x = 250.0f32;
+            let preview_y = 40.0f32;
+            let preview_w = self.extent.width as f32 - 500.0;
+            let preview_h = self.extent.height as f32 - 70.0;
+            
+            let center_x = preview_x + preview_w / 2.0;
+            let center_y = preview_y + preview_h / 2.0;
+            let radius = 80.0;
+            
+            self.triangle_angle += 90.0 * 0.016; // 90度/秒
+            if self.triangle_angle > 360.0 {
+                self.triangle_angle -= 360.0;
+            }
+            
+            let angle_rad = self.triangle_angle.to_radians();
+            
+            // 三角形三个顶点
+            let p0 = (center_x + radius * angle_rad.cos(), center_y - radius * angle_rad.sin());
+            let p1 = (center_x + radius * (angle_rad + 2.094).cos(), center_y - radius * (angle_rad + 2.094).sin());
+            let p2 = (center_x + radius * (angle_rad + 4.189).cos(), center_y - radius * (angle_rad + 4.189).sin());
+            
+            // 三角形颜色：紫色
+            let (r, g, b, a) = (1.0, 0.5, 0.8, 1.0);
+            
+            // 绘制填充三角形（3个顶点）
+            vertices.extend_from_slice(&[
+                p0.0, p0.1, r, g, b, a, 0.0, 0.0,
+                p1.0, p1.1, r, g, b, a, 0.0, 0.0,
+                p2.0, p2.1, r, g, b, a, 0.0, 0.0,
+            ]);
             
             let vertex_data: &[u8] = bytemuck::cast_slice(&vertices);
             
