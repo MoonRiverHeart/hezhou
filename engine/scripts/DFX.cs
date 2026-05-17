@@ -84,19 +84,19 @@ namespace Hezhou
 
         private static class NativeMethods
         {
-            [DllImport("hezhou_engine", CallingConvention = CallingConvention.Cdecl)]
+            [DllImport("hezhou_scripting", CallingConvention = CallingConvention.Cdecl)]
             public static extern IntPtr dfx_create();
 
-            [DllImport("hezhou_engine", CallingConvention = CallingConvention.Cdecl)]
+            [DllImport("hezhou_scripting", CallingConvention = CallingConvention.Cdecl)]
             public static extern void dfx_destroy(IntPtr system);
 
-            [DllImport("hezhou_engine", CallingConvention = CallingConvention.Cdecl)]
+            [DllImport("hezhou_scripting", CallingConvention = CallingConvention.Cdecl)]
             public static extern void dfx_enable_all(IntPtr system);
 
-            [DllImport("hezhou_engine", CallingConvention = CallingConvention.Cdecl)]
+            [DllImport("hezhou_scripting", CallingConvention = CallingConvention.Cdecl)]
             public static extern void dfx_set_log_level(IntPtr system, byte level);
 
-            [DllImport("hezhou_engine", CallingConvention = CallingConvention.Cdecl)]
+            [DllImport("hezhou_scripting", CallingConvention = CallingConvention.Cdecl)]
             public static extern void dfx_log(
                 IntPtr system,
                 byte level,
@@ -105,19 +105,19 @@ namespace Hezhou
                 string file,
                 uint line);
 
-            [DllImport("hezhou_engine", CallingConvention = CallingConvention.Cdecl)]
+            [DllImport("hezhou_scripting", CallingConvention = CallingConvention.Cdecl)]
             public static extern void dfx_trace_begin(IntPtr system, string name, string category);
 
-            [DllImport("hezhou_engine", CallingConvention = CallingConvention.Cdecl)]
+            [DllImport("hezhou_scripting", CallingConvention = CallingConvention.Cdecl)]
             public static extern void dfx_trace_end(IntPtr system, string name, string category);
 
-            [DllImport("hezhou_engine", CallingConvention = CallingConvention.Cdecl)]
+            [DllImport("hezhou_scripting", CallingConvention = CallingConvention.Cdecl)]
             public static extern float dfx_get_fps(IntPtr system);
 
-            [DllImport("hezhou_engine", CallingConvention = CallingConvention.Cdecl)]
+            [DllImport("hezhou_scripting", CallingConvention = CallingConvention.Cdecl)]
             public static extern ulong dfx_get_frame_count(IntPtr system);
 
-            [DllImport("hezhou_engine", CallingConvention = CallingConvention.Cdecl)]
+            [DllImport("hezhou_scripting", CallingConvention = CallingConvention.Cdecl)]
             public static extern void dfx_clear_log_buffer(IntPtr system);
         }
     }

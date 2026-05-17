@@ -21,17 +21,17 @@ fn main() {
     println!("[1] 创建UISystem...");
     let ui_system = Arc::new(Mutex::new(UISystem::new()));
     
-    println!("[2] 编译C#脚本...");
-    let dll_path = compile_ui_script();
-    println!("    编译成功: {}\n", dll_path);
-    
+println!("[2] 编译C#脚本...");
+    let dll_path = "scripts/bin/Mono/TestScript.dll";
+    println!("    使用DLL: {}\n", dll_path);
+
     println!("[3] 加载Mono DLL...");
-    let executor = MonoUIExecutor::new(&dll_path)
+    let executor = MonoUIExecutor::new(dll_path)
         .expect("Failed to load Mono DLL");
     println!("    加载成功!\n");
-    
+
     println!("[4] 调用Initialize...");
-    executor.call_static_void("UIScript", "Initialize", &[])
+    executor.call_static_void("TestScript", "Initialize", &[])
         .expect("Initialize failed");
     println!("    Initialize调用成功!\n");
     

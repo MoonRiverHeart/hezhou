@@ -19,7 +19,7 @@ namespace Hezhou
 
         private static class NativeMethods
         {
-            [DllImport("hezhou_engine", CallingConvention = CallingConvention.Cdecl)]
+            [DllImport("hezhou_scripting", CallingConvention = CallingConvention.Cdecl)]
             public static extern void ui_register_update_thunk_ptr(IntPtr callback);
         }
     }
