@@ -26,7 +26,7 @@ println!("[2] 编译C#脚本...");
     println!("    使用DLL: {}\n", dll_path);
 
     println!("[3] 加载Mono DLL...");
-    let executor = MonoUIExecutor::new(dll_path)
+    let mut executor = MonoUIExecutor::new(dll_path)
         .expect("Failed to load Mono DLL");
     println!("    加载成功!\n");
 
@@ -65,17 +65,13 @@ println!("[2] 编译C#脚本...");
         std::thread::sleep(Duration::from_millis(16));
     }
     
-    println!("[6] 测试热重载...");
+println!("[6] 测试热重载...");
     ui_clear_callbacks();
     
-    println!("    重新编译C#脚本...");
-    let new_dll_path = compile_ui_script_with_timestamp();
+    println!("    在同一Domain内重新加载...");
+    executor.reload().expect("Reload failed");
     
-    println!("    加载新DLL...");
-    let executor2 = MonoUIExecutor::new(&new_dll_path)
-        .expect("Failed to reload");
-    
-    executor2.call_static_void("UIScript", "Initialize", &[])
+    executor.call_static_void("TestScript", "Initialize", &[])
         .expect("Initialize failed");
     println!("    热重载成功!\n");
     
