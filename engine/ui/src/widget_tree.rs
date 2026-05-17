@@ -134,7 +134,8 @@ impl WidgetTree {
     fn hit_test_recursive(&self, id: WidgetId, point: Point) -> Option<WidgetId> {
         if let Some(node) = self.nodes.get(&id) {
             if node.widget.as_ref().hit_test(point) {
-                for child in self.get_children(id) {
+                let children = self.get_children(id);
+                for child in children.iter().rev() {
                     if let Some(hit) = self.hit_test_recursive(*child, point) {
                         return Some(hit);
                     }
