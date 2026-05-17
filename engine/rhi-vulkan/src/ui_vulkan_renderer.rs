@@ -1273,12 +1273,12 @@ DrawCommand::Text { bounds, width, height, font_color, text, text_len, font_size
                                 let a = font_color.a;
                                 
                                 vertices.extend_from_slice(&[
-                                    x, y + h, r, g, b, a, u0, v0,
-                                    x + w, y + h, r, g, b, a, u1, v0,
-                                    x, y, r, g, b, a, u0, v1,
-                                    x + w, y + h, r, g, b, a, u1, v0,
-                                    x + w, y, r, g, b, a, u1, v1,
-                                    x, y, r, g, b, a, u0, v1,
+                                    x, y, r, g, b, a, u0, v0,
+                                    x + w, y, r, g, b, a, u1, v0,
+                                    x, y + h, r, g, b, a, u0, v1,
+                                    x + w, y, r, g, b, a, u1, v0,
+                                    x + w, y + h, r, g, b, a, u1, v1,
+                                    x, y + h, r, g, b, a, u0, v1,
                                 ]);
                             }
                         }

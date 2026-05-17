@@ -16,7 +16,7 @@ void main() {
     vec2 normalized_pos = (in_position + pc.offset) / pc.screen_size;
     vec2 clip_pos = normalized_pos * 2.0 - 1.0;
     
-    gl_Position = vec4(clip_pos.x, -clip_pos.y, 0.0, 1.0);
+    gl_Position = vec4(clip_pos.x, clip_pos.y, 0.0, 1.0);
     frag_color = in_color;
     frag_uv = in_uv;
 }
