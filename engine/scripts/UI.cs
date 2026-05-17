@@ -54,6 +54,21 @@ namespace Hezhou
         public delegate void RemoveWidgetDelegate(IntPtr handle, ulong widgetId);
         
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate ulong CreateTextEditDelegate(IntPtr handle, float width, float height);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate ulong CreateTextEditInParentDelegate(IntPtr handle, ulong parentId, float width, float height);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void TextEditSetTextDelegate(IntPtr handle, ulong widgetId, string text);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void TextEditInsertCharDelegate(IntPtr handle, ulong widgetId, byte c);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void TextEditDeleteCharDelegate(IntPtr handle, ulong widgetId);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public delegate void RegisterResizeDelegate(IntPtr callbackPtr);
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
@@ -86,6 +101,11 @@ namespace Hezhou
             public IntPtr ui_widget_set_position;
             public IntPtr ui_widget_set_size;
             public IntPtr ui_remove_widget;
+            public IntPtr ui_create_text_edit;
+            public IntPtr ui_create_text_edit_in_parent;
+            public IntPtr ui_text_edit_set_text;
+            public IntPtr ui_text_edit_insert_char;
+            public IntPtr ui_text_edit_delete_char;
             public IntPtr widget_tree_ptr;
         }
 
@@ -216,6 +236,28 @@ public static void RegisterResizeCallback(ResizeCallbackDelegate callback)
             }
             var func = Marshal.GetDelegateForFunctionPointer<CreatePanelInParentDelegate>(_ffi.ui_create_panel_in_parent);
             return func(_widgetTree, parentId, x, y, width, height, r, g, b, a);
+        }
+
+        public static ulong CreateTextEdit(ulong parentId, float width, float height)
+        {
+            if (_ffi.ui_create_text_edit_in_parent == IntPtr.Zero)
+            {
+                Console.WriteLine("[C#] ERROR: CreateTextEditInParent函数指针为空");
+                return 0;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<CreateTextEditInParentDelegate>(_ffi.ui_create_text_edit_in_parent);
+            return func(_widgetTree, parentId, width, height);
+        }
+
+        public static void TextEditSetText(ulong widgetId, string text)
+        {
+            if (_ffi.ui_text_edit_set_text == IntPtr.Zero)
+            {
+                Console.WriteLine("[C#] ERROR: TextEditSetText函数指针为空");
+                return;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<TextEditSetTextDelegate>(_ffi.ui_text_edit_set_text);
+            func(_widgetTree, widgetId, text);
         }
 
         public static ulong GetRootId()

@@ -27,6 +27,11 @@ pub type SetWidgetLayoutFn = extern "C" fn(WidgetTreeHandle, u64, f32, f32, f32,
 pub type SetPositionFn = extern "C" fn(WidgetTreeHandle, u64, f32, f32);
 pub type SetSizeFn = extern "C" fn(WidgetTreeHandle, u64, f32, f32);
 pub type RemoveWidgetFn = extern "C" fn(WidgetTreeHandle, u64);
+pub type CreateTextEditFn = extern "C" fn(WidgetTreeHandle, f32, f32) -> u64;
+pub type CreateTextEditInParentFn = extern "C" fn(WidgetTreeHandle, u64, f32, f32) -> u64;
+pub type TextEditSetTextFn = extern "C" fn(WidgetTreeHandle, u64, *const c_char);
+pub type TextEditInsertCharFn = extern "C" fn(WidgetTreeHandle, u64, c_char);
+pub type TextEditDeleteCharFn = extern "C" fn(WidgetTreeHandle, u64);
 
 #[repr(C)]
 pub struct FfiContext {
@@ -54,6 +59,11 @@ pub struct FfiContext {
     pub ui_widget_set_position: SetPositionFn,
     pub ui_widget_set_size: SetSizeFn,
     pub ui_remove_widget: RemoveWidgetFn,
+    pub ui_create_text_edit: CreateTextEditFn,
+    pub ui_create_text_edit_in_parent: CreateTextEditInParentFn,
+    pub ui_text_edit_set_text: TextEditSetTextFn,
+    pub ui_text_edit_insert_char: TextEditInsertCharFn,
+    pub ui_text_edit_delete_char: TextEditDeleteCharFn,
     pub widget_tree_ptr: WidgetTreeHandle,
 }
 
