@@ -21,6 +21,11 @@ namespace Hezhou
         private static Panel _dropdownMenu;
         private static VStack _menuItems;
         
+        private static Panel _scriptEditorPanel;
+        private static ulong _scriptTextEditId;
+        private static Label _scriptEditorLabel;
+        private static bool _scriptEditorVisible = false;
+        
         private static float _screenWidth = 1280f;
         private static float _screenHeight = 720f;
 
@@ -164,6 +169,45 @@ namespace Hezhou
         {
             Console.WriteLine($"[Editor] 点击\"新建\"按钮, id={widgetId}");
             ShowDropdownMenu(10, 45, new string[] { "新建场景", "新建脚本", "新建材质", "新建文件夹" });
+        }
+        
+        private static void OnNewScriptClick(ulong widgetId)
+        {
+            Console.WriteLine("[Editor] 创建新脚本...");
+            HideDropdownMenu();
+            ShowScriptEditor();
+        }
+        
+        private static void ShowScriptEditor()
+        {
+            if (_scriptEditorVisible) return;
+            
+            ulong rootId = UI.GetRootId();
+            float previewX = LEFT_PANEL_WIDTH;
+            float previewWidth = _screenWidth - LEFT_PANEL_WIDTH - RIGHT_PANEL_WIDTH;
+            float previewY = TOOLBAR_HEIGHT;
+            float previewHeight = _screenHeight - TOOLBAR_HEIGHT - STATUS_BAR_HEIGHT - BOTTOM_PANEL_HEIGHT;
+            
+            _scriptEditorPanel = new Panel(rootId, previewX, previewY, previewWidth, previewHeight, 0.1f, 0.1f, 0.12f, 1.0f);
+            
+            var hotReloadBtn = new Button(_scriptEditorPanel.Id, 100f, 30f, "Hot Reload");
+            UI.SetWidgetLayout(hotReloadBtn.Id, 10f, 10f, 100f, 30f);
+            hotReloadBtn.SetOnClick(OnHotReloadClick);
+            
+            _scriptEditorLabel = new Label(_scriptEditorPanel.Id, 200f, 25f, "Script Editor");
+            UI.SetWidgetLayout(_scriptEditorLabel.Id, 10f, 50f, 200f, 25f);
+            
+            _scriptTextEditId = UI.CreateTextEdit(_scriptEditorPanel.Id, previewWidth - 20f, previewHeight - 80f);
+            UI.SetWidgetLayout(_scriptTextEditId, 10f, 80f, previewWidth - 20f, previewHeight - 80f);
+            UI.TextEditSetText(_scriptTextEditId, "// New Script\nusing System;\n\npublic class NewScript\n{\n    public void Start()\n    {\n        \n    }\n}");
+            
+            _scriptEditorVisible = true;
+            Console.WriteLine("[Editor] Script Editor显示成功");
+        }
+        
+        private static void OnHotReloadClick(ulong widgetId)
+        {
+            Console.WriteLine("[Editor] Hot Reload triggered!");
         }
         
         private static void OnOpenClick(ulong widgetId)
