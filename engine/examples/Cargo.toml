@@ -74,3 +74,8 @@ required-features = ["mono"]
 name = "mono_ui_thunk_demo"
 path = "src/mono_ui_thunk_demo.rs"
 required-features = ["mono"]
+
+[[bin]]
+name = "mono_editor_demo"
+path = "src/mono_editor_demo.rs"
+required-features = ["mono"]

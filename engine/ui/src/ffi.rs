@@ -730,3 +730,36 @@ pub extern "C" fn ui_set_widget_layout(
         }
     }
 }
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_create_panel_in_parent(
+    handle: WidgetTreeHandle,
+    parent_id: u64,
+    x: f32,
+    y: f32,
+    width: f32,
+    height: f32,
+    r: f32,
+    g: f32,
+    b: f32,
+    a: f32,
+) -> u64 {
+    if handle.is_null() {
+        return 0;
+    }
+    unsafe {
+        let arc = &*(handle as *const Arc<Mutex<WidgetTree>>);
+        let mut tree = arc.lock();
+        let mut panel = Panel::new();
+        panel.set_layout(Layout::new(x, y, width, height));
+        panel.set_style(
+            Style::new()
+                .with_background(Color::new(r, g, b, a))
+                .with_border(Color::new(0.3, 0.3, 0.3, 1.0), 1.0, 0.0)
+        );
+        let id = panel.id();
+        let parent = WidgetId::from_raw(parent_id);
+        tree.add_widget(Box::new(panel), parent);
+        id.id
+    }
+}

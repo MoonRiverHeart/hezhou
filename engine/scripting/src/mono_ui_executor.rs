@@ -60,6 +60,23 @@ impl MonoUIExecutor {
         )
     }
 
+    pub fn call_static_with_ptr_namespace(
+        &self,
+        namespace: &str,
+        class_name: &str,
+        method_name: &str,
+        ptr_arg: usize,
+    ) -> Result<(), ScriptError> {
+        self.manager.execute_with_ptr(
+            &self.assembly_name,
+            namespace,
+            class_name,
+            method_name,
+            ptr_arg,
+            1,
+        )
+    }
+
     pub fn call_static_with_args(
         &self,
         class_name: &str,
