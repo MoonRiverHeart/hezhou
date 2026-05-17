@@ -8,6 +8,7 @@ pub type SetTextFn = extern "C" fn(WidgetTreeHandle, u64, *const c_char);
 pub type SetOnClickThunkPtrFn = extern "C" fn(WidgetTreeHandle, u64, *const c_void);
 pub type RegisterUpdateThunkPtrFn = extern "C" fn(*const c_void);
 pub type RegisterResizeThunkPtrFn = extern "C" fn(*const c_void);
+pub type RegisterGlobalClickThunkPtrFn = extern "C" fn(*const c_void);
 pub type TriggerResizeFn = extern "C" fn(f32, f32);
 pub type GetScreenSizeFn = extern "C" fn(*mut f32, *mut f32);
 
@@ -25,6 +26,7 @@ pub type GetRootIdFn = extern "C" fn(WidgetTreeHandle) -> u64;
 pub type SetWidgetLayoutFn = extern "C" fn(WidgetTreeHandle, u64, f32, f32, f32, f32);
 pub type SetPositionFn = extern "C" fn(WidgetTreeHandle, u64, f32, f32);
 pub type SetSizeFn = extern "C" fn(WidgetTreeHandle, u64, f32, f32);
+pub type RemoveWidgetFn = extern "C" fn(WidgetTreeHandle, u64);
 
 #[repr(C)]
 pub struct FfiContext {
@@ -34,6 +36,7 @@ pub struct FfiContext {
     pub ui_button_set_on_click_thunk_ptr: SetOnClickThunkPtrFn,
     pub ui_register_update_thunk_ptr: RegisterUpdateThunkPtrFn,
     pub ui_register_resize_thunk_ptr: RegisterResizeThunkPtrFn,
+    pub ui_register_global_click_thunk_ptr: RegisterGlobalClickThunkPtrFn,
     pub ui_trigger_resize: TriggerResizeFn,
     pub ui_get_screen_size: GetScreenSizeFn,
     pub ui_create_button: CreateButtonFn,
@@ -50,6 +53,7 @@ pub struct FfiContext {
     pub ui_set_widget_layout: SetWidgetLayoutFn,
     pub ui_widget_set_position: SetPositionFn,
     pub ui_widget_set_size: SetSizeFn,
+    pub ui_remove_widget: RemoveWidgetFn,
     pub widget_tree_ptr: WidgetTreeHandle,
 }
 

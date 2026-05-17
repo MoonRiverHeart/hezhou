@@ -603,6 +603,15 @@ pub extern "C" fn ui_register_resize_thunk_ptr(callback_ptr: *const std::ffi::c_
 }
 
 #[unsafe(no_mangle)]
+pub extern "C" fn ui_register_global_click_thunk_ptr(callback_ptr: *const std::ffi::c_void) {
+    if callback_ptr.is_null() {
+        return;
+    }
+    let callback: crate::thunk_manager::GlobalClickCallback = unsafe { std::mem::transmute(callback_ptr) };
+    crate::thunk_manager::ui_register_global_click_callback(callback);
+}
+
+#[unsafe(no_mangle)]
 pub extern "C" fn ui_trigger_resize(width: f32, height: f32) {
     crate::thunk_manager::trigger_resize_callback(width, height);
 }
@@ -614,12 +623,30 @@ pub extern "C" fn ui_set_screen_size(width: f32, height: f32) {
 
 #[unsafe(no_mangle)]
 pub extern "C" fn ui_get_screen_size(out_width: *mut f32, out_height: *mut f32) {
-    let (width, height) = crate::thunk_manager::ui_get_screen_size();
-    if !out_width.is_null() {
-        unsafe { *out_width = width; }
+    let (w, h) = crate::thunk_manager::ui_get_screen_size();
+    unsafe {
+        if !out_width.is_null() {
+            *out_width = w;
+        }
+        if !out_height.is_null() {
+            *out_height = h;
+        }
     }
-    if !out_height.is_null() {
-        unsafe { *out_height = height; }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_remove_widget(
+    handle: WidgetTreeHandle,
+    widget_id: u64,
+) {
+    if handle.is_null() {
+        return;
+    }
+    unsafe {
+        let arc = &*(handle as *const Arc<Mutex<WidgetTree>>);
+        let mut tree = arc.lock();
+        let id = WidgetId::from_raw(widget_id);
+        tree.remove_widget(id);
     }
 }
 

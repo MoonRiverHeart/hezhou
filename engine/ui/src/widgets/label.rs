@@ -111,13 +111,14 @@ impl Widget for Label {
     }
 
     fn draw(&mut self, canvas: &mut Canvas) {
-        let bounds = self.layout.bounds();
+        let width = self.layout.width;
+        let height = self.layout.height;
 
         if self.style.background_color.a > 0.0 {
-            canvas.draw_rect(bounds, &self.style);
+            canvas.draw_rect(Rect::new(0.0, 0.0, width, height), &self.style);
         }
 
-        canvas.draw_text(bounds, &self.text, &self.text_style);
+        canvas.draw_text(Rect::new(0.0, 0.0, width, height), &self.text, &self.text_style);
     }
 
     fn measure(&self, font_atlas: &crate::font_atlas::FontAtlas) -> (f32, f32) {

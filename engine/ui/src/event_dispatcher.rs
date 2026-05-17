@@ -1,9 +1,10 @@
 use crate::event::*;
+use crate::gesture::*;
 use crate::gesture_recognizer::*;
-use crate::gesture::GestureType;
+use crate::thunk_manager::*;
 use crate::types::*;
 use crate::widget_tree::*;
-use hezhou_dfx::*;
+use hezhou_dfx::DfxSystem;
 use parking_lot::Mutex;
 use std::sync::Arc;
 
@@ -58,18 +59,27 @@ impl EventDispatcher {
         if let Some(g) = gesture {
             if g.gesture_type == GestureType::Tap {
                 let mut tree = self.widget_tree.lock();
-                if let Some(widget) = tree.get_widget_mut(g.target) {
-                    if widget.widget_type() == "Button" {
+                let widget_type = tree.get_widget(g.target)
+                    .map(|w| w.widget_type())
+                    .unwrap_or("");
+                drop(tree);
+                
+                if widget_type == "Button" {
+                    let mut tree = self.widget_tree.lock();
+                    if let Some(widget) = tree.get_widget_mut(g.target) {
                         use crate::widgets::Button;
                         if let Some(button) = widget.as_any_mut().downcast_mut::<Button>() {
                             button.trigger_click();
                         }
                     }
+                    drop(tree);
+                    crate::thunk_manager::trigger_onclick_callback(g.target.id);
+                } else {
+                    crate::thunk_manager::ui_trigger_global_click(click_point.x, click_point.y);
                 }
-                drop(tree);
-                
-                crate::thunk_manager::trigger_onclick_callback(g.target.id);
             }
+        } else if event.event_type == EventType::TouchEnd {
+            crate::thunk_manager::ui_trigger_global_click(click_point.x, click_point.y);
         }
     }
 

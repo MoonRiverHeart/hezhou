@@ -20,7 +20,6 @@ namespace Hezhou
         
         private static Panel _dropdownMenu;
         private static VStack _menuItems;
-        private static bool _menuVisible = false;
         
         private static float _screenWidth = 1280f;
         private static float _screenHeight = 720f;
@@ -43,6 +42,7 @@ namespace Hezhou
             CreateEditorLayout();
             
             UI.RegisterResizeCallback(OnResize);
+            UI.RegisterGlobalClickCallback(OnGlobalClick);
             
             Console.WriteLine("[Editor] 编辑器初始化完成");
         }
@@ -185,31 +185,38 @@ namespace Hezhou
             Console.WriteLine("[Editor] 开始运行游戏...");
         }
         
+        private static void OnGlobalClick(float x, float y)
+        {
+            Console.WriteLine($"[Editor] GlobalClick at ({x}, {y})");
+            HideDropdownMenu();
+        }
+        
         private static void ShowDropdownMenu(float x, float y, string[] items)
         {
-            if (_menuVisible)
-            {
-                HideDropdownMenu();
-            }
+            HideDropdownMenu();
             
             ulong rootId = UI.GetRootId();
             _dropdownMenu = new Panel(rootId, x, y, 150, items.Length * 25 + 5, 0.25f, 0.25f, 0.25f, 0.95f);
             _menuItems = new VStack(_dropdownMenu.Id, 2f);
-            _menuItems.SetPosition(5, 5);
+_menuItems.SetPosition(5, 5);
             
             foreach (var item in items)
             {
                 _menuItems.AddLabel(140, 20, item);
             }
             
-            _menuVisible = true;
             Console.WriteLine($"[Editor] 显示下拉菜单: {items.Length}项");
         }
         
-private static void HideDropdownMenu()
+        private static void HideDropdownMenu()
         {
-            _menuVisible = false;
-            Console.WriteLine("[Editor] 隐藏下拉菜单");
+            if (_dropdownMenu != null)
+            {
+                UI.RemoveWidget(_dropdownMenu.Id);
+                _dropdownMenu = null;
+                _menuItems = null;
+                Console.WriteLine("[Editor] 隐藏下拉菜单");
+            }
         }
     }
 }

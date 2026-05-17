@@ -145,7 +145,8 @@ impl Widget for Button {
     }
 
     fn draw(&mut self, canvas: &mut Canvas) {
-        let bounds = self.layout.bounds();
+        let width = self.layout.width;
+        let height = self.layout.height;
 
         let current_style = match self.state {
             WidgetState::Hovered => Style::new()
@@ -160,9 +161,9 @@ impl Widget for Button {
             _ => self.style,
         };
 
-        canvas.draw_rect(bounds, &current_style);
+        canvas.draw_rect(Rect::new(0.0, 0.0, width, height), &current_style);
 
-        canvas.draw_text(bounds, &self.text, &self.text_style);
+        canvas.draw_text(Rect::new(0.0, 0.0, width, height), &self.text, &self.text_style);
     }
 
     fn on_event(&mut self, event: &Event) -> EventResult {

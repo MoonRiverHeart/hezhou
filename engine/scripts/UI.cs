@@ -47,9 +47,12 @@ namespace Hezhou
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public delegate void SetPositionDelegate(IntPtr handle, ulong widgetId, float x, float y);
 
-        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public delegate void SetSizeDelegate(IntPtr handle, ulong widgetId, float width, float height);
-
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void RemoveWidgetDelegate(IntPtr handle, ulong widgetId);
+        
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public delegate void RegisterResizeDelegate(IntPtr callbackPtr);
 
@@ -65,6 +68,7 @@ namespace Hezhou
             public IntPtr ui_button_set_on_click_thunk_ptr;
             public IntPtr ui_register_update_thunk_ptr;
             public IntPtr ui_register_resize_thunk_ptr;
+            public IntPtr ui_register_global_click_thunk_ptr;
             public IntPtr ui_trigger_resize;
             public IntPtr ui_get_screen_size;
             public IntPtr ui_create_button;
@@ -81,6 +85,7 @@ namespace Hezhou
             public IntPtr ui_set_widget_layout;
             public IntPtr ui_widget_set_position;
             public IntPtr ui_widget_set_size;
+            public IntPtr ui_remove_widget;
             public IntPtr widget_tree_ptr;
         }
 
@@ -103,15 +108,29 @@ namespace Hezhou
             func(out width, out height);
         }
 
-        public static void RegisterResizeCallback(ResizeCallbackDelegate callback)
+public static void RegisterResizeCallback(ResizeCallbackDelegate callback)
         {
+            IntPtr callbackPtr = Marshal.GetFunctionPointerForDelegate(callback);
+            
             if (_ffi.ui_register_resize_thunk_ptr == IntPtr.Zero)
             {
-                Console.WriteLine("[C#] ERROR: RegisterResize函数指针为空");
+                Console.WriteLine("[C#] ERROR: RegisterResizeThunkPtr函数指针为空");
                 return;
             }
-            IntPtr callbackPtr = Marshal.GetFunctionPointerForDelegate(callback);
             var func = Marshal.GetDelegateForFunctionPointer<RegisterResizeDelegate>(_ffi.ui_register_resize_thunk_ptr);
+            func(callbackPtr);
+        }
+        
+        public static void RegisterGlobalClickCallback(GlobalClickCallbackDelegate callback)
+        {
+            IntPtr callbackPtr = Marshal.GetFunctionPointerForDelegate(callback);
+            
+            if (_ffi.ui_register_global_click_thunk_ptr == IntPtr.Zero)
+            {
+                Console.WriteLine("[C#] ERROR: RegisterGlobalClickThunkPtr函数指针为空");
+                return;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<RegisterGlobalClickDelegate>(_ffi.ui_register_global_click_thunk_ptr);
             func(callbackPtr);
         }
 
@@ -221,6 +240,17 @@ namespace Hezhou
             func(_widgetTree, widgetId, x, y, width, height);
         }
 
+        public static void RemoveWidget(ulong widgetId)
+        {
+            if (_ffi.ui_remove_widget == IntPtr.Zero)
+            {
+                Console.WriteLine("[C#] ERROR: RemoveWidget函数指针为空");
+                return;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<RemoveWidgetDelegate>(_ffi.ui_remove_widget);
+            func(_widgetTree, widgetId);
+        }
+
         public static void SetText(ulong widgetId, string text)
         {
             if (_ffi.ui_widget_set_text == IntPtr.Zero)
@@ -249,6 +279,12 @@ namespace Hezhou
         
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public delegate void ResizeCallbackDelegate(float width, float height);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void GlobalClickCallbackDelegate(float x, float y);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void RegisterGlobalClickDelegate(IntPtr callbackPtr);
     }
 
     public class VStack

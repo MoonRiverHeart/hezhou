@@ -108,8 +108,9 @@ impl Widget for HStack {
     }
 
     fn draw(&mut self, canvas: &mut Canvas) {
-        let bounds = self.layout.bounds();
-        canvas.draw_rect(bounds, &self.style);
+        let width = self.layout.width;
+        let height = self.layout.height;
+        canvas.draw_rect(Rect::new(0.0, 0.0, width, height), &self.style);
     }
 
     fn on_event(&mut self, _event: &Event) -> EventResult {

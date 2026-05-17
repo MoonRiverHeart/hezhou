@@ -8,6 +8,7 @@ pub type UpdateCallback = extern "C" fn(f32);
 pub type WidgetCallback = extern "C" fn(u64);
 pub type InitCallback = extern "C" fn();
 pub type ResizeCallback = extern "C" fn(f32, f32);
+pub type GlobalClickCallback = extern "C" fn(f32, f32);
 
 static UI_CALLBACKS: LazyLock<Mutex<UICallbacks>> =
     LazyLock::new(|| Mutex::new(UICallbacks::new()));
@@ -23,6 +24,7 @@ pub struct UICallbacks {
     onclicks: HashMap<u64, WidgetCallback>,
     on_init: Option<InitCallback>,
     on_resize: Option<ResizeCallback>,
+    on_global_click: Option<GlobalClickCallback>,
 }
 
 impl UICallbacks {
@@ -32,6 +34,7 @@ impl UICallbacks {
             onclicks: HashMap::new(),
             on_init: None,
             on_resize: None,
+            on_global_click: None,
         }
     }
     
@@ -40,6 +43,7 @@ impl UICallbacks {
         self.onclicks.clear();
         self.on_init = None;
         self.on_resize = None;
+        self.on_global_click = None;
     }
 }
 
@@ -69,6 +73,20 @@ pub extern "C" fn ui_register_resize_callback(callback: ResizeCallback) {
     let mut callbacks = UI_CALLBACKS.lock();
     callbacks.on_resize = Some(callback);
     dfx_info!("UI", "注册Resize回调: {:?}", callback);
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_register_global_click_callback(callback: GlobalClickCallback) {
+    let mut callbacks = UI_CALLBACKS.lock();
+    callbacks.on_global_click = Some(callback);
+    dfx_info!("UI", "注册GlobalClick回调: {:?}", callback);
+}
+
+pub fn ui_trigger_global_click(x: f32, y: f32) {
+    let callbacks = UI_CALLBACKS.lock();
+    if let Some(callback) = callbacks.on_global_click {
+        callback(x, y);
+    }
 }
 
 pub fn ui_set_screen_size(width: f32, height: f32) {

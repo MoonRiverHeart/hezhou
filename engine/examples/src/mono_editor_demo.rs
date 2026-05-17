@@ -36,6 +36,7 @@ fn main() {
         ui_button_set_on_click_thunk_ptr: unsafe { std::mem::transmute(ui_ffi::ui_button_set_on_click_thunk_ptr as *const std::ffi::c_void) },
         ui_register_update_thunk_ptr: ui_ffi::ui_register_update_thunk_ptr,
         ui_register_resize_thunk_ptr: ui_ffi::ui_register_resize_thunk_ptr,
+        ui_register_global_click_thunk_ptr: ui_ffi::ui_register_global_click_thunk_ptr,
         ui_trigger_resize: ui_ffi::ui_trigger_resize,
         ui_get_screen_size: ui_ffi::ui_get_screen_size,
         ui_create_button: unsafe { std::mem::transmute(ui_ffi::ui_create_button as *const std::ffi::c_void) },
@@ -52,6 +53,7 @@ fn main() {
         ui_set_widget_layout: unsafe { std::mem::transmute(ui_ffi::ui_set_widget_layout as *const std::ffi::c_void) },
         ui_widget_set_position: unsafe { std::mem::transmute(ui_ffi::ui_widget_set_position as *const std::ffi::c_void) },
         ui_widget_set_size: unsafe { std::mem::transmute(ui_ffi::ui_widget_set_size as *const std::ffi::c_void) },
+        ui_remove_widget: unsafe { std::mem::transmute(ui_ffi::ui_remove_widget as *const std::ffi::c_void) },
         widget_tree_ptr: widget_tree_handle,
     };
     hezhou_scripting::ffi_context::set_ffi_context(ffi_ctx);

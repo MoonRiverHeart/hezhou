@@ -107,13 +107,14 @@ impl Widget for Panel {
     }
 
     fn draw(&mut self, canvas: &mut Canvas) {
-        let bounds = self.layout.bounds();
+        let width = self.layout.width;
+        let height = self.layout.height;
 
         if self.style.shadow.is_some() {
-            canvas.draw_shadow(bounds, self.style.shadow.as_ref().unwrap());
+            canvas.draw_shadow(Rect::new(0.0, 0.0, width, height), self.style.shadow.as_ref().unwrap());
         }
 
-        canvas.draw_rect(bounds, &self.style);
+        canvas.draw_rect(Rect::new(0.0, 0.0, width, height), &self.style);
     }
 
     fn on_event(&mut self, event: &Event) -> EventResult {
