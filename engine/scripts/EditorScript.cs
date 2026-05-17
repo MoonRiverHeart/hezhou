@@ -184,6 +184,15 @@ namespace Hezhou
         {
             if (_scriptEditorVisible) return;
             
+            Console.WriteLine("[Editor] ShowScriptEditor开始...");
+            
+            if (_previewPanel != null)
+            {
+                Console.WriteLine("[Editor] 移除previewPanel...");
+                UI.RemoveWidget(_previewPanel.Id);
+                _previewPanel = null;
+            }
+            
             ulong rootId = UI.GetRootId();
             float previewX = LEFT_PANEL_WIDTH;
             float previewWidth = _screenWidth - LEFT_PANEL_WIDTH - RIGHT_PANEL_WIDTH;
