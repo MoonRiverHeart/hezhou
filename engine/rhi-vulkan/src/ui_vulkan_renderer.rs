@@ -1205,35 +1205,6 @@ let font_atlas = self.ui_system.lock().get_font_atlas();
                 let mut tree_guard = tree.lock();
                 let font_atlas = ui.get_font_atlas();
                 tree_guard.perform_layout(font_atlas);
-                
-                if self.frame_count == 0 {
-                    if let Some(root_id) = tree_guard.root {
-                        for child in tree_guard.get_children(root_id) {
-                            let widget_type = tree_guard.get_widget(*child)
-                                .map(|w| w.widget_type())
-                                .unwrap_or("unknown");
-                            let layout = tree_guard.get_widget(*child)
-                                .map(|w| *w.layout())
-                                .unwrap_or(hezhou_ui::Layout::zero());
-                            println!("[Debug] Root child: type={}, id={}, x={}, y={}, w={}, h={}", 
-                                widget_type, child.id, layout.x, layout.y, layout.width, layout.height);
-                            
-                            if widget_type == "VStack" {
-                                for subchild in tree_guard.get_children(*child) {
-                                    let sub_type = tree_guard.get_widget(*subchild)
-                                        .map(|w| w.widget_type())
-                                        .unwrap_or("unknown");
-                                    let sub_layout = tree_guard.get_widget(*subchild)
-                                        .map(|w| *w.layout())
-                                        .unwrap_or(hezhou_ui::Layout::zero());
-                                    println!("[Debug]   VStack child: type={}, id={}, x={}, y={}, w={}, h={}",
-                                        sub_type, subchild.id, sub_layout.x, sub_layout.y, sub_layout.width, sub_layout.height);
-                                }
-                            }
-                        }
-                    }
-                }
-                
                 tree_guard.generate_render_data()
             };
             
