@@ -208,33 +208,36 @@ impl FontAtlas {
         (total_width, max_height)
     }
     
-    pub fn layout_text_centered(
+    pub fn layout_text_left(
         &self,
         font_index: usize,
         text: &str,
         font_size: f32,
         container_x: f32,
         container_y: f32,
-        container_width: f32,
         container_height: f32,
     ) -> Vec<(f32, f32, usize, usize, f32, f32, f32, f32)> {
         if font_index >= self.fonts.len() || text.is_empty() {
             return Vec::new();
         }
         
-        let (text_width, text_height) = self.measure_text(font_index, text, font_size);
+        let max_bearing_y = text.chars()
+            .filter_map(|c| self.get_char_info(font_index, c, font_size))
+            .map(|info| info.bearing_y)
+            .fold(0.0f32, f32::max);
         
-        let start_x = container_x + (container_width - text_width) / 2.0;
-        let start_y = container_y + (container_height - text_height) / 2.0;
+        let baseline_y = container_y + max_bearing_y;
         
         let mut result = Vec::new();
-        let mut cursor_x = start_x;
+        let mut cursor_x = container_x;
         
         for character in text.chars() {
             if let Some(info) = self.get_char_info(font_index, character, font_size) {
+                let char_y = baseline_y - info.bearing_y;
+                
                 result.push((
                     cursor_x,
-                    start_y,
+                    char_y,
                     info.width as usize,
                     info.height as usize,
                     info.uv_x,
@@ -250,32 +253,40 @@ impl FontAtlas {
         result
     }
     
-    pub fn layout_text_left(
+    pub fn layout_text_centered(
         &self,
         font_index: usize,
         text: &str,
         font_size: f32,
         container_x: f32,
         container_y: f32,
+        container_width: f32,
         container_height: f32,
     ) -> Vec<(f32, f32, usize, usize, f32, f32, f32, f32)> {
         if font_index >= self.fonts.len() || text.is_empty() {
             return Vec::new();
         }
         
-        let (_, text_height) = self.measure_text(font_index, text, font_size);
+        let (text_width, _) = self.measure_text(font_index, text, font_size);
         
-        let start_x = container_x;
-        let start_y = container_y + (container_height - text_height) / 2.0;
+        let max_bearing_y = text.chars()
+            .filter_map(|c| self.get_char_info(font_index, c, font_size))
+            .map(|info| info.bearing_y)
+            .fold(0.0f32, f32::max);
+        
+        let baseline_y = container_y + container_height / 2.0 + max_bearing_y / 2.0;
+        let start_x = container_x + (container_width - text_width) / 2.0;
         
         let mut result = Vec::new();
         let mut cursor_x = start_x;
         
         for character in text.chars() {
             if let Some(info) = self.get_char_info(font_index, character, font_size) {
+                let char_y = baseline_y - info.bearing_y;
+                
                 result.push((
                     cursor_x,
-                    start_y,
+                    char_y,
                     info.width as usize,
                     info.height as usize,
                     info.uv_x,
