@@ -41,6 +41,16 @@ impl UIInputHandler {
             PlatformEventKind::Touch => {
             }
             PlatformEventKind::Key => {
+                unsafe {
+                    let key_event = event.data.key;
+                    self.on_key_event(&key_event, event.timestamp);
+                }
+            }
+            PlatformEventKind::Char => {
+                unsafe {
+                    let char_event = event.data.char_event;
+                    self.on_char_event(&char_event, event.timestamp);
+                }
             }
             PlatformEventKind::Mouse => {
             }
@@ -143,6 +153,13 @@ impl UIInputHandler {
         self.event_dispatcher.lock().dispatch_event(&mut event);
     }
 
+    pub fn on_char_event(&mut self, char_event: &CharEvent, timestamp: u64) {
+        let mut event = Event::new(EventType::KeyDown, timestamp)
+            .with_data(EventData::Key(KeyData::new(0, 0).with_unicode(char_event.codepoint)));
+
+        self.event_dispatcher.lock().dispatch_event(&mut event);
+    }
+
     pub fn on_resize(&mut self, width: i32, height: i32) {
         self.screen_width = width as f32;
         self.screen_height = height as f32;
@@ -154,6 +171,7 @@ fn convert_mouse_button(platform_button: hezhou_platform::MouseButton) -> MouseB
         hezhou_platform::MouseButton::Left => MouseButton::Left,
         hezhou_platform::MouseButton::Right => MouseButton::Right,
         hezhou_platform::MouseButton::Middle => MouseButton::Middle,
+        hezhou_platform::MouseButton::None => MouseButton::None,
     }
 }
 

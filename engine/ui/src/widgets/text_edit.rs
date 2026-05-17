@@ -201,6 +201,23 @@ impl Widget for TextEdit {
                 self.flags.dirty_render = true;
                 return EventResult::Handled;
             }
+            EventType::KeyDown => {
+                if self.focused {
+                    if let EventData::Key(key_data) = &event.data {
+                        if key_data.unicode_char > 0 && key_data.unicode_char < 128 {
+                            let c = char::from_u32(key_data.unicode_char).unwrap_or('\0');
+                            if c != '\0' {
+                                self.insert_char(c);
+                                return EventResult::Handled;
+                            }
+                        }
+                        if key_data.keycode == 40 {
+                            self.delete_char();
+                            return EventResult::Handled;
+                        }
+                    }
+                }
+            }
             _ => {}
         }
         EventResult::Ignored

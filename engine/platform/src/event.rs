@@ -3,6 +3,18 @@
 pub struct PlatformEvent {
     pub kind: PlatformEventKind,
     pub timestamp: u64,
+    pub data: PlatformEventData,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub union PlatformEventData {
+    pub touch: TouchEvent,
+    pub key: KeyEvent,
+    pub char_event: CharEvent,
+    pub mouse: MouseEvent,
+    pub window: WindowEvent,
+    pub lifecycle: LifecycleEvent,
 }
 
 #[repr(C)]
@@ -10,6 +22,7 @@ pub struct PlatformEvent {
 pub enum PlatformEventKind {
     Touch,
     Key,
+    Char,
     Mouse,
     WindowResize,
     WindowClose,
@@ -17,6 +30,7 @@ pub enum PlatformEventKind {
 }
 
 #[repr(C)]
+#[derive(Clone, Copy)]
 pub struct TouchEvent {
     pub action: TouchAction,
     pub x: f32,
@@ -34,10 +48,17 @@ pub enum TouchAction {
 }
 
 #[repr(C)]
+#[derive(Clone, Copy)]
 pub struct KeyEvent {
     pub action: KeyAction,
     pub keycode: KeyCode,
     pub modifiers: KeyModifiers,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct CharEvent {
+    pub codepoint: u32,
 }
 
 #[repr(C)]
@@ -116,6 +137,7 @@ pub struct KeyModifiers {
 }
 
 #[repr(C)]
+#[derive(Clone, Copy)]
 pub struct MouseEvent {
     pub action: MouseAction,
     pub button: MouseButton,
@@ -137,18 +159,21 @@ pub enum MouseAction {
 #[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum MouseButton {
+    None = 3,
     Left = 0,
     Right = 1,
     Middle = 2,
 }
 
 #[repr(C)]
+#[derive(Clone, Copy)]
 pub struct WindowEvent {
     pub width: i32,
     pub height: i32,
 }
 
 #[repr(C)]
+#[derive(Clone, Copy)]
 pub struct LifecycleEvent {
     pub state: LifecycleState,
 }
@@ -167,6 +192,7 @@ pub enum LifecycleState {
 unsafe impl Send for PlatformEvent {}
 unsafe impl Send for TouchEvent {}
 unsafe impl Send for KeyEvent {}
+unsafe impl Send for CharEvent {}
 unsafe impl Send for MouseEvent {}
 unsafe impl Send for WindowEvent {}
 unsafe impl Send for LifecycleEvent {}

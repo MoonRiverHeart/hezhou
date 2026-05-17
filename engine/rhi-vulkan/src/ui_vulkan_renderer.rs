@@ -5,7 +5,7 @@ use glfw::{Glfw, PWindow, GlfwReceiver, WindowEvent, WindowMode, Action, Key};
 use std::ffi::CString;
 use std::collections::HashMap;
 use hezhou_ui::{UISystem, UIInputHandler, Panel, Button, Label, Layout, DrawCommand, Widget, Style, Color, TextStyle, ffi::WidgetTreeHandle, ffi::ui_set_primary_button_id};
-use hezhou_platform::{MouseAction, MouseEvent, MouseButton};
+use hezhou_platform::{MouseAction, MouseEvent, MouseButton, CharEvent, KeyEvent, KeyAction, KeyCode, KeyModifiers};
 use hezhou_dfx::{DfxSystem, LogLevel};
 use parking_lot::Mutex;
 use std::sync::Arc;
@@ -1506,7 +1506,22 @@ self.dfx.lock().get_logger().lock().log(
                         if key == Key::Space {
                             self.space_pressed = true;
                         }
+                        if key == Key::Backspace {
+                            self.input_handler.lock().on_key_event(&KeyEvent {
+                                action: KeyAction::Press,
+                                keycode: KeyCode::Backspace,
+                                modifiers: KeyModifiers::default(),
+                            }, self.frame_count);
+                        }
                         self.dfx.lock().get_logger().lock().log(LogLevel::Info, "GLFW", &format!("Key pressed: {:?}", key), file!(), line!());
+                    }
+                }
+                WindowEvent::Char(codepoint) => {
+                    if codepoint >= '\0' && codepoint <= '\x7F' {
+                        self.input_handler.lock().on_char_event(&CharEvent {
+                            codepoint: codepoint as u32,
+                        }, self.frame_count);
+                        self.dfx.lock().get_logger().lock().log(LogLevel::Info, "GLFW", &format!("Char input: {} ({})", codepoint, codepoint as u32), file!(), line!());
                     }
                 }
                 WindowEvent::Close => {

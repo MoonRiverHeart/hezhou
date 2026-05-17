@@ -151,6 +151,11 @@ impl Platform for GLFWPlatform {
                     events.push(PlatformEvent {
                         kind: PlatformEventKind::WindowClose,
                         timestamp: (time * 1000.0) as u64,
+                        data: PlatformEventData {
+                            lifecycle: LifecycleEvent {
+                                state: LifecycleState::Destroy,
+                            },
+                        },
                     });
                 }
             }
@@ -221,6 +226,25 @@ impl GLFWPlatform {
                 PlatformEvent {
                     kind: PlatformEventKind::Key,
                     timestamp,
+                    data: PlatformEventData {
+                        key: KeyEvent {
+                            action: _key_action,
+                            keycode: _keycode,
+                            modifiers: KeyModifiers::default(),
+                        },
+                    },
+                }
+            }
+
+            glfw::WindowEvent::Char(codepoint) => {
+                PlatformEvent {
+                    kind: PlatformEventKind::Char,
+                    timestamp,
+                    data: PlatformEventData {
+                        char_event: CharEvent {
+                            codepoint: codepoint as u32,
+                        },
+                    },
                 }
             }
 
@@ -241,6 +265,16 @@ impl GLFWPlatform {
                 PlatformEvent {
                     kind: PlatformEventKind::Mouse,
                     timestamp,
+                    data: PlatformEventData {
+                        mouse: MouseEvent {
+                            action: _mouse_action,
+                            button: _mouse_button,
+                            x: *last_mouse_x as f32,
+                            y: *last_mouse_y as f32,
+                            dx: 0.0,
+                            dy: 0.0,
+                        },
+                    },
                 }
             }
 
@@ -253,27 +287,66 @@ impl GLFWPlatform {
                 PlatformEvent {
                     kind: PlatformEventKind::Mouse,
                     timestamp,
+                    data: PlatformEventData {
+                        mouse: MouseEvent {
+                            action: MouseAction::Move,
+                            button: MouseButton::None,
+                            x: x as f32,
+                            y: y as f32,
+                            dx: _dx as f32,
+                            dy: _dy as f32,
+                        },
+                    },
                 }
             }
 
             glfw::WindowEvent::Scroll(_x, _y) => PlatformEvent {
                 kind: PlatformEventKind::Mouse,
                 timestamp,
+                data: PlatformEventData {
+                    mouse: MouseEvent {
+                        action: MouseAction::Scroll,
+                        button: MouseButton::None,
+                        x: *last_mouse_x as f32,
+                        y: *last_mouse_y as f32,
+                        dx: 0.0,
+                        dy: 0.0,
+                    },
+                },
             },
 
             glfw::WindowEvent::Size(_width, _height) => PlatformEvent {
                 kind: PlatformEventKind::WindowResize,
                 timestamp,
+                data: PlatformEventData {
+                    window: WindowEvent {
+                        width: _width,
+                        height: _height,
+                    },
+                },
             },
 
             glfw::WindowEvent::Close => PlatformEvent {
                 kind: PlatformEventKind::WindowClose,
                 timestamp,
+                data: PlatformEventData {
+                    lifecycle: LifecycleEvent {
+                        state: LifecycleState::Destroy,
+                    },
+                },
             },
 
             _ => PlatformEvent {
                 kind: PlatformEventKind::Touch,
                 timestamp,
+                data: PlatformEventData {
+                    touch: TouchEvent {
+                        action: TouchAction::Cancel,
+                        x: 0.0,
+                        y: 0.0,
+                        pointer_id: 0,
+                    },
+                },
             },
         }
     }
