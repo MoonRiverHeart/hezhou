@@ -6,11 +6,16 @@ namespace Hezhou
     public static class EditorScript
     {
         private static Panel _toolbar;
+        private static HStack _toolbarButtons;
         private static Panel _projectPanel;
+        private static VStack _projectTree;
         private static Panel _assetPanel;
+        private static VStack _assetList;
         private static Panel _previewPanel;
         private static Panel _propertiesPanel;
+        private static VStack _propsList;
         private static Panel _statusBar;
+        private static HStack _statusItems;
         private static Label _fpsLabel;
         
         private static float _screenWidth = 1280f;
@@ -53,45 +58,51 @@ namespace Hezhou
             Console.WriteLine($"[Editor] RootId={rootId}");
 
             _toolbar = new Panel(rootId, 0, toolbarY, _screenWidth, TOOLBAR_HEIGHT, 0.15f, 0.15f, 0.15f, 1.0f);
-            Console.WriteLine($"[Editor] Toolbar created, id={_toolbar.Id}");
-            _toolbar.AddButton(80f, 30f, "新建");
-            _toolbar.AddButton(80f, 30f, "打开");
-            _toolbar.AddButton(80f, 30f, "保存");
-            _toolbar.AddButton(80f, 30f, "运行");
+            _toolbarButtons = new HStack(_toolbar.Id, 10f);
+            _toolbarButtons.SetPosition(10f, 5f);
+            _toolbarButtons.AddButton(80f, 30f, "新建");
+            _toolbarButtons.AddButton(80f, 30f, "打开");
+            _toolbarButtons.AddButton(80f, 30f, "保存");
+            _toolbarButtons.AddButton(80f, 30f, "运行");
             Console.WriteLine("[Editor] 工具栏创建完成");
 
             _projectPanel = new Panel(rootId, 0, mainY, LEFT_PANEL_WIDTH, mainHeight, 0.2f, 0.2f, 0.2f, 1.0f);
-            _projectPanel.AddLabel(LEFT_PANEL_WIDTH - 20f, 25f, "项目结构");
-            ulong projectTreeId = _projectPanel.AddPanel(10f, 35f, LEFT_PANEL_WIDTH - 20f, mainHeight - 50f, 0.25f, 0.25f, 0.25f, 1.0f);
-            UI.CreateLabel(projectTreeId, LEFT_PANEL_WIDTH - 40f, 20f, "├─ Assets");
-            UI.CreateLabel(projectTreeId, LEFT_PANEL_WIDTH - 40f, 20f, "├─ Scenes");
-            UI.CreateLabel(projectTreeId, LEFT_PANEL_WIDTH - 40f, 20f, "└─ Scripts");
+            UI.CreateLabel(_projectPanel.Id, 10f, 10f, LEFT_PANEL_WIDTH - 20f, 25f, "项目结构");
+            _projectTree = new VStack(_projectPanel.Id, 5f);
+            _projectTree.SetPosition(10f, 40f);
+            _projectTree.AddLabel(LEFT_PANEL_WIDTH - 40f, 20f, "├─ Assets");
+            _projectTree.AddLabel(LEFT_PANEL_WIDTH - 40f, 20f, "├─ Scenes");
+            _projectTree.AddLabel(LEFT_PANEL_WIDTH - 40f, 20f, "└─ Scripts");
             Console.WriteLine("[Editor] 项目结构面板创建完成");
 
             _assetPanel = new Panel(rootId, 0, bottomY, LEFT_PANEL_WIDTH, BOTTOM_PANEL_HEIGHT, 0.2f, 0.2f, 0.2f, 1.0f);
-            _assetPanel.AddLabel(LEFT_PANEL_WIDTH - 20f, 25f, "资产管理");
-            ulong assetListId = _assetPanel.AddPanel(10f, 35f, LEFT_PANEL_WIDTH - 20f, BOTTOM_PANEL_HEIGHT - 50f, 0.25f, 0.25f, 0.25f, 1.0f);
-            UI.CreateLabel(assetListId, LEFT_PANEL_WIDTH - 40f, 20f, "Textures: 0");
-            UI.CreateLabel(assetListId, LEFT_PANEL_WIDTH - 40f, 20f, "Models: 0");
-            UI.CreateLabel(assetListId, LEFT_PANEL_WIDTH - 40f, 20f, "Scripts: 1");
+            UI.CreateLabel(_assetPanel.Id, 10f, 10f, LEFT_PANEL_WIDTH - 20f, 25f, "资产管理");
+            _assetList = new VStack(_assetPanel.Id, 5f);
+            _assetList.SetPosition(10f, 40f);
+            _assetList.AddLabel(LEFT_PANEL_WIDTH - 40f, 20f, "Textures: 0");
+            _assetList.AddLabel(LEFT_PANEL_WIDTH - 40f, 20f, "Models: 0");
+            _assetList.AddLabel(LEFT_PANEL_WIDTH - 40f, 20f, "Scripts: 1");
             Console.WriteLine("[Editor] 资产管理面板创建完成");
 
             _previewPanel = new Panel(rootId, previewX, mainY, previewWidth, mainHeight + BOTTOM_PANEL_HEIGHT, 0.1f, 0.1f, 0.1f, 1.0f);
-            _previewPanel.AddLabel(previewWidth - 20f, 25f, "游戏预览");
+            UI.CreateLabel(_previewPanel.Id, 10f, 10f, previewWidth - 20f, 25f, "游戏预览");
             Console.WriteLine("[Editor] 游戏预览面板创建完成");
 
             _propertiesPanel = new Panel(rootId, _screenWidth - RIGHT_PANEL_WIDTH, mainY, RIGHT_PANEL_WIDTH, mainHeight + BOTTOM_PANEL_HEIGHT, 0.2f, 0.2f, 0.2f, 1.0f);
-            _propertiesPanel.AddLabel(RIGHT_PANEL_WIDTH - 20f, 25f, "属性编辑");
-            ulong propsContentId = _propertiesPanel.AddPanel(10f, 35f, RIGHT_PANEL_WIDTH - 20f, mainHeight, 0.25f, 0.25f, 0.25f, 1.0f);
-            UI.CreateLabel(propsContentId, RIGHT_PANEL_WIDTH - 40f, 20f, "选中: 无");
-            UI.CreateLabel(propsContentId, RIGHT_PANEL_WIDTH - 40f, 20f, "位置: (0, 0)");
-            UI.CreateLabel(propsContentId, RIGHT_PANEL_WIDTH - 40f, 20f, "大小: (0, 0)");
+            UI.CreateLabel(_propertiesPanel.Id, 10f, 10f, RIGHT_PANEL_WIDTH - 20f, 25f, "属性编辑");
+            _propsList = new VStack(_propertiesPanel.Id, 5f);
+            _propsList.SetPosition(10f, 40f);
+            _propsList.AddLabel(RIGHT_PANEL_WIDTH - 40f, 20f, "选中: 无");
+            _propsList.AddLabel(RIGHT_PANEL_WIDTH - 40f, 20f, "位置: (0, 0)");
+            _propsList.AddLabel(RIGHT_PANEL_WIDTH - 40f, 20f, "大小: (0, 0)");
             Console.WriteLine("[Editor] 属性面板创建完成");
 
             _statusBar = new Panel(rootId, 0, statusY, _screenWidth, STATUS_BAR_HEIGHT, 0.12f, 0.12f, 0.12f, 1.0f);
-            _fpsLabel = new Label(_statusBar.Id, 100f, 20f, "FPS: 0");
-            _statusBar.AddLabel(150f, 20f, "状态: 就绪");
-            _statusBar.AddLabel(150f, 20f, "项目: 未命名");
+            _statusItems = new HStack(_statusBar.Id, 20f);
+            _statusItems.SetPosition(10f, 5f);
+            _fpsLabel = new Label(_statusItems.Id, 100f, 20f, "FPS: 0");
+            _statusItems.AddLabel(150f, 20f, "状态: 就绪");
+            _statusItems.AddLabel(150f, 20f, "项目: 未命名");
             Console.WriteLine("[Editor] 状态栏创建完成");
         }
 
@@ -127,7 +138,10 @@ namespace Hezhou
 
         public static void Update(float deltaTime)
         {
-            _fpsLabel.Text = $"FPS: {((int)(1000f / deltaTime))}";
+            if (deltaTime > 0)
+            {
+                _fpsLabel.Text = $"FPS: {((int)(1000f / deltaTime))}";
+            }
         }
     }
 }

@@ -643,6 +643,32 @@ pub extern "C" fn ui_create_vstack(
 }
 
 #[unsafe(no_mangle)]
+pub extern "C" fn ui_create_vstack_in_parent(
+    handle: WidgetTreeHandle,
+    parent_id: u64,
+    spacing: f32,
+) -> u64 {
+    if handle.is_null() {
+        return 0;
+    }
+    unsafe {
+        let arc = &*(handle as *const Arc<Mutex<WidgetTree>>);
+        let mut tree = arc.lock();
+        let vstack = VStack::new().with_spacing(spacing);
+        let id = vstack.id();
+        
+        let parent = if parent_id == 0 {
+            tree.root.unwrap_or(WidgetId::invalid())
+        } else {
+            WidgetId::from_raw(parent_id)
+        };
+        
+        tree.add_widget(Box::new(vstack), parent);
+        id.id
+    }
+}
+
+#[unsafe(no_mangle)]
 pub extern "C" fn ui_create_hstack(
     handle: WidgetTreeHandle,
     spacing: f32,
@@ -657,6 +683,32 @@ pub extern "C" fn ui_create_hstack(
         let id = hstack.id();
         let root_id = tree.root.unwrap_or(WidgetId::invalid());
         tree.add_widget(Box::new(hstack), root_id);
+        id.id
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_create_hstack_in_parent(
+    handle: WidgetTreeHandle,
+    parent_id: u64,
+    spacing: f32,
+) -> u64 {
+    if handle.is_null() {
+        return 0;
+    }
+    unsafe {
+        let arc = &*(handle as *const Arc<Mutex<WidgetTree>>);
+        let mut tree = arc.lock();
+        let hstack = HStack::new().with_spacing(spacing);
+        let id = hstack.id();
+        
+        let parent = if parent_id == 0 {
+            tree.root.unwrap_or(WidgetId::invalid())
+        } else {
+            WidgetId::from_raw(parent_id)
+        };
+        
+        tree.add_widget(Box::new(hstack), parent);
         id.id
     }
 }

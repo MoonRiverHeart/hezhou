@@ -15,7 +15,9 @@ pub type CreateButtonFn = extern "C" fn(WidgetTreeHandle, f32, f32, f32, f32, *c
 pub type CreateLabelFn = extern "C" fn(WidgetTreeHandle, f32, f32, f32, f32, *const c_char) -> u64;
 pub type CreatePanelFn = extern "C" fn(WidgetTreeHandle, f32, f32, f32, f32) -> u64;
 pub type CreateVStackFn = extern "C" fn(WidgetTreeHandle, f32) -> u64;
+pub type CreateVStackInParentFn = extern "C" fn(WidgetTreeHandle, u64, f32) -> u64;
 pub type CreateHStackFn = extern "C" fn(WidgetTreeHandle, f32) -> u64;
+pub type CreateHStackInParentFn = extern "C" fn(WidgetTreeHandle, u64, f32) -> u64;
 pub type CreateButtonInParentFn = extern "C" fn(WidgetTreeHandle, u64, f32, f32, *const c_char) -> u64;
 pub type CreateLabelInParentFn = extern "C" fn(WidgetTreeHandle, u64, f32, f32, *const c_char) -> u64;
 pub type CreatePanelInParentFn = extern "C" fn(WidgetTreeHandle, u64, f32, f32, f32, f32, f32, f32, f32, f32) -> u64;
@@ -38,7 +40,9 @@ pub struct FfiContext {
     pub ui_create_label: CreateLabelFn,
     pub ui_create_panel: CreatePanelFn,
     pub ui_create_vstack: CreateVStackFn,
+    pub ui_create_vstack_in_parent: CreateVStackInParentFn,
     pub ui_create_hstack: CreateHStackFn,
+    pub ui_create_hstack_in_parent: CreateHStackInParentFn,
     pub ui_create_button_in_parent: CreateButtonInParentFn,
     pub ui_create_label_in_parent: CreateLabelInParentFn,
     pub ui_create_panel_in_parent: CreatePanelInParentFn,

@@ -21,7 +21,13 @@ namespace Hezhou
         public delegate ulong CreateVStackDelegate(IntPtr handle, float spacing);
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate ulong CreateVStackInParentDelegate(IntPtr handle, ulong parentId, float spacing);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public delegate ulong CreateHStackDelegate(IntPtr handle, float spacing);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate ulong CreateHStackInParentDelegate(IntPtr handle, ulong parentId, float spacing);
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public delegate ulong CreateButtonInParentDelegate(IntPtr handle, ulong parentId, float width, float height, [MarshalAs(UnmanagedType.LPStr)] string text);
@@ -65,7 +71,9 @@ namespace Hezhou
             public IntPtr ui_create_label;
             public IntPtr ui_create_panel;
             public IntPtr ui_create_vstack;
+            public IntPtr ui_create_vstack_in_parent;
             public IntPtr ui_create_hstack;
+            public IntPtr ui_create_hstack_in_parent;
             public IntPtr ui_create_button_in_parent;
             public IntPtr ui_create_label_in_parent;
             public IntPtr ui_create_panel_in_parent;
@@ -118,6 +126,17 @@ namespace Hezhou
             return func(_widgetTree, spacing);
         }
 
+        public static ulong CreateVStack(ulong parentId, float spacing = 8f)
+        {
+            if (_ffi.ui_create_vstack_in_parent == IntPtr.Zero)
+            {
+                Console.WriteLine("[C#] ERROR: CreateVStackInParent函数指针为空");
+                return 0;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<CreateVStackInParentDelegate>(_ffi.ui_create_vstack_in_parent);
+            return func(_widgetTree, parentId, spacing);
+        }
+
         public static ulong CreateHStack(float spacing = 8f)
         {
             if (_ffi.ui_create_hstack == IntPtr.Zero)
@@ -127,6 +146,17 @@ namespace Hezhou
             }
             var func = Marshal.GetDelegateForFunctionPointer<CreateHStackDelegate>(_ffi.ui_create_hstack);
             return func(_widgetTree, spacing);
+        }
+
+        public static ulong CreateHStack(ulong parentId, float spacing = 8f)
+        {
+            if (_ffi.ui_create_hstack_in_parent == IntPtr.Zero)
+            {
+                Console.WriteLine("[C#] ERROR: CreateHStackInParent函数指针为空");
+                return 0;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<CreateHStackInParentDelegate>(_ffi.ui_create_hstack_in_parent);
+            return func(_widgetTree, parentId, spacing);
         }
 
         public static ulong CreateButton(ulong parentId, float width, float height, string text)
@@ -149,6 +179,13 @@ namespace Hezhou
             }
             var func = Marshal.GetDelegateForFunctionPointer<CreateLabelInParentDelegate>(_ffi.ui_create_label_in_parent);
             return func(_widgetTree, parentId, width, height, text);
+        }
+
+        public static ulong CreateLabel(ulong parentId, float x, float y, float width, float height, string text)
+        {
+            ulong id = CreateLabel(parentId, width, height, text);
+            SetWidgetLayout(id, x, y, width, height);
+            return id;
         }
 
         public static ulong CreatePanel(ulong parentId, float x, float y, float width, float height, float r = 0.2f, float g = 0.2f, float b = 0.2f, float a = 1.0f)
@@ -218,10 +255,10 @@ namespace Hezhou
     {
         public ulong Id { get; private set; }
         
-        public VStack(float spacing = 8f)
+        public VStack(ulong parentId, float spacing = 8f)
         {
-            Id = UI.CreateVStack(spacing);
-            Console.WriteLine($"[C#] VStack创建成功: id={Id}");
+            Id = UI.CreateVStack(parentId, spacing);
+            Console.WriteLine($"[C#] VStack创建成功: id={Id}, parent={parentId}");
         }
         
         public ulong AddButton(float width, float height, string text)
@@ -244,10 +281,10 @@ namespace Hezhou
     {
         public ulong Id { get; private set; }
         
-        public HStack(float spacing = 8f)
+        public HStack(ulong parentId, float spacing = 8f)
         {
-            Id = UI.CreateHStack(spacing);
-            Console.WriteLine($"[C#] HStack创建成功: id={Id}");
+            Id = UI.CreateHStack(parentId, spacing);
+            Console.WriteLine($"[C#] HStack创建成功: id={Id}, parent={parentId}");
         }
         
         public ulong AddButton(float width, float height, string text)
