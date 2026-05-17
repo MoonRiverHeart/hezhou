@@ -679,7 +679,13 @@ pub extern "C" fn ui_create_button_in_parent(
         let mut button = Button::new(&text_str);
         button.set_layout(Layout::new(0.0, 0.0, width, height));
         let id = button.id();
-        let parent = WidgetId::from_raw(parent_id);
+        
+        let parent = if parent_id == 0 {
+            tree.root.unwrap_or(WidgetId::invalid())
+        } else {
+            WidgetId::from_raw(parent_id)
+        };
+        
         tree.add_widget(Box::new(button), parent);
         id.id
     }
@@ -703,7 +709,13 @@ pub extern "C" fn ui_create_label_in_parent(
         let mut label = Label::new(&text_str);
         label.set_layout(Layout::new(0.0, 0.0, width, height));
         let id = label.id();
-        let parent = WidgetId::from_raw(parent_id);
+        
+        let parent = if parent_id == 0 {
+            tree.root.unwrap_or(WidgetId::invalid())
+        } else {
+            WidgetId::from_raw(parent_id)
+        };
+        
         tree.add_widget(Box::new(label), parent);
         id.id
     }
@@ -758,8 +770,26 @@ pub extern "C" fn ui_create_panel_in_parent(
                 .with_border(Color::new(0.3, 0.3, 0.3, 1.0), 1.0, 0.0)
         );
         let id = panel.id();
-        let parent = WidgetId::from_raw(parent_id);
+        
+        let parent = if parent_id == 0 {
+            tree.root.unwrap_or(WidgetId::invalid())
+        } else {
+            WidgetId::from_raw(parent_id)
+        };
+        
         tree.add_widget(Box::new(panel), parent);
         id.id
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_get_root_id(handle: WidgetTreeHandle) -> u64 {
+    if handle.is_null() {
+        return 0;
+    }
+    unsafe {
+        let arc = &*(handle as *const Arc<Mutex<WidgetTree>>);
+        let tree = arc.lock();
+        tree.root.map(|r| r.id).unwrap_or(0)
     }
 }

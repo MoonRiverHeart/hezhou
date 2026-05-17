@@ -33,6 +33,9 @@ namespace Hezhou
         public delegate ulong CreatePanelInParentDelegate(IntPtr handle, ulong parentId, float x, float y, float width, float height, float r, float g, float b, float a);
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate ulong GetRootIdDelegate(IntPtr handle);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public delegate void SetWidgetLayoutDelegate(IntPtr handle, ulong widgetId, float x, float y, float width, float height);
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
@@ -66,6 +69,7 @@ namespace Hezhou
             public IntPtr ui_create_button_in_parent;
             public IntPtr ui_create_label_in_parent;
             public IntPtr ui_create_panel_in_parent;
+            public IntPtr ui_get_root_id;
             public IntPtr ui_set_widget_layout;
             public IntPtr ui_widget_set_position;
             public IntPtr ui_widget_set_size;
@@ -156,6 +160,17 @@ namespace Hezhou
             }
             var func = Marshal.GetDelegateForFunctionPointer<CreatePanelInParentDelegate>(_ffi.ui_create_panel_in_parent);
             return func(_widgetTree, parentId, x, y, width, height, r, g, b, a);
+        }
+
+        public static ulong GetRootId()
+        {
+            if (_ffi.ui_get_root_id == IntPtr.Zero)
+            {
+                Console.WriteLine("[C#] ERROR: GetRootId函数指针为空");
+                return 0;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<GetRootIdDelegate>(_ffi.ui_get_root_id);
+            return func(_widgetTree);
         }
 
         public static void SetWidgetLayout(ulong widgetId, float x, float y, float width, float height)

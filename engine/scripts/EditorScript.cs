@@ -49,9 +49,11 @@ namespace Hezhou
             float previewWidth = _screenWidth - LEFT_PANEL_WIDTH - RIGHT_PANEL_WIDTH;
             float previewX = LEFT_PANEL_WIDTH;
 
-            ulong rootId = 0;
+            ulong rootId = UI.GetRootId();
+            Console.WriteLine($"[Editor] RootId={rootId}");
 
             _toolbar = new Panel(rootId, 0, toolbarY, _screenWidth, TOOLBAR_HEIGHT, 0.15f, 0.15f, 0.15f, 1.0f);
+            Console.WriteLine($"[Editor] Toolbar created, id={_toolbar.Id}");
             _toolbar.AddButton(80f, 30f, "新建");
             _toolbar.AddButton(80f, 30f, "打开");
             _toolbar.AddButton(80f, 30f, "保存");

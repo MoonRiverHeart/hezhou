@@ -19,6 +19,7 @@ pub type CreateHStackFn = extern "C" fn(WidgetTreeHandle, f32) -> u64;
 pub type CreateButtonInParentFn = extern "C" fn(WidgetTreeHandle, u64, f32, f32, *const c_char) -> u64;
 pub type CreateLabelInParentFn = extern "C" fn(WidgetTreeHandle, u64, f32, f32, *const c_char) -> u64;
 pub type CreatePanelInParentFn = extern "C" fn(WidgetTreeHandle, u64, f32, f32, f32, f32, f32, f32, f32, f32) -> u64;
+pub type GetRootIdFn = extern "C" fn(WidgetTreeHandle) -> u64;
 pub type SetWidgetLayoutFn = extern "C" fn(WidgetTreeHandle, u64, f32, f32, f32, f32);
 pub type SetPositionFn = extern "C" fn(WidgetTreeHandle, u64, f32, f32);
 pub type SetSizeFn = extern "C" fn(WidgetTreeHandle, u64, f32, f32);
@@ -41,6 +42,7 @@ pub struct FfiContext {
     pub ui_create_button_in_parent: CreateButtonInParentFn,
     pub ui_create_label_in_parent: CreateLabelInParentFn,
     pub ui_create_panel_in_parent: CreatePanelInParentFn,
+    pub ui_get_root_id: GetRootIdFn,
     pub ui_set_widget_layout: SetWidgetLayoutFn,
     pub ui_widget_set_position: SetPositionFn,
     pub ui_widget_set_size: SetSizeFn,
