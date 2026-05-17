@@ -14,6 +14,7 @@ hezhou-core = { path = "../core" }
 hezhou-platform = { path = "../platform", features = ["glfw"] }
 hezhou-rhi-vulkan = { path = "../rhi-vulkan" }
 hezhou-ui = { path = "../ui" }
+hezhou-dfx = { path = "../dfx" }
 hezhou-rhi = { path = "../rhi" }
 glfw = "0.62"
 ash = "0.38"
@@ -67,4 +68,9 @@ path = "src/ui_vulkan_demo.rs"
 [[bin]]
 name = "mono_ui_demo"
 path = "src/mono_ui_demo.rs"
+required-features = ["mono"]
+
+[[bin]]
+name = "mono_ui_thunk_demo"
+path = "src/mono_ui_thunk_demo.rs"
 required-features = ["mono"]

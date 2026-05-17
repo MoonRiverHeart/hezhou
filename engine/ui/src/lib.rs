@@ -10,6 +10,7 @@ pub mod gesture_recognizer;
 pub mod layout;
 pub mod platform;
 pub mod style;
+pub mod thunk_manager;
 pub mod types;
 pub mod widget;
 pub mod widget_tree;
@@ -29,12 +30,43 @@ pub use gesture_recognizer::*;
 pub use layout::*;
 pub use platform::*;
 pub use style::*;
+pub use thunk_manager::*;
 pub use types::*;
 pub use widget::*;
 pub use widget_tree::*;
 pub use widgets::*;
 
 use hezhou_dfx::*;
+
+#[macro_export]
+macro_rules! dfx_info {
+    ($module:expr, $message:expr) => {
+        println!("[Info][{}] {}", $module, $message);
+    };
+    ($module:expr, $message:expr, $($arg:tt)*) => {
+        println!("[Info][{}] {}", $module, format!($message, $($arg)*));
+    };
+}
+
+#[macro_export]
+macro_rules! dfx_debug {
+    ($module:expr, $message:expr) => {
+        println!("[Debug][{}] {}", $module, $message);
+    };
+    ($module:expr, $message:expr, $($arg:tt)*) => {
+        println!("[Debug][{}] {}", $module, format!($message, $($arg)*));
+    };
+}
+
+#[macro_export]
+macro_rules! dfx_error {
+    ($module:expr, $message:expr) => {
+        println!("[Error][{}] {}", $module, $message);
+    };
+    ($module:expr, $message:expr, $($arg:tt)*) => {
+        println!("[Error][{}] {}", $module, format!($message, $($arg)*));
+    };
+}
 use std::sync::Arc;
 
 pub struct UISystem {

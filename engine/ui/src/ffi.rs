@@ -1,4 +1,5 @@
 use crate::*;
+use crate::thunk_manager::*;
 use parking_lot::Mutex;
 use std::ffi::{c_char, CStr};
 use std::sync::Arc;
@@ -353,4 +354,43 @@ pub extern "C" fn ui_button_set_on_click(
             }
         }
     }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_button_set_on_click_thunk(
+    handle: WidgetTreeHandle,
+    widget_id: u64,
+    callback: WidgetCallback,
+) {
+    ui_register_onclick_callback(widget_id, callback);
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_register_update_thunk(callback: UpdateCallback) {
+    ui_register_update_callback(callback);
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_register_init_thunk(callback: InitCallback) {
+    ui_register_init_callback(callback);
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_trigger_update(delta_time: f32) {
+    trigger_update_callback(delta_time);
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_trigger_onclick(widget_id: u64) {
+    trigger_onclick_callback(widget_id);
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_trigger_init() {
+    trigger_init_callback();
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_has_onclick(widget_id: u64) -> bool {
+    has_onclick_callback(widget_id)
 }
