@@ -10,6 +10,8 @@ cargo test
 cargo run --bin mono_rotation_demo --features mono      # Mono JIT demo (console)
 cargo run --bin mono_triangle_demo --features mono      # Mono JIT + Vulkan triangle
 cargo run --bin mono_hot_reload_test --features mono    # Mono hot reload test
+cargo run --bin mono_ui_thunk_demo --features mono      # Mono UI + Thunk callbacks
+cargo run --bin mono_editor_demo --features mono        # Game Editor (1280x720)
 cargo run --bin rotation_demo --features native-aot    # NativeAOT demo
 ```
 
@@ -47,6 +49,23 @@ dotnet build RotationScript.NativeAOT.csproj -c Release
 ### mono_hot_reload_test
 - Automated test for hot reload functionality
 - Modifies C# source, recompiles, reloads, verifies changes
+
+### mono_ui_thunk_demo
+- UI system with VStack/HStack layout containers
+- C# creates widgets, Rust calculates layout
+- Button click callback via Thunk mechanism
+- Window resize triggers layout update
+
+### mono_editor_demo
+- Game Editor with professional layout
+- Top toolbar (40px): 新建/打开/保存/运行 buttons
+- Left panel (250px): Project structure tree
+- Bottom-left (200px): Asset management
+- Center: Game preview area
+- Right panel (250px): Property editor
+- Bottom status bar (30px): FPS display
+- Window size: 1280x720
+- Resize: Auto layout recalculation
 
 ## Important Notes
 
@@ -109,6 +128,14 @@ cargo run --bin mono_rotation_demo --features mono
 # Mono hot reload automated test
 cd engine/examples
 cargo run --bin mono_hot_reload_test --features mono
+
+# Mono UI + Thunk callbacks
+cd engine/examples
+cargo run --bin mono_ui_thunk_demo --features mono
+
+# Game Editor (1280x720)
+cd engine/examples
+cargo run --bin mono_editor_demo --features mono --release
 
 # NativeAOT version
 cd engine/examples
