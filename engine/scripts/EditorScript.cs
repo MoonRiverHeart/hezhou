@@ -249,8 +249,10 @@ private static void ShowDropdownMenu(float x, float y, string[] items, UI.Widget
             for (int i = 0; i < items.Length; i++)
             {
                 ulong btnId = _menuItems.AddButton(140, 30f, items[i]);
+                Console.WriteLine($"[Editor] 菜单项{i}: '{items[i]}', btnId={btnId}");
                 if (i < callbacks.Length && callbacks[i] != null)
                 {
+                    Console.WriteLine($"[Editor] 注册回调: btnId={btnId}");
                     UI.SetOnClick(btnId, callbacks[i]);
                 }
             }

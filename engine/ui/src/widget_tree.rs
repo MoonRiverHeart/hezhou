@@ -128,15 +128,20 @@ impl WidgetTree {
     }
 
     pub fn hit_test(&self, point: Point) -> Option<WidgetId> {
-        self.hit_test_recursive(self.root?, point)
+        self.hit_test_recursive(self.root?, point, 0.0, 0.0)
     }
 
-    fn hit_test_recursive(&self, id: WidgetId, point: Point) -> Option<WidgetId> {
+    fn hit_test_recursive(&self, id: WidgetId, point: Point, parent_abs_x: f32, parent_abs_y: f32) -> Option<WidgetId> {
         if let Some(node) = self.nodes.get(&id) {
-            if node.widget.as_ref().hit_test(point) {
+            let layout = *node.widget.as_ref().layout();
+            let abs_x = parent_abs_x + layout.x;
+            let abs_y = parent_abs_y + layout.y;
+            
+            let abs_bounds = Rect::new(abs_x, abs_y, layout.width, layout.height);
+            if abs_bounds.contains(&point) {
                 let children = self.get_children(id);
                 for child in children.iter().rev() {
-                    if let Some(hit) = self.hit_test_recursive(*child, point) {
+                    if let Some(hit) = self.hit_test_recursive(*child, point, abs_x, abs_y) {
                         return Some(hit);
                     }
                 }
