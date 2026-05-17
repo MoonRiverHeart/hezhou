@@ -18,6 +18,10 @@ namespace Hezhou
         private static HStack _statusItems;
         private static Label _fpsLabel;
         
+        private static Panel _dropdownMenu;
+        private static VStack _menuItems;
+        private static bool _menuVisible = false;
+        
         private static float _screenWidth = 1280f;
         private static float _screenHeight = 720f;
 
@@ -60,10 +64,19 @@ namespace Hezhou
             _toolbar = new Panel(rootId, 0, toolbarY, _screenWidth, TOOLBAR_HEIGHT, 0.15f, 0.15f, 0.15f, 1.0f);
             _toolbarButtons = new HStack(_toolbar.Id, 10f);
             _toolbarButtons.SetPosition(10f, 5f);
-            _toolbarButtons.AddButton(80f, 30f, "新建");
-            _toolbarButtons.AddButton(80f, 30f, "打开");
-            _toolbarButtons.AddButton(80f, 30f, "保存");
-            _toolbarButtons.AddButton(80f, 30f, "运行");
+            
+            var newBtn = _toolbarButtons.AddButton(80f, 30f, "新建");
+            newBtn.SetOnClick(OnNewClick);
+            
+            var openBtn = _toolbarButtons.AddButton(80f, 30f, "打开");
+            openBtn.SetOnClick(OnOpenClick);
+            
+            var saveBtn = _toolbarButtons.AddButton(80f, 30f, "保存");
+            saveBtn.SetOnClick(OnSaveClick);
+            
+            var runBtn = _toolbarButtons.AddButton(80f, 30f, "运行");
+            runBtn.SetOnClick(OnRunClick);
+            
             Console.WriteLine("[Editor] 工具栏创建完成");
 
             _projectPanel = new Panel(rootId, 0, mainY, LEFT_PANEL_WIDTH, mainHeight, 0.2f, 0.2f, 0.2f, 1.0f);
@@ -142,6 +155,61 @@ namespace Hezhou
             {
                 _fpsLabel.Text = $"FPS: {((int)(1000f / deltaTime))}";
             }
+        }
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void WidgetCallbackDelegate();
+        
+        private static void OnNewClick(ulong widgetId)
+        {
+            Console.WriteLine($"[Editor] 点击\"新建\"按钮, id={widgetId}");
+            ShowDropdownMenu(10, 45, new string[] { "新建场景", "新建脚本", "新建材质", "新建文件夹" });
+        }
+        
+        private static void OnOpenClick(ulong widgetId)
+        {
+            Console.WriteLine($"[Editor] 点击\"打开\"按钮, id={widgetId}");
+            ShowDropdownMenu(100, 45, new string[] { "打开场景", "打开项目", "打开资源" });
+        }
+        
+        private static void OnSaveClick(ulong widgetId)
+        {
+            Console.WriteLine($"[Editor] 点击\"保存\"按钮, id={widgetId}");
+            ShowDropdownMenu(190, 45, new string[] { "保存场景", "保存全部", "另存为..." });
+        }
+        
+        private static void OnRunClick(ulong widgetId)
+        {
+            Console.WriteLine($"[Editor] 点击\"运行\"按钮, id={widgetId}");
+            HideDropdownMenu();
+            Console.WriteLine("[Editor] 开始运行游戏...");
+        }
+        
+        private static void ShowDropdownMenu(float x, float y, string[] items)
+        {
+            if (_menuVisible)
+            {
+                HideDropdownMenu();
+            }
+            
+            ulong rootId = UI.GetRootId();
+            _dropdownMenu = new Panel(rootId, x, y, 150, items.Length * 25 + 5, 0.25f, 0.25f, 0.25f, 0.95f);
+            _menuItems = new VStack(_dropdownMenu.Id, 2f);
+            _menuItems.SetPosition(5, 5);
+            
+            foreach (var item in items)
+            {
+                _menuItems.AddLabel(140, 20, item);
+            }
+            
+            _menuVisible = true;
+            Console.WriteLine($"[Editor] 显示下拉菜单: {items.Length}项");
+        }
+        
+private static void HideDropdownMenu()
+        {
+            _menuVisible = false;
+            Console.WriteLine("[Editor] 隐藏下拉菜单");
         }
     }
 }

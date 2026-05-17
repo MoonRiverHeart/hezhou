@@ -103,7 +103,7 @@ impl UIInputHandler {
     pub fn on_mouse_event(&mut self, mouse: &MouseEvent, timestamp: u64) {
         let ui_button = convert_mouse_button(mouse.button);
         let x = mouse.x;
-        let y = self.screen_height - mouse.y;
+        let y = mouse.y;
 
         match mouse.action {
             MouseAction::Press => {

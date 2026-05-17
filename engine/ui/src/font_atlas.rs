@@ -266,7 +266,7 @@ pub fn create_font_atlas() -> FontAtlas {
         let font_data = std::fs::read(font_path).expect("Failed to read font file");
         let font_index = atlas.add_font(&font_data);
         
-        let test_chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()-_+=[]{}|;:,.<>?/~ Click Me Welcome to Hezhou UI Press SPACE to change text hello 新建打开保存运行项目结构资产管理游戏预览属性编辑选中位置大小状态FPS脚本场景模型纹理";
+        let test_chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()-_+=[]{}|;:,.<>?/~ Click Me Welcome to Hezhou UI Press SPACE to change text hello 新建打开保存运行项目结构资产管理游戏预览属性编辑选中位置大小状态FPS脚本场景模型纹理新建场景新建脚本新建材质新建文件夹打开场景打开项目打开资源保存场景保存全部另存为就绪未命名TexturesModels";
         let sizes = [32.0, 16.0, 14.0];
         
         atlas.prerasterize_chars(font_index, test_chars, &sizes);

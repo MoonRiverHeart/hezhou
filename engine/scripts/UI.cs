@@ -287,9 +287,9 @@ namespace Hezhou
             Console.WriteLine($"[C#] HStack创建成功: id={Id}, parent={parentId}");
         }
         
-        public ulong AddButton(float width, float height, string text)
+        public Button AddButton(float width, float height, string text)
         {
-            return UI.CreateButton(Id, width, height, text);
+            return new Button(Id, width, height, text);
         }
         
         public ulong AddLabel(float width, float height, string text)
