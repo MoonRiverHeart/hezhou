@@ -5,11 +5,32 @@ layout(location = 1) in vec2 frag_uv;
 
 layout(location = 0) out vec4 out_color;
 
-layout(binding = 0) uniform sampler2D ui_texture;
+layout(set = 0, binding = 0) uniform sampler2D font_texture;
+
+layout(push_constant) uniform PushConstants {
+    vec2 screen_size;
+    vec2 offset;
+    float px_range;
+    bool enable_msdf;
+} pc;
 
 void main() {
-    vec4 tex_color = texture(ui_texture, frag_uv);
-    vec4 final_color = frag_color * tex_color;
-    
-    out_color = final_color;
+    if (frag_uv.x == 0.0 && frag_uv.y == 0.0) {
+        out_color = frag_color;
+    } else {
+        vec3 texture_color = texture(font_texture, frag_uv).rgb;
+        
+        float dist = texture_color.r;
+        
+        float px_range = pc.px_range;
+        if (px_range <= 0.0) {
+            px_range = 4.0;
+        }
+        
+        float d = (dist - 0.5) * px_range;
+        
+        float alpha = smoothstep(-1.0, 1.0, d);
+        
+        out_color = vec4(frag_color.rgb, frag_color.a * alpha);
+    }
 }

@@ -16,24 +16,24 @@ impl Time {
             fixed_accumulator: 0.0,
         }
     }
-    
+
     pub fn update(&mut self, delta_time: f32) {
         self.elapsed += delta_time as f64;
         self.delta = delta_time;
         self.frame_count += 1;
         self.fixed_accumulator += delta_time;
     }
-    
+
     pub fn needs_fixed_update(&self) -> bool {
         self.fixed_accumulator >= self.fixed_delta
     }
-    
+
     pub fn consume_fixed_delta(&mut self) -> f32 {
         let delta = self.fixed_delta;
         self.fixed_accumulator -= delta;
         delta
     }
-    
+
     pub fn reset(&mut self) {
         self.elapsed = 0.0;
         self.delta = 0.0;
@@ -62,19 +62,19 @@ impl MainLoop {
             is_running: false,
         }
     }
-    
+
     pub fn start(&mut self) {
         self.is_running = true;
     }
-    
+
     pub fn stop(&mut self) {
         self.is_running = false;
     }
-    
+
     pub fn is_running(&self) -> bool {
         self.is_running
     }
-    
+
     pub fn ideal_delta_time(&self) -> f32 {
         if self.target_fps > 0.0 {
             1.0 / self.target_fps

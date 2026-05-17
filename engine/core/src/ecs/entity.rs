@@ -9,16 +9,13 @@ pub struct Entity {
 
 impl Entity {
     pub fn new(id: EntityId) -> Self {
-        Self {
-            id,
-            generation: 0,
-        }
+        Self { id, generation: 0 }
     }
-    
+
     pub fn is_valid(&self) -> bool {
         self.id != 0
     }
-    
+
     pub fn equals(&self, other: &Self) -> bool {
         self.id == other.id && self.generation == other.generation
     }

@@ -8,20 +8,20 @@ pub enum EventType {
     TouchMove,
     TouchEnd,
     TouchCancel,
-    
+
     Click,
     LongPress,
     DoubleClick,
-    
+
     KeyDown,
     KeyUp,
-    
+
     MouseEnter,
     MouseLeave,
-    
+
     FocusGain,
     FocusLost,
-    
+
     LayoutChanged,
     StyleChanged,
 }
@@ -74,25 +74,25 @@ impl Event {
             data: EventData::None,
         }
     }
-    
+
     pub fn with_target(mut self, target: WidgetId) -> Self {
         self.target = target;
         self
     }
-    
+
     pub fn with_data(mut self, data: EventData) -> Self {
         self.data = data;
         self
     }
-    
+
     pub fn stop_propagation(&mut self) {
         self.stopped = true;
     }
-    
+
     pub fn stop_immediate_propagation(&mut self) {
         self.immediate_stopped = true;
     }
-    
+
     pub fn prevent_default(&mut self) {
         // 标记事件已被取消
     }
@@ -126,7 +126,7 @@ impl TouchData {
             pressure: 1.0,
         }
     }
-    
+
     pub fn with_pressure(mut self, pressure: f32) -> Self {
         self.pressure = pressure;
         self
@@ -149,7 +149,7 @@ impl KeyData {
             unicode_char: 0,
         }
     }
-    
+
     pub fn with_unicode(mut self, unicode_char: u32) -> Self {
         self.unicode_char = unicode_char;
         self
@@ -210,14 +210,23 @@ pub struct EventPhase {
 
 impl EventPhase {
     pub fn capturing() -> Self {
-        Self { capturing: true, bubbling: false }
+        Self {
+            capturing: true,
+            bubbling: false,
+        }
     }
-    
+
     pub fn bubbling() -> Self {
-        Self { capturing: false, bubbling: true }
+        Self {
+            capturing: false,
+            bubbling: true,
+        }
     }
-    
+
     pub fn at_target() -> Self {
-        Self { capturing: false, bubbling: false }
+        Self {
+            capturing: false,
+            bubbling: false,
+        }
     }
 }

@@ -85,7 +85,13 @@ pub extern "C" fn physics_destroy_body(world: *mut c_void, body_id: u64) {
 }
 
 #[no_mangle]
-pub extern "C" fn physics_body_set_position(world: *mut c_void, body_id: u64, x: f32, y: f32, z: f32) {
+pub extern "C" fn physics_body_set_position(
+    world: *mut c_void,
+    body_id: u64,
+    x: f32,
+    y: f32,
+    z: f32,
+) {
     if world.is_null() {
         return;
     }
@@ -98,7 +104,13 @@ pub extern "C" fn physics_body_set_position(world: *mut c_void, body_id: u64, x:
 }
 
 #[no_mangle]
-pub extern "C" fn physics_body_get_position(world: *mut c_void, body_id: u64, out_x: *mut f32, out_y: *mut f32, out_z: *mut f32) {
+pub extern "C" fn physics_body_get_position(
+    world: *mut c_void,
+    body_id: u64,
+    out_x: *mut f32,
+    out_y: *mut f32,
+    out_z: *mut f32,
+) {
     if world.is_null() || out_x.is_null() || out_y.is_null() || out_z.is_null() {
         return;
     }
@@ -113,7 +125,13 @@ pub extern "C" fn physics_body_get_position(world: *mut c_void, body_id: u64, ou
 }
 
 #[no_mangle]
-pub extern "C" fn physics_body_set_velocity(world: *mut c_void, body_id: u64, x: f32, y: f32, z: f32) {
+pub extern "C" fn physics_body_set_velocity(
+    world: *mut c_void,
+    body_id: u64,
+    x: f32,
+    y: f32,
+    z: f32,
+) {
     if world.is_null() {
         return;
     }
@@ -139,7 +157,11 @@ pub extern "C" fn physics_body_set_mass(world: *mut c_void, body_id: u64, mass: 
 }
 
 #[no_mangle]
-pub extern "C" fn physics_create_sphere_collider(world: *mut c_void, radius: f32, body_id: u64) -> u64 {
+pub extern "C" fn physics_create_sphere_collider(
+    world: *mut c_void,
+    radius: f32,
+    body_id: u64,
+) -> u64 {
     if world.is_null() {
         return 0;
     }
@@ -150,12 +172,21 @@ pub extern "C" fn physics_create_sphere_collider(world: *mut c_void, radius: f32
 }
 
 #[no_mangle]
-pub extern "C" fn physics_create_box_collider(world: *mut c_void, half_x: f32, half_y: f32, half_z: f32, body_id: u64) -> u64 {
+pub extern "C" fn physics_create_box_collider(
+    world: *mut c_void,
+    half_x: f32,
+    half_y: f32,
+    half_z: f32,
+    body_id: u64,
+) -> u64 {
     if world.is_null() {
         return 0;
     }
     unsafe {
         let world = &mut *(world as *mut PhysicsWorld);
-        world.create_collider(ColliderShape::box_half_extents(hezhou_core::math::Vec3::new(half_x, half_y, half_z)), body_id)
+        world.create_collider(
+            ColliderShape::box_half_extents(hezhou_core::math::Vec3::new(half_x, half_y, half_z)),
+            body_id,
+        )
     }
 }

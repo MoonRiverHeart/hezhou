@@ -16,11 +16,11 @@ impl AnimationCurve {
     pub fn interpolate(&self, progress: f32) -> f32 {
         match self {
             Self::Linear => progress,
-            
+
             Self::EaseIn => progress * progress,
-            
+
             Self::EaseOut => 1.0 - (1.0 - progress) * (1.0 - progress),
-            
+
             Self::EaseInOut => {
                 if progress < 0.5 {
                     2.0 * progress * progress
@@ -28,28 +28,28 @@ impl AnimationCurve {
                     1.0 - 2.0 * (1.0 - progress) * (1.0 - progress)
                 }
             }
-            
+
             Self::Spring(params) => self.spring_curve(progress, params),
-            
+
             Self::Bounce => self.bounce_curve(progress),
         }
     }
-    
+
     fn spring_curve(&self, progress: f32, params: &SpringParams) -> f32 {
         let damping = params.damping;
         let stiffness = params.stiffness;
-        
+
         let omega = (stiffness / damping).sqrt();
         let decay = (-damping * progress).exp();
         let oscillation = (omega * progress).cos();
-        
+
         1.0 - decay * oscillation * (1.0 - progress)
     }
-    
+
     fn bounce_curve(&self, progress: f32) -> f32 {
         let n1 = 7.5625;
         let d1 = 2.75;
-        
+
         if progress < 1.0 / d1 {
             n1 * progress * progress
         } else if progress < 2.0 / d1 {
@@ -121,7 +121,7 @@ impl AnimationId {
             id: Uuid::new_v4().as_u128() as u64,
         }
     }
-    
+
     pub fn invalid() -> Self {
         Self { id: 0 }
     }
@@ -152,7 +152,13 @@ pub struct Animation {
 }
 
 impl Animation {
-    pub fn new(target: WidgetId, property: AnimatedProperty, from: f32, to: f32, duration: f32) -> Self {
+    pub fn new(
+        target: WidgetId,
+        property: AnimatedProperty,
+        from: f32,
+        to: f32,
+        duration: f32,
+    ) -> Self {
         Self {
             id: AnimationId::new(),
             target,
@@ -169,38 +175,38 @@ impl Animation {
             elapsed_time: 0.0,
         }
     }
-    
+
     pub fn with_delay(mut self, delay: f32) -> Self {
         self.delay = delay;
         self
     }
-    
+
     pub fn with_curve(mut self, curve: AnimationCurve) -> Self {
         self.curve = curve;
         self
     }
-    
+
     pub fn with_repeat(mut self, count: u32) -> Self {
         self.repeat_count = count;
         self
     }
-    
+
     pub fn with_auto_reverse(mut self) -> Self {
         self.auto_reverse = true;
         self
     }
-    
+
     pub fn current_value(&self) -> f32 {
         let progress = if self.duration > 0.0 {
             (self.elapsed_time / self.duration).min(1.0)
         } else {
             1.0
         };
-        
+
         let curve_progress = self.curve.interpolate(progress);
         self.from_value + (self.to_value - self.from_value) * curve_progress
     }
-    
+
     pub fn is_complete(&self) -> bool {
         self.elapsed_time >= self.duration
     }

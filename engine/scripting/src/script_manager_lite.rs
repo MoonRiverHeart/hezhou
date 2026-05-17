@@ -22,7 +22,9 @@ impl ScriptManager {
         descriptor: CallbackDescriptor,
         context: usize,
     ) {
-        self.callbacks.lock().register_sync(name, callback, descriptor, context);
+        self.callbacks
+            .lock()
+            .register_sync(name, callback, descriptor, context);
     }
 
     pub fn register_async_callback(
@@ -32,7 +34,9 @@ impl ScriptManager {
         descriptor: CallbackDescriptor,
         context: usize,
     ) {
-        self.callbacks.lock().register_async(name, callback, descriptor, context);
+        self.callbacks
+            .lock()
+            .register_async(name, callback, descriptor, context);
     }
 
     pub fn register_task_callback(
@@ -43,10 +47,16 @@ impl ScriptManager {
         supports_progress: bool,
         context: usize,
     ) {
-        self.callbacks.lock().register_task(name, callback, descriptor, supports_progress, context);
+        self.callbacks
+            .lock()
+            .register_task(name, callback, descriptor, supports_progress, context);
     }
 
-    pub fn trigger_sync(&self, name: &str, arg: ScriptValue) -> Result<ScriptValue, crate::error::ScriptError> {
+    pub fn trigger_sync(
+        &self,
+        name: &str,
+        arg: ScriptValue,
+    ) -> Result<ScriptValue, crate::error::ScriptError> {
         self.callbacks.lock().trigger_sync(name, arg)
     }
 

@@ -157,15 +157,17 @@ pub extern "C" fn ecs_get_entity_parent(world: *const World, entity_id: u64) -> 
     }
     unsafe {
         let entity = Entity::new(entity_id);
-        (*world)
-            .get_parent(entity)
-            .map(|p| p.id)
-            .unwrap_or(0)
+        (*world).get_parent(entity).map(|p| p.id).unwrap_or(0)
     }
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn ecs_get_entity_children(world: *const World, entity_id: u64, out_children: *mut u64, max_count: u32) -> u32 {
+pub extern "C" fn ecs_get_entity_children(
+    world: *const World,
+    entity_id: u64,
+    out_children: *mut u64,
+    max_count: u32,
+) -> u32 {
     if world.is_null() || out_children.is_null() {
         return 0;
     }
@@ -184,9 +186,16 @@ pub extern "C" fn ecs_get_entity_children(world: *const World, entity_id: u64, o
 pub extern "C" fn ecs_add_transform_component(
     world: *mut World,
     entity_id: u64,
-    px: f32, py: f32, pz: f32,
-    rx: f32, ry: f32, rz: f32, rw: f32,
-    sx: f32, sy: f32, sz: f32,
+    px: f32,
+    py: f32,
+    pz: f32,
+    rx: f32,
+    ry: f32,
+    rz: f32,
+    rw: f32,
+    sx: f32,
+    sy: f32,
+    sz: f32,
 ) {
     if world.is_null() {
         return;
@@ -195,7 +204,12 @@ pub extern "C" fn ecs_add_transform_component(
         let entity = Entity::new(entity_id);
         let component = TransformComponent {
             position: Vec3::new(px, py, pz),
-            rotation: Quaternion { x: rx, y: ry, z: rz, w: rw },
+            rotation: Quaternion {
+                x: rx,
+                y: ry,
+                z: rz,
+                w: rw,
+            },
             scale: Vec3::new(sx, sy, sz),
         };
         (*world).add_component(entity, component);
@@ -239,7 +253,13 @@ pub extern "C" fn ecs_get_transform_component(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn ecs_set_transform_position(world: *mut World, entity_id: u64, x: f32, y: f32, z: f32) {
+pub extern "C" fn ecs_set_transform_position(
+    world: *mut World,
+    entity_id: u64,
+    x: f32,
+    y: f32,
+    z: f32,
+) {
     if world.is_null() {
         return;
     }
@@ -253,7 +273,14 @@ pub extern "C" fn ecs_set_transform_position(world: *mut World, entity_id: u64, 
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn ecs_set_transform_rotation(world: *mut World, entity_id: u64, x: f32, y: f32, z: f32, w: f32) {
+pub extern "C" fn ecs_set_transform_rotation(
+    world: *mut World,
+    entity_id: u64,
+    x: f32,
+    y: f32,
+    z: f32,
+    w: f32,
+) {
     if world.is_null() {
         return;
     }
@@ -267,7 +294,13 @@ pub extern "C" fn ecs_set_transform_rotation(world: *mut World, entity_id: u64, 
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn ecs_set_transform_scale(world: *mut World, entity_id: u64, x: f32, y: f32, z: f32) {
+pub extern "C" fn ecs_set_transform_scale(
+    world: *mut World,
+    entity_id: u64,
+    x: f32,
+    y: f32,
+    z: f32,
+) {
     if world.is_null() {
         return;
     }
@@ -377,7 +410,12 @@ pub extern "C" fn ecs_entity_count(world: *const World) -> u32 {
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn event_bus_subscribe(engine: *mut Engine, event_type: i32, callback: EventCallback, priority: c_int) {
+pub extern "C" fn event_bus_subscribe(
+    engine: *mut Engine,
+    event_type: i32,
+    callback: EventCallback,
+    priority: c_int,
+) {
     if engine.is_null() {
         return;
     }
@@ -390,7 +428,9 @@ pub extern "C" fn event_bus_subscribe(engine: *mut Engine, event_type: i32, call
             4 => EventType::Custom,
             _ => EventType::Custom,
         };
-        (*engine).event_bus.subscribe(event_type, callback, priority);
+        (*engine)
+            .event_bus
+            .subscribe(event_type, callback, priority);
     }
 }
 

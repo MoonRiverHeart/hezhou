@@ -20,7 +20,12 @@ pub extern "C" fn render_engine_destroy(engine: *mut RenderEngine) {
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn render_init_surface(engine: *mut RenderEngine, window: *mut OH_NativeWindow, width: c_int, height: c_int) {
+pub extern "C" fn render_init_surface(
+    engine: *mut RenderEngine,
+    window: *mut OH_NativeWindow,
+    width: c_int,
+    height: c_int,
+) {
     if engine.is_null() {
         return;
     }
@@ -60,7 +65,13 @@ pub extern "C" fn render_end_frame(engine: *mut RenderEngine) {
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn render_set_clear_color(engine: *mut RenderEngine, r: c_float, g: c_float, b: c_float, a: c_float) {
+pub extern "C" fn render_set_clear_color(
+    engine: *mut RenderEngine,
+    r: c_float,
+    g: c_float,
+    b: c_float,
+    a: c_float,
+) {
     if engine.is_null() {
         return;
     }
@@ -81,27 +92,40 @@ pub extern "C" fn render_create_camera(engine: *mut RenderEngine) -> CameraId {
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn render_camera_set_position(camera_id: CameraId, x: c_float, y: c_float, z: c_float) {
+pub extern "C" fn render_camera_set_position(
+    camera_id: CameraId,
+    x: c_float,
+    y: c_float,
+    z: c_float,
+) {
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn render_camera_set_rotation(camera_id: CameraId, qx: c_float, qy: c_float, qz: c_float, qw: c_float) {
+pub extern "C" fn render_camera_set_rotation(
+    camera_id: CameraId,
+    qx: c_float,
+    qy: c_float,
+    qz: c_float,
+    qw: c_float,
+) {
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn render_camera_set_fov(camera_id: CameraId, fov: c_float) {
-}
+pub extern "C" fn render_camera_set_fov(camera_id: CameraId, fov: c_float) {}
 
 #[unsafe(no_mangle)]
-pub extern "C" fn render_camera_set_clip_planes(camera_id: CameraId, near: c_float, far: c_float) {
-}
+pub extern "C" fn render_camera_set_clip_planes(camera_id: CameraId, near: c_float, far: c_float) {}
 
 #[unsafe(no_mangle)]
-pub extern "C" fn render_camera_set_aspect(camera_id: CameraId, aspect: c_float) {
-}
+pub extern "C" fn render_camera_set_aspect(camera_id: CameraId, aspect: c_float) {}
 
 #[unsafe(no_mangle)]
-pub extern "C" fn render_camera_look_at(camera_id: CameraId, tx: c_float, ty: c_float, tz: c_float) {
+pub extern "C" fn render_camera_look_at(
+    camera_id: CameraId,
+    tx: c_float,
+    ty: c_float,
+    tz: c_float,
+) {
 }
 
 #[unsafe(no_mangle)]
@@ -121,7 +145,13 @@ pub extern "C" fn renderer_destroy(renderer: *mut Renderer) {
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn renderer_set_clear_color(renderer: *mut Renderer, r: c_float, g: c_float, b: c_float, a: c_float) {
+pub extern "C" fn renderer_set_clear_color(
+    renderer: *mut Renderer,
+    r: c_float,
+    g: c_float,
+    b: c_float,
+    a: c_float,
+) {
     if renderer.is_null() {
         return;
     }
@@ -181,11 +211,29 @@ pub extern "C" fn mesh_create_quad() -> MeshId {
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn mesh_transform(mesh_id: MeshId, tx: c_float, ty: c_float, tz: c_float, rx: c_float, ry: c_float, rz: c_float, rw: c_float, sx: c_float, sy: c_float, sz: c_float) {
+pub extern "C" fn mesh_transform(
+    mesh_id: MeshId,
+    tx: c_float,
+    ty: c_float,
+    tz: c_float,
+    rx: c_float,
+    ry: c_float,
+    rz: c_float,
+    rw: c_float,
+    sx: c_float,
+    sy: c_float,
+    sz: c_float,
+) {
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn texture_create(width: u32, height: u32, format: u32, data: *const u8, data_size: usize) -> TextureId {
+pub extern "C" fn texture_create(
+    width: u32,
+    height: u32,
+    format: u32,
+    data: *const u8,
+    data_size: usize,
+) -> TextureId {
     static mut NEXT_TEXTURE_ID: TextureId = 1;
     unsafe {
         let id = NEXT_TEXTURE_ID;
@@ -205,9 +253,14 @@ pub extern "C" fn material_create(shader_name: *const c_char) -> MaterialId {
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn material_set_base_color(material_id: MaterialId, r: c_float, g: c_float, b: c_float, a: c_float) {
+pub extern "C" fn material_set_base_color(
+    material_id: MaterialId,
+    r: c_float,
+    g: c_float,
+    b: c_float,
+    a: c_float,
+) {
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn material_set_texture(material_id: MaterialId, slot: u32, texture_id: TextureId) {
-}
+pub extern "C" fn material_set_texture(material_id: MaterialId, slot: u32, texture_id: TextureId) {}

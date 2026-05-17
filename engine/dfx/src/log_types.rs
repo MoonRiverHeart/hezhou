@@ -26,7 +26,7 @@ impl LogLevel {
             LogLevel::Fatal => "FATAL",
         }
     }
-    
+
     pub fn from_u8(value: u8) -> Self {
         match value {
             0 => LogLevel::Trace,

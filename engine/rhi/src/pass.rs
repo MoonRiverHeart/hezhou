@@ -12,7 +12,10 @@ impl RenderPassDesc {
         Self {
             attachments: vec![AttachmentDesc::color(format)],
             subpasses: vec![SubpassDesc {
-                color_attachments: vec![AttachmentRef { attachment: 0, layout: ImageLayout::ColorAttachmentOptimal }],
+                color_attachments: vec![AttachmentRef {
+                    attachment: 0,
+                    layout: ImageLayout::ColorAttachmentOptimal,
+                }],
                 depth_stencil_attachment: None,
                 input_attachments: vec![],
                 resolve_attachments: vec![],
@@ -20,13 +23,22 @@ impl RenderPassDesc {
             dependencies: vec![],
         }
     }
-    
+
     pub fn color_depth(color_format: TextureFormat, depth_format: TextureFormat) -> Self {
         Self {
-            attachments: vec![AttachmentDesc::color(color_format), AttachmentDesc::depth(depth_format)],
+            attachments: vec![
+                AttachmentDesc::color(color_format),
+                AttachmentDesc::depth(depth_format),
+            ],
             subpasses: vec![SubpassDesc {
-                color_attachments: vec![AttachmentRef { attachment: 0, layout: ImageLayout::ColorAttachmentOptimal }],
-                depth_stencil_attachment: Some(AttachmentRef { attachment: 1, layout: ImageLayout::DepthStencilAttachmentOptimal }),
+                color_attachments: vec![AttachmentRef {
+                    attachment: 0,
+                    layout: ImageLayout::ColorAttachmentOptimal,
+                }],
+                depth_stencil_attachment: Some(AttachmentRef {
+                    attachment: 1,
+                    layout: ImageLayout::DepthStencilAttachmentOptimal,
+                }),
                 input_attachments: vec![],
                 resolve_attachments: vec![],
             }],
@@ -50,33 +62,55 @@ pub struct AttachmentDesc {
 impl AttachmentDesc {
     pub fn color(format: TextureFormat) -> Self {
         Self {
-            format, samples: 1,
-            load_op: AttachmentLoadOp::Clear, store_op: AttachmentStoreOp::Store,
-            stencil_load_op: AttachmentLoadOp::DontCare, stencil_store_op: AttachmentStoreOp::DontCare,
-            initial_layout: ImageLayout::Undefined, final_layout: ImageLayout::PresentSrc,
+            format,
+            samples: 1,
+            load_op: AttachmentLoadOp::Clear,
+            store_op: AttachmentStoreOp::Store,
+            stencil_load_op: AttachmentLoadOp::DontCare,
+            stencil_store_op: AttachmentStoreOp::DontCare,
+            initial_layout: ImageLayout::Undefined,
+            final_layout: ImageLayout::PresentSrc,
         }
     }
-    
+
     pub fn depth(format: TextureFormat) -> Self {
         Self {
-            format, samples: 1,
-            load_op: AttachmentLoadOp::Clear, store_op: AttachmentStoreOp::Store,
-            stencil_load_op: AttachmentLoadOp::Clear, stencil_store_op: AttachmentStoreOp::Store,
-            initial_layout: ImageLayout::Undefined, final_layout: ImageLayout::DepthStencilAttachmentOptimal,
+            format,
+            samples: 1,
+            load_op: AttachmentLoadOp::Clear,
+            store_op: AttachmentStoreOp::Store,
+            stencil_load_op: AttachmentLoadOp::Clear,
+            stencil_store_op: AttachmentStoreOp::Store,
+            initial_layout: ImageLayout::Undefined,
+            final_layout: ImageLayout::DepthStencilAttachmentOptimal,
         }
     }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum AttachmentLoadOp { Load, Clear, DontCare }
+pub enum AttachmentLoadOp {
+    Load,
+    Clear,
+    DontCare,
+}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum AttachmentStoreOp { Store, DontCare }
+pub enum AttachmentStoreOp {
+    Store,
+    DontCare,
+}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ImageLayout {
-    Undefined, General, ColorAttachmentOptimal, DepthStencilAttachmentOptimal,
-    DepthStencilReadOnlyOptimal, ShaderReadOnlyOptimal, TransferSrcOptimal, TransferDstOptimal, PresentSrc,
+    Undefined,
+    General,
+    ColorAttachmentOptimal,
+    DepthStencilAttachmentOptimal,
+    DepthStencilReadOnlyOptimal,
+    ShaderReadOnlyOptimal,
+    TransferSrcOptimal,
+    TransferDstOptimal,
+    PresentSrc,
 }
 
 #[derive(Clone, Debug)]
@@ -105,16 +139,31 @@ pub struct SubpassDependency {
 
 #[derive(Clone, Copy, Debug, Default)]
 pub struct PipelineStageFlags {
-    pub top_of_pipe: bool, pub draw_indirect: bool, pub vertex_input: bool, pub vertex_shader: bool,
-    pub fragment_shader: bool, pub early_fragment_tests: bool, pub late_fragment_tests: bool,
-    pub color_attachment_output: bool, pub compute_shader: bool, pub transfer: bool, pub bottom_of_pipe: bool,
+    pub top_of_pipe: bool,
+    pub draw_indirect: bool,
+    pub vertex_input: bool,
+    pub vertex_shader: bool,
+    pub fragment_shader: bool,
+    pub early_fragment_tests: bool,
+    pub late_fragment_tests: bool,
+    pub color_attachment_output: bool,
+    pub compute_shader: bool,
+    pub transfer: bool,
+    pub bottom_of_pipe: bool,
 }
 
 #[derive(Clone, Copy, Debug, Default)]
 pub struct AccessFlags {
-    pub indirect_command_read: bool, pub index_read: bool, pub vertex_attribute_read: bool,
-    pub uniform_read: bool, pub shader_read: bool, pub shader_write: bool,
-    pub color_attachment_read: bool, pub color_attachment_write: bool,
-    pub depth_stencil_attachment_read: bool, pub depth_stencil_attachment_write: bool,
-    pub transfer_read: bool, pub transfer_write: bool,
+    pub indirect_command_read: bool,
+    pub index_read: bool,
+    pub vertex_attribute_read: bool,
+    pub uniform_read: bool,
+    pub shader_read: bool,
+    pub shader_write: bool,
+    pub color_attachment_read: bool,
+    pub color_attachment_write: bool,
+    pub depth_stencil_attachment_read: bool,
+    pub depth_stencil_attachment_write: bool,
+    pub transfer_read: bool,
+    pub transfer_write: bool,
 }

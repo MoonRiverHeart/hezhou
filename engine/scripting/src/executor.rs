@@ -6,7 +6,7 @@ pub trait ScriptExecutor {
     fn reload(&mut self) -> Result<(), ScriptError>;
     fn call(&self, method: &str, args: ScriptValue) -> Result<ScriptValue, ScriptError>;
     fn unload(&mut self);
-    
+
     fn get_rotation_speed(&self) -> Result<f32, ScriptError>;
     fn set_rotation_speed(&mut self, speed: f32) -> Result<(), ScriptError>;
 }

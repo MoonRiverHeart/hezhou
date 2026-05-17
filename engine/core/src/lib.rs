@@ -1,12 +1,12 @@
-pub mod math;
 pub mod ecs;
 pub mod event;
-pub mod time_loop;
 pub mod ffi;
+pub mod math;
+pub mod time_loop;
 
-pub use math::*;
 pub use ecs::*;
 pub use event::*;
+pub use math::*;
 pub use time_loop::*;
 
 pub struct Engine {
@@ -25,18 +25,18 @@ impl Engine {
             is_running: false,
         }
     }
-    
+
     pub fn start(&mut self) {
         self.is_running = true;
     }
-    
+
     pub fn stop(&mut self) {
         self.is_running = false;
     }
-    
+
     pub fn run_frame(&mut self, delta_time: f32) {
         self.time.update(delta_time);
-        
+
         self.event_bus.dispatch_pre_update();
         self.world.update(delta_time);
         self.event_bus.dispatch_post_update();

@@ -1,5 +1,5 @@
-use nalgebra::{Vector2, Vector3, Vector4};
 use bytemuck::{Pod, Zeroable};
+use nalgebra::{Vector2, Vector3, Vector4};
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default, Pod, Zeroable)]

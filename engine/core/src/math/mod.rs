@@ -1,9 +1,9 @@
-pub mod vec;
 pub mod mat;
 pub mod quat;
 pub mod transform;
+pub mod vec;
 
-pub use vec::*;
 pub use mat::*;
 pub use quat::*;
 pub use transform::*;
+pub use vec::*;

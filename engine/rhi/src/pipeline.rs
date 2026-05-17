@@ -1,5 +1,5 @@
 use crate::ShaderHandle;
-use hezhou_geometry::{VertexLayout, PrimitiveTopology};
+use hezhou_geometry::{PrimitiveTopology, VertexLayout};
 
 #[derive(Clone, Debug)]
 pub struct PipelineDesc {
@@ -28,17 +28,17 @@ impl PipelineDesc {
             layout: PipelineLayout::default(),
         }
     }
-    
+
     pub fn fragment(mut self, shader: ShaderHandle) -> Self {
         self.fragment_shader = Some(shader);
         self
     }
-    
+
     pub fn topology(mut self, topology: PrimitiveTopology) -> Self {
         self.primitive_topology = topology;
         self
     }
-    
+
     pub fn vertex_layout(mut self, layout: VertexLayout) -> Self {
         self.vertex_layout = layout;
         self
@@ -73,7 +73,9 @@ pub enum FillMode {
 }
 
 impl Default for FillMode {
-    fn default() -> Self { Self::Fill }
+    fn default() -> Self {
+        Self::Fill
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -85,7 +87,9 @@ pub enum CullMode {
 }
 
 impl Default for CullMode {
-    fn default() -> Self { Self::Back }
+    fn default() -> Self {
+        Self::Back
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -95,7 +99,9 @@ pub enum FrontFace {
 }
 
 impl Default for FrontFace {
-    fn default() -> Self { Self::CounterClockwise }
+    fn default() -> Self {
+        Self::CounterClockwise
+    }
 }
 
 #[derive(Clone, Debug, Default)]
@@ -110,25 +116,46 @@ pub struct DepthStencilState {
 
 impl DepthStencilState {
     pub fn depth_none() -> Self {
-        Self { depth_test_enable: false, depth_write_enable: false, ..Default::default() }
+        Self {
+            depth_test_enable: false,
+            depth_write_enable: false,
+            ..Default::default()
+        }
     }
-    
+
     pub fn depth_read() -> Self {
-        Self { depth_test_enable: true, depth_write_enable: false, ..Default::default() }
+        Self {
+            depth_test_enable: true,
+            depth_write_enable: false,
+            ..Default::default()
+        }
     }
-    
+
     pub fn depth_write() -> Self {
-        Self { depth_test_enable: true, depth_write_enable: true, ..Default::default() }
+        Self {
+            depth_test_enable: true,
+            depth_write_enable: true,
+            ..Default::default()
+        }
     }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum CompareOp {
-    Never, Less, Equal, LessOrEqual, Greater, NotEqual, GreaterOrEqual, Always,
+    Never,
+    Less,
+    Equal,
+    LessOrEqual,
+    Greater,
+    NotEqual,
+    GreaterOrEqual,
+    Always,
 }
 
 impl Default for CompareOp {
-    fn default() -> Self { Self::Less }
+    fn default() -> Self {
+        Self::Less
+    }
 }
 
 #[derive(Clone, Copy, Debug, Default)]
@@ -144,11 +171,20 @@ pub struct StencilOpState {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum StencilOp {
-    Keep, Zero, Replace, IncrementAndClamp, DecrementAndClamp, Invert, IncrementAndWrap, DecrementAndWrap,
+    Keep,
+    Zero,
+    Replace,
+    IncrementAndClamp,
+    DecrementAndClamp,
+    Invert,
+    IncrementAndWrap,
+    DecrementAndWrap,
 }
 
 impl Default for StencilOp {
-    fn default() -> Self { Self::Keep }
+    fn default() -> Self {
+        Self::Keep
+    }
 }
 
 #[derive(Clone, Debug, Default)]
@@ -164,7 +200,12 @@ pub struct BlendState {
 }
 
 impl BlendState {
-    pub fn opaque() -> Self { Self { enable: false, ..Default::default() } }
+    pub fn opaque() -> Self {
+        Self {
+            enable: false,
+            ..Default::default()
+        }
+    }
     pub fn alpha_blend() -> Self {
         Self {
             enable: true,
@@ -188,32 +229,72 @@ impl BlendState {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum BlendOp { Add, Subtract, ReverseSubtract, Min, Max }
+pub enum BlendOp {
+    Add,
+    Subtract,
+    ReverseSubtract,
+    Min,
+    Max,
+}
 
 impl Default for BlendOp {
-    fn default() -> Self { Self::Add }
+    fn default() -> Self {
+        Self::Add
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum BlendFactor {
-    Zero, One, SrcColor, OneMinusSrcColor, SrcAlpha, OneMinusSrcAlpha,
-    DstColor, OneMinusDstColor, DstAlpha, OneMinusDstAlpha, SrcAlphaSaturate,
-    ConstantColor, OneMinusConstantColor, ConstantAlpha, OneMinusConstantAlpha,
+    Zero,
+    One,
+    SrcColor,
+    OneMinusSrcColor,
+    SrcAlpha,
+    OneMinusSrcAlpha,
+    DstColor,
+    OneMinusDstColor,
+    DstAlpha,
+    OneMinusDstAlpha,
+    SrcAlphaSaturate,
+    ConstantColor,
+    OneMinusConstantColor,
+    ConstantAlpha,
+    OneMinusConstantAlpha,
 }
 
 impl Default for BlendFactor {
-    fn default() -> Self { Self::Zero }
+    fn default() -> Self {
+        Self::Zero
+    }
 }
 
 #[derive(Clone, Copy, Debug, Default)]
 pub struct ColorComponentFlags {
-    pub r: bool, pub g: bool, pub b: bool, pub a: bool,
+    pub r: bool,
+    pub g: bool,
+    pub b: bool,
+    pub a: bool,
 }
 
 impl ColorComponentFlags {
-    pub const ALL: Self = Self { r: true, g: true, b: true, a: true };
-    pub const NONE: Self = Self { r: false, g: false, b: false, a: false };
-    pub const RGB: Self = Self { r: true, g: true, b: true, a: false };
+    pub const ALL: Self = Self {
+        r: true,
+        g: true,
+        b: true,
+        a: true,
+    };
+    pub const NONE: Self = Self {
+        r: false,
+        g: false,
+        b: false,
+        a: false,
+    };
+    pub const RGB: Self = Self {
+        r: true,
+        g: true,
+        b: true,
+        a: false,
+    };
 }
 
 #[derive(Clone, Debug, Default)]
@@ -237,16 +318,30 @@ pub struct DescriptorBinding {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum DescriptorType {
-    UniformBuffer, StorageBuffer, SampledTexture, Sampler, StorageTexture,
+    UniformBuffer,
+    StorageBuffer,
+    SampledTexture,
+    Sampler,
+    StorageTexture,
 }
 
 #[derive(Clone, Copy, Debug)]
 pub struct ShaderStageFlags {
-    pub vertex: bool, pub fragment: bool, pub geometry: bool, pub compute: bool,
+    pub vertex: bool,
+    pub fragment: bool,
+    pub geometry: bool,
+    pub compute: bool,
 }
 
 impl Default for ShaderStageFlags {
-    fn default() -> Self { Self { vertex: true, fragment: true, geometry: false, compute: false } }
+    fn default() -> Self {
+        Self {
+            vertex: true,
+            fragment: true,
+            geometry: false,
+            compute: false,
+        }
+    }
 }
 
 #[derive(Clone, Debug)]

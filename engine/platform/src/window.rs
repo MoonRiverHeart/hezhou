@@ -25,7 +25,7 @@ impl WindowHandle {
             height,
         }
     }
-    
+
     pub fn null() -> Self {
         Self {
             window_type: NativeWindowType::Unknown,
@@ -34,15 +34,15 @@ impl WindowHandle {
             height: 0,
         }
     }
-    
+
     pub fn is_valid(&self) -> bool {
         self.ptr != 0 && self.width > 0 && self.height > 0
     }
-    
+
     pub fn get_native_ptr(&self) -> *mut std::ffi::c_void {
         self.ptr as *mut std::ffi::c_void
     }
-    
+
     pub fn get_size(&self) -> (i32, i32) {
         (self.width, self.height)
     }

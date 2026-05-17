@@ -19,62 +19,72 @@ impl AnimationEngine {
             dfx,
         }
     }
-    
+
     pub fn create_animation(&mut self, animation: Animation) -> AnimationId {
         let id = animation.id;
         self.animations.insert(id, animation);
         id
     }
-    
+
     pub fn start_animation(&mut self, id: AnimationId) {
         if let Some(anim) = self.animations.get_mut(&id) {
             anim.running = true;
             anim.paused = false;
             anim.elapsed_time = 0.0;
-            
+
             if !self.running_animations.contains(&id) {
                 self.running_animations.push(id);
             }
-            
-            println!("[AnimationEngine] Animation started: id={}, duration={}s", id.id, anim.duration);
+
+            println!(
+                "[AnimationEngine] Animation started: id={}, duration={}s",
+                id.id, anim.duration
+            );
         }
     }
-    
+
     pub fn pause_animation(&mut self, id: AnimationId) {
         if let Some(anim) = self.animations.get_mut(&id) {
             anim.paused = true;
             println!("[AnimationEngine] Animation paused: id={}", id.id);
         }
     }
-    
+
     pub fn cancel_animation(&mut self, id: AnimationId) {
         if let Some(anim) = self.animations.get_mut(&id) {
             anim.running = false;
             anim.paused = false;
-            
-            self.running_animations.retain(|running_id| *running_id != id);
+
+            self.running_animations
+                .retain(|running_id| *running_id != id);
             println!("[AnimationEngine] Animation cancelled: id={}", id.id);
         }
     }
-    
+
     pub fn update(&mut self, delta_time: f32) {
         for id in &self.running_animations {
             let anim = self.animations.get_mut(id).unwrap();
-            
-            if anim.paused { continue; }
-            
+
+            if anim.paused {
+                continue;
+            }
+
             anim.elapsed_time += delta_time;
-            
+
             let current_value = anim.current_value();
-            
-            println!("[AnimationEngine] Animation {} updated: progress={}, value={}", id.id, 
-                anim.elapsed_time / anim.duration, current_value);
-            
+
+            println!(
+                "[AnimationEngine] Animation {} updated: progress={}, value={}",
+                id.id,
+                anim.elapsed_time / anim.duration,
+                current_value
+            );
+
             if anim.is_complete() {
                 if anim.repeat_count > 1 {
                     anim.repeat_count -= 1;
                     anim.elapsed_time = 0.0;
-                    
+
                     if anim.auto_reverse {
                         let temp = anim.from_value;
                         anim.from_value = anim.to_value;
@@ -86,18 +96,20 @@ impl AnimationEngine {
                 }
             }
         }
-        
-        self.running_animations.retain(|id| {
-            self.animations.get(id).map(|a| a.running).unwrap_or(false)
-        });
+
+        self.running_animations
+            .retain(|id| self.animations.get(id).map(|a| a.running).unwrap_or(false));
     }
-    
+
     pub fn get_animation_value(&self, id: AnimationId) -> Option<f32> {
         self.animations.get(&id).map(|anim| anim.current_value())
     }
-    
+
     pub fn is_animation_running(&self, id: AnimationId) -> bool {
-        self.animations.get(&id).map(|anim| anim.running).unwrap_or(false)
+        self.animations
+            .get(&id)
+            .map(|anim| anim.running)
+            .unwrap_or(false)
     }
 }
 

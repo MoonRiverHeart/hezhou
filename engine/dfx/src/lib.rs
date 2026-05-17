@@ -1,14 +1,14 @@
+pub mod crash;
 pub mod log_types;
 pub mod logger;
-pub mod crash;
-pub mod trace;
 pub mod perf;
+pub mod trace;
 
+pub use crash::*;
 pub use log_types::*;
 pub use logger::*;
-pub use crash::*;
-pub use trace::*;
 pub use perf::*;
+pub use trace::*;
 
 use parking_lot::Mutex;
 use std::sync::Arc;
@@ -29,32 +29,32 @@ impl DfxSystem {
             perf_monitor: Arc::new(Mutex::new(PerformanceMonitor::new())),
         }
     }
-    
+
     pub fn enable_all(&mut self) {
         self.logger.lock().set_level(LogLevel::Trace);
         self.crash_handler.lock().enable();
         self.trace_analyzer.lock().enable();
         self.perf_monitor.lock().enable();
     }
-    
+
     pub fn disable_all(&mut self) {
         self.crash_handler.lock().disable();
         self.trace_analyzer.lock().disable();
         self.perf_monitor.lock().disable();
     }
-    
+
     pub fn get_logger(&self) -> Arc<Mutex<Logger>> {
         self.logger.clone()
     }
-    
+
     pub fn get_crash_handler(&self) -> Arc<Mutex<CrashHandler>> {
         self.crash_handler.clone()
     }
-    
+
     pub fn get_trace_analyzer(&self) -> Arc<Mutex<TraceAnalyzer>> {
         self.trace_analyzer.clone()
     }
-    
+
     pub fn get_perf_monitor(&self) -> Arc<Mutex<PerformanceMonitor>> {
         self.perf_monitor.clone()
     }
@@ -120,12 +120,12 @@ pub extern "C" fn dfx_log(
     if system.is_null() || module.is_null() || message.is_null() || file.is_null() {
         return;
     }
-    
+
     unsafe {
         let module_str = std::ffi::CStr::from_ptr(module).to_str().unwrap_or("");
         let message_str = std::ffi::CStr::from_ptr(message).to_str().unwrap_or("");
         let file_str = std::ffi::CStr::from_ptr(file).to_str().unwrap_or("");
-        
+
         (*system).logger.lock().log(
             LogLevel::from_u8(level),
             module_str,
@@ -172,12 +172,15 @@ pub extern "C" fn dfx_trace_begin(
     if system.is_null() || name.is_null() || category.is_null() {
         return;
     }
-    
+
     unsafe {
         let name_str = std::ffi::CStr::from_ptr(name).to_str().unwrap_or("");
         let category_str = std::ffi::CStr::from_ptr(category).to_str().unwrap_or("");
-        
-        (*system).trace_analyzer.lock().begin_point(name_str, category_str);
+
+        (*system)
+            .trace_analyzer
+            .lock()
+            .begin_point(name_str, category_str);
     }
 }
 
@@ -190,12 +193,15 @@ pub extern "C" fn dfx_trace_end(
     if system.is_null() || name.is_null() || category.is_null() {
         return;
     }
-    
+
     unsafe {
         let name_str = std::ffi::CStr::from_ptr(name).to_str().unwrap_or("");
         let category_str = std::ffi::CStr::from_ptr(category).to_str().unwrap_or("");
-        
-        (*system).trace_analyzer.lock().end_point(name_str, category_str);
+
+        (*system)
+            .trace_analyzer
+            .lock()
+            .end_point(name_str, category_str);
     }
 }
 
@@ -222,10 +228,8 @@ pub extern "C" fn dfx_get_fps(system: *mut DfxSystem) -> f32 {
     if system.is_null() {
         return 0.0;
     }
-    
-    unsafe {
-        (*system).perf_monitor.lock().get_fps()
-    }
+
+    unsafe { (*system).perf_monitor.lock().get_fps() }
 }
 
 #[unsafe(no_mangle)]
@@ -233,10 +237,8 @@ pub extern "C" fn dfx_get_frame_count(system: *mut DfxSystem) -> u64 {
     if system.is_null() {
         return 0;
     }
-    
-    unsafe {
-        (*system).perf_monitor.lock().get_frame_count()
-    }
+
+    unsafe { (*system).perf_monitor.lock().get_frame_count() }
 }
 
 #[unsafe(no_mangle)]
@@ -253,18 +255,22 @@ pub extern "C" fn dfx_get_perf_snapshot(system: *mut DfxSystem) -> PerformanceSn
             triangle_count: 0,
         };
     }
-    
+
     unsafe {
-        (*system).perf_monitor.lock().get_latest_snapshot().unwrap_or(PerformanceSnapshot {
-            timestamp: 0,
-            fps: 0.0,
-            frame_time_ms: 0.0,
-            cpu_usage_percent: 0.0,
-            memory_used_mb: 0.0,
-            memory_available_mb: 0.0,
-            draw_calls: 0,
-            triangle_count: 0,
-        })
+        (*system)
+            .perf_monitor
+            .lock()
+            .get_latest_snapshot()
+            .unwrap_or(PerformanceSnapshot {
+                timestamp: 0,
+                fps: 0.0,
+                frame_time_ms: 0.0,
+                cpu_usage_percent: 0.0,
+                memory_used_mb: 0.0,
+                memory_available_mb: 0.0,
+                draw_calls: 0,
+                triangle_count: 0,
+            })
     }
 }
 
@@ -273,10 +279,10 @@ pub extern "C" fn dfx_save_trace(system: *mut DfxSystem, path: *const std::os::r
     if system.is_null() || path.is_null() {
         return -1;
     }
-    
+
     unsafe {
         let path_str = std::ffi::CStr::from_ptr(path).to_str().unwrap_or("");
-        
+
         match (*system).trace_analyzer.lock().save_to_file(path_str) {
             Ok(_) => 0,
             Err(_) => -1,
@@ -287,14 +293,14 @@ pub extern "C" fn dfx_save_trace(system: *mut DfxSystem, path: *const std::os::r
 #[unsafe(no_mangle)]
 pub extern "C" fn dfx_capture_stack_trace() -> *mut StackFrame {
     let frames = CrashHandler::capture_stack_trace();
-    
+
     if frames.is_empty() {
         return std::ptr::null_mut();
     }
-    
+
     let boxed = frames.into_boxed_slice();
     let ptr = Box::into_raw(boxed) as *mut StackFrame;
-    
+
     ptr
 }
 
@@ -303,10 +309,8 @@ pub extern "C" fn dfx_get_stack_frame_count(frames: *mut StackFrame) -> u32 {
     if frames.is_null() {
         return 0;
     }
-    
-    unsafe {
-        10
-    }
+
+    unsafe { 10 }
 }
 
 #[unsafe(no_mangle)]
@@ -314,7 +318,7 @@ pub extern "C" fn dfx_free_stack_trace(frames: *mut StackFrame, count: u32) {
     if frames.is_null() {
         return;
     }
-    
+
     let slice = unsafe { std::slice::from_raw_parts_mut(frames, count as usize) };
     let _ = unsafe { Box::from_raw(slice as *mut [StackFrame]) };
 }
@@ -324,10 +328,8 @@ pub extern "C" fn dfx_get_log_buffer_count(system: *mut DfxSystem) -> u32 {
     if system.is_null() {
         return 0;
     }
-    
-    unsafe {
-        (*system).logger.lock().get_buffer().len() as u32
-    }
+
+    unsafe { (*system).logger.lock().get_buffer().len() as u32 }
 }
 
 #[unsafe(no_mangle)]

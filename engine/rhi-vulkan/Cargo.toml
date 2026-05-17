@@ -15,10 +15,14 @@ mono = ["hezhou-scripting/mono"]
 hezhou-core = { path = "../core" }
 hezhou-geometry = { path = "../geometry" }
 hezhou-rhi = { path = "../rhi" }
+hezhou-ui = { path = "../ui" }
+hezhou-platform = { path = "../platform" }
+hezhou-dfx = { path = "../dfx" }
 hezhou-scripting = { path = "../scripting", default-features = false }
 ash = "0.38"
 bytemuck = "1.14"
 glfw = { version = "0.62", default-features = false, features = ["src-build", "vulkan", "raw-window-handle-v0-6", "native-handles"] }
 libloading = "0.8"
+parking_lot = "0.12"
 
 [dev-dependencies]

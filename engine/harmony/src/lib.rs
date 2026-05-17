@@ -1,13 +1,13 @@
+mod event_bus;
 mod event_types;
 mod native_window;
-mod event_bus;
 
+pub use event_bus::EventBus;
 pub use event_types::*;
 pub use native_window::{NativeWindowContext, OH_NativeWindow};
-pub use event_bus::EventBus;
 
-use std::os::raw::c_void;
 use parking_lot::Mutex;
+use std::os::raw::c_void;
 use std::sync::Arc;
 
 pub struct HarmonyEngine {
@@ -48,11 +48,13 @@ pub extern "C" fn harmony_engine_shutdown(engine: *mut HarmonyEngine) {
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn harmony_get_window_context(engine: *mut HarmonyEngine) -> *mut NativeWindowContext {
+pub extern "C" fn harmony_get_window_context(
+    engine: *mut HarmonyEngine,
+) -> *mut NativeWindowContext {
     if engine.is_null() {
         return std::ptr::null_mut();
     }
-    
+
     unsafe {
         let e = &*engine;
         Arc::as_ptr(&e.window_ctx) as *mut NativeWindowContext
@@ -64,7 +66,7 @@ pub extern "C" fn harmony_get_event_bus(engine: *mut HarmonyEngine) -> *mut Even
     if engine.is_null() {
         return std::ptr::null_mut();
     }
-    
+
     unsafe {
         let e = &*engine;
         Arc::as_ptr(&e.event_bus) as *mut EventBus
@@ -82,7 +84,7 @@ pub extern "C" fn harmony_register_event_callback(
     if engine.is_null() || event_name.is_null() {
         return;
     }
-    
+
     unsafe {
         let e = &*engine;
         let name = std::ffi::CStr::from_ptr(event_name).to_str().unwrap_or("");
@@ -91,8 +93,10 @@ pub extern "C" fn harmony_register_event_callback(
         } else {
             std::ffi::CStr::from_ptr(description).to_str().unwrap_or("")
         };
-        
+
         let descriptor = hezhou_scripting::CallbackDescriptor::new_sync(name, desc, "");
-        e.event_bus.lock().register_event_handler(name, callback, descriptor, context);
+        e.event_bus
+            .lock()
+            .register_event_handler(name, callback, descriptor, context);
     }
 }

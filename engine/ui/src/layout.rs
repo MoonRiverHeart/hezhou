@@ -24,15 +24,15 @@ impl Layout {
             padding: EdgeInsets::zero(),
         }
     }
-    
+
     pub fn zero() -> Self {
         Self::new(0.0, 0.0, 0.0, 0.0)
     }
-    
+
     pub fn bounds(&self) -> Rect {
         Rect::new(self.x, self.y, self.width, self.height)
     }
-    
+
     pub fn content_bounds(&self) -> Rect {
         Rect::new(
             self.x + self.padding.left,
@@ -41,12 +41,12 @@ impl Layout {
             self.height - self.padding.vertical(),
         )
     }
-    
+
     pub fn set_position(&mut self, x: f32, y: f32) {
         self.x = x;
         self.y = y;
     }
-    
+
     pub fn set_size(&mut self, width: f32, height: f32) {
         self.width = width;
         self.height = height;

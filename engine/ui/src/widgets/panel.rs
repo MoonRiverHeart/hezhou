@@ -1,9 +1,9 @@
-use crate::widget::*;
-use crate::types::*;
-use crate::layout::*;
-use crate::style::*;
 use crate::canvas::*;
 use crate::event::*;
+use crate::layout::*;
+use crate::style::*;
+use crate::types::*;
+use crate::widget::*;
 
 pub struct Panel {
     id: WidgetId,
@@ -31,12 +31,12 @@ impl Panel {
             layout_type: crate::layout::LayoutType::Absolute,
         }
     }
-    
+
     pub fn with_layout_type(mut self, layout_type: crate::layout::LayoutType) -> Self {
         self.layout_type = layout_type;
         self
     }
-    
+
     pub fn add_child_widget(&mut self, child: Box<dyn Widget>) {
         let child_id = child.id();
         self.children.push(child_id);
@@ -44,48 +44,78 @@ impl Panel {
 }
 
 impl Widget for Panel {
-    fn id(&self) -> WidgetId { self.id }
-    fn parent(&self) -> Option<WidgetId> { 
-        if self.parent_id.is_valid() { Some(self.parent_id) } else { None }
+    fn id(&self) -> WidgetId {
+        self.id
     }
-    fn set_parent(&mut self, parent: WidgetId) { self.parent_id = parent; }
-    
-    fn children(&self) -> &[WidgetId] { &self.children }
-    fn add_child(&mut self, child: WidgetId) { self.children.push(child); }
+    fn parent(&self) -> Option<WidgetId> {
+        if self.parent_id.is_valid() {
+            Some(self.parent_id)
+        } else {
+            None
+        }
+    }
+    fn set_parent(&mut self, parent: WidgetId) {
+        self.parent_id = parent;
+    }
+
+    fn children(&self) -> &[WidgetId] {
+        &self.children
+    }
+    fn add_child(&mut self, child: WidgetId) {
+        self.children.push(child);
+    }
     fn remove_child(&mut self, child: WidgetId) {
         self.children.retain(|c| *c != child);
     }
-    
-    fn layout(&self) -> &Layout { &self.layout }
+
+    fn layout(&self) -> &Layout {
+        &self.layout
+    }
     fn set_layout(&mut self, layout: Layout) {
         self.layout = layout;
         self.flags.dirty_layout = true;
         self.flags.dirty_render = true;
     }
-    
-    fn style(&self) -> &Style { &self.style }
+
+    fn style(&self) -> &Style {
+        &self.style
+    }
     fn set_style(&mut self, style: Style) {
         self.style = style;
         self.flags.dirty_style = true;
         self.flags.dirty_render = true;
     }
-    
-    fn state(&self) -> WidgetState { self.state }
+
+    fn state(&self) -> WidgetState {
+        self.state
+    }
     fn set_state(&mut self, state: WidgetState) {
         self.state = state;
         self.flags.dirty_render = true;
     }
-    
+
+    fn widget_type(&self) -> &'static str {
+        "Panel"
+    }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+        self
+    }
+
     fn draw(&mut self, canvas: &mut Canvas) {
         let bounds = self.layout.bounds();
-        
+
         if self.style.shadow.is_some() {
             canvas.draw_shadow(bounds, self.style.shadow.as_ref().unwrap());
         }
-        
+
         canvas.draw_rect(bounds, &self.style);
     }
-    
+
     fn on_event(&mut self, event: &Event) -> EventResult {
         EventResult::Ignored
     }

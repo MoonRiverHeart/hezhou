@@ -1,12 +1,12 @@
 use crate::callback_registry::CallbackRegistry;
 use crate::callback_types::*;
-use crate::value_bridge::ScriptValue;
 use crate::error::{ScriptError, ScriptResult};
-use wrapped_mono::*;
+use crate::value_bridge::ScriptValue;
+use parking_lot::Mutex;
 use std::collections::HashMap;
 use std::path::PathBuf;
-use parking_lot::Mutex;
 use std::sync::Arc;
+use wrapped_mono::*;
 
 pub struct ScriptManager {
     domain: Option<Domain>,
@@ -26,19 +26,21 @@ impl ScriptManager {
 
     pub fn load_script(&mut self, dll_path: &str) -> ScriptResult<String> {
         let domain = self.domain.as_ref().ok_or(ScriptError::NotInitialized)?;
-        
-        let assembly = domain.assembly_open(dll_path)
+
+        let assembly = domain
+            .assembly_open(dll_path)
             .ok_or_else(|| ScriptError::AssemblyNotFound(dll_path.to_string()))?;
-        
+
         let path_buf = PathBuf::from(dll_path);
         let name = path_buf
             .file_name()
             .and_then(|n| n.to_str())
             .unwrap_or("unknown");
-        
+
         let name_without_ext = name.strip_suffix(".dll").unwrap_or(name);
-        
-        self.assemblies.insert(name_without_ext.to_string(), assembly);
+
+        self.assemblies
+            .insert(name_without_ext.to_string(), assembly);
         Ok(name_without_ext.to_string())
     }
 
@@ -53,21 +55,28 @@ impl ScriptManager {
             .file_name()
             .and_then(|n| n.to_str())
             .unwrap_or("unknown");
-        
+
         let name_without_ext = name.strip_suffix(".dll").unwrap_or(name);
-        
+
         self.assemblies.remove(name_without_ext);
-        
+
         // Copy DLL to temp path to bypass Mono's assembly cache
         let temp_dir = std::env::temp_dir();
-        let temp_dll_name = format!("{}_{}.dll", name_without_ext, std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_millis());
+        let temp_dll_name = format!(
+            "{}_{}.dll",
+            name_without_ext,
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_millis()
+        );
         let temp_dll_path = temp_dir.join(&temp_dll_name);
-        
+
         std::fs::copy(dll_path, &temp_dll_path)
             .map_err(|e| ScriptError::InvokeFailed(format!("Failed to copy DLL to temp: {}", e)))?;
-        
+
         let new_name = self.load_script(temp_dll_path.to_str().unwrap())?;
-        
+
         Ok(new_name)
     }
 
@@ -81,34 +90,46 @@ impl ScriptManager {
         param_count: i32,
     ) -> ScriptResult<ScriptValue> {
         let _domain = self.domain.as_ref().ok_or(ScriptError::NotInitialized)?;
-        let assembly = self.assemblies.get(assembly_name)
+        let assembly = self
+            .assemblies
+            .get(assembly_name)
             .ok_or_else(|| ScriptError::AssemblyNotFound(assembly_name.to_string()))?;
-        
+
         let image = assembly.get_image();
-        
+
         let class = Class::from_name(&image, namespace, class_name)
             .or_else(|| Class::from_name_case(&image, namespace, class_name))
             .ok_or_else(|| ScriptError::ClassNotFound(format!("{}.{}", namespace, class_name)))?;
-        
+
         let mut iter = std::ptr::null_mut::<std::os::raw::c_void>();
         let mut found_method_ptr: *mut wrapped_mono::binds::MonoMethod = std::ptr::null_mut();
         loop {
-            let method_ptr = unsafe { wrapped_mono::binds::mono_class_get_methods(class.get_ptr(), &mut iter as *mut *mut std::os::raw::c_void) };
+            let method_ptr = unsafe {
+                wrapped_mono::binds::mono_class_get_methods(
+                    class.get_ptr(),
+                    &mut iter as *mut *mut std::os::raw::c_void,
+                )
+            };
             if method_ptr.is_null() {
                 break;
             }
             let name_cstr = unsafe { wrapped_mono::binds::mono_method_get_name(method_ptr) };
-            let name = unsafe { std::ffi::CStr::from_ptr(name_cstr) }.to_str().unwrap_or("?");
+            let name = unsafe { std::ffi::CStr::from_ptr(name_cstr) }
+                .to_str()
+                .unwrap_or("?");
             if name == method_name {
                 found_method_ptr = method_ptr;
                 break;
             }
         }
-        
+
         if found_method_ptr.is_null() {
-            return Err(ScriptError::MethodNotFound(format!("{} ({} params)", method_name, param_count)));
+            return Err(ScriptError::MethodNotFound(format!(
+                "{} ({} params)",
+                method_name, param_count
+            )));
         }
-        
+
         let mut params: Vec<*mut std::os::raw::c_void> = Vec::new();
         if param_count > 0 {
             if let Some(float_val) = arg_float {
@@ -116,21 +137,27 @@ impl ScriptManager {
                 params.push(float_ptr);
             }
         }
-        
+
         let mut exc_ptr: *mut wrapped_mono::binds::MonoObject = std::ptr::null_mut();
         let result_obj = unsafe {
             wrapped_mono::binds::mono_runtime_invoke(
                 found_method_ptr,
                 std::ptr::null_mut(),
-                if params.is_empty() { std::ptr::null_mut() } else { params.as_mut_ptr() as *mut *mut std::os::raw::c_void },
+                if params.is_empty() {
+                    std::ptr::null_mut()
+                } else {
+                    params.as_mut_ptr() as *mut *mut std::os::raw::c_void
+                },
                 &mut exc_ptr as *mut *mut wrapped_mono::binds::MonoObject,
             )
         };
-        
+
         if !exc_ptr.is_null() {
-            return Err(ScriptError::InvokeFailed("Exception during method call".to_string()));
+            return Err(ScriptError::InvokeFailed(
+                "Exception during method call".to_string(),
+            ));
         }
-        
+
         if result_obj.is_null() {
             Ok(ScriptValue::null())
         } else {
@@ -148,7 +175,9 @@ impl ScriptManager {
         descriptor: CallbackDescriptor,
         context: usize,
     ) {
-        self.callbacks.lock().register_sync(name, callback, descriptor, context);
+        self.callbacks
+            .lock()
+            .register_sync(name, callback, descriptor, context);
     }
 
     pub fn register_async_callback(
@@ -158,7 +187,9 @@ impl ScriptManager {
         descriptor: CallbackDescriptor,
         context: usize,
     ) {
-        self.callbacks.lock().register_async(name, callback, descriptor, context);
+        self.callbacks
+            .lock()
+            .register_async(name, callback, descriptor, context);
     }
 
     pub fn register_task_callback(
@@ -169,19 +200,36 @@ impl ScriptManager {
         supports_progress: bool,
         context: usize,
     ) {
-        self.callbacks.lock().register_task(name, callback, descriptor, supports_progress, context);
+        self.callbacks
+            .lock()
+            .register_task(name, callback, descriptor, supports_progress, context);
     }
 
     pub fn trigger_sync(&self, name: &str, arg: ScriptValue) -> ScriptResult<ScriptValue> {
         self.callbacks.lock().trigger_sync(name, arg)
     }
 
-    pub fn trigger_async(&self, name: &str, arg: ScriptValue, completion_ptr: usize) -> ScriptResult<()> {
-        self.callbacks.lock().trigger_async(name, arg, completion_ptr)
+    pub fn trigger_async(
+        &self,
+        name: &str,
+        arg: ScriptValue,
+        completion_ptr: usize,
+    ) -> ScriptResult<()> {
+        self.callbacks
+            .lock()
+            .trigger_async(name, arg, completion_ptr)
     }
 
-    pub fn trigger_task(&self, name: &str, arg: ScriptValue, progress_ptr: usize, completion_ptr: usize) -> ScriptResult<u64> {
-        self.callbacks.lock().trigger_task(name, arg, progress_ptr, completion_ptr)
+    pub fn trigger_task(
+        &self,
+        name: &str,
+        arg: ScriptValue,
+        progress_ptr: usize,
+        completion_ptr: usize,
+    ) -> ScriptResult<u64> {
+        self.callbacks
+            .lock()
+            .trigger_task(name, arg, progress_ptr, completion_ptr)
     }
 
     pub fn query_task_progress(&self, id: u64) -> Option<f32> {
@@ -201,11 +249,15 @@ impl ScriptManager {
     }
 
     pub fn notify_completion(&mut self, completion_ptr: usize, result: ScriptValue) {
-        self.callbacks.lock().notify_completion(completion_ptr, result);
+        self.callbacks
+            .lock()
+            .notify_completion(completion_ptr, result);
     }
 
     pub fn notify_progress(&mut self, progress_ptr: usize, progress: f32) {
-        self.callbacks.lock().notify_progress(progress_ptr, progress);
+        self.callbacks
+            .lock()
+            .notify_progress(progress_ptr, progress);
     }
 
     pub fn list_callbacks(&self) -> Vec<CallbackDescriptor> {

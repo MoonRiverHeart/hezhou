@@ -1,4 +1,4 @@
-use crate::{Vertex, BoundingBox};
+use crate::{BoundingBox, Vertex};
 use nalgebra::Vector3;
 
 #[derive(Clone, Debug)]
@@ -57,7 +57,8 @@ impl MeshData {
                 let i1 = chunk[1] as usize;
                 let i2 = chunk[2] as usize;
 
-                if i0 < self.vertices.len() && i1 < self.vertices.len() && i2 < self.vertices.len() {
+                if i0 < self.vertices.len() && i1 < self.vertices.len() && i2 < self.vertices.len()
+                {
                     let v0 = Vector3::from(self.vertices[i0].position);
                     let v1 = Vector3::from(self.vertices[i1].position);
                     let v2 = Vector3::from(self.vertices[i2].position);
@@ -96,7 +97,8 @@ impl MeshData {
                 let i1 = chunk[1] as usize;
                 let i2 = chunk[2] as usize;
 
-                if i0 < self.vertices.len() && i1 < self.vertices.len() && i2 < self.vertices.len() {
+                if i0 < self.vertices.len() && i1 < self.vertices.len() && i2 < self.vertices.len()
+                {
                     let v0 = &self.vertices[i0];
                     let v1 = &self.vertices[i1];
                     let v2 = &self.vertices[i2];
@@ -165,9 +167,15 @@ impl MeshData {
 
     pub fn create_triangle() -> Self {
         let vertices = vec![
-            Vertex::new([0.0, 0.5, 0.0]).with_uv([0.5, 1.0]).with_color([1.0, 0.0, 0.0, 1.0]),
-            Vertex::new([-0.5, -0.5, 0.0]).with_uv([0.0, 0.0]).with_color([0.0, 1.0, 0.0, 1.0]),
-            Vertex::new([0.5, -0.5, 0.0]).with_uv([1.0, 0.0]).with_color([0.0, 0.0, 1.0, 1.0]),
+            Vertex::new([0.0, 0.5, 0.0])
+                .with_uv([0.5, 1.0])
+                .with_color([1.0, 0.0, 0.0, 1.0]),
+            Vertex::new([-0.5, -0.5, 0.0])
+                .with_uv([0.0, 0.0])
+                .with_color([0.0, 1.0, 0.0, 1.0]),
+            Vertex::new([0.5, -0.5, 0.0])
+                .with_uv([1.0, 0.0])
+                .with_color([0.0, 0.0, 1.0, 1.0]),
         ];
         let indices = vec![0, 1, 2];
         let mut mesh = Self::new(vertices, indices);
@@ -177,10 +185,18 @@ impl MeshData {
 
     pub fn create_quad() -> Self {
         let vertices = vec![
-            Vertex::new([-0.5, -0.5, 0.0]).with_uv([0.0, 0.0]).with_color([1.0, 1.0, 1.0, 1.0]),
-            Vertex::new([0.5, -0.5, 0.0]).with_uv([1.0, 0.0]).with_color([1.0, 1.0, 1.0, 1.0]),
-            Vertex::new([0.5, 0.5, 0.0]).with_uv([1.0, 1.0]).with_color([1.0, 1.0, 1.0, 1.0]),
-            Vertex::new([-0.5, 0.5, 0.0]).with_uv([0.0, 1.0]).with_color([1.0, 1.0, 1.0, 1.0]),
+            Vertex::new([-0.5, -0.5, 0.0])
+                .with_uv([0.0, 0.0])
+                .with_color([1.0, 1.0, 1.0, 1.0]),
+            Vertex::new([0.5, -0.5, 0.0])
+                .with_uv([1.0, 0.0])
+                .with_color([1.0, 1.0, 1.0, 1.0]),
+            Vertex::new([0.5, 0.5, 0.0])
+                .with_uv([1.0, 1.0])
+                .with_color([1.0, 1.0, 1.0, 1.0]),
+            Vertex::new([-0.5, 0.5, 0.0])
+                .with_uv([0.0, 1.0])
+                .with_color([1.0, 1.0, 1.0, 1.0]),
         ];
         let indices = vec![0, 1, 2, 0, 2, 3];
         let mut mesh = Self::new(vertices, indices);
@@ -190,38 +206,82 @@ impl MeshData {
 
     pub fn create_cube() -> Self {
         let vertices = vec![
-            Vertex::new([-0.5, -0.5, -0.5]).with_uv([0.0, 0.0]).with_normal([0.0, 0.0, -1.0]),
-            Vertex::new([0.5, -0.5, -0.5]).with_uv([1.0, 0.0]).with_normal([0.0, 0.0, -1.0]),
-            Vertex::new([0.5, 0.5, -0.5]).with_uv([1.0, 1.0]).with_normal([0.0, 0.0, -1.0]),
-            Vertex::new([-0.5, 0.5, -0.5]).with_uv([0.0, 1.0]).with_normal([0.0, 0.0, -1.0]),
-            Vertex::new([-0.5, -0.5, 0.5]).with_uv([0.0, 0.0]).with_normal([0.0, 0.0, 1.0]),
-            Vertex::new([0.5, -0.5, 0.5]).with_uv([1.0, 0.0]).with_normal([0.0, 0.0, 1.0]),
-            Vertex::new([0.5, 0.5, 0.5]).with_uv([1.0, 1.0]).with_normal([0.0, 0.0, 1.0]),
-            Vertex::new([-0.5, 0.5, 0.5]).with_uv([0.0, 1.0]).with_normal([0.0, 0.0, 1.0]),
-            Vertex::new([-0.5, 0.5, -0.5]).with_uv([0.0, 0.0]).with_normal([0.0, 1.0, 0.0]),
-            Vertex::new([0.5, 0.5, -0.5]).with_uv([1.0, 0.0]).with_normal([0.0, 1.0, 0.0]),
-            Vertex::new([0.5, 0.5, 0.5]).with_uv([1.0, 1.0]).with_normal([0.0, 1.0, 0.0]),
-            Vertex::new([-0.5, 0.5, 0.5]).with_uv([0.0, 1.0]).with_normal([0.0, 1.0, 0.0]),
-            Vertex::new([-0.5, -0.5, -0.5]).with_uv([0.0, 0.0]).with_normal([0.0, -1.0, 0.0]),
-            Vertex::new([0.5, -0.5, -0.5]).with_uv([1.0, 0.0]).with_normal([0.0, -1.0, 0.0]),
-            Vertex::new([0.5, -0.5, 0.5]).with_uv([1.0, 1.0]).with_normal([0.0, -1.0, 0.0]),
-            Vertex::new([-0.5, -0.5, 0.5]).with_uv([0.0, 1.0]).with_normal([0.0, -1.0, 0.0]),
-            Vertex::new([0.5, -0.5, -0.5]).with_uv([0.0, 0.0]).with_normal([1.0, 0.0, 0.0]),
-            Vertex::new([0.5, 0.5, -0.5]).with_uv([1.0, 0.0]).with_normal([1.0, 0.0, 0.0]),
-            Vertex::new([0.5, 0.5, 0.5]).with_uv([1.0, 1.0]).with_normal([1.0, 0.0, 0.0]),
-            Vertex::new([0.5, -0.5, 0.5]).with_uv([0.0, 1.0]).with_normal([1.0, 0.0, 0.0]),
-            Vertex::new([-0.5, -0.5, -0.5]).with_uv([0.0, 0.0]).with_normal([-1.0, 0.0, 0.0]),
-            Vertex::new([-0.5, 0.5, -0.5]).with_uv([1.0, 0.0]).with_normal([-1.0, 0.0, 0.0]),
-            Vertex::new([-0.5, 0.5, 0.5]).with_uv([1.0, 1.0]).with_normal([-1.0, 0.0, 0.0]),
-            Vertex::new([-0.5, -0.5, 0.5]).with_uv([0.0, 1.0]).with_normal([-1.0, 0.0, 0.0]),
+            Vertex::new([-0.5, -0.5, -0.5])
+                .with_uv([0.0, 0.0])
+                .with_normal([0.0, 0.0, -1.0]),
+            Vertex::new([0.5, -0.5, -0.5])
+                .with_uv([1.0, 0.0])
+                .with_normal([0.0, 0.0, -1.0]),
+            Vertex::new([0.5, 0.5, -0.5])
+                .with_uv([1.0, 1.0])
+                .with_normal([0.0, 0.0, -1.0]),
+            Vertex::new([-0.5, 0.5, -0.5])
+                .with_uv([0.0, 1.0])
+                .with_normal([0.0, 0.0, -1.0]),
+            Vertex::new([-0.5, -0.5, 0.5])
+                .with_uv([0.0, 0.0])
+                .with_normal([0.0, 0.0, 1.0]),
+            Vertex::new([0.5, -0.5, 0.5])
+                .with_uv([1.0, 0.0])
+                .with_normal([0.0, 0.0, 1.0]),
+            Vertex::new([0.5, 0.5, 0.5])
+                .with_uv([1.0, 1.0])
+                .with_normal([0.0, 0.0, 1.0]),
+            Vertex::new([-0.5, 0.5, 0.5])
+                .with_uv([0.0, 1.0])
+                .with_normal([0.0, 0.0, 1.0]),
+            Vertex::new([-0.5, 0.5, -0.5])
+                .with_uv([0.0, 0.0])
+                .with_normal([0.0, 1.0, 0.0]),
+            Vertex::new([0.5, 0.5, -0.5])
+                .with_uv([1.0, 0.0])
+                .with_normal([0.0, 1.0, 0.0]),
+            Vertex::new([0.5, 0.5, 0.5])
+                .with_uv([1.0, 1.0])
+                .with_normal([0.0, 1.0, 0.0]),
+            Vertex::new([-0.5, 0.5, 0.5])
+                .with_uv([0.0, 1.0])
+                .with_normal([0.0, 1.0, 0.0]),
+            Vertex::new([-0.5, -0.5, -0.5])
+                .with_uv([0.0, 0.0])
+                .with_normal([0.0, -1.0, 0.0]),
+            Vertex::new([0.5, -0.5, -0.5])
+                .with_uv([1.0, 0.0])
+                .with_normal([0.0, -1.0, 0.0]),
+            Vertex::new([0.5, -0.5, 0.5])
+                .with_uv([1.0, 1.0])
+                .with_normal([0.0, -1.0, 0.0]),
+            Vertex::new([-0.5, -0.5, 0.5])
+                .with_uv([0.0, 1.0])
+                .with_normal([0.0, -1.0, 0.0]),
+            Vertex::new([0.5, -0.5, -0.5])
+                .with_uv([0.0, 0.0])
+                .with_normal([1.0, 0.0, 0.0]),
+            Vertex::new([0.5, 0.5, -0.5])
+                .with_uv([1.0, 0.0])
+                .with_normal([1.0, 0.0, 0.0]),
+            Vertex::new([0.5, 0.5, 0.5])
+                .with_uv([1.0, 1.0])
+                .with_normal([1.0, 0.0, 0.0]),
+            Vertex::new([0.5, -0.5, 0.5])
+                .with_uv([0.0, 1.0])
+                .with_normal([1.0, 0.0, 0.0]),
+            Vertex::new([-0.5, -0.5, -0.5])
+                .with_uv([0.0, 0.0])
+                .with_normal([-1.0, 0.0, 0.0]),
+            Vertex::new([-0.5, 0.5, -0.5])
+                .with_uv([1.0, 0.0])
+                .with_normal([-1.0, 0.0, 0.0]),
+            Vertex::new([-0.5, 0.5, 0.5])
+                .with_uv([1.0, 1.0])
+                .with_normal([-1.0, 0.0, 0.0]),
+            Vertex::new([-0.5, -0.5, 0.5])
+                .with_uv([0.0, 1.0])
+                .with_normal([-1.0, 0.0, 0.0]),
         ];
         let indices = vec![
-            0, 1, 2, 0, 2, 3,
-            4, 6, 5, 4, 7, 6,
-            8, 9, 10, 8, 10, 11,
-            12, 14, 13, 12, 15, 14,
-            16, 17, 18, 16, 18, 19,
-            20, 22, 21, 20, 23, 22,
+            0, 1, 2, 0, 2, 3, 4, 6, 5, 4, 7, 6, 8, 9, 10, 8, 10, 11, 12, 14, 13, 12, 15, 14, 16,
+            17, 18, 16, 18, 19, 20, 22, 21, 20, 23, 22,
         ];
         Self::new(vertices, indices)
     }

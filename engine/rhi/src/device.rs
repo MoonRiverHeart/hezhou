@@ -1,40 +1,52 @@
-use crate::{RhiResult, RhiError, BufferHandle, BufferDesc, TextureHandle, TextureDesc, ShaderHandle, ShaderDesc, PipelineHandle, PipelineDesc, RenderPassHandle, RenderPassDesc, CommandPoolHandle, SwapChainHandle, SwapChainDesc, FramebufferHandle, FramebufferDesc};
+use crate::{
+    BufferDesc, BufferHandle, CommandPoolHandle, FramebufferDesc, FramebufferHandle, PipelineDesc,
+    PipelineHandle, RenderPassDesc, RenderPassHandle, RhiError, RhiResult, ShaderDesc,
+    ShaderHandle, SwapChainDesc, SwapChainHandle, TextureDesc, TextureHandle,
+};
 
 pub trait Device {
     fn capabilities(&self) -> &DeviceCapabilities;
-    
+
     fn create_buffer(&self, desc: &BufferDesc) -> RhiResult<BufferHandle>;
     fn destroy_buffer(&self, buffer: BufferHandle);
     fn map_buffer(&self, buffer: BufferHandle) -> RhiResult<*mut u8>;
     fn unmap_buffer(&self, buffer: BufferHandle);
     fn write_buffer(&self, buffer: BufferHandle, offset: usize, data: &[u8]) -> RhiResult<()>;
-    
+
     fn create_texture(&self, desc: &TextureDesc) -> RhiResult<TextureHandle>;
     fn destroy_texture(&self, texture: TextureHandle);
-    
+
     fn create_shader(&self, desc: &ShaderDesc) -> RhiResult<ShaderHandle>;
     fn destroy_shader(&self, shader: ShaderHandle);
-    
+
     fn create_pipeline(&self, desc: &PipelineDesc) -> RhiResult<PipelineHandle>;
     fn destroy_pipeline(&self, pipeline: PipelineHandle);
-    
+
     fn create_render_pass(&self, desc: &RenderPassDesc) -> RhiResult<RenderPassHandle>;
     fn destroy_render_pass(&self, pass: RenderPassHandle);
-    
+
     fn create_command_pool(&self) -> RhiResult<CommandPoolHandle>;
     fn destroy_command_pool(&self, pool: CommandPoolHandle);
-    fn create_command_buffer(&self, pool: CommandPoolHandle) -> RhiResult<crate::CommandBufferHandle>;
+    fn create_command_buffer(
+        &self,
+        pool: CommandPoolHandle,
+    ) -> RhiResult<crate::CommandBufferHandle>;
     fn reset_command_pool(&self, pool: CommandPoolHandle);
-    
+
     fn create_swapchain(&self, desc: &SwapChainDesc) -> RhiResult<SwapChainHandle>;
     fn destroy_swapchain(&self, swapchain: SwapChainHandle);
-    fn resize_swapchain(&self, swapchain: SwapChainHandle, width: u32, height: u32) -> RhiResult<()>;
-    
+    fn resize_swapchain(
+        &self,
+        swapchain: SwapChainHandle,
+        width: u32,
+        height: u32,
+    ) -> RhiResult<()>;
+
     fn create_framebuffer(&self, desc: &FramebufferDesc) -> RhiResult<FramebufferHandle>;
     fn destroy_framebuffer(&self, framebuffer: FramebufferHandle);
-    
+
     fn wait_idle(&self) -> RhiResult<()>;
-    
+
     fn begin_frame(&self) -> RhiResult<u32>;
     fn end_frame(&self) -> RhiResult<()>;
     fn present(&self) -> RhiResult<()>;

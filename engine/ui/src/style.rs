@@ -22,24 +22,24 @@ impl Style {
             shadow: None,
         }
     }
-    
+
     pub fn with_background(mut self, color: Color) -> Self {
         self.background_color = color;
         self
     }
-    
+
     pub fn with_border(mut self, color: Color, width: f32, radius: f32) -> Self {
         self.border_color = color;
         self.border_width = width;
         self.border_radius = radius;
         self
     }
-    
+
     pub fn with_opacity(mut self, opacity: f32) -> Self {
         self.opacity = opacity;
         self
     }
-    
+
     pub fn with_shadow(mut self, shadow: Shadow) -> Self {
         self.shadow = Some(shadow);
         self
@@ -70,22 +70,22 @@ impl TextStyle {
             alignment: TextAlignment::default(),
         }
     }
-    
+
     pub fn with_size(mut self, size: f32) -> Self {
         self.font_size = size;
         self
     }
-    
+
     pub fn with_color(mut self, color: Color) -> Self {
         self.font_color = color;
         self
     }
-    
+
     pub fn with_weight(mut self, weight: FontWeight) -> Self {
         self.font_weight = weight;
         self
     }
-    
+
     pub fn with_alignment(mut self, alignment: TextAlignment) -> Self {
         self.alignment = alignment;
         self
@@ -132,7 +132,7 @@ impl ButtonStyle {
             disabled: Style::new().with_background(Color::new(0.7, 0.7, 0.7, 0.5)),
         }
     }
-    
+
     pub fn material() -> Self {
         Self {
             normal: Style::new()

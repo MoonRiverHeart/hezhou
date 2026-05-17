@@ -1,5 +1,4 @@
 use ash::vk;
-use ash::Device;
 use hezhou_rhi::*;
 use hezhou_rhi::error::RhiError;
 use parking_lot::Mutex;
@@ -7,6 +6,8 @@ use std::sync::Arc;
 
 pub struct VulkanUIRenderer {
     device: Arc<Mutex<ash::Device>>,
+    instance: ash::Instance,
+    physical_device: vk::PhysicalDevice,
     pipeline: vk::Pipeline,
     pipeline_layout: vk::PipelineLayout,
     render_pass: vk::RenderPass,
@@ -27,28 +28,37 @@ pub struct VulkanUIRenderer {
 }
 
 impl VulkanUIRenderer {
-    pub fn new(device: Arc<Mutex<ash::Device>>, physical_device: vk::PhysicalDevice) -> Result<Self, RhiError> {
+    pub fn new(
+        device: Arc<Mutex<ash::Device>>,
+        instance: ash::Instance,
+        physical_device: vk::PhysicalDevice
+    ) -> Result<Self, RhiError> {
         let device_guard = device.lock();
         
-        let pipeline_layout = Self::create_pipeline_layout(&device_guard)?;
+        let descriptor_set_layout = Self::create_descriptor_set_layout(&device_guard)?;
+        let pipeline_layout = Self::create_pipeline_layout(&device_guard, descriptor_set_layout)?;
         let render_pass = Self::create_render_pass(&device_guard)?;
         let pipeline = Self::create_pipeline(&device_guard, pipeline_layout, render_pass)?;
         
         let (vertex_buffer, vertex_buffer_memory) = Self::create_buffer(
-            &device_guard, physical_device, 1024 * 1024, vk::BufferUsageFlags::VERTEX_BUFFER
+            &device_guard, &instance, physical_device, 1024 * 1024, vk::BufferUsageFlags::VERTEX_BUFFER
         )?;
         let (index_buffer, index_buffer_memory) = Self::create_buffer(
-            &device_guard, physical_device, 512 * 1024, vk::BufferUsageFlags::INDEX_BUFFER
+            &device_guard, &instance, physical_device, 512 * 1024, vk::BufferUsageFlags::INDEX_BUFFER
         )?;
         
-        let (descriptor_pool, descriptor_set_layout, descriptor_set) = 
-            Self::create_descriptor_sets(&device_guard)?;
+        let (descriptor_pool, descriptor_set) = 
+            Self::create_descriptor_sets(&device_guard, descriptor_set_layout)?;
         
         let command_pool = Self::create_command_pool(&device_guard)?;
         let command_buffer = Self::allocate_command_buffer(&device_guard, command_pool)?;
         
+        drop(device_guard);
+        
         Ok(Self {
             device,
+            instance,
+            physical_device,
             pipeline,
             pipeline_layout,
             render_pass,
@@ -65,7 +75,7 @@ impl VulkanUIRenderer {
         })
     }
     
-    fn create_pipeline_layout(device: &ash::Device) -> Result<vk::PipelineLayout, RhiError> {
+    fn create_pipeline_layout(device: &ash::Device, set_layout: vk::DescriptorSetLayout) -> Result<vk::PipelineLayout, RhiError> {
         let push_constant_range = vk::PushConstantRange {
             stage_flags: vk::ShaderStageFlags::VERTEX,
             offset: 0,
@@ -76,7 +86,7 @@ impl VulkanUIRenderer {
             push_constant_range_count: 1,
             p_push_constant_ranges: &push_constant_range,
             set_layout_count: 1,
-            p_set_layouts: &Self::create_descriptor_set_layout(device)?,
+            p_set_layouts: &set_layout,
             ..Default::default()
         };
         
@@ -93,6 +103,7 @@ impl VulkanUIRenderer {
             descriptor_count: 1,
             stage_flags: vk::ShaderStageFlags::FRAGMENT,
             p_immutable_samplers: std::ptr::null(),
+            _marker: std::marker::PhantomData,
         };
         
         let layout_info = vk::DescriptorSetLayoutCreateInfo {
@@ -151,20 +162,22 @@ impl VulkanUIRenderer {
         layout: vk::PipelineLayout, 
         render_pass: vk::RenderPass
     ) -> Result<vk::Pipeline, RhiError> {
-        let vert_shader = Self::create_shader_module(device, include_bytes!("../../shaders/ui.vert.spv"))?;
-        let frag_shader = Self::create_shader_module(device, include_bytes!("../../shaders/ui.frag.spv"))?;
+        let vert_shader = Self::create_shader_module(device, include_bytes!("../../shaders/ui/ui.vert.spv"))?;
+        let frag_shader = Self::create_shader_module(device, include_bytes!("../../shaders/ui/ui.frag.spv"))?;
+        
+        let main_name = std::ffi::CString::new("main").unwrap();
         
         let vert_stage = vk::PipelineShaderStageCreateInfo {
             stage: vk::ShaderStageFlags::VERTEX,
             module: vert_shader,
-            p_name: unsafe { std::ffi::CStr::from_ptr("main\0".as_ptr() as *const i8) },
+            p_name: main_name.as_ptr(),
             ..Default::default()
         };
         
         let frag_stage = vk::PipelineShaderStageCreateInfo {
             stage: vk::ShaderStageFlags::FRAGMENT,
             module: frag_shader,
-            p_name: unsafe { std::ffi::CStr::from_ptr("main\0".as_ptr() as *const i8) },
+            p_name: main_name.as_ptr(),
             ..Default::default()
         };
         
@@ -303,6 +316,7 @@ impl VulkanUIRenderer {
     
     fn create_buffer(
         device: &ash::Device, 
+        instance: &ash::Instance,
         physical_device: vk::PhysicalDevice, 
         size: vk::DeviceSize, 
         usage: vk::BufferUsageFlags
@@ -322,7 +336,7 @@ impl VulkanUIRenderer {
         let mem_requirements = unsafe { device.get_buffer_memory_requirements(buffer) };
         
         let mem_properties = unsafe {
-            device.get_physical_device_memory_properties(physical_device)
+            instance.get_physical_device_memory_properties(physical_device)
         };
         
         let mem_type_index = Self::find_memory_type(
@@ -333,7 +347,7 @@ impl VulkanUIRenderer {
         
         let alloc_info = vk::MemoryAllocateInfo {
             allocation_size: mem_requirements.size,
-            memory_type_index,
+            memory_type_index: mem_type_index,
             ..Default::default()
         };
         
@@ -357,16 +371,14 @@ impl VulkanUIRenderer {
     ) -> u32 {
         for i in 0..mem_properties.memory_type_count {
             if (type_filter & (1 << i)) != 0 
-                && mem_properties.memory_types[i].property_flags.contains(properties) {
+                && mem_properties.memory_types[i as usize].property_flags.contains(properties) {
                 return i;
             }
         }
         0
     }
     
-    fn create_descriptor_sets(device: &ash::Device) -> Result<(vk::DescriptorPool, vk::DescriptorSetLayout, vk::DescriptorSet), RhiError> {
-        let set_layout = Self::create_descriptor_set_layout(device)?;
-        
+    fn create_descriptor_sets(device: &ash::Device, set_layout: vk::DescriptorSetLayout) -> Result<(vk::DescriptorPool, vk::DescriptorSet), RhiError> {
         let pool_sizes = [
             vk::DescriptorPoolSize {
                 ty: vk::DescriptorType::COMBINED_IMAGE_SAMPLER,
@@ -398,7 +410,7 @@ impl VulkanUIRenderer {
                 .map_err(|e| RhiError::InvalidOperation(format!("Failed to allocate descriptor sets: {}", e)))?
         };
         
-        Ok((pool, set_layout, sets[0]))
+        Ok((pool, sets[0]))
     }
     
     fn create_command_pool(device: &ash::Device) -> Result<vk::CommandPool, RhiError> {
@@ -421,10 +433,12 @@ impl VulkanUIRenderer {
             ..Default::default()
         };
         
-        unsafe {
+        let buffers = unsafe {
             device.allocate_command_buffers(&alloc_info)
-                .map_err(|e| RhiError::InvalidOperation(format!("Failed to allocate command buffer: {}", e)))?[0]
-        }
+                .map_err(|e| RhiError::InvalidOperation(format!("Failed to allocate command buffer: {}", e)))?
+        };
+        
+        Ok(buffers[0])
     }
 }
 
@@ -433,9 +447,7 @@ impl UIRenderer for VulkanUIRenderer {
         Ok(UIRenderTarget::new(width, height))
     }
     
-    fn destroy_render_target(&mut self, _target: UIRenderTarget) {
-        // TODO: cleanup
-    }
+    fn destroy_render_target(&mut self, _target: UIRenderTarget) {}
     
     fn begin_frame(&mut self, target: &UIRenderTarget) {
         self.current_target = Some(UIRenderTarget::new(target.width(), target.height()));
@@ -521,12 +533,10 @@ impl UIRenderer for VulkanUIRenderer {
     }
     
     fn create_texture(&mut self, _width: u32, _height: u32, _data: &[u8]) -> Result<TextureHandle, RhiError> {
-        Ok(TextureHandle::new(0))
+        Ok(TextureHandle::null())
     }
     
-    fn destroy_texture(&mut self, _texture: TextureHandle) {
-        // TODO: cleanup
-    }
+    fn destroy_texture(&mut self, _texture: TextureHandle) {}
 }
 
 impl Drop for VulkanUIRenderer {

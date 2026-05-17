@@ -1,9 +1,9 @@
-use crate::widget::*;
-use crate::types::*;
-use crate::layout::*;
-use crate::style::*;
 use crate::canvas::*;
 use crate::event::*;
+use crate::layout::*;
+use crate::style::*;
+use crate::types::*;
+use crate::widget::*;
 use std::sync::Mutex;
 
 pub struct Button {
@@ -42,60 +42,111 @@ impl Button {
             on_click: None,
         }
     }
+
+    pub fn set_on_click(&mut self, callback: Box<dyn FnMut() + Send + Sync>) {
+        self.on_click = Some(callback);
+    }
     
     pub fn with_on_click(mut self, callback: Box<dyn FnMut() + Send + Sync>) -> Self {
         self.on_click = Some(callback);
         self
     }
-    
+
     pub fn set_text(&mut self, text: &str) {
         self.text = text.to_string();
         self.flags.dirty_render = true;
     }
-    
+
     pub fn set_style(&mut self, style: Style) {
         self.style = style;
         self.flags.dirty_style = true;
         self.flags.dirty_render = true;
     }
+    
+    pub fn trigger_click(&mut self) {
+        if let Some(callback) = &mut self.on_click {
+            callback();
+        }
+    }
 }
 
 impl Widget for Button {
-    fn id(&self) -> WidgetId { self.id }
-    fn parent(&self) -> Option<WidgetId> { 
-        if self.parent_id.is_valid() { Some(self.parent_id) } else { None }
+    fn id(&self) -> WidgetId {
+        self.id
     }
-    fn set_parent(&mut self, parent: WidgetId) { self.parent_id = parent; }
-    
-    fn children(&self) -> &[WidgetId] { &self.children }
-    fn add_child(&mut self, child: WidgetId) { self.children.push(child); }
+    fn parent(&self) -> Option<WidgetId> {
+        if self.parent_id.is_valid() {
+            Some(self.parent_id)
+        } else {
+            None
+        }
+    }
+    fn set_parent(&mut self, parent: WidgetId) {
+        self.parent_id = parent;
+    }
+
+    fn children(&self) -> &[WidgetId] {
+        &self.children
+    }
+    fn add_child(&mut self, child: WidgetId) {
+        self.children.push(child);
+    }
     fn remove_child(&mut self, child: WidgetId) {
         self.children.retain(|c| *c != child);
     }
-    
-    fn layout(&self) -> &Layout { &self.layout }
+
+    fn layout(&self) -> &Layout {
+        &self.layout
+    }
     fn set_layout(&mut self, layout: Layout) {
         self.layout = layout;
         self.flags.dirty_layout = true;
         self.flags.dirty_render = true;
     }
-    
-    fn style(&self) -> &Style { &self.style }
+
+    fn style(&self) -> &Style {
+        &self.style
+    }
     fn set_style(&mut self, style: Style) {
         self.style = style;
         self.flags.dirty_style = true;
         self.flags.dirty_render = true;
     }
-    
-    fn state(&self) -> WidgetState { self.state }
+
+    fn state(&self) -> WidgetState {
+        self.state
+    }
     fn set_state(&mut self, state: WidgetState) {
         self.state = state;
         self.flags.dirty_render = true;
     }
-    
+
+    fn measure(&self, font_atlas: &crate::font_atlas::FontAtlas) -> (f32, f32) {
+        let (text_width, text_height) =
+            font_atlas.measure_text(0, &self.text, self.text_style.font_size * 2.0);
+
+        let padding = 20.0;
+        let width = text_width + padding * 2.0;
+        let height = text_height + padding * 2.0;
+
+        (width, height)
+    }
+
+    fn widget_type(&self) -> &'static str {
+        "Button"
+    }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+        self
+    }
+
     fn draw(&mut self, canvas: &mut Canvas) {
         let bounds = self.layout.bounds();
-        
+
         let current_style = match self.state {
             WidgetState::Hovered => Style::new()
                 .with_background(Color::new(0.25, 0.65, 1.0, 1.0))
@@ -108,12 +159,12 @@ impl Widget for Button {
                 .with_border(Color::transparent(), 0.0, 4.0),
             _ => self.style,
         };
-        
+
         canvas.draw_rect(bounds, &current_style);
-        
+
         canvas.draw_text(bounds, &self.text, &self.text_style);
     }
-    
+
     fn on_event(&mut self, event: &Event) -> EventResult {
         match event.event_type {
             EventType::TouchBegin => {
@@ -122,7 +173,7 @@ impl Widget for Button {
                     return EventResult::Handled;
                 }
             }
-            
+
             EventType::TouchEnd => {
                 if self.state == WidgetState::Pressed {
                     self.set_state(WidgetState::Normal);
@@ -132,24 +183,24 @@ impl Widget for Button {
                     return EventResult::Stopped;
                 }
             }
-            
+
             EventType::MouseEnter => {
                 if self.state != WidgetState::Disabled {
                     self.set_state(WidgetState::Hovered);
                     return EventResult::Handled;
                 }
             }
-            
+
             EventType::MouseLeave => {
                 if self.state == WidgetState::Hovered {
                     self.set_state(WidgetState::Normal);
                     return EventResult::Handled;
                 }
             }
-            
+
             _ => {}
         }
-        
+
         EventResult::Ignored
     }
 }

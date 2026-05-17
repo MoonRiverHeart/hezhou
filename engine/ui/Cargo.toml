@@ -7,8 +7,27 @@ edition = "2021"
 hezhou-core = { path = "../core" }
 hezhou-dfx = { path = "../dfx" }
 hezhou-rhi = { path = "../rhi" }
+hezhou-platform = { path = "../platform" }
 parking_lot = "0.12"
 uuid = { version = "1.10", features = ["v4", "serde"] }
+fontdue = "0.9"
+
+[features]
+default = []
+msdf = ["dep:fdsm", "dep:fdsm-ttf-parser", "dep:ttf-parser"]
+debug_visualization = []
+
+[dependencies.fdsm]
+version = "0.8"
+optional = true
+
+[dependencies.fdsm-ttf-parser]
+version = "0.2"
+optional = true
+
+[dependencies.ttf-parser]
+version = "0.24"
+optional = true
 
 [lib]
 crate-type = ["cdylib", "rlib"]
@@ -16,7 +35,3 @@ crate-type = ["cdylib", "rlib"]
 [[example]]
 name = "ui_demo"
 path = "examples/ui_demo.rs"
-
-[features]
-default = []
-debug_visualization = []

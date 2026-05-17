@@ -13,6 +13,12 @@ hezhou-scripting = { path = "../scripting", default-features = false }
 hezhou-core = { path = "../core" }
 hezhou-platform = { path = "../platform", features = ["glfw"] }
 hezhou-rhi-vulkan = { path = "../rhi-vulkan" }
+hezhou-ui = { path = "../ui" }
+hezhou-rhi = { path = "../rhi" }
+glfw = "0.62"
+ash = "0.38"
+parking_lot = "0.12"
+bytemuck = "1.14"
 
 [[bin]]
 name = "engine_demo"
@@ -52,4 +58,13 @@ required-features = ["mono"]
 [[bin]]
 name = "mono_triangle_demo"
 path = "src/mono_triangle_demo.rs"
+required-features = ["mono"]
+
+[[bin]]
+name = "ui_vulkan_demo"
+path = "src/ui_vulkan_demo.rs"
+
+[[bin]]
+name = "mono_ui_demo"
+path = "src/mono_ui_demo.rs"
 required-features = ["mono"]

@@ -26,7 +26,7 @@ impl Texture {
             data: Vec::new(),
         }
     }
-    
+
     pub fn create_2d(id: TextureId, width: u32, height: u32, format: TextureFormat) -> Self {
         let size = Self::calculate_size(width, height, &format);
         Self {
@@ -37,8 +37,14 @@ impl Texture {
             data: vec![0u8; size],
         }
     }
-    
-    pub fn from_data(id: TextureId, width: u32, height: u32, format: TextureFormat, data: Vec<u8>) -> Self {
+
+    pub fn from_data(
+        id: TextureId,
+        width: u32,
+        height: u32,
+        format: TextureFormat,
+        data: Vec<u8>,
+    ) -> Self {
         Self {
             id,
             width,
@@ -47,7 +53,7 @@ impl Texture {
             data,
         }
     }
-    
+
     fn calculate_size(width: u32, height: u32, format: &TextureFormat) -> usize {
         let bytes_per_pixel = match format {
             TextureFormat::RGBA8 => 4,
@@ -57,15 +63,15 @@ impl Texture {
         };
         (width * height * bytes_per_pixel) as usize
     }
-    
+
     pub fn set_data(&mut self, data: Vec<u8>) {
         self.data = data;
     }
-    
+
     pub fn get_data(&self) -> &[u8] {
         &self.data
     }
-    
+
     pub fn resize(&mut self, width: u32, height: u32) {
         let size = Self::calculate_size(width, height, &self.format);
         self.width = width;

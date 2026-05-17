@@ -1,4 +1,4 @@
-use crate::{TextureHandle, RenderPassHandle};
+use crate::{RenderPassHandle, TextureHandle};
 
 #[derive(Clone, Debug)]
 pub struct FramebufferDesc {

@@ -30,7 +30,7 @@ impl Gesture {
             data: GestureData::None,
         }
     }
-    
+
     pub fn with_data(mut self, data: GestureData) -> Self {
         self.data = data;
         self
@@ -77,7 +77,7 @@ impl TapData {
     pub fn new(x: f32, y: f32) -> Self {
         Self { x, y, tap_count: 1 }
     }
-    
+
     pub fn with_count(mut self, count: u32) -> Self {
         self.tap_count = count;
         self
@@ -106,17 +106,14 @@ impl PanData {
             velocity_y: 0.0,
         }
     }
-    
+
     pub fn update_position(&mut self, x: f32, y: f32) {
         self.current_x = x;
         self.current_y = y;
     }
-    
+
     pub fn translation(&self) -> Point {
-        Point::new(
-            self.current_x - self.start_x,
-            self.current_y - self.start_y,
-        )
+        Point::new(self.current_x - self.start_x, self.current_y - self.start_y)
     }
 }
 
@@ -129,7 +126,10 @@ pub struct PinchData {
 
 impl PinchData {
     pub fn new(scale: f32) -> Self {
-        Self { scale, velocity: 0.0 }
+        Self {
+            scale,
+            velocity: 0.0,
+        }
     }
 }
 
@@ -142,7 +142,10 @@ pub struct RotationData {
 
 impl RotationData {
     pub fn new(rotation: f32) -> Self {
-        Self { rotation, velocity: 0.0 }
+        Self {
+            rotation,
+            velocity: 0.0,
+        }
     }
 }
 
@@ -155,7 +158,10 @@ pub struct SwipeData {
 
 impl SwipeData {
     pub fn new(direction: SwipeDirection, velocity: f32) -> Self {
-        Self { direction, velocity }
+        Self {
+            direction,
+            velocity,
+        }
     }
 }
 

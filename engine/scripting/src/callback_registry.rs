@@ -1,6 +1,6 @@
 use crate::callback_types::*;
-use crate::value_bridge::ScriptValue;
 use crate::error::ScriptError;
+use crate::value_bridge::ScriptValue;
 use std::collections::HashMap;
 
 pub type TaskId = u64;
@@ -59,7 +59,13 @@ impl CallbackRegistry {
         }
     }
 
-    pub fn register_sync(&mut self, name: String, callback: SyncCallback, descriptor: CallbackDescriptor, context: usize) {
+    pub fn register_sync(
+        &mut self,
+        name: String,
+        callback: SyncCallback,
+        descriptor: CallbackDescriptor,
+        context: usize,
+    ) {
         let entry = SyncCallbackEntry {
             callback,
             descriptor,
@@ -68,7 +74,13 @@ impl CallbackRegistry {
         self.sync_callbacks.insert(name, entry);
     }
 
-    pub fn register_async(&mut self, name: String, callback: AsyncCallback, descriptor: CallbackDescriptor, context: usize) {
+    pub fn register_async(
+        &mut self,
+        name: String,
+        callback: AsyncCallback,
+        descriptor: CallbackDescriptor,
+        context: usize,
+    ) {
         let entry = AsyncCallbackEntry {
             callback,
             descriptor,
@@ -77,7 +89,14 @@ impl CallbackRegistry {
         self.async_callbacks.insert(name, entry);
     }
 
-    pub fn register_task(&mut self, name: String, callback: TaskCallback, descriptor: CallbackDescriptor, supports_progress: bool, context: usize) {
+    pub fn register_task(
+        &mut self,
+        name: String,
+        callback: TaskCallback,
+        descriptor: CallbackDescriptor,
+        supports_progress: bool,
+        context: usize,
+    ) {
         let entry = TaskCallbackEntry {
             callback,
             descriptor,
@@ -88,37 +107,57 @@ impl CallbackRegistry {
     }
 
     pub fn trigger_sync(&self, name: &str, arg: ScriptValue) -> Result<ScriptValue, ScriptError> {
-        let entry = self.sync_callbacks.get(name)
+        let entry = self
+            .sync_callbacks
+            .get(name)
             .ok_or_else(|| ScriptError::CallbackNotFound(name.to_string()))?;
-        
+
         let context = entry.closure_context.unwrap_or(0);
         Ok((entry.callback)(arg, context))
     }
 
-    pub fn trigger_async(&self, name: &str, arg: ScriptValue, completion_ptr: usize) -> Result<(), ScriptError> {
-        let entry = self.async_callbacks.get(name)
+    pub fn trigger_async(
+        &self,
+        name: &str,
+        arg: ScriptValue,
+        completion_ptr: usize,
+    ) -> Result<(), ScriptError> {
+        let entry = self
+            .async_callbacks
+            .get(name)
             .ok_or_else(|| ScriptError::CallbackNotFound(name.to_string()))?;
-        
+
         let context = entry.closure_context.unwrap_or(0);
         (entry.callback)(arg, context, completion_ptr);
         Ok(())
     }
 
-    pub fn trigger_task(&mut self, name: &str, arg: ScriptValue, progress_ptr: usize, completion_ptr: usize) -> Result<TaskId, ScriptError> {
-        let entry = self.task_callbacks.get(name)
+    pub fn trigger_task(
+        &mut self,
+        name: &str,
+        arg: ScriptValue,
+        progress_ptr: usize,
+        completion_ptr: usize,
+    ) -> Result<TaskId, ScriptError> {
+        let entry = self
+            .task_callbacks
+            .get(name)
             .ok_or_else(|| ScriptError::CallbackNotFound(name.to_string()))?;
-        
+
         let task_id = self.next_task_id;
         self.next_task_id += 1;
-        
-        self.running_tasks.insert(task_id, RunningTask {
-            id: task_id,
-            progress: 0.0,
-            status: TaskStatus::Running,
-            result: None,
-            error_message: None,
-        });
-        
+
+        self.running_tasks.insert(
+            task_id,
+            RunningTask {
+                id: task_id,
+                progress: 0.0,
+                status: TaskStatus::Running,
+                result: None,
+                error_message: None,
+            },
+        );
+
         let context = entry.closure_context.unwrap_or(0);
         (entry.callback)(arg, context, progress_ptr, completion_ptr);
         Ok(task_id)

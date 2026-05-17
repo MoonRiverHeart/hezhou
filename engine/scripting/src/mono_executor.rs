@@ -1,7 +1,7 @@
 use crate::error::ScriptError;
 use crate::executor::ScriptExecutor;
-use crate::value_bridge::ScriptValue;
 use crate::script_manager::ScriptManager;
+use crate::value_bridge::ScriptValue;
 
 pub struct MonoExecutor {
     manager: ScriptManager,
@@ -30,7 +30,7 @@ impl ScriptExecutor for MonoExecutor {
         self.assembly_name = self.manager.load_script(path)?;
         Ok(())
     }
-    
+
     fn reload(&mut self) -> Result<(), ScriptError> {
         if self.dll_path.is_empty() {
             return Err(ScriptError::NotInitialized);
@@ -38,19 +38,19 @@ impl ScriptExecutor for MonoExecutor {
         self.assembly_name = self.manager.reload(&self.dll_path)?;
         Ok(())
     }
-    
+
     fn call(&self, method: &str, args: ScriptValue) -> Result<ScriptValue, ScriptError> {
         let arg_float = match args.type_tag {
-            2 => Some(args.float_value),  // Float
+            2 => Some(args.float_value), // Float
             _ => None,
         };
-        
+
         let param_count = match method {
             "GetRotationSpeed" | "GetCurrentAngle" => 0,
             "UpdateRotation" | "SetRotationSpeed" => 1,
             _ => 1,
         };
-        
+
         self.manager.execute(
             &self.assembly_name,
             &self.namespace,
@@ -60,14 +60,14 @@ impl ScriptExecutor for MonoExecutor {
             param_count,
         )
     }
-    
+
     fn unload(&mut self) {
         if !self.assembly_name.is_empty() {
             self.manager.unload(&self.assembly_name);
             self.assembly_name.clear();
         }
     }
-    
+
     fn get_rotation_speed(&self) -> Result<f32, ScriptError> {
         let result = self.call("GetRotationSpeed", ScriptValue::from_int(0))?;
         if result.type_tag == 2 {
@@ -78,7 +78,7 @@ impl ScriptExecutor for MonoExecutor {
             Ok(90.0)
         }
     }
-    
+
     fn set_rotation_speed(&mut self, speed: f32) -> Result<(), ScriptError> {
         self.call("SetRotationSpeed", ScriptValue::from_float(speed))?;
         Ok(())

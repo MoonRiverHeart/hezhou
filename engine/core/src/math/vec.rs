@@ -9,19 +9,19 @@ impl Vec2 {
     pub fn new(x: f32, y: f32) -> Self {
         Self { x, y }
     }
-    
+
     pub fn zero() -> Self {
         Self::new(0.0, 0.0)
     }
-    
+
     pub fn one() -> Self {
         Self::new(1.0, 1.0)
     }
-    
+
     pub fn magnitude(&self) -> f32 {
         (self.x * self.x + self.y * self.y).sqrt()
     }
-    
+
     pub fn normalized(&self) -> Self {
         let mag = self.magnitude();
         if mag > 0.0 {
@@ -30,16 +30,13 @@ impl Vec2 {
             Self::zero()
         }
     }
-    
+
     pub fn dot(a: &Self, b: &Self) -> f32 {
         a.x * b.x + a.y * b.y
     }
-    
+
     pub fn lerp(a: &Self, b: &Self, t: f32) -> Self {
-        Self::new(
-            a.x + (b.x - a.x) * t,
-            a.y + (b.y - a.y) * t,
-        )
+        Self::new(a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t)
     }
 }
 
@@ -76,43 +73,43 @@ impl Vec3 {
     pub fn new(x: f32, y: f32, z: f32) -> Self {
         Self { x, y, z }
     }
-    
+
     pub fn zero() -> Self {
         Self::new(0.0, 0.0, 0.0)
     }
-    
+
     pub fn one() -> Self {
         Self::new(1.0, 1.0, 1.0)
     }
-    
+
     pub fn up() -> Self {
         Self::new(0.0, 1.0, 0.0)
     }
-    
+
     pub fn down() -> Self {
         Self::new(0.0, -1.0, 0.0)
     }
-    
+
     pub fn forward() -> Self {
         Self::new(0.0, 0.0, -1.0)
     }
-    
+
     pub fn back() -> Self {
         Self::new(0.0, 0.0, 1.0)
     }
-    
+
     pub fn right() -> Self {
         Self::new(1.0, 0.0, 0.0)
     }
-    
+
     pub fn left() -> Self {
         Self::new(-1.0, 0.0, 0.0)
     }
-    
+
     pub fn magnitude(&self) -> f32 {
         (self.x * self.x + self.y * self.y + self.z * self.z).sqrt()
     }
-    
+
     pub fn normalized(&self) -> Self {
         let mag = self.magnitude();
         if mag > 0.0 {
@@ -121,11 +118,11 @@ impl Vec3 {
             Self::zero()
         }
     }
-    
+
     pub fn dot(a: &Self, b: &Self) -> f32 {
         a.x * b.x + a.y * b.y + a.z * b.z
     }
-    
+
     pub fn cross(a: &Self, b: &Self) -> Self {
         Self::new(
             a.y * b.z - a.z * b.y,
@@ -133,7 +130,7 @@ impl Vec3 {
             a.x * b.y - a.y * b.x,
         )
     }
-    
+
     pub fn lerp(a: &Self, b: &Self, t: f32) -> Self {
         Self::new(
             a.x + (b.x - a.x) * t,
@@ -141,7 +138,7 @@ impl Vec3 {
             a.z + (b.z - a.z) * t,
         )
     }
-    
+
     pub fn distance(a: &Self, b: &Self) -> f32 {
         (*a - *b).magnitude()
     }
@@ -188,11 +185,11 @@ impl Vec4 {
     pub fn new(x: f32, y: f32, z: f32, w: f32) -> Self {
         Self { x, y, z, w }
     }
-    
+
     pub fn from_vec3(v: Vec3, w: f32) -> Self {
         Self::new(v.x, v.y, v.z, w)
     }
-    
+
     pub fn to_vec3(&self) -> Vec3 {
         Vec3::new(self.x, self.y, self.z)
     }
@@ -209,15 +206,15 @@ impl Vec2u {
     pub fn new(x: u32, y: u32) -> Self {
         Self { x, y }
     }
-    
+
     pub fn zero() -> Self {
         Self::new(0, 0)
     }
-    
+
     pub fn width(&self) -> u32 {
         self.x
     }
-    
+
     pub fn height(&self) -> u32 {
         self.y
     }
@@ -242,19 +239,19 @@ impl Vec3u {
     pub fn new(x: u32, y: u32, z: u32) -> Self {
         Self { x, y, z }
     }
-    
+
     pub fn zero() -> Self {
         Self::new(0, 0, 0)
     }
-    
+
     pub fn width(&self) -> u32 {
         self.x
     }
-    
+
     pub fn height(&self) -> u32 {
         self.y
     }
-    
+
     pub fn depth(&self) -> u32 {
         self.z
     }

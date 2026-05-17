@@ -15,7 +15,7 @@ impl Ray {
             max_distance: f32::INFINITY,
         }
     }
-    
+
     pub fn with_max_distance(origin: Vec3, direction: Vec3, max_distance: f32) -> Self {
         Self {
             origin,
@@ -23,19 +23,19 @@ impl Ray {
             max_distance,
         }
     }
-    
+
     pub fn origin(&self) -> &Vec3 {
         &self.origin
     }
-    
+
     pub fn direction(&self) -> &Vec3 {
         &self.direction
     }
-    
+
     pub fn max_distance(&self) -> f32 {
         self.max_distance
     }
-    
+
     pub fn point_at(&self, distance: f32) -> Vec3 {
         self.origin + self.direction * distance
     }
@@ -68,7 +68,7 @@ impl RaycastResult {
             collider_id: None,
         }
     }
-    
+
     pub fn hit(point: Vec3, normal: Vec3, distance: f32) -> Self {
         Self {
             hit: true,
@@ -79,37 +79,37 @@ impl RaycastResult {
             collider_id: None,
         }
     }
-    
+
     pub fn with_body(mut self, body_id: u64) -> Self {
         self.body_id = Some(body_id);
         self
     }
-    
+
     pub fn with_collider(mut self, collider_id: u64) -> Self {
         self.collider_id = Some(collider_id);
         self
     }
-    
+
     pub fn is_hit(&self) -> bool {
         self.hit
     }
-    
+
     pub fn point(&self) -> &Vec3 {
         &self.point
     }
-    
+
     pub fn normal(&self) -> &Vec3 {
         &self.normal
     }
-    
+
     pub fn distance(&self) -> f32 {
         self.distance
     }
-    
+
     pub fn body_id(&self) -> Option<u64> {
         self.body_id
     }
-    
+
     pub fn collider_id(&self) -> Option<u64> {
         self.collider_id
     }

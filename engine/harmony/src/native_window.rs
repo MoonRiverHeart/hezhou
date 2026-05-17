@@ -24,15 +24,15 @@ impl NativeWindowContext {
             surface_callbacks: Arc::new(Mutex::new(Vec::new())),
         }
     }
-    
+
     pub fn register_surface_callback(&mut self, callback: SurfaceCallback) {
         self.surface_callbacks.lock().push(callback);
     }
-    
+
     pub fn get_window(&self) -> *mut OH_NativeWindow {
         self.window
     }
-    
+
     pub fn get_size(&self) -> (i32, i32) {
         (self.width, self.height)
     }
@@ -54,12 +54,12 @@ pub extern "C" fn harmony_on_surface_created(
     if ctx.is_null() {
         return;
     }
-    
+
     let context = unsafe { &mut *ctx };
     context.window = window;
     context.width = width;
     context.height = height;
-    
+
     for callback in context.surface_callbacks.lock().iter() {
         callback(window, width, height);
     }
@@ -74,11 +74,11 @@ pub extern "C" fn harmony_on_surface_resize(
     if ctx.is_null() {
         return;
     }
-    
+
     let context = unsafe { &mut *ctx };
     context.width = width;
     context.height = height;
-    
+
     for callback in context.surface_callbacks.lock().iter() {
         callback(context.window, width, height);
     }
@@ -89,7 +89,7 @@ pub extern "C" fn harmony_on_surface_destroyed(ctx: *mut NativeWindowContext) {
     if ctx.is_null() {
         return;
     }
-    
+
     let context = unsafe { &mut *ctx };
     context.window = std::ptr::null_mut();
     context.width = 0;
