@@ -872,3 +872,122 @@ pub extern "C" fn ui_get_root_id(handle: WidgetTreeHandle) -> u64 {
         tree.root.map(|r| r.id).unwrap_or(0)
     }
 }
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_create_text_edit(
+    handle: WidgetTreeHandle,
+    width: f32,
+    height: f32,
+) -> u64 {
+    if handle.is_null() {
+        return 0;
+    }
+    unsafe {
+        let arc = &*(handle as *const Arc<Mutex<WidgetTree>>);
+        let mut tree = arc.lock();
+        let text_edit = TextEdit::with_size(width, height);
+        let id = text_edit.id();
+        let root_id = tree.root.unwrap_or(WidgetId::invalid());
+        tree.add_widget(Box::new(text_edit), root_id);
+        id.id
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_create_text_edit_in_parent(
+    handle: WidgetTreeHandle,
+    parent_id: u64,
+    width: f32,
+    height: f32,
+) -> u64 {
+    if handle.is_null() {
+        return 0;
+    }
+    unsafe {
+        let arc = &*(handle as *const Arc<Mutex<WidgetTree>>);
+        let mut tree = arc.lock();
+        let text_edit = TextEdit::with_size(width, height);
+        let id = text_edit.id();
+        let parent = if parent_id == 0 {
+            tree.root.unwrap_or(WidgetId::invalid())
+        } else {
+            WidgetId::from_raw(parent_id)
+        };
+        tree.add_widget(Box::new(text_edit), parent);
+        id.id
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_text_edit_set_text(
+    handle: WidgetTreeHandle,
+    widget_id: u64,
+    text: *const std::ffi::c_char,
+) {
+    if handle.is_null() || text.is_null() {
+        return;
+    }
+    unsafe {
+        let arc = &*(handle as *const Arc<Mutex<WidgetTree>>);
+        let mut tree = arc.lock();
+        let id = WidgetId::from_raw(widget_id);
+        if let Some(widget) = tree.get_widget_mut(id) {
+            if widget.widget_type() == "TextEdit" {
+                use crate::widgets::TextEdit;
+                if let Some(text_edit) = widget.as_any_mut().downcast_mut::<TextEdit>() {
+                    let text_str = std::ffi::CStr::from_ptr(text).to_string_lossy();
+                    text_edit.set_text(&text_str);
+                }
+            }
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_text_edit_insert_char(
+    handle: WidgetTreeHandle,
+    widget_id: u64,
+    c: std::ffi::c_char,
+) {
+    if handle.is_null() {
+        return;
+    }
+    unsafe {
+        let arc = &*(handle as *const Arc<Mutex<WidgetTree>>);
+        let mut tree = arc.lock();
+        let id = WidgetId::from_raw(widget_id);
+        if let Some(widget) = tree.get_widget_mut(id) {
+            if widget.widget_type() == "TextEdit" {
+                use crate::widgets::TextEdit;
+                if let Some(text_edit) = widget.as_any_mut().downcast_mut::<TextEdit>() {
+                    if c != 0 {
+                        text_edit.insert_char(c as u8 as char);
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_text_edit_delete_char(
+    handle: WidgetTreeHandle,
+    widget_id: u64,
+) {
+    if handle.is_null() {
+        return;
+    }
+    unsafe {
+        let arc = &*(handle as *const Arc<Mutex<WidgetTree>>);
+        let mut tree = arc.lock();
+        let id = WidgetId::from_raw(widget_id);
+        if let Some(widget) = tree.get_widget_mut(id) {
+            if widget.widget_type() == "TextEdit" {
+                use crate::widgets::TextEdit;
+                if let Some(text_edit) = widget.as_any_mut().downcast_mut::<TextEdit>() {
+                    text_edit.delete_char();
+                }
+            }
+        }
+    }
+}
