@@ -168,7 +168,9 @@ namespace Hezhou
         private static void OnNewClick(ulong widgetId)
         {
             Console.WriteLine($"[Editor] 点击\"新建\"按钮, id={widgetId}");
-            ShowDropdownMenu(10, 45, new string[] { "新建场景", "新建脚本", "新建材质", "新建文件夹" });
+            ShowDropdownMenu(10, 45, 
+                new string[] { "新建场景", "新建脚本", "新建材质", "新建文件夹" },
+                new UI.WidgetCallbackDelegate[] { null, OnNewScriptClick, null, null });
         }
         
         private static void OnNewScriptClick(ulong widgetId)
@@ -235,21 +237,30 @@ namespace Hezhou
             HideDropdownMenu();
         }
         
-private static void ShowDropdownMenu(float x, float y, string[] items)
+private static void ShowDropdownMenu(float x, float y, string[] items, UI.WidgetCallbackDelegate[] callbacks)
         {
             HideDropdownMenu();
             
             ulong rootId = UI.GetRootId();
-            _dropdownMenu = new Panel(rootId, x, y, 160, items.Length * 30 + 10, 0.25f, 0.25f, 0.25f, 0.95f);
+            _dropdownMenu = new Panel(rootId, x, y, 160, items.Length * 35 + 10, 0.25f, 0.25f, 0.25f, 0.95f);
             _menuItems = new VStack(_dropdownMenu.Id, 5f);
             _menuItems.SetPosition(10, 10);
             
-            foreach (var item in items)
+            for (int i = 0; i < items.Length; i++)
             {
-                var label = _menuItems.AddLabel(140, 25, item);
+                ulong btnId = _menuItems.AddButton(140, 30f, items[i]);
+                if (i < callbacks.Length && callbacks[i] != null)
+                {
+                    UI.SetOnClick(btnId, callbacks[i]);
+                }
             }
             
             Console.WriteLine($"[Editor] 显示下拉菜单: {items.Length}项");
+        }
+        
+        private static void ShowDropdownMenu(float x, float y, string[] items)
+        {
+            ShowDropdownMenu(x, y, items, new UI.WidgetCallbackDelegate[items.Length]);
         }
         
         private static void HideDropdownMenu()
