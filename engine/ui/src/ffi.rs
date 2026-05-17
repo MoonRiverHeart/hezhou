@@ -622,3 +622,111 @@ pub extern "C" fn ui_get_screen_size(out_width: *mut f32, out_height: *mut f32) 
         unsafe { *out_height = height; }
     }
 }
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_create_vstack(
+    handle: WidgetTreeHandle,
+    spacing: f32,
+) -> u64 {
+    if handle.is_null() {
+        return 0;
+    }
+    unsafe {
+        let arc = &*(handle as *const Arc<Mutex<WidgetTree>>);
+        let mut tree = arc.lock();
+        let vstack = VStack::new().with_spacing(spacing);
+        let id = vstack.id();
+        let root_id = tree.root.unwrap_or(WidgetId::invalid());
+        tree.add_widget(Box::new(vstack), root_id);
+        id.id
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_create_hstack(
+    handle: WidgetTreeHandle,
+    spacing: f32,
+) -> u64 {
+    if handle.is_null() {
+        return 0;
+    }
+    unsafe {
+        let arc = &*(handle as *const Arc<Mutex<WidgetTree>>);
+        let mut tree = arc.lock();
+        let hstack = HStack::new().with_spacing(spacing);
+        let id = hstack.id();
+        let root_id = tree.root.unwrap_or(WidgetId::invalid());
+        tree.add_widget(Box::new(hstack), root_id);
+        id.id
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_create_button_in_parent(
+    handle: WidgetTreeHandle,
+    parent_id: u64,
+    width: f32,
+    height: f32,
+    text: *const c_char,
+) -> u64 {
+    if handle.is_null() || text.is_null() {
+        return 0;
+    }
+    unsafe {
+        let text_str = CStr::from_ptr(text).to_string_lossy().into_owned();
+        let arc = &*(handle as *const Arc<Mutex<WidgetTree>>);
+        let mut tree = arc.lock();
+        let mut button = Button::new(&text_str);
+        button.set_layout(Layout::new(0.0, 0.0, width, height));
+        let id = button.id();
+        let parent = WidgetId::from_raw(parent_id);
+        tree.add_widget(Box::new(button), parent);
+        id.id
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_create_label_in_parent(
+    handle: WidgetTreeHandle,
+    parent_id: u64,
+    width: f32,
+    height: f32,
+    text: *const c_char,
+) -> u64 {
+    if handle.is_null() || text.is_null() {
+        return 0;
+    }
+    unsafe {
+        let text_str = CStr::from_ptr(text).to_string_lossy().into_owned();
+        let arc = &*(handle as *const Arc<Mutex<WidgetTree>>);
+        let mut tree = arc.lock();
+        let mut label = Label::new(&text_str);
+        label.set_layout(Layout::new(0.0, 0.0, width, height));
+        let id = label.id();
+        let parent = WidgetId::from_raw(parent_id);
+        tree.add_widget(Box::new(label), parent);
+        id.id
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_set_widget_layout(
+    handle: WidgetTreeHandle,
+    widget_id: u64,
+    x: f32,
+    y: f32,
+    width: f32,
+    height: f32,
+) {
+    if handle.is_null() {
+        return;
+    }
+    unsafe {
+        let arc = &*(handle as *const Arc<Mutex<WidgetTree>>);
+        let mut tree = arc.lock();
+        let id = WidgetId::from_raw(widget_id);
+        if let Some(widget) = tree.get_widget_mut(id) {
+            widget.set_layout(Layout::new(x, y, width, height));
+        }
+    }
+}

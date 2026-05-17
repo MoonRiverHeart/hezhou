@@ -3,9 +3,12 @@ using Hezhou;
 
 public static class TestScript
 {
+    private static VStack _vstack;
     private static Label _label;
-    private static Button _button;
-    private static UI.WidgetCallbackDelegate _clickCallback;
+    private static Button _button1;
+    private static Button _button2;
+    private static UI.WidgetCallbackDelegate _button1Callback;
+    private static UI.WidgetCallbackDelegate _button2Callback;
     private static UI.ResizeCallbackDelegate _resizeCallback;
     
     private static float _screenWidth = 800f;
@@ -21,51 +24,35 @@ public static class TestScript
             UI.GetScreenSize(out _screenWidth, out _screenHeight);
             Console.WriteLine($"[C#] 屏幕大小: {_screenWidth}x{_screenHeight}");
             
-            CreateWidgets();
+            CreateUI();
             
             _resizeCallback = OnResize;
             UI.RegisterResizeCallback(_resizeCallback);
             
-            Console.WriteLine("[C#] UI控件创建完成");
+            Console.WriteLine("[C#] UI创建完成（使用VStack布局）");
         } catch (Exception e) {
             Console.WriteLine("[C#] ERROR: " + e.Message);
             Console.WriteLine("[C#] StackTrace: " + e.StackTrace);
         }
     }
     
-    private static void CreateWidgets()
+    private static void CreateUI()
     {
-        float labelWidth = 400f;
-        float labelHeight = 50f;
-        float labelX = (_screenWidth - labelWidth) / 2f;
-        float labelY = _screenHeight / 2f - labelHeight - 25f;
+        float centerX = _screenWidth / 2f - 100f;
+        float centerY = _screenHeight / 2f - 80f;
         
-        if (_label == null)
-        {
-            _label = new Label("Hello from C#", labelX, labelY, labelWidth, labelHeight);
-            _label.EnsureCreated();
-        }
-        else
-        {
-            UI.SetPosition(_label.Id, labelX, labelY);
-        }
+        _vstack = new VStack(spacing: 10f);
+        _vstack.SetPosition(centerX, centerY);
         
-        float buttonWidth = 200f;
-        float buttonHeight = 50f;
-        float buttonX = (_screenWidth - buttonWidth) / 2f;
-        float buttonY = _screenHeight / 2f + 25f;
+        _label = new Label(_vstack.Id, 200f, 30f, "Hello from C#");
         
-        if (_button == null)
-        {
-            _button = new Button("Click Me!", buttonX, buttonY, buttonWidth, buttonHeight);
-            _clickCallback = OnButtonClick;
-            _button.SetOnClick(_clickCallback);
-            _button.EnsureCreated();
-        }
-        else
-        {
-            UI.SetPosition(_button.Id, buttonX, buttonY);
-        }
+        _button1 = new Button(_vstack.Id, 200f, 50f, "Button 1");
+        _button1Callback = OnButton1Click;
+        _button1.SetOnClick(_button1Callback);
+        
+        _button2 = new Button(_vstack.Id, 200f, 50f, "Button 2");
+        _button2Callback = OnButton2Click;
+        _button2.SetOnClick(_button2Callback);
     }
     
     private static void OnResize(float width, float height)
@@ -73,13 +60,21 @@ public static class TestScript
         Console.WriteLine($"[C#] Resize: {width}x{height}");
         _screenWidth = width;
         _screenHeight = height;
-        CreateWidgets();
+        
+        float centerX = _screenWidth / 2f - 100f;
+        float centerY = _screenHeight / 2f - 80f;
+        _vstack.SetPosition(centerX, centerY);
     }
     
-    private static void OnButtonClick(ulong widgetId)
+    private static void OnButton1Click(ulong widgetId)
     {
-        Console.WriteLine("[C#] Button clicked!");
-        _label.Text = "Button was clicked!";
-        _button.Text = "Clicked!";
+        Console.WriteLine("[C#] Button 1 clicked!");
+        _button1.Text = "hello";
+    }
+    
+    private static void OnButton2Click(ulong widgetId)
+    {
+        Console.WriteLine("[C#] Button 2 clicked!");
+        _button2.Text = "hello";
     }
 }

@@ -6,9 +6,9 @@ use std::collections::HashMap;
 
 pub struct WidgetTree {
     pub root: Option<WidgetId>,
-    nodes: HashMap<WidgetId, WidgetNode>,
-    parent_map: HashMap<WidgetId, WidgetId>,
-    children_map: HashMap<WidgetId, Vec<WidgetId>>,
+    pub nodes: HashMap<WidgetId, WidgetNode>,
+    pub parent_map: HashMap<WidgetId, WidgetId>,
+    pub children_map: HashMap<WidgetId, Vec<WidgetId>>,
 }
 
 struct WidgetNode {
@@ -320,13 +320,20 @@ pub fn perform_layout(&mut self, font_atlas: &FontAtlas) {
             .unwrap_or(8.0);
 
         let mut current_x = parent_layout.x;
+        
+        let max_child_height = child_sizes.iter().map(|(_, h)| *h).fold(0.0f32, f32::max);
 
         for (i, &child_id) in children.iter().enumerate() {
             let (w, h) = child_sizes[i];
 
             if let Some(node) = self.nodes.get_mut(&child_id) {
                 let child_layout = *node.widget.layout();
-                let y = parent_layout.y + (parent_layout.height - h) / 2.0;
+                let container_height = if parent_layout.height > 0.0 {
+                    parent_layout.height
+                } else {
+                    max_child_height
+                };
+                let y = parent_layout.y + (container_height - h) / 2.0;
 
                 node.widget.set_layout(crate::layout::Layout::new(
                     current_x,
@@ -364,14 +371,25 @@ pub fn perform_layout(&mut self, font_atlas: &FontAtlas) {
             })
             .unwrap_or(8.0);
 
-        let mut current_y = parent_layout.y;
+        let total_height: f32 = child_sizes.iter().map(|(_, h)| h).sum::<f32>()
+            + spacing * (children.len().saturating_sub(1)) as f32;
+        
+        let max_child_width = child_sizes.iter().map(|(w, _)| *w).fold(0.0f32, f32::max);
+        
+        let mut current_y = parent_layout.y + total_height;
 
         for (i, &child_id) in children.iter().enumerate() {
             let (w, h) = child_sizes[i];
+            current_y -= h;
 
             if let Some(node) = self.nodes.get_mut(&child_id) {
                 let child_layout = *node.widget.layout();
-                let x = parent_layout.x + (parent_layout.width - w) / 2.0;
+                let container_width = if parent_layout.width > 0.0 {
+                    parent_layout.width
+                } else {
+                    max_child_width
+                };
+                let x = parent_layout.x + (container_width - w) / 2.0;
 
                 node.widget.set_layout(crate::layout::Layout::new(
                     x,
@@ -381,7 +399,7 @@ pub fn perform_layout(&mut self, font_atlas: &FontAtlas) {
                 ));
             }
 
-            current_y += h + spacing;
+            current_y -= spacing;
         }
     }
 
