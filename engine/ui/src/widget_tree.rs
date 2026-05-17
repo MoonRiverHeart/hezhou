@@ -181,27 +181,23 @@ impl WidgetTree {
 pub fn perform_layout(&mut self, font_atlas: &FontAtlas) {
         if let Some(root_id) = self.root {
             let _ = self.measure_and_layout(root_id, font_atlas);
-            self.convert_to_absolute_coordinates(root_id, 0.0, 0.0);
         }
     }
     
-    fn convert_to_absolute_coordinates(&mut self, id: WidgetId, parent_x: f32, parent_y: f32) {
-        if let Some(node) = self.nodes.get_mut(&id) {
-            let child_layout = *node.widget.layout();
-            let absolute_x = parent_x + child_layout.x;
-            let absolute_y = parent_y + child_layout.y;
-            
-            node.widget.set_layout(crate::layout::Layout::new(
-                absolute_x,
-                absolute_y,
-                child_layout.width,
-                child_layout.height,
-            ));
-            
-            let children = self.get_children(id).to_vec();
-            for &child_id in &children {
-                self.convert_to_absolute_coordinates(child_id, absolute_x, absolute_y);
-            }
+    pub fn get_absolute_layout(&self, id: WidgetId) -> Option<crate::layout::Layout> {
+        let node = self.nodes.get(&id)?;
+        let layout = *node.widget.layout();
+        
+        if let Some(parent_id) = self.parent_map.get(&id) {
+            let parent_layout = self.get_absolute_layout(*parent_id)?;
+            Some(crate::layout::Layout::new(
+                parent_layout.x + layout.x,
+                parent_layout.y + layout.y,
+                layout.width,
+                layout.height,
+            ))
+        } else {
+            Some(layout)
         }
     }
     
@@ -398,21 +394,38 @@ pub fn perform_layout(&mut self, font_atlas: &FontAtlas) {
         let mut render_data = Vec::new();
 
         if let Some(root_id) = self.root {
-            self.generate_render_data_recursive(root_id, &mut render_data);
+            self.generate_render_data_recursive(root_id, 0.0, 0.0, &mut render_data);
         }
 
         render_data
     }
 
-    fn generate_render_data_recursive(&mut self, id: WidgetId, render_data: &mut Vec<RenderData>) {
+    fn generate_render_data_recursive(
+        &mut self,
+        id: WidgetId,
+        parent_abs_x: f32,
+        parent_abs_y: f32,
+        render_data: &mut Vec<RenderData>,
+    ) {
         if let Some(node) = self.nodes.get_mut(&id) {
             if node.widget.as_ref().state() != WidgetState::Disabled {
+                let layout = *node.widget.as_ref().layout();
+                
                 let mut canvas = Canvas::new();
                 node.widget.as_mut().draw(&mut canvas);
+                
+                let commands = canvas.get_commands().to_vec();
+                let absolute_commands: Vec<DrawCommand> = commands
+                    .iter()
+                    .map(|cmd| Self::offset_draw_command(cmd, parent_abs_x, parent_abs_y))
+                    .collect();
 
+                let abs_x = parent_abs_x + layout.x;
+                let abs_y = parent_abs_y + layout.y;
+                
                 render_data.push(RenderData {
-                    draw_commands: canvas.get_commands().to_vec(),
-                    bounds: node.widget.as_ref().layout().bounds(),
+                    draw_commands: absolute_commands,
+                    bounds: Rect::new(abs_x, abs_y, layout.width, layout.height),
                     z_index: 0,
                 });
 
@@ -420,9 +433,82 @@ pub fn perform_layout(&mut self, font_atlas: &FontAtlas) {
             }
         }
 
+        let layout = self.nodes.get(&id).map(|n| *n.widget.layout()).unwrap_or_default();
+        let abs_x = parent_abs_x + layout.x;
+        let abs_y = parent_abs_y + layout.y;
+        
         let children = self.get_children(id).to_vec();
         for child in children {
-            self.generate_render_data_recursive(child, render_data);
+            self.generate_render_data_recursive(child, abs_x, abs_y, render_data);
+        }
+    }
+    
+    fn offset_draw_command(cmd: &DrawCommand, offset_x: f32, offset_y: f32) -> DrawCommand {
+        match cmd {
+            DrawCommand::Rect { bounds, width, height, fill_color, stroke_color, stroke_width, border_radius } => {
+                DrawCommand::Rect {
+                    bounds: Point::new(bounds.x + offset_x, bounds.y + offset_y),
+                    width: *width,
+                    height: *height,
+                    fill_color: *fill_color,
+                    stroke_color: *stroke_color,
+                    stroke_width: *stroke_width,
+                    border_radius: *border_radius,
+                }
+            }
+            DrawCommand::Text { bounds, width, height, text, text_len, font_size, font_color, alignment } => {
+                DrawCommand::Text {
+                    bounds: Point::new(bounds.x + offset_x, bounds.y + offset_y),
+                    width: *width,
+                    height: *height,
+                    text: *text,
+                    text_len: *text_len,
+                    font_size: *font_size,
+                    font_color: *font_color,
+                    alignment: *alignment,
+                }
+            }
+            DrawCommand::Line { start, end, color, width } => {
+                DrawCommand::Line {
+                    start: Point::new(start.x + offset_x, start.y + offset_y),
+                    end: Point::new(end.x + offset_x, end.y + offset_y),
+                    color: *color,
+                    width: *width,
+                }
+            }
+            DrawCommand::Image { bounds, width, height, texture_id, uv } => {
+                DrawCommand::Image {
+                    bounds: Point::new(bounds.x + offset_x, bounds.y + offset_y),
+                    width: *width,
+                    height: *height,
+                    texture_id: *texture_id,
+                    uv: *uv,
+                }
+            }
+            DrawCommand::Shadow { bounds, shadow } => {
+                DrawCommand::Shadow {
+                    bounds: Rect::new(
+                        bounds.x + offset_x,
+                        bounds.y + offset_y,
+                        bounds.width,
+                        bounds.height,
+                    ),
+                    shadow: shadow.clone(),
+                }
+            }
+            DrawCommand::ClipRect { rect } => {
+                DrawCommand::ClipRect {
+                    rect: Rect::new(
+                        rect.x + offset_x,
+                        rect.y + offset_y,
+                        rect.width,
+                        rect.height,
+                    ),
+                }
+            }
+            DrawCommand::ClearClip => DrawCommand::ClearClip,
+            DrawCommand::SetTransform { transform } => DrawCommand::SetTransform { transform: *transform },
+            DrawCommand::ResetTransform => DrawCommand::ResetTransform,
         }
     }
 }
