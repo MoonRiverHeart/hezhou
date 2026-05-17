@@ -260,13 +260,13 @@ impl Default for FontAtlas {
 pub fn create_font_atlas() -> FontAtlas {
     let mut atlas = FontAtlas::new();
     
-    let font_path = std::path::Path::new("C:\\Users\\94023\\AppData\\Local\\Microsoft\\Windows\\Fonts\\CodeNewRomanNerdFont-Regular.otf");
+    let font_path = std::path::Path::new("C:\\Users\\94023\\Documents\\commandline-tools-windows-x64\\command-line-tools\\sdk\\default\\hms\\previewer\\resources\\fonts\\HarmonyOS_Sans_SC.ttf");
     
     if font_path.exists() {
         let font_data = std::fs::read(font_path).expect("Failed to read font file");
         let font_index = atlas.add_font(&font_data);
         
-        let test_chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()-_+=[]{}|;:,.<>?/~ Click Me Welcome to Hezhou UI Press SPACE to change text hello";
+        let test_chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()-_+=[]{}|;:,.<>?/~ Click Me Welcome to Hezhou UI Press SPACE to change text hello 新建打开保存运行项目结构资产管理游戏预览属性编辑选中位置大小状态FPS脚本场景模型纹理";
         let sizes = [32.0, 16.0, 14.0];
         
         atlas.prerasterize_chars(font_index, test_chars, &sizes);

@@ -410,6 +410,8 @@ pub fn perform_layout(&mut self, font_atlas: &FontAtlas) {
         if let Some(node) = self.nodes.get_mut(&id) {
             if node.widget.as_ref().state() != WidgetState::Disabled {
                 let layout = *node.widget.as_ref().layout();
+                let abs_x = parent_abs_x + layout.x;
+                let abs_y = parent_abs_y + layout.y;
                 
                 let mut canvas = Canvas::new();
                 node.widget.as_mut().draw(&mut canvas);
@@ -417,12 +419,9 @@ pub fn perform_layout(&mut self, font_atlas: &FontAtlas) {
                 let commands = canvas.get_commands().to_vec();
                 let absolute_commands: Vec<DrawCommand> = commands
                     .iter()
-                    .map(|cmd| Self::offset_draw_command(cmd, parent_abs_x, parent_abs_y))
+                    .map(|cmd| Self::offset_draw_command(cmd, abs_x, abs_y))
                     .collect();
 
-                let abs_x = parent_abs_x + layout.x;
-                let abs_y = parent_abs_y + layout.y;
-                
                 render_data.push(RenderData {
                     draw_commands: absolute_commands,
                     bounds: Rect::new(abs_x, abs_y, layout.width, layout.height),
