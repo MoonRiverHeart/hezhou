@@ -21,6 +21,7 @@ fn main() {
 
     println!("[2] 设置UI Root Panel...");
     renderer.setup_ui_for_script();
+    ui_ffi::ui_set_screen_size(1280.0, 720.0);
     println!("    Root Panel设置完成!\n");
 
     println!("[3] 编译C#编辑器脚本...");
