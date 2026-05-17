@@ -83,8 +83,11 @@ pub extern "C" fn ui_register_global_click_callback(callback: GlobalClickCallbac
 }
 
 pub fn ui_trigger_global_click(x: f32, y: f32) {
-    let callbacks = UI_CALLBACKS.lock();
-    if let Some(callback) = callbacks.on_global_click {
+    let callback = {
+        let callbacks = UI_CALLBACKS.lock();
+        callbacks.on_global_click
+    };
+    if let Some(callback) = callback {
         callback(x, y);
     }
 }
@@ -107,22 +110,31 @@ pub extern "C" fn ui_clear_callbacks() {
 }
 
 pub fn trigger_update_callback(delta_time: f32) {
-    let callbacks = UI_CALLBACKS.lock();
-    if let Some(cb) = callbacks.update {
+    let callback = {
+        let callbacks = UI_CALLBACKS.lock();
+        callbacks.update
+    };
+    if let Some(cb) = callback {
         cb(delta_time);
     }
 }
 
 pub fn trigger_onclick_callback(widget_id: u64) {
-    let callbacks = UI_CALLBACKS.lock();
-    if let Some(cb) = callbacks.onclicks.get(&widget_id) {
+    let callback = {
+        let callbacks = UI_CALLBACKS.lock();
+        callbacks.onclicks.get(&widget_id).copied()
+    };
+    if let Some(cb) = callback {
         cb(widget_id);
     }
 }
 
 pub fn trigger_init_callback() {
-    let callbacks = UI_CALLBACKS.lock();
-    if let Some(cb) = callbacks.on_init {
+    let callback = {
+        let callbacks = UI_CALLBACKS.lock();
+        callbacks.on_init
+    };
+    if let Some(cb) = callback {
         cb();
     }
 }
@@ -131,8 +143,11 @@ pub fn trigger_resize_callback(width: f32, height: f32) {
     let mut size = SCREEN_SIZE.lock();
     *size = (width, height);
     
-    let callbacks = UI_CALLBACKS.lock();
-    if let Some(cb) = callbacks.on_resize {
+    let callback = {
+        let callbacks = UI_CALLBACKS.lock();
+        callbacks.on_resize
+    };
+    if let Some(cb) = callback {
         cb(width, height);
     }
 }
