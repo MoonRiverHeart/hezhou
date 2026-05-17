@@ -4,7 +4,7 @@ use ash::khr::swapchain::Device as SwapchainLoader;
 use glfw::{Glfw, PWindow, GlfwReceiver, WindowEvent, WindowMode, Action, Key};
 use std::ffi::CString;
 use std::collections::HashMap;
-use hezhou_ui::{UISystem, UIInputHandler, Panel, Button, Label, Layout, DrawCommand, Widget, Style, Color, TextStyle, ffi::WidgetTreeHandle};
+use hezhou_ui::{UISystem, UIInputHandler, Panel, Button, Label, Layout, DrawCommand, Widget, Style, Color, TextStyle, ffi::WidgetTreeHandle, ffi::ui_set_primary_button_id};
 use hezhou_platform::{MouseAction, MouseEvent, MouseButton};
 use hezhou_dfx::{DfxSystem, LogLevel};
 use parking_lot::Mutex;
@@ -712,6 +712,8 @@ pub fn setup_ui(&mut self) {
             button.set_layout(Layout::new(0.0, 0.0, 150.0, 40.0));
             self.button_id = button.id().id;
             
+            ui_set_primary_button_id(self.button_id);
+            
             self.dfx.lock().get_logger().lock().log(
                 LogLevel::Info,
                 "UI",
@@ -824,6 +826,91 @@ let font_atlas = ui.get_font_atlas();
     
     pub fn get_button_id(&self) -> u64 {
         self.button_id
+    }
+    
+    pub fn setup_ui_for_script(&mut self) {
+        let ui = self.ui_system.lock();
+        let tree = ui.get_widget_tree();
+        
+        let mut tree_guard = tree.lock();
+        
+        let mut root_panel = Panel::new();
+        root_panel.set_layout(Layout::new(0.0, 0.0, self.extent.width as f32, self.extent.height as f32));
+        root_panel.set_style(Style::new().with_background(Color::transparent()));
+        tree_guard.set_root(Box::new(root_panel));
+        
+        self.dfx.lock().get_logger().lock().log(LogLevel::Info, "UI", "Root panel created (C# will create widgets)", file!(), line!());
+        
+        drop(tree_guard);
+        
+        let font_atlas = ui.get_font_atlas();
+        let texture_data = font_atlas.get_atlas_texture().to_vec();
+        
+        drop(ui);
+        
+        unsafe {
+            let mem_requirements = self.device.get_image_memory_requirements(self.font_texture);
+            let data_ptr = self.device.map_memory(
+                self.font_texture_memory,
+                0,
+                mem_requirements.size,
+                vk::MemoryMapFlags::empty()
+            ).map_err(|e| format!("Failed to map font texture in setup: {}", e)).unwrap();
+            
+            std::ptr::copy_nonoverlapping(texture_data.as_ptr(), data_ptr as *mut u8, texture_data.len());
+            self.device.unmap_memory(self.font_texture_memory);
+            
+            let transition_cmd = self.device.allocate_command_buffers(&vk::CommandBufferAllocateInfo {
+                command_pool: self.command_pool,
+                level: vk::CommandBufferLevel::PRIMARY,
+                command_buffer_count: 1,
+                ..Default::default()
+            }).unwrap()[0];
+            
+            self.device.begin_command_buffer(transition_cmd, &vk::CommandBufferBeginInfo::default()).unwrap();
+            
+            let barrier = vk::ImageMemoryBarrier {
+                old_layout: vk::ImageLayout::PREINITIALIZED,
+                new_layout: vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
+                src_queue_family_index: vk::QUEUE_FAMILY_IGNORED,
+                dst_queue_family_index: vk::QUEUE_FAMILY_IGNORED,
+                image: self.font_texture,
+                subresource_range: vk::ImageSubresourceRange {
+                    aspect_mask: vk::ImageAspectFlags::COLOR,
+                    base_mip_level: 0,
+                    level_count: 1,
+                    base_array_layer: 0,
+                    layer_count: 1,
+                },
+                src_access_mask: vk::AccessFlags::HOST_WRITE,
+                dst_access_mask: vk::AccessFlags::SHADER_READ,
+                ..Default::default()
+            };
+            
+            self.device.cmd_pipeline_barrier(
+                transition_cmd,
+                vk::PipelineStageFlags::HOST,
+                vk::PipelineStageFlags::FRAGMENT_SHADER,
+                vk::DependencyFlags::empty(),
+                &[],
+                &[],
+                &[barrier]
+            );
+            
+            self.device.end_command_buffer(transition_cmd).unwrap();
+            
+            self.device.queue_submit(self.queue, &[vk::SubmitInfo {
+                command_buffer_count: 1,
+                p_command_buffers: &transition_cmd,
+                ..Default::default()
+            }], vk::Fence::null()).unwrap();
+            
+            self.device.queue_wait_idle(self.queue).unwrap();
+            
+            self.device.free_command_buffers(self.command_pool, &[transition_cmd]);
+        }
+        
+        self.dfx.lock().get_logger().lock().log(LogLevel::Info, "UI", "UI setup complete (script will create widgets)", file!(), line!());
     }
     
     pub fn get_widget_tree_handle(&self) -> WidgetTreeHandle {
@@ -987,6 +1074,8 @@ let font_atlas = ui.get_font_atlas();
                 self.update_ui_layout();
             }
             self.needs_resize = false;
+            
+            hezhou_ui::ffi::ui_trigger_resize(self.extent.width as f32, self.extent.height as f32);
         }
         
         if self.button_clicked.load(Ordering::SeqCst) {

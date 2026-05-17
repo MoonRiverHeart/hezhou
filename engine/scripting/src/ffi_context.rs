@@ -1,0 +1,54 @@
+use std::ffi::{c_void, c_char};
+
+pub type WidgetTreeHandle = *mut c_void;
+
+pub type GetButtonIdFn = extern "C" fn() -> u64;
+pub type SetButtonIdFn = extern "C" fn(u64);
+pub type SetTextFn = extern "C" fn(WidgetTreeHandle, u64, *const c_char);
+pub type SetOnClickThunkPtrFn = extern "C" fn(WidgetTreeHandle, u64, *const c_void);
+pub type RegisterUpdateThunkPtrFn = extern "C" fn(*const c_void);
+pub type RegisterResizeThunkPtrFn = extern "C" fn(*const c_void);
+pub type TriggerResizeFn = extern "C" fn(f32, f32);
+pub type GetScreenSizeFn = extern "C" fn(*mut f32, *mut f32);
+
+pub type CreateButtonFn = extern "C" fn(WidgetTreeHandle, f32, f32, f32, f32, *const c_char) -> u64;
+pub type CreateLabelFn = extern "C" fn(WidgetTreeHandle, f32, f32, f32, f32, *const c_char) -> u64;
+pub type CreatePanelFn = extern "C" fn(WidgetTreeHandle, f32, f32, f32, f32) -> u64;
+pub type SetPositionFn = extern "C" fn(WidgetTreeHandle, u64, f32, f32);
+pub type SetSizeFn = extern "C" fn(WidgetTreeHandle, u64, f32, f32);
+
+#[repr(C)]
+pub struct FfiContext {
+    pub ui_get_primary_button_id: GetButtonIdFn,
+    pub ui_set_primary_button_id: SetButtonIdFn,
+    pub ui_widget_set_text: SetTextFn,
+    pub ui_button_set_on_click_thunk_ptr: SetOnClickThunkPtrFn,
+    pub ui_register_update_thunk_ptr: RegisterUpdateThunkPtrFn,
+    pub ui_register_resize_thunk_ptr: RegisterResizeThunkPtrFn,
+    pub ui_trigger_resize: TriggerResizeFn,
+    pub ui_get_screen_size: GetScreenSizeFn,
+    pub ui_create_button: CreateButtonFn,
+    pub ui_create_label: CreateLabelFn,
+    pub ui_create_panel: CreatePanelFn,
+    pub ui_widget_set_position: SetPositionFn,
+    pub ui_widget_set_size: SetSizeFn,
+    pub widget_tree_ptr: WidgetTreeHandle,
+}
+
+static mut FFI_CONTEXT: Option<Box<FfiContext>> = None;
+
+pub fn set_ffi_context(ctx: FfiContext) {
+    unsafe {
+        let boxed = Box::new(ctx);
+        FFI_CONTEXT = Some(boxed);
+    }
+}
+
+pub fn get_ffi_context_ptr() -> *const FfiContext {
+    unsafe { 
+        match &FFI_CONTEXT {
+            Some(boxed) => boxed.as_ref() as *const FfiContext,
+            None => std::ptr::null(),
+        }
+    }
+}

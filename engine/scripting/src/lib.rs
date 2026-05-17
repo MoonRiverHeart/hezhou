@@ -2,6 +2,7 @@ pub mod callback_registry;
 pub mod callback_types;
 pub mod error;
 pub mod ffi;
+pub mod ffi_context;
 pub mod script_manager_lite;
 pub mod value_bridge;
 
@@ -27,6 +28,7 @@ pub use callback_types::*;
 pub use error::*;
 pub use executor::*;
 pub use ffi::*;
+pub use ffi_context::*;
 pub use value_bridge::*;
 
 #[cfg(feature = "native-aot")]

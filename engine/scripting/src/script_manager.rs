@@ -26,6 +26,19 @@ impl ScriptManager {
 
     pub fn load_script(&mut self, dll_path: &str) -> ScriptResult<String> {
         let domain = self.domain.as_ref().ok_or(ScriptError::NotInitialized)?;
+        
+        let dll_name = std::ffi::CString::new("mono_ui_thunk_demo").unwrap();
+        let target_dll = std::ffi::CString::new("mono_ui_thunk_demo.exe").unwrap();
+        
+        unsafe {
+            wrapped_mono::binds::mono_dllmap_insert(
+                std::ptr::null_mut(),
+                dll_name.as_ptr(),
+                std::ptr::null(),
+                target_dll.as_ptr(),
+                std::ptr::null(),
+            );
+        }
 
         let assembly = domain
             .assembly_open(dll_path)
@@ -166,6 +179,85 @@ impl ScriptManager {
             let float_value = unsafe { *float_ptr };
             Ok(ScriptValue::from_float(float_value))
         }
+    }
+
+    pub fn execute_with_ptr(
+        &self,
+        assembly_name: &str,
+        namespace: &str,
+        class_name: &str,
+        method_name: &str,
+        ptr_arg: usize,
+        param_count: i32,
+    ) -> ScriptResult<()> {
+        let _domain = self.domain.as_ref().ok_or(ScriptError::NotInitialized)?;
+        let assembly = self
+            .assemblies
+            .get(assembly_name)
+            .ok_or_else(|| ScriptError::AssemblyNotFound(assembly_name.to_string()))?;
+
+        let image = assembly.get_image();
+
+        let class = Class::from_name(&image, namespace, class_name)
+            .or_else(|| Class::from_name_case(&image, namespace, class_name))
+            .ok_or_else(|| ScriptError::ClassNotFound(format!("{}.{}", namespace, class_name)))?;
+
+        let mut iter = std::ptr::null_mut::<std::os::raw::c_void>();
+        let mut found_method_ptr: *mut wrapped_mono::binds::MonoMethod = std::ptr::null_mut();
+        loop {
+            let method_ptr = unsafe {
+                wrapped_mono::binds::mono_class_get_methods(
+                    class.get_ptr(),
+                    &mut iter as *mut *mut std::os::raw::c_void,
+                )
+            };
+            if method_ptr.is_null() {
+                break;
+            }
+            let name_cstr = unsafe { wrapped_mono::binds::mono_method_get_name(method_ptr) };
+            let name = unsafe { std::ffi::CStr::from_ptr(name_cstr) }
+                .to_str()
+                .unwrap_or("?");
+            if name == method_name {
+                found_method_ptr = method_ptr;
+                break;
+            }
+        }
+
+        if found_method_ptr.is_null() {
+            return Err(ScriptError::MethodNotFound(format!(
+                "{} ({} params)",
+                method_name, param_count
+            )));
+        }
+
+        let mut params: Vec<*mut std::os::raw::c_void> = Vec::new();
+        let mut ptr_storage: usize = ptr_arg;
+        if param_count > 0 {
+            params.push(&mut ptr_storage as *mut usize as *mut std::os::raw::c_void);
+        }
+
+        let mut exc_ptr: *mut wrapped_mono::binds::MonoObject = std::ptr::null_mut();
+        unsafe {
+            wrapped_mono::binds::mono_runtime_invoke(
+                found_method_ptr,
+                std::ptr::null_mut(),
+                if params.is_empty() {
+                    std::ptr::null_mut()
+                } else {
+                    params.as_mut_ptr() as *mut *mut std::os::raw::c_void
+                },
+                &mut exc_ptr as *mut *mut wrapped_mono::binds::MonoObject,
+            )
+        };
+
+        if !exc_ptr.is_null() {
+            return Err(ScriptError::InvokeFailed(
+                "Exception during method call".to_string(),
+            ));
+        }
+
+        Ok(())
     }
 
     pub fn register_sync_callback(

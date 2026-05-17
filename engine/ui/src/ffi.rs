@@ -425,3 +425,200 @@ pub extern "C" fn ui_trigger_init() {
 pub extern "C" fn ui_has_onclick(widget_id: u64) -> bool {
     has_onclick_callback(widget_id)
 }
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_set_primary_button_id(id: u64) {
+    crate::thunk_manager::ui_set_primary_button_id(id);
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_get_primary_button_id() -> u64 {
+    crate::thunk_manager::ui_get_primary_button_id()
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_create_button(
+    handle: WidgetTreeHandle,
+    x: f32,
+    y: f32,
+    width: f32,
+    height: f32,
+    text: *const c_char,
+) -> u64 {
+    if handle.is_null() || text.is_null() {
+        return 0;
+    }
+    unsafe {
+        let text_str = CStr::from_ptr(text).to_string_lossy().into_owned();
+        let arc = &*(handle as *const Arc<Mutex<WidgetTree>>);
+        let mut tree = arc.lock();
+        let mut button = Button::new(&text_str);
+        button.set_layout(Layout::new(x, y, width, height));
+        let id = button.id();
+        let root_id = tree.root.unwrap_or(WidgetId::invalid());
+        tree.add_widget(Box::new(button), root_id);
+        id.id
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_create_label(
+    handle: WidgetTreeHandle,
+    x: f32,
+    y: f32,
+    width: f32,
+    height: f32,
+    text: *const c_char,
+) -> u64 {
+    if handle.is_null() || text.is_null() {
+        return 0;
+    }
+    unsafe {
+        let text_str = CStr::from_ptr(text).to_string_lossy().into_owned();
+        let arc = &*(handle as *const Arc<Mutex<WidgetTree>>);
+        let mut tree = arc.lock();
+        let mut label = Label::new(&text_str);
+        label.set_layout(Layout::new(x, y, width, height));
+        let id = label.id();
+        let root_id = tree.root.unwrap_or(WidgetId::invalid());
+        tree.add_widget(Box::new(label), root_id);
+        id.id
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_create_panel(
+    handle: WidgetTreeHandle,
+    x: f32,
+    y: f32,
+    width: f32,
+    height: f32,
+) -> u64 {
+    if handle.is_null() {
+        return 0;
+    }
+    unsafe {
+        let arc = &*(handle as *const Arc<Mutex<WidgetTree>>);
+        let mut tree = arc.lock();
+        let mut panel = Panel::new();
+        panel.set_layout(Layout::new(x, y, width, height));
+        let id = panel.id();
+        let root_id = tree.root.unwrap_or(WidgetId::invalid());
+        tree.add_widget(Box::new(panel), root_id);
+        id.id
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_widget_get_x(handle: WidgetTreeHandle, widget_id: u64) -> f32 {
+    if handle.is_null() {
+        return 0.0;
+    }
+    unsafe {
+        let arc = &*(handle as *const Arc<Mutex<WidgetTree>>);
+        let tree = arc.lock();
+        let id = WidgetId::from_raw(widget_id);
+        tree.get_widget(id).map(|w| w.layout().x).unwrap_or(0.0)
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_widget_get_y(handle: WidgetTreeHandle, widget_id: u64) -> f32 {
+    if handle.is_null() {
+        return 0.0;
+    }
+    unsafe {
+        let arc = &*(handle as *const Arc<Mutex<WidgetTree>>);
+        let tree = arc.lock();
+        let id = WidgetId::from_raw(widget_id);
+        tree.get_widget(id).map(|w| w.layout().y).unwrap_or(0.0)
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_widget_get_width(handle: WidgetTreeHandle, widget_id: u64) -> f32 {
+    if handle.is_null() {
+        return 0.0;
+    }
+    unsafe {
+        let arc = &*(handle as *const Arc<Mutex<WidgetTree>>);
+        let tree = arc.lock();
+        let id = WidgetId::from_raw(widget_id);
+        tree.get_widget(id).map(|w| w.layout().width).unwrap_or(0.0)
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_widget_get_height(handle: WidgetTreeHandle, widget_id: u64) -> f32 {
+    if handle.is_null() {
+        return 0.0;
+    }
+    unsafe {
+        let arc = &*(handle as *const Arc<Mutex<WidgetTree>>);
+        let tree = arc.lock();
+        let id = WidgetId::from_raw(widget_id);
+        tree.get_widget(id).map(|w| w.layout().height).unwrap_or(0.0)
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_widget_set_position(handle: WidgetTreeHandle, widget_id: u64, x: f32, y: f32) {
+    if handle.is_null() {
+        return;
+    }
+    unsafe {
+        let arc = &*(handle as *const Arc<Mutex<WidgetTree>>);
+        let mut tree = arc.lock();
+        let id = WidgetId::from_raw(widget_id);
+        if let Some(widget) = tree.get_widget_mut(id) {
+            let layout = widget.layout();
+            widget.set_layout(Layout::new(x, y, layout.width, layout.height));
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_widget_set_size(handle: WidgetTreeHandle, widget_id: u64, width: f32, height: f32) {
+    if handle.is_null() {
+        return;
+    }
+    unsafe {
+        let arc = &*(handle as *const Arc<Mutex<WidgetTree>>);
+        let mut tree = arc.lock();
+        let id = WidgetId::from_raw(widget_id);
+        if let Some(widget) = tree.get_widget_mut(id) {
+            let layout = widget.layout();
+            widget.set_layout(Layout::new(layout.x, layout.y, width, height));
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_register_resize_thunk_ptr(callback_ptr: *const std::ffi::c_void) {
+    if callback_ptr.is_null() {
+        return;
+    }
+    let callback: ResizeCallback = unsafe { std::mem::transmute(callback_ptr) };
+    crate::thunk_manager::ui_register_resize_callback(callback);
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_trigger_resize(width: f32, height: f32) {
+    crate::thunk_manager::trigger_resize_callback(width, height);
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_set_screen_size(width: f32, height: f32) {
+    crate::thunk_manager::ui_set_screen_size(width, height);
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_get_screen_size(out_width: *mut f32, out_height: *mut f32) {
+    let (width, height) = crate::thunk_manager::ui_get_screen_size();
+    if !out_width.is_null() {
+        unsafe { *out_width = width; }
+    }
+    if !out_height.is_null() {
+        unsafe { *out_height = height; }
+    }
+}

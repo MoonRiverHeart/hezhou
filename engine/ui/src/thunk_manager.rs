@@ -7,14 +7,22 @@ use crate::*;
 pub type UpdateCallback = extern "C" fn(f32);
 pub type WidgetCallback = extern "C" fn(u64);
 pub type InitCallback = extern "C" fn();
+pub type ResizeCallback = extern "C" fn(f32, f32);
 
 static UI_CALLBACKS: LazyLock<Mutex<UICallbacks>> =
     LazyLock::new(|| Mutex::new(UICallbacks::new()));
+
+static PRIMARY_BUTTON_ID: LazyLock<Mutex<Option<u64>>> =
+    LazyLock::new(|| Mutex::new(None));
+
+static SCREEN_SIZE: LazyLock<Mutex<(f32, f32)>> =
+    LazyLock::new(|| Mutex::new((800.0, 600.0)));
 
 pub struct UICallbacks {
     update: Option<UpdateCallback>,
     onclicks: HashMap<u64, WidgetCallback>,
     on_init: Option<InitCallback>,
+    on_resize: Option<ResizeCallback>,
 }
 
 impl UICallbacks {
@@ -23,6 +31,7 @@ impl UICallbacks {
             update: None,
             onclicks: HashMap::new(),
             on_init: None,
+            on_resize: None,
         }
     }
     
@@ -30,6 +39,7 @@ impl UICallbacks {
         self.update = None;
         self.onclicks.clear();
         self.on_init = None;
+        self.on_resize = None;
     }
 }
 
@@ -52,6 +62,23 @@ pub extern "C" fn ui_register_init_callback(callback: InitCallback) {
     let mut callbacks = UI_CALLBACKS.lock();
     callbacks.on_init = Some(callback);
     dfx_info!("UI", "注册Init回调: {:?}", callback);
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_register_resize_callback(callback: ResizeCallback) {
+    let mut callbacks = UI_CALLBACKS.lock();
+    callbacks.on_resize = Some(callback);
+    dfx_info!("UI", "注册Resize回调: {:?}", callback);
+}
+
+pub fn ui_set_screen_size(width: f32, height: f32) {
+    let mut size = SCREEN_SIZE.lock();
+    *size = (width, height);
+}
+
+pub fn ui_get_screen_size() -> (f32, f32) {
+    let size = SCREEN_SIZE.lock();
+    *size
 }
 
 #[unsafe(no_mangle)]
@@ -82,7 +109,28 @@ pub fn trigger_init_callback() {
     }
 }
 
+pub fn trigger_resize_callback(width: f32, height: f32) {
+    let mut size = SCREEN_SIZE.lock();
+    *size = (width, height);
+    
+    let callbacks = UI_CALLBACKS.lock();
+    if let Some(cb) = callbacks.on_resize {
+        cb(width, height);
+    }
+}
+
 pub fn has_onclick_callback(widget_id: u64) -> bool {
     let callbacks = UI_CALLBACKS.lock();
     callbacks.onclicks.contains_key(&widget_id)
+}
+
+pub fn ui_set_primary_button_id(id: u64) {
+    let mut primary_id = PRIMARY_BUTTON_ID.lock();
+    *primary_id = Some(id);
+    dfx_info!("UI", "设置主按钮ID: {}", id);
+}
+
+pub fn ui_get_primary_button_id() -> u64 {
+    let primary_id = PRIMARY_BUTTON_ID.lock();
+    primary_id.unwrap_or(0)
 }

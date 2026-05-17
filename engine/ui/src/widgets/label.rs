@@ -28,7 +28,7 @@ impl Label {
             state: WidgetState::Normal,
             flags: crate::widget::WidgetFlags::default(),
             text: text.to_string(),
-            text_style: TextStyle::new().with_size(16.0).with_color(Color::black()),
+            text_style: TextStyle::new().with_size(16.0).with_color(Color::white()),
         }
     }
 

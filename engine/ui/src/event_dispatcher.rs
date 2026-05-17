@@ -66,6 +66,9 @@ impl EventDispatcher {
                         }
                     }
                 }
+                drop(tree);
+                
+                crate::thunk_manager::trigger_onclick_callback(g.target.id);
             }
         }
     }

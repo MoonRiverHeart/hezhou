@@ -26,7 +26,7 @@ impl MonoUIExecutor {
         method_name: &str,
         args: &[ScriptValue],
     ) -> Result<(), ScriptError> {
-        let result = self.manager.execute(
+        let _result = self.manager.execute(
             &self.assembly_name,
             "",
             class_name,
@@ -42,6 +42,22 @@ impl MonoUIExecutor {
         )?;
 
         Ok(())
+    }
+
+    pub fn call_static_with_ptr(
+        &self,
+        class_name: &str,
+        method_name: &str,
+        ptr_arg: usize,
+    ) -> Result<(), ScriptError> {
+        self.manager.execute_with_ptr(
+            &self.assembly_name,
+            "",
+            class_name,
+            method_name,
+            ptr_arg,
+            1,
+        )
     }
 
     pub fn call_static_with_args(
