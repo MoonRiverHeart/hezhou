@@ -249,6 +249,47 @@ impl FontAtlas {
         
         result
     }
+    
+    pub fn layout_text_left(
+        &self,
+        font_index: usize,
+        text: &str,
+        font_size: f32,
+        container_x: f32,
+        container_y: f32,
+        container_height: f32,
+    ) -> Vec<(f32, f32, usize, usize, f32, f32, f32, f32)> {
+        if font_index >= self.fonts.len() || text.is_empty() {
+            return Vec::new();
+        }
+        
+        let (_, text_height) = self.measure_text(font_index, text, font_size);
+        
+        let start_x = container_x;
+        let start_y = container_y + (container_height - text_height) / 2.0;
+        
+        let mut result = Vec::new();
+        let mut cursor_x = start_x;
+        
+        for character in text.chars() {
+            if let Some(info) = self.get_char_info(font_index, character, font_size) {
+                result.push((
+                    cursor_x,
+                    start_y,
+                    info.width as usize,
+                    info.height as usize,
+                    info.uv_x,
+                    info.uv_y,
+                    info.uv_w,
+                    info.uv_h,
+                ));
+                
+                cursor_x += info.advance_x;
+            }
+        }
+        
+        result
+    }
 }
 
 impl Default for FontAtlas {

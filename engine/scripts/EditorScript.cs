@@ -191,18 +191,18 @@ namespace Hezhou
             HideDropdownMenu();
         }
         
-        private static void ShowDropdownMenu(float x, float y, string[] items)
+private static void ShowDropdownMenu(float x, float y, string[] items)
         {
             HideDropdownMenu();
             
             ulong rootId = UI.GetRootId();
-            _dropdownMenu = new Panel(rootId, x, y, 150, items.Length * 25 + 5, 0.25f, 0.25f, 0.25f, 0.95f);
-            _menuItems = new VStack(_dropdownMenu.Id, 2f);
-_menuItems.SetPosition(5, 5);
+            _dropdownMenu = new Panel(rootId, x, y, 160, items.Length * 30 + 10, 0.25f, 0.25f, 0.25f, 0.95f);
+            _menuItems = new VStack(_dropdownMenu.Id, 5f);
+            _menuItems.SetPosition(10, 10);
             
             foreach (var item in items)
             {
-                _menuItems.AddLabel(140, 20, item);
+                var label = _menuItems.AddLabel(140, 25, item);
             }
             
             Console.WriteLine($"[Editor] 显示下拉菜单: {items.Length}项");

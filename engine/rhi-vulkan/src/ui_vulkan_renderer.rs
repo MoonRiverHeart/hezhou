@@ -1231,7 +1231,7 @@ DrawCommand::Rect { bounds, width, height, fill_color, .. } => {
                             x, y + h, r, g, b, a, 0.0, 0.0,
                         ]);
                     }
-DrawCommand::Text { bounds, width, height, font_color, text, text_len, font_size, .. } => {
+DrawCommand::Text { bounds, width, height, font_color, text, text_len, font_size, alignment, .. } => {
                             let text_str = if text.is_null() || *text_len == 0 {
                                 ""
                             } else {
@@ -1243,15 +1243,26 @@ DrawCommand::Text { bounds, width, height, font_color, text, text_len, font_size
                             let ui_lock = self.ui_system.lock();
                             let font_atlas = ui_lock.get_font_atlas();
                             
-                            let glyphs = font_atlas.layout_text_centered(
-                                0,
-                                text_str,
-                                *font_size * 2.0,
-                                bounds.x,
-                                bounds.y,
-                                *width,
-                                *height,
-                            );
+                            let glyphs = if alignment.horizontal == hezhou_ui::HorizontalAlignment::Left {
+                                font_atlas.layout_text_left(
+                                    0,
+                                    text_str,
+                                    *font_size * 2.0,
+                                    bounds.x,
+                                    bounds.y,
+                                    *height,
+                                )
+                            } else {
+                                font_atlas.layout_text_centered(
+                                    0,
+                                    text_str,
+                                    *font_size * 2.0,
+                                    bounds.x,
+                                    bounds.y,
+                                    *width,
+                                    *height,
+                                )
+                            };
                             
                             for (gx, gy, gw, gh, uv_x, uv_y, uv_w, uv_h) in glyphs {
                                 let w = gw as f32;
