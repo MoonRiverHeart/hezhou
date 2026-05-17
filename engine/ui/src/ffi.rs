@@ -366,12 +366,43 @@ pub extern "C" fn ui_button_set_on_click_thunk(
 }
 
 #[unsafe(no_mangle)]
+pub extern "C" fn ui_button_set_on_click_thunk_ptr(
+    handle: WidgetTreeHandle,
+    widget_id: u64,
+    callback_ptr: *const std::ffi::c_void,
+) {
+    if callback_ptr.is_null() {
+        return;
+    }
+    let callback: WidgetCallback = unsafe { std::mem::transmute(callback_ptr) };
+    ui_register_onclick_callback(widget_id, callback);
+}
+
+#[unsafe(no_mangle)]
 pub extern "C" fn ui_register_update_thunk(callback: UpdateCallback) {
     ui_register_update_callback(callback);
 }
 
 #[unsafe(no_mangle)]
+pub extern "C" fn ui_register_update_thunk_ptr(callback_ptr: *const std::ffi::c_void) {
+    if callback_ptr.is_null() {
+        return;
+    }
+    let callback: UpdateCallback = unsafe { std::mem::transmute(callback_ptr) };
+    ui_register_update_callback(callback);
+}
+
+#[unsafe(no_mangle)]
 pub extern "C" fn ui_register_init_thunk(callback: InitCallback) {
+    ui_register_init_callback(callback);
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_register_init_thunk_ptr(callback_ptr: *const std::ffi::c_void) {
+    if callback_ptr.is_null() {
+        return;
+    }
+    let callback: InitCallback = unsafe { std::mem::transmute(callback_ptr) };
     ui_register_init_callback(callback);
 }
 

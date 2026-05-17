@@ -43,8 +43,7 @@ foreach ($script in $scriptsToCompile) {
 $mcsArgs = @(
     "-target:library",
     "-out:$outputDll",
-    "-r:System.dll",
-    "-r:System.Runtime.dll"
+    "-unsafe"
 ) + $scriptsToCompile
 
 Write-Host "[Info] Compiling: $ScriptName"

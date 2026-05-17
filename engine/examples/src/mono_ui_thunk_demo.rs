@@ -30,22 +30,9 @@ fn main() {
         .expect("Failed to load Mono DLL");
     println!("    加载成功!\n");
     
-    println!("[4] 设置Handles并调用Initialize...");
-    {
-        let widget_tree = ui_system.lock().get_widget_tree();
-        let event_dispatcher = ui_system.lock().get_event_dispatcher();
-        
-        let widget_tree_handle = Box::into_raw(Box::new(widget_tree)) as *mut Arc<Mutex<hezhou_ui::WidgetTree>>;
-        let event_dispatcher_handle = Box::into_raw(Box::new(event_dispatcher)) as *mut Arc<Mutex<hezhou_ui::EventDispatcher>>;
-        
-        executor.call_static_void("UIScript", "SetHandles", &[
-            hezhou_scripting::ScriptValue::from_double(widget_tree_handle as i64 as f64),
-            hezhou_scripting::ScriptValue::from_double(event_dispatcher_handle as i64 as f64),
-        ]).expect("SetHandles failed");
-        
-        executor.call_static_void("UIScript", "Initialize", &[])
-            .expect("Initialize failed");
-    }
+    println!("[4] 调用Initialize...");
+    executor.call_static_void("UIScript", "Initialize", &[])
+        .expect("Initialize failed");
     println!("    Initialize调用成功!\n");
     
     println!("[5] 模拟运行循环...\n");
@@ -88,21 +75,8 @@ fn main() {
     let executor2 = MonoUIExecutor::new(&new_dll_path)
         .expect("Failed to reload");
     
-    {
-        let widget_tree = ui_system.lock().get_widget_tree();
-        let event_dispatcher = ui_system.lock().get_event_dispatcher();
-        
-        let widget_tree_handle = Box::into_raw(Box::new(widget_tree)) as *mut Arc<Mutex<hezhou_ui::WidgetTree>>;
-        let event_dispatcher_handle = Box::into_raw(Box::new(event_dispatcher)) as *mut Arc<Mutex<hezhou_ui::EventDispatcher>>;
-        
-        executor2.call_static_void("UIScript", "SetHandles", &[
-            hezhou_scripting::ScriptValue::from_double(widget_tree_handle as i64 as f64),
-            hezhou_scripting::ScriptValue::from_double(event_dispatcher_handle as i64 as f64),
-        ]).expect("SetHandles failed");
-        
-        executor2.call_static_void("UIScript", "Initialize", &[])
-            .expect("Initialize failed");
-    }
+    executor2.call_static_void("UIScript", "Initialize", &[])
+        .expect("Initialize failed");
     println!("    热重载成功!\n");
     
     println!("[7] 继续运行...");
@@ -151,7 +125,7 @@ fn compile_ui_script() -> String {
     let args = [
         "-target:library".to_string(),
         format!("-out:{}", output_dll),
-        "-r:System.dll".to_string(),
+        "-unsafe".to_string(),
         format!("{}/UIScript.cs", scripts_dir),
         format!("{}/DFX.cs", scripts_dir),
         format!("{}/UI.cs", scripts_dir),
@@ -159,14 +133,43 @@ fn compile_ui_script() -> String {
     
     let result = Command::new("mcs")
         .args(&args)
-        .output()
-        .expect("mcs not found");
+        .output();
     
-    if !result.status.success() {
-        panic!("Compilation failed: {}", String::from_utf8_lossy(&result.stderr));
+    match result {
+        Ok(output) => {
+            if output.status.success() {
+                output_dll
+            } else {
+                println!("Compilation failed: {}", String::from_utf8_lossy(&output.stderr));
+                panic!("Mono compilation failed");
+            }
+        }
+        Err(_) => {
+            println!("mcs not found, using precompiled DLL");
+            find_latest_dll(output_dir).unwrap_or_else(|| panic!("No precompiled DLL found in {}", output_dir))
+        }
+    }
+}
+
+fn find_latest_dll(output_dir: &str) -> Option<String> {
+    use std::fs;
+    
+    let entries: Vec<_> = fs::read_dir(output_dir)
+        .ok()?
+        .filter_map(|e| e.ok())
+        .filter(|e| e.path().extension().map(|ext| ext == "dll").unwrap_or(false))
+        .filter(|e| e.file_name().to_str().map(|name| name.starts_with("UIScript_")).unwrap_or(false))
+        .collect();
+    
+    if entries.is_empty() {
+        return None;
     }
     
-    output_dll
+    let latest = entries
+        .iter()
+        .max_by_key(|e| e.metadata().and_then(|m| m.modified()).unwrap_or(std::time::SystemTime::UNIX_EPOCH));
+    
+    latest.map(|e| e.path().to_str().unwrap().to_string())
 }
 
 fn compile_ui_script_with_timestamp() -> String {
