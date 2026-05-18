@@ -103,6 +103,16 @@ impl TextEdit {
         self.flags.dirty_render = true;
     }
     
+    fn estimate_cursor_x(&self) -> f32 {
+        // 估算光标 x 位置（用于验证反向映射）
+        let text_start_x = 10.0;
+        let char_width = self.text_style.font_size * 0.6;
+        
+        // 简化计算：cursor_position * char_width
+        // 这只是估算，实际渲染时使用 font_atlas 精确值
+        text_start_x + self.cursor_position.min(self.text.len()) as f32 * char_width
+    }
+    
     fn update_char_layouts(&mut self) {
         if !self.char_layouts.is_empty() {
             return;
@@ -306,39 +316,39 @@ impl Widget for TextEdit {
             // 获取 max_bearing_y 用于光标 y 计算
             let max_bearing_y = canvas.get_max_bearing_y(&self.text, self.text_style.font_size * 2.0);
             
-            // 计算光标位置
+// 计算光标位置
             let (cursor_x, cursor_y) = if self.cursor_position == 0 {
                 (text_start_x, text_start_y)
             } else {
                 let mut found_x = text_start_x;
                 let mut found_y = text_start_y;
-                let mut current_line = 0;
+                
+                println!("[Cursor] Calculating position for cursor_position={}", self.cursor_position);
                 
                 for (x, baseline_y, advance, char_idx, byte_idx) in &char_positions {
+                    println!("[Cursor] char_idx={}, byte_idx={}, x={}, advance={}, baseline_y={}", 
+                             char_idx, byte_idx, x, advance, baseline_y);
+                    
                     if *byte_idx < self.cursor_position {
                         // 光标 x 在字符之后
                         found_x = *x + *advance;
-                        // 光标 y 使用 baseline_y - max_bearing_y = container_y
-                        // 但需要考虑换行
-                        let line_start_y = text_start_y + current_line as f32 * line_height;
-                        found_y = line_start_y;
+                        // 光标 y 使用 baseline_y - max_bearing_y = line_start_y
+                        // 但需要考虑不同行的 baseline_y
+                        found_y = *baseline_y - max_bearing_y;
+                        println!("[Cursor]   -> byte_idx {} < cursor_position {}, found_x={}, found_y={} (baseline_y={} - max_bearing_y={})", 
+                                 byte_idx, self.cursor_position, found_x, found_y, baseline_y, max_bearing_y);
                     } else {
+                        println!("[Cursor]   -> byte_idx {} >= cursor_position {}, stopping", 
+                                 byte_idx, self.cursor_position);
                         break;
-                    }
-                    
-                    // 检测换行（baseline_y 增加）
-                    if *char_idx > 0 {
-                        let prev_baseline_y = char_positions[*char_idx - 1].1;
-                        if *baseline_y > prev_baseline_y + line_height * 0.5 {
-                            current_line += 1;
-                        }
                     }
                 }
                 
+                println!("[Cursor] Final cursor position: ({}, {})", found_x, found_y);
                 (found_x, found_y)
             };
             
-            let cursor_height = self.text_style.font_size * 2.0 * 0.6;
+            let cursor_height = self.text_style.font_size * 2.0 * 0.75;
             
             canvas.draw_rect(
                 Rect::new(cursor_x, cursor_y, 2.0, cursor_height),
@@ -380,10 +390,17 @@ impl Widget for TextEdit {
                 if let EventData::Touch(touch_data) = &event.data {
                     let click_x = touch_data.x;
                     let click_y = touch_data.y;
-                    println!("[TextEdit] Click at ({}, {})", click_x, click_y);
+                    println!("[Click] Click at ({}, {})", click_x, click_y);
                     
+                    // 反向映射：像素位置 -> 字符索引
                     self.cursor_position = self.find_cursor_position_at(click_x, click_y);
-                    println!("[TextEdit] cursor_position set to {}", self.cursor_position);
+                    println!("[Click] cursor_position set to {}", self.cursor_position);
+                    
+                    // 验证正向映射一致性（调试）
+                    // 注意：这里需要 font_atlas，但 TouchBegin 没有 canvas
+                    // 只能用估算值验证
+                    let estimated_x = self.estimate_cursor_x();
+                    println!("[Click] Estimated cursor x: {}, actual click x: {}", estimated_x, click_x);
                 }
                 
                 self.flags.dirty_render = true;

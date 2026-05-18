@@ -62,6 +62,9 @@ impl Canvas {
             let baseline_y = container_y + max_bearing_y;
             let line_height = font_size * 1.5;
             
+            println!("[FontAtlas] container_y={}, max_bearing_y={}, baseline_y={}", 
+                     container_y, max_bearing_y, baseline_y);
+            
             let mut cursor_x = container_x;
             let mut cursor_y = baseline_y;
             let mut results = Vec::new();
@@ -70,16 +73,21 @@ impl Canvas {
                 if c == '\n' {
                     cursor_x = container_x;
                     cursor_y += line_height;
+                    println!("[FontAtlas] Newline at char_idx={}, cursor_y={}", char_idx, cursor_y);
                     continue;
                 }
                 
                 if let Some(info) = atlas.get_char_info(self.font_index, c, font_size) {
+                    println!("[FontAtlas] char '{}' (char_idx={}, byte_idx={}): cursor_x={}, advance={}, width={}, bearing_y={}", 
+                             c, char_idx, byte_idx, cursor_x, info.advance_x, info.width, info.bearing_y);
+                    
                     // 光标需要的是字符的 x 位置和该行的 baseline_y
                     results.push((cursor_x, cursor_y, info.advance_x, char_idx, byte_idx));
                     cursor_x += info.advance_x;
                 }
             }
             
+            println!("[FontAtlas] Final cursor_x={}", cursor_x);
             results
         } else {
             Vec::new()
