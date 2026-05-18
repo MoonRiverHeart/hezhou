@@ -230,10 +230,18 @@ impl FontAtlas {
         
         let mut result = Vec::new();
         let mut cursor_x = container_x;
+        let mut cursor_y = baseline_y;
+        let mut line_height = font_size * 1.5;  // 行高
         
         for character in text.chars() {
+            if character == '\n' {
+                cursor_x = container_x;
+                cursor_y += line_height;
+                continue;
+            }
+            
             if let Some(info) = self.get_char_info(font_index, character, font_size) {
-                let char_y = baseline_y - info.bearing_y;
+                let char_y = cursor_y - info.bearing_y;
                 
                 result.push((
                     cursor_x,

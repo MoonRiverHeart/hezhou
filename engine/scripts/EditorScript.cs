@@ -25,6 +25,7 @@ namespace Hezhou
         private static ulong _scriptTextEditId;
         private static Label _scriptEditorLabel;
         private static bool _scriptEditorVisible = false;
+        private static Button _toggleEditorBtn;
         
         private static float _screenWidth = 1280f;
         private static float _screenHeight = 720f;
@@ -81,6 +82,10 @@ namespace Hezhou
             
             var runBtn = _toolbarButtons.AddButton(80f, 30f, "运行");
             runBtn.SetOnClick(OnRunClick);
+            
+            _toggleEditorBtn = new Button(_toolbar.Id, 80f, 30f, "编辑器");
+            UI.SetWidgetLayout(_toggleEditorBtn.Id, _screenWidth - 100f, 5f, 80f, 30f);
+            _toggleEditorBtn.SetOnClick(OnToggleEditorClick);
             
             Console.WriteLine("[Editor] 工具栏创建完成");
 
@@ -327,6 +332,108 @@ private static void ShowDropdownMenu(float x, float y, string[] items, UI.Widget
                 _menuItems = null;
                 Console.WriteLine("[Editor] 隐藏下拉菜单");
             }
+        }
+        
+        private static void OnToggleEditorClick(ulong widgetId)
+        {
+            Console.WriteLine($"[Editor] 点击\"编辑器\"切换按钮, id={widgetId}");
+            HideDropdownMenu();
+            
+            if (_scriptEditorVisible)
+            {
+                HideScriptEditor();
+                ShowMainLayout();
+            }
+            else
+            {
+                HideMainLayout();
+                ShowScriptEditor();
+            }
+        }
+        
+        private static void HideScriptEditor()
+        {
+            if (!_scriptEditorVisible) return;
+            
+            if (_scriptEditorPanel != null)
+            {
+                UI.RemoveWidget(_scriptEditorPanel.Id);
+                _scriptEditorPanel = null;
+            }
+            _scriptEditorVisible = false;
+            
+            if (_toggleEditorBtn != null)
+            {
+                _toggleEditorBtn.Text = "编辑器";
+            }
+            
+            Console.WriteLine("[Editor] 脚本编辑器隐藏");
+        }
+        
+        private static void ShowMainLayout()
+        {
+            Console.WriteLine("[Editor] 显示主界面...");
+            
+            ulong rootId = UI.GetRootId();
+            float mainY = TOOLBAR_HEIGHT;
+            float mainHeight = _screenHeight - TOOLBAR_HEIGHT - STATUS_BAR_HEIGHT - BOTTOM_PANEL_HEIGHT;
+            float bottomY = _screenHeight - STATUS_BAR_HEIGHT - BOTTOM_PANEL_HEIGHT;
+            float previewWidth = _screenWidth - LEFT_PANEL_WIDTH - RIGHT_PANEL_WIDTH;
+            float previewX = LEFT_PANEL_WIDTH;
+            
+            // 重新创建主界面panels
+            if (_previewPanel == null)
+            {
+                _previewPanel = new Panel(rootId, previewX, mainY, previewWidth, mainHeight + BOTTOM_PANEL_HEIGHT, 0.08f, 0.08f, 0.08f, 0.3f);
+                UI.CreateLabel(_previewPanel.Id, 10f, 10f, previewWidth - 20f, 25f, "游戏预览");
+            }
+            
+            if (_assetPanel == null)
+            {
+                _assetPanel = new Panel(rootId, 0, bottomY, LEFT_PANEL_WIDTH, BOTTOM_PANEL_HEIGHT, 0.2f, 0.2f, 0.2f, 1.0f);
+                UI.CreateLabel(_assetPanel.Id, 10f, 10f, LEFT_PANEL_WIDTH - 20f, 25f, "资产管理");
+                var assetList = new VStack(_assetPanel.Id, 5f);
+                assetList.SetPosition(10f, 40f);
+                assetList.AddLabel(LEFT_PANEL_WIDTH - 40f, 20f, "Textures: 0");
+            }
+            
+            if (_propertiesPanel == null)
+            {
+                _propertiesPanel = new Panel(rootId, _screenWidth - RIGHT_PANEL_WIDTH, mainY, RIGHT_PANEL_WIDTH, mainHeight + BOTTOM_PANEL_HEIGHT, 0.2f, 0.2f, 0.2f, 1.0f);
+                UI.CreateLabel(_propertiesPanel.Id, 10f, 10f, RIGHT_PANEL_WIDTH - 20f, 25f, "属性编辑");
+            }
+            
+            Console.WriteLine("[Editor] 主界面显示完成");
+        }
+        
+        private static void HideMainLayout()
+        {
+            Console.WriteLine("[Editor] 隐藏主界面...");
+            
+            if (_previewPanel != null)
+            {
+                UI.RemoveWidget(_previewPanel.Id);
+                _previewPanel = null;
+            }
+            
+            if (_assetPanel != null)
+            {
+                UI.RemoveWidget(_assetPanel.Id);
+                _assetPanel = null;
+            }
+            
+            if (_propertiesPanel != null)
+            {
+                UI.RemoveWidget(_propertiesPanel.Id);
+                _propertiesPanel = null;
+            }
+            
+            if (_toggleEditorBtn != null)
+            {
+                _toggleEditorBtn.Text = "预览";
+            }
+            
+            Console.WriteLine("[Editor] 主界面隐藏完成");
         }
     }
 }
