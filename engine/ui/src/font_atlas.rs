@@ -53,6 +53,18 @@ impl FontAtlas {
         self.fonts.len() - 1
     }
     
+    pub fn get_font_ascent(&self, font_index: usize, font_size: f32) -> f32 {
+        if font_index < self.fonts.len() {
+            if let Some(metrics) = self.fonts[font_index].horizontal_line_metrics(font_size) {
+                metrics.ascent
+            } else {
+                font_size * 0.75
+            }
+        } else {
+            font_size * 0.75
+        }
+    }
+    
     pub fn prerasterize_chars(&mut self, font_index: usize, chars: &str, sizes: &[f32]) {
         if font_index >= self.fonts.len() {
             return;
@@ -227,7 +239,7 @@ impl FontAtlas {
             return Vec::new();
         }
         
-        let max_bearing_y = font_size;
+        let max_bearing_y = self.get_font_ascent(font_index, font_size);
         
         let (_, text_height) = self.measure_text(font_index, text, font_size);
         
@@ -286,7 +298,7 @@ impl FontAtlas {
         
         let (text_width, text_height) = self.measure_text(font_index, text, font_size);
         
-        let max_bearing_y = font_size;
+        let max_bearing_y = self.get_font_ascent(font_index, font_size);
         
         let text_top = container_y + (container_height - text_height) / 2.0;
         let baseline_y = text_top + max_bearing_y;

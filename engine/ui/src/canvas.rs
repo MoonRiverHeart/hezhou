@@ -58,11 +58,7 @@ impl Canvas {
     
     pub fn layout_text_for_cursor_with_wrap(&self, text: &str, font_size: f32, container_x: f32, container_y: f32, wrap_width: Option<f32>) -> Vec<(f32, f32, f32, usize, usize, usize)> {
         if let Some(atlas) = self.get_font_atlas() {
-            let max_bearing_y = text.graphemes(true)
-                .flat_map(|g| g.chars())
-                .filter_map(|c| atlas.get_char_info(self.font_index, c, font_size))
-                .map(|info| info.bearing_y)
-                .fold(0.0f32, f32::max);
+            let max_bearing_y = atlas.get_font_ascent(self.font_index, font_size);
             
             let baseline_y = container_y + max_bearing_y;
             let line_height = font_size * 2.0;
@@ -105,13 +101,9 @@ impl Canvas {
     
     pub fn get_max_bearing_y(&self, text: &str, font_size: f32) -> f32 {
         if let Some(atlas) = self.get_font_atlas() {
-            text.chars()
-                .filter(|c| *c != '\n')
-                .filter_map(|c| atlas.get_char_info(self.font_index, c, font_size))
-                .map(|info| info.bearing_y)
-                .fold(0.0f32, f32::max)
+            atlas.get_font_ascent(self.font_index, font_size)
         } else {
-            0.0
+            font_size * 0.75
         }
     }
 
