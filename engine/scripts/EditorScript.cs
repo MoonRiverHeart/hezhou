@@ -159,10 +159,11 @@ namespace Hezhou
             
             if (_scriptEditorPanel != null && _scriptEditorVisible)
             {
+                float editorWidth = _screenWidth - LEFT_PANEL_WIDTH;
                 float editorHeight = _screenHeight - TOOLBAR_HEIGHT - STATUS_BAR_HEIGHT;
-                UI.SetWidgetLayout(_scriptEditorPanel.Id, 0f, TOOLBAR_HEIGHT, _screenWidth, editorHeight);
+                UI.SetWidgetLayout(_scriptEditorPanel.Id, LEFT_PANEL_WIDTH, TOOLBAR_HEIGHT, editorWidth, editorHeight);
                 if (_scriptTextEditId != 0)
-                    UI.SetWidgetLayout(_scriptTextEditId, 10f, 80f, _screenWidth - 20f, editorHeight - 80f);
+                    UI.SetWidgetLayout(_scriptTextEditId, 10f, 50f, editorWidth - 20f, editorHeight - 50f);
             }
             
             Console.WriteLine("[Editor] 布局更新完成");
@@ -200,18 +201,12 @@ namespace Hezhou
             
             Console.WriteLine("[Editor] ShowScriptEditor开始...");
             
-            // 移除所有可能遮挡的panel
+            // 移除preview相关panel，保留左侧目录树
             if (_previewPanel != null)
             {
                 Console.WriteLine("[Editor] 移除previewPanel...");
                 UI.RemoveWidget(_previewPanel.Id);
                 _previewPanel = null;
-            }
-            if (_projectPanel != null)
-            {
-                Console.WriteLine("[Editor] 移除projectPanel...");
-                UI.RemoveWidget(_projectPanel.Id);
-                _projectPanel = null;
             }
             if (_assetPanel != null)
             {
@@ -228,24 +223,38 @@ namespace Hezhou
             
             ulong rootId = UI.GetRootId();
             
-            // 铺满除toolbar和statusBar外的全部区域
-            float editorX = 0f;
+            // 左侧脚本目录树 (保持projectPanel位置)
+            float leftWidth = LEFT_PANEL_WIDTH;
+            float editorX = LEFT_PANEL_WIDTH;
             float editorY = TOOLBAR_HEIGHT;
-            float editorWidth = _screenWidth;
+            float editorWidth = _screenWidth - LEFT_PANEL_WIDTH;
             float editorHeight = _screenHeight - TOOLBAR_HEIGHT - STATUS_BAR_HEIGHT;
             
-            _scriptEditorPanel = new Panel(rootId, editorX, editorY, editorWidth, editorHeight, 0.1f, 0.1f, 0.12f, 1.0f);
+            // 在projectPanel添加脚本项
+            if (_projectPanel != null)
+            {
+                var scriptsLabel = new Label(_projectPanel.Id, 150f, 25f, "Scripts/");
+                UI.SetWidgetLayout(scriptsLabel.Id, 10f, 40f, 150f, 25f);
+                
+                var newScriptLabel = new Label(_projectPanel.Id, 150f, 25f, "  NewScript.cs");
+                UI.SetWidgetLayout(newScriptLabel.Id, 10f, 70f, 150f, 25f);
+                
+                Console.WriteLine("[Editor] 左侧目录树添加脚本项");
+            }
+            
+            // 右侧编辑区
+            _scriptEditorPanel = new Panel(rootId, editorX, editorY, editorWidth, editorHeight, 0.12f, 0.12f, 0.14f, 1.0f);
             
             var hotReloadBtn = new Button(_scriptEditorPanel.Id, 100f, 30f, "Hot Reload");
             UI.SetWidgetLayout(hotReloadBtn.Id, 10f, 10f, 100f, 30f);
             hotReloadBtn.SetOnClick(OnHotReloadClick);
             
-            _scriptEditorLabel = new Label(_scriptEditorPanel.Id, 200f, 25f, "Script Editor");
-            UI.SetWidgetLayout(_scriptEditorLabel.Id, 10f, 50f, 200f, 25f);
+            _scriptEditorLabel = new Label(_scriptEditorPanel.Id, 200f, 25f, "Script Editor - NewScript.cs");
+            UI.SetWidgetLayout(_scriptEditorLabel.Id, 120f, 10f, 300f, 25f);
             
-            _scriptTextEditId = UI.CreateTextEdit(_scriptEditorPanel.Id, editorWidth - 20f, editorHeight - 80f);
-            UI.SetWidgetLayout(_scriptTextEditId, 10f, 80f, editorWidth - 20f, editorHeight - 80f);
-            UI.TextEditSetText(_scriptTextEditId, "// New Script\nusing System;\n\npublic class NewScript\n{\n    public void Start()\n    {\n        \n    }\n}");
+            _scriptTextEditId = UI.CreateTextEdit(_scriptEditorPanel.Id, editorWidth - 20f, editorHeight - 50f);
+            UI.SetWidgetLayout(_scriptTextEditId, 10f, 50f, editorWidth - 20f, editorHeight - 50f);
+            UI.TextEditSetText(_scriptTextEditId, "// NewScript.cs\nusing System;\nusing Hezhou;\n\npublic class NewScript\n{\n    public void Start()\n    {\n        Console.WriteLine(\"NewScript started!\");\n    }\n    \n    public void Update(float deltaTime)\n    {\n        // Update logic here\n    }\n}");
             
             _scriptEditorVisible = true;
             Console.WriteLine("[Editor] Script Editor显示成功");

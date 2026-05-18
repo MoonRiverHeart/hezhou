@@ -35,7 +35,7 @@ impl TextEdit {
             state: WidgetState::Normal,
             flags: crate::widget::WidgetFlags::default(),
             text: String::new(),
-            text_style: TextStyle::new().with_size(14.0).with_color(Color::white()),
+            text_style: TextStyle::new().with_size(16.0).with_color(Color::new(0.9, 0.9, 0.9, 1.0)),
             cursor_position: 0,
             cursor_visible: true,
             selection_start: 0,
