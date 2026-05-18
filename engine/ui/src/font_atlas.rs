@@ -227,10 +227,7 @@ impl FontAtlas {
             return Vec::new();
         }
         
-        let max_bearing_y = text.chars()
-            .filter_map(|c| self.get_char_info(font_index, c, font_size))
-            .map(|info| info.bearing_y)
-            .fold(0.0f32, f32::max);
+        let max_bearing_y = font_size;
         
         let (_, text_height) = self.measure_text(font_index, text, font_size);
         
@@ -289,10 +286,7 @@ impl FontAtlas {
         
         let (text_width, text_height) = self.measure_text(font_index, text, font_size);
         
-        let max_bearing_y = text.chars()
-            .filter_map(|c| self.get_char_info(font_index, c, font_size))
-            .map(|info| info.bearing_y)
-            .fold(0.0f32, f32::max);
+        let max_bearing_y = font_size;
         
         let text_top = container_y + (container_height - text_height) / 2.0;
         let baseline_y = text_top + max_bearing_y;
