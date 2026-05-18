@@ -1,5 +1,8 @@
 using System;
 using System.Runtime.InteropServices;
+using System.IO;
+using System.Diagnostics;
+using System.Collections.Generic;
 
 namespace Hezhou
 {
@@ -29,6 +32,11 @@ namespace Hezhou
         
         private static float _screenWidth = 1280f;
         private static float _screenHeight = 720f;
+        private static float _contentScale = 1.0f;
+        
+        private static string _currentDirectory = "scripts";
+        private static Dictionary<ulong, string> _fileItemPaths = new Dictionary<ulong, string>();
+        private static Dictionary<ulong, string> _dirItemPaths = new Dictionary<ulong, string>();
 
         private const float TOOLBAR_HEIGHT = 40f;
         private const float STATUS_BAR_HEIGHT = 40f;
@@ -44,8 +52,9 @@ namespace Hezhou
             
             UI.InitFromContext(contextPtr);
             UI.GetScreenSize(out _screenWidth, out _screenHeight);
+            _contentScale = UI.GetContentScale();
             
-            Console.WriteLine($"[Editor] 屏幕尺寸: {_screenWidth}x{_screenHeight}");
+            Console.WriteLine($"[Editor] 屏幕尺寸: {_screenWidth}x{_screenHeight}, DPI缩放: {_contentScale}");
             
             _updateCallback = Update;
             UI.RegisterUpdateCallback(_updateCallback);
@@ -242,24 +251,9 @@ namespace Hezhou
             float editorWidth = _screenWidth - LEFT_PANEL_WIDTH;
             float editorHeight = _screenHeight - TOOLBAR_HEIGHT - STATUS_BAR_HEIGHT;
             
-            // 在projectPanel添加脚本项
-            if (_projectPanel != null)
-            {
-                // 移除旧的projectTree（如果有）
-                if (_projectTree != null)
-                {
-                    UI.RemoveWidget(_projectTree.Id);
-                }
-                
-                // 重新创建projectTree以清空原有内容
-                _projectTree = new VStack(_projectPanel.Id, 5f);
-                _projectTree.SetPosition(10f, 40f);
-                
-                _projectTree.AddLabel(LEFT_PANEL_WIDTH - 40f, 20f, "Scripts/");
-                _projectTree.AddLabel(LEFT_PANEL_WIDTH - 40f, 20f, "  NewScript.cs");
-                
-                Console.WriteLine("[Editor] 左侧目录树添加脚本项");
-            }
+            // 刷新目录树显示实际文件系统
+            RefreshDirectoryTree();
+            Console.WriteLine("[Editor] 左侧目录树已刷新");
             
             // 右侧编辑区
             _scriptEditorPanel = new Panel(rootId, editorX, editorY, editorWidth, editorHeight, 0.12f, 0.12f, 0.14f, 1.0f);
@@ -551,6 +545,134 @@ private static void ShowDropdownMenu(float x, float y, string[] items, UI.Widget
             }
             
             Console.WriteLine("[Editor] 主界面隐藏完成");
+        }
+        
+        private static void OpenInExplorer(ulong widgetId)
+        {
+            Console.WriteLine("[Editor] 打开文件管理器...");
+            try
+            {
+                Process.Start("explorer.exe", _currentDirectory);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[Editor] ERROR: {ex.Message}");
+            }
+        }
+        
+        private static void RefreshDirectoryTree()
+        {
+            if (_projectPanel == null) return;
+            
+            if (_projectTree != null)
+            {
+                UI.RemoveWidget(_projectTree.Id);
+            }
+            
+            _fileItemPaths.Clear();
+            _dirItemPaths.Clear();
+            
+            _projectTree = new VStack(_projectPanel.Id, 5f);
+            _projectTree.SetPosition(10f, 40f);
+            
+            var openBtn = _projectTree.AddButton(LEFT_PANEL_WIDTH - 40f, 20f, "📂 打开目录");
+            UI.SetOnClick(openBtn, OpenInExplorer);
+            
+            try
+            {
+                if (Directory.Exists(_currentDirectory))
+                {
+                    AddDirectoryItems(_projectTree, _currentDirectory, 0);
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[Editor] ERROR reading directory: {ex.Message}");
+            }
+            
+            Console.WriteLine("[Editor] 目录树刷新完成");
+        }
+        
+        private static void AddDirectoryItems(VStack stack, string path, int depth)
+        {
+            string prefix = new string(' ', depth * 2);
+            
+            try
+            {
+                string[] dirs = Directory.GetDirectories(path);
+                foreach (string dir in dirs)
+                {
+                    string name = Path.GetFileName(dir);
+                    ulong btnId = stack.AddButton(LEFT_PANEL_WIDTH - 40f, 20f, $"{prefix}📁 {name}/");
+                    _dirItemPaths[btnId] = dir;
+                    UI.SetOnClick(btnId, OnDirectoryClick);
+                }
+                
+                string[] files = Directory.GetFiles(path);
+                foreach (string file in files)
+                {
+                    if (file.EndsWith(".cs") || file.EndsWith(".txt") || file.EndsWith(".json"))
+                    {
+                        string name = Path.GetFileName(file);
+                        ulong btnId = stack.AddButton(LEFT_PANEL_WIDTH - 40f, 20f, $"{prefix}📄 {name}");
+                        _fileItemPaths[btnId] = file;
+                        UI.SetOnClick(btnId, OnFileClick);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[Editor] ERROR: {ex.Message}");
+            }
+        }
+        
+        private static void OnDirectoryClick(ulong widgetId)
+        {
+            if (_dirItemPaths.TryGetValue(widgetId, out string path))
+            {
+                _currentDirectory = path;
+                RefreshDirectoryTree();
+                Console.WriteLine($"[Editor] 进入目录: {path}");
+            }
+        }
+        
+        private static void OnFileClick(ulong widgetId)
+        {
+            if (_fileItemPaths.TryGetValue(widgetId, out string path))
+            {
+                Console.WriteLine($"[Editor] 点击文件: {path}");
+                LoadFileToEditor(path);
+            }
+        }
+        
+        private static void LoadFileToEditor(string filePath)
+        {
+            try
+            {
+                string content = File.ReadAllText(filePath);
+                string fileName = Path.GetFileName(filePath);
+                
+                if (!_scriptEditorVisible)
+                {
+                    HideMainLayout();
+                    ShowScriptEditor();
+                }
+                
+                if (_scriptTextEditId != 0)
+                {
+                    UI.TextEditSetText(_scriptTextEditId, content);
+                    Console.WriteLine($"[Editor] 文件已加载: {fileName} ({content.Length} chars)");
+                    
+                    if (_scriptEditorLabel != null)
+                    {
+                        _scriptEditorLabel.Text = $"Script Editor - {fileName}";
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[Editor] ERROR loading file: {ex.Message}");
+            }
         }
     }
 }
