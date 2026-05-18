@@ -159,10 +159,10 @@ namespace Hezhou
             
             if (_scriptEditorPanel != null && _scriptEditorVisible)
             {
-                float scriptEditorHeight = _screenHeight - TOOLBAR_HEIGHT - STATUS_BAR_HEIGHT - BOTTOM_PANEL_HEIGHT;
-                UI.SetWidgetLayout(_scriptEditorPanel.Id, previewX, mainY, previewWidth, scriptEditorHeight);
+                float editorHeight = _screenHeight - TOOLBAR_HEIGHT - STATUS_BAR_HEIGHT;
+                UI.SetWidgetLayout(_scriptEditorPanel.Id, 0f, TOOLBAR_HEIGHT, _screenWidth, editorHeight);
                 if (_scriptTextEditId != 0)
-                    UI.SetWidgetLayout(_scriptTextEditId, 10f, 80f, previewWidth - 20f, scriptEditorHeight - 80f);
+                    UI.SetWidgetLayout(_scriptTextEditId, 10f, 80f, _screenWidth - 20f, editorHeight - 80f);
             }
             
             Console.WriteLine("[Editor] 布局更新完成");
@@ -200,20 +200,41 @@ namespace Hezhou
             
             Console.WriteLine("[Editor] ShowScriptEditor开始...");
             
+            // 移除所有可能遮挡的panel
             if (_previewPanel != null)
             {
                 Console.WriteLine("[Editor] 移除previewPanel...");
                 UI.RemoveWidget(_previewPanel.Id);
                 _previewPanel = null;
             }
+            if (_projectPanel != null)
+            {
+                Console.WriteLine("[Editor] 移除projectPanel...");
+                UI.RemoveWidget(_projectPanel.Id);
+                _projectPanel = null;
+            }
+            if (_assetPanel != null)
+            {
+                Console.WriteLine("[Editor] 移除assetPanel...");
+                UI.RemoveWidget(_assetPanel.Id);
+                _assetPanel = null;
+            }
+            if (_propertiesPanel != null)
+            {
+                Console.WriteLine("[Editor] 移除propertiesPanel...");
+                UI.RemoveWidget(_propertiesPanel.Id);
+                _propertiesPanel = null;
+            }
             
             ulong rootId = UI.GetRootId();
-            float previewX = LEFT_PANEL_WIDTH;
-            float previewWidth = _screenWidth - LEFT_PANEL_WIDTH - RIGHT_PANEL_WIDTH;
-            float previewY = TOOLBAR_HEIGHT;
-            float previewHeight = _screenHeight - TOOLBAR_HEIGHT - STATUS_BAR_HEIGHT - BOTTOM_PANEL_HEIGHT;
             
-            _scriptEditorPanel = new Panel(rootId, previewX, previewY, previewWidth, previewHeight, 0.1f, 0.1f, 0.12f, 1.0f);
+            // 铺满除toolbar和statusBar外的全部区域
+            float editorX = 0f;
+            float editorY = TOOLBAR_HEIGHT;
+            float editorWidth = _screenWidth;
+            float editorHeight = _screenHeight - TOOLBAR_HEIGHT - STATUS_BAR_HEIGHT;
+            
+            _scriptEditorPanel = new Panel(rootId, editorX, editorY, editorWidth, editorHeight, 0.1f, 0.1f, 0.12f, 1.0f);
             
             var hotReloadBtn = new Button(_scriptEditorPanel.Id, 100f, 30f, "Hot Reload");
             UI.SetWidgetLayout(hotReloadBtn.Id, 10f, 10f, 100f, 30f);
@@ -222,8 +243,8 @@ namespace Hezhou
             _scriptEditorLabel = new Label(_scriptEditorPanel.Id, 200f, 25f, "Script Editor");
             UI.SetWidgetLayout(_scriptEditorLabel.Id, 10f, 50f, 200f, 25f);
             
-            _scriptTextEditId = UI.CreateTextEdit(_scriptEditorPanel.Id, previewWidth - 20f, previewHeight - 80f);
-            UI.SetWidgetLayout(_scriptTextEditId, 10f, 80f, previewWidth - 20f, previewHeight - 80f);
+            _scriptTextEditId = UI.CreateTextEdit(_scriptEditorPanel.Id, editorWidth - 20f, editorHeight - 80f);
+            UI.SetWidgetLayout(_scriptTextEditId, 10f, 80f, editorWidth - 20f, editorHeight - 80f);
             UI.TextEditSetText(_scriptTextEditId, "// New Script\nusing System;\n\npublic class NewScript\n{\n    public void Start()\n    {\n        \n    }\n}");
             
             _scriptEditorVisible = true;
