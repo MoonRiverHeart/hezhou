@@ -265,6 +265,8 @@ impl TextEdit {
     fn find_cursor_position_at(&self, click_x: f32, click_y: f32) -> usize {
         println!("[Click] Finding cursor position at ({}, {})", click_x, click_y);
         
+        let num_graphemes = self.text.graphemes(true).count();
+        
         if !self.char_layouts.is_empty() {
             println!("[Click] Using precise char_layouts ({} graphemes)", self.char_layouts.len());
             
@@ -284,9 +286,6 @@ impl TextEdit {
                 let line_center_y = (cursor_draw_y + cursor_draw_y_end) / 2.0;
                 let y_distance = (click_y - line_center_y).abs();
                 
-                println!("[Click] grapheme {}: baseline_y={}, cursor_draw_y={} to {}, center_y={}, y_distance={}", 
-                         layout.grapheme_index, layout.y, cursor_draw_y, cursor_draw_y_end, line_center_y, y_distance);
-                
                 if y_distance < min_y_distance {
                     min_y_distance = y_distance;
                     closest_line_y = layout.y;
@@ -299,9 +298,6 @@ impl TextEdit {
                 if layout.y == closest_line_y {
                     let grapheme_center_x = layout.x + layout.width / 2.0;
                     
-                    println!("[Click] grapheme {}: x={}, width={}, center_x={}", 
-                             layout.grapheme_index, layout.x, layout.width, grapheme_center_x);
-                    
                     let x_distance = (click_x - grapheme_center_x).abs();
                     
                     if x_distance < best_distance {
@@ -313,10 +309,12 @@ impl TextEdit {
                             best_grapheme_idx = layout.grapheme_index + 1;
                             best_byte_idx = layout.grapheme_end_byte;
                         }
-                        println!("[Click]   -> x_distance={}, best_grapheme_idx={}", x_distance, best_grapheme_idx);
                     }
                 }
             }
+            
+            // 确保不超过文本长度
+            best_grapheme_idx = best_grapheme_idx.min(num_graphemes);
             
             println!("[Click] Final grapheme_index={}, byte_index={}", best_grapheme_idx, best_byte_idx);
             return best_grapheme_idx;
@@ -403,11 +401,11 @@ impl Widget for TextEdit {
         
         // 渲染选择高亮（在文本之前）
         if self.selection_start != self.selection_end && !self.char_layouts.is_empty() {
-            let start = self.selection_start.min(self.selection_end);
-            let end = self.selection_start.max(self.selection_end);
+            let num_graphemes = self.text.graphemes(true).count();
+            let start = self.selection_start.min(self.selection_end).min(num_graphemes);
+            let end = self.selection_start.max(self.selection_end).min(num_graphemes);
             let max_bearing_y = self.cached_max_bearing_y;
             
-            // 找到选择范围的grapheme，绘制高亮矩形
             for layout in &self.char_layouts {
                 if layout.grapheme_index >= start && layout.grapheme_index < end {
                     let highlight_y = layout.y - max_bearing_y;
@@ -557,12 +555,13 @@ impl Widget for TextEdit {
                     let shift_pressed = touch_data.modifiers & 1 != 0;
                     println!("[Click] Click at ({}, {}), shift={}", click_x, click_y, shift_pressed);
                     
-                    let new_grapheme_idx = self.find_cursor_position_at(click_x, click_y);
+                    let num_graphemes = self.text.graphemes(true).count();
+                    let new_grapheme_idx = self.find_cursor_position_at(click_x, click_y).min(num_graphemes);
                     let new_byte_idx = self.grapheme_index_to_byte_index(new_grapheme_idx);
                     
                     if shift_pressed {
                         if self.selection_start == self.selection_end {
-                            self.selection_start = self.cursor_grapheme_index;
+                            self.selection_start = self.cursor_grapheme_index.min(num_graphemes);
                             self.selection_end = new_grapheme_idx;
                         } else {
                             self.selection_end = new_grapheme_idx;
@@ -588,7 +587,8 @@ impl Widget for TextEdit {
                         let click_x = touch_data.x;
                         let click_y = touch_data.y;
                         
-                        let new_grapheme_idx = self.find_cursor_position_at(click_x, click_y);
+                        let num_graphemes = self.text.graphemes(true).count();
+                        let new_grapheme_idx = self.find_cursor_position_at(click_x, click_y).min(num_graphemes);
                         let new_byte_idx = self.grapheme_index_to_byte_index(new_grapheme_idx);
                         
                         self.selection_end = new_grapheme_idx;
