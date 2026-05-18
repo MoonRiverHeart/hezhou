@@ -469,11 +469,15 @@ impl Widget for TextEdit {
             
             // 只在布局 dirty 时重新计算
             if self.layout_dirty || self.char_layouts.is_empty() {
-                let char_positions = canvas.layout_text_for_cursor(
+                // 使用自动换行（容器宽度 - 20px 边距）
+                let wrap_width = Some(self.layout.width - 20.0);
+                
+                let char_positions = canvas.layout_text_for_cursor_with_wrap(
                     &self.text,
                     font_size,
                     text_start_x,
                     text_start_y,
+                    wrap_width,
                 );
                 
                 let max_bearing_y = canvas.get_max_bearing_y(&self.text, font_size);
@@ -525,12 +529,14 @@ impl Widget for TextEdit {
                 let text_start_x = 10.0;
                 let text_start_y = 10.0;
                 let font_size = self.text_style.font_size * 2.0;
+                let wrap_width = Some(self.layout.width - 20.0);
                 
-                let char_positions = canvas.layout_text_for_cursor(
+                let char_positions = canvas.layout_text_for_cursor_with_wrap(
                     &self.text,
                     font_size,
                     text_start_x,
                     text_start_y,
+                    wrap_width,
                 );
                 
                 let max_bearing_y = canvas.get_max_bearing_y(&self.text, font_size);
