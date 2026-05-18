@@ -50,22 +50,51 @@ impl Canvas {
         self.font_atlas_ptr.map(|ptr| unsafe { &*ptr })
     }
     
-    pub fn layout_text_for_cursor(&self, text: &str, font_size: f32, container_x: f32, container_y: f32) -> Vec<(f32, f32, usize, usize)> {
+    pub fn layout_text_for_cursor(&self, text: &str, font_size: f32, container_x: f32, container_y: f32) -> Vec<(f32, f32, f32, usize, usize)> {
         if let Some(atlas) = self.get_font_atlas() {
-            let layouts = atlas.layout_text_left(self.font_index, text, font_size, container_x, container_y, font_size * 1.5);
+            // 计算 max_bearing_y 和 baseline_y
+            let max_bearing_y = text.chars()
+                .filter(|c| *c != '\n')
+                .filter_map(|c| atlas.get_char_info(self.font_index, c, font_size))
+                .map(|info| info.bearing_y)
+                .fold(0.0f32, f32::max);
             
-            text.char_indices().enumerate().map(|(char_idx, (byte_idx, c))| {
+            let baseline_y = container_y + max_bearing_y;
+            let line_height = font_size * 1.5;
+            
+            let mut cursor_x = container_x;
+            let mut cursor_y = baseline_y;
+            let mut results = Vec::new();
+            
+            for (char_idx, (byte_idx, c)) in text.char_indices().enumerate() {
                 if c == '\n' {
-                    (0.0, 0.0, char_idx, byte_idx)
-                } else if char_idx < layouts.len() {
-                    let (x, y, _, _, _, _, _, _) = layouts[char_idx];
-                    (x, y, char_idx, byte_idx)
-                } else {
-                    (0.0, 0.0, char_idx, byte_idx)
+                    cursor_x = container_x;
+                    cursor_y += line_height;
+                    continue;
                 }
-            }).collect()
+                
+                if let Some(info) = atlas.get_char_info(self.font_index, c, font_size) {
+                    // 光标需要的是字符的 x 位置和该行的 baseline_y
+                    results.push((cursor_x, cursor_y, info.advance_x, char_idx, byte_idx));
+                    cursor_x += info.advance_x;
+                }
+            }
+            
+            results
         } else {
             Vec::new()
+        }
+    }
+    
+    pub fn get_max_bearing_y(&self, text: &str, font_size: f32) -> f32 {
+        if let Some(atlas) = self.get_font_atlas() {
+            text.chars()
+                .filter(|c| *c != '\n')
+                .filter_map(|c| atlas.get_char_info(self.font_index, c, font_size))
+                .map(|info| info.bearing_y)
+                .fold(0.0f32, f32::max)
+        } else {
+            0.0
         }
     }
 
