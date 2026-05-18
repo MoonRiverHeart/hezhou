@@ -172,9 +172,22 @@ impl Widget for TextEdit {
         }
         
         if self.focused && self.cursor_visible {
-            let cursor_x = 10.0 + self.cursor_position as f32 * 8.0;
+            // 计算光标位置：前面所有字符的总宽度
+            let text_before_cursor = if self.cursor_position <= self.text.len() {
+                &self.text[..self.cursor_position]
+            } else {
+                &self.text
+            };
+            
+            // 简化版：每个字符约8px（实际应该用font_atlas测量）
+            let cursor_x = 10.0 + text_before_cursor.len() as f32 * 8.0;
+            
+            // 光标高度使用字体高度
+            let cursor_height = self.text_style.font_size * 1.2;
+            let cursor_y = 10.0;
+            
             canvas.draw_rect(
-                Rect::new(cursor_x, 10.0, 2.0, height - 20.0),
+                Rect::new(cursor_x, cursor_y, 2.0, cursor_height),
                 &Style::new().with_background(Color::white()),
             );
         }
@@ -202,9 +215,31 @@ impl Widget for TextEdit {
     fn on_event(&mut self, event: &Event) -> EventResult {
         match event.event_type {
             EventType::TouchBegin => {
-                println!("[TextEdit] TouchBegin received, setting focused=true");
+                println!("[TextEdit] TouchBegin received");
                 self.focused = true;
                 self.cursor_visible = true;
+                
+                // 根据点击位置计算cursor_position
+                if let EventData::Touch(touch_data) = &event.data {
+                    let click_x = touch_data.x;
+                    println!("[TextEdit] Click at x={}", click_x);
+                    
+                    // 点击相对于TextEdit的位置（TextEdit本身从(0,0)开始，文本从(10,10)开始）
+                    let text_start_x = 10.0;
+                    let relative_x = click_x - text_start_x;
+                    
+                    // 计算点击位置应该在哪个字符
+                    // 简化版：假设每个字符约8px宽度（实际应该用font_atlas）
+                    if relative_x <= 0.0 {
+                        self.cursor_position = 0;
+                    } else {
+                        // 估算位置（每个字符约8px）
+                        let estimated_pos = (relative_x / 8.0) as usize;
+                        self.cursor_position = estimated_pos.min(self.text.len());
+                    }
+                    println!("[TextEdit] cursor_position set to {}", self.cursor_position);
+                }
+                
                 self.flags.dirty_render = true;
                 return EventResult::Handled;
             }
