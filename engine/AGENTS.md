@@ -141,3 +141,40 @@ cargo run --bin mono_editor_demo --features mono --release
 cd engine/examples
 cargo run --bin rotation_demo --features native-aot
 ```
+
+## TextEdit Widget
+
+### Coordinate System
+- **Window coordinates** → `event_dispatcher` converts to **Widget relative coordinates**
+- TextEdit receives widget-relative coordinates from events
+
+### Text Rendering vs Cursor Positioning
+- `font_atlas.rs`: `layout_text_left` returns `char_y = baseline_y - info.bearing_y` (per-character bearing)
+- `canvas.rs`: `layout_text_for_cursor_with_wrap` returns unified `baseline_y` for all characters in a line
+- `max_bearing_y`: Maximum bearing_y across all characters in text, used for unified baseline
+
+### Key Formula
+- `baseline_y = container_y + max_bearing_y`
+- `cursor_draw_y = baseline_y - max_bearing_y` (matches text render start y)
+- `line_height = font_size * 2.0` (must be consistent across font_atlas.rs and canvas.rs)
+
+### Click Position Calculation
+- Find closest line by comparing `click_y` against `cursor_draw_y` (not baseline_y)
+- Line center y = `(baseline_y - max_bearing_y + font_size) / 2`
+- Then find closest grapheme by x-coordinate within that line
+
+### Common Issues
+1. **Cursor/Click position mismatch**: Ensure `line_height` is consistent (`font_size * 2.0`)
+2. **Second line cursor offset**: Use `baseline_y - max_bearing_y` for comparison, not raw baseline_y
+3. **Selection highlight offset**: Highlight rect y should be `baseline_y - max_bearing_y`
+4. **Ctrl+C/V not working**: GLFW `mods` parameter must be parsed and passed to `KeyModifiers`
+
+### Mouse Selection
+- `TouchBegin`: Set selection_start = current cursor position
+- `TouchMove`: Update selection_end and cursor position
+- `TouchEnd`: Finalize selection
+
+### Keyboard Modifiers
+- GLFW backend: Parse `glfw::Modifiers` to set `KeyModifiers.shift/ctrl/alt`
+- UIInputHandler: Track Shift/Ctrl state via separate KeyEvents
+- TouchData modifiers: bit 0 = Shift, bit 1 = Ctrl, bit 2 = Alt

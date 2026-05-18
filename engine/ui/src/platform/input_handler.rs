@@ -124,23 +124,30 @@ impl UIInputHandler {
 
         match mouse.action {
             MouseAction::Press => {
+                self.touch_active = true;
                 let mut event = Event::new(EventType::TouchBegin, timestamp)
                     .with_data(EventData::Touch(TouchData::new(x, y, 0).with_modifiers(modifiers)));
 
                 self.event_dispatcher.lock().dispatch_event(&mut event);
             }
             MouseAction::Release => {
+                self.touch_active = false;
                 let mut event = Event::new(EventType::TouchEnd, timestamp)
                     .with_data(EventData::Touch(TouchData::new(x, y, 0)));
 
                 self.event_dispatcher.lock().dispatch_event(&mut event);
             }
             MouseAction::Move => {
-                let mut event = Event::new(EventType::MouseEnter, timestamp).with_data(
-                    EventData::Mouse(MouseData::new(x, y, ui_button)),
-                );
-
-                self.event_dispatcher.lock().dispatch_event(&mut event);
+                if self.touch_active {
+                    let mut event = Event::new(EventType::TouchMove, timestamp)
+                        .with_data(EventData::Touch(TouchData::new(x, y, 0)));
+                    self.event_dispatcher.lock().dispatch_event(&mut event);
+                } else {
+                    let mut event = Event::new(EventType::MouseMove, timestamp).with_data(
+                        EventData::Mouse(MouseData::new(x, y, ui_button)),
+                    );
+                    self.event_dispatcher.lock().dispatch_event(&mut event);
+                }
             }
             MouseAction::Scroll => {
             }

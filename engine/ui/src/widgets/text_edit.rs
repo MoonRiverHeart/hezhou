@@ -21,16 +21,16 @@ pub struct TextEdit {
     flags: crate::widget::WidgetFlags,
     text: String,
     text_style: TextStyle,
-    cursor_grapheme_index: usize,  // 光标在grapheme cluster的位置
-    cursor_byte_index: usize,      // 光标对应的byte位置（用于插入/删除）
+    cursor_grapheme_index: usize,
+    cursor_byte_index: usize,
     cursor_visible: bool,
     selection_start: usize,
     selection_end: usize,
     focused: bool,
     char_layouts: Vec<CharLayout>,
     layout_dirty: bool,
-    cached_max_bearing_y: f32,
     cached_line_height: f32,
+    cached_max_bearing_y: f32,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -66,8 +66,8 @@ impl TextEdit {
             focused: false,
             char_layouts: Vec::new(),
             layout_dirty: true,
-            cached_max_bearing_y: 0.0,
             cached_line_height: 0.0,
+            cached_max_bearing_y: 0.0,
         }
     }
     
@@ -268,26 +268,33 @@ impl TextEdit {
         if !self.char_layouts.is_empty() {
             println!("[Click] Using precise char_layouts ({} graphemes)", self.char_layouts.len());
             
+            let max_bearing_y = self.cached_max_bearing_y;
+            let font_size = self.text_style.font_size * 2.0;
+            
             let mut best_grapheme_idx = 0;
             let mut best_byte_idx = 0;
             let mut best_distance = f32::MAX;
             
-            // 首先找到最近的行（通过 Y 坐标）
             let mut closest_line_y = 0.0;
             let mut min_y_distance = f32::MAX;
             
             for layout in &self.char_layouts {
-                let line_y = layout.y;
-                let y_distance = (click_y - line_y).abs();
+                let cursor_draw_y = layout.y - max_bearing_y;
+                let cursor_draw_y_end = cursor_draw_y + font_size;
+                let line_center_y = (cursor_draw_y + cursor_draw_y_end) / 2.0;
+                let y_distance = (click_y - line_center_y).abs();
+                
+                println!("[Click] grapheme {}: baseline_y={}, cursor_draw_y={} to {}, center_y={}, y_distance={}", 
+                         layout.grapheme_index, layout.y, cursor_draw_y, cursor_draw_y_end, line_center_y, y_distance);
+                
                 if y_distance < min_y_distance {
                     min_y_distance = y_distance;
-                    closest_line_y = line_y;
+                    closest_line_y = layout.y;
                 }
             }
             
-            println!("[Click] Closest line_y: {}", closest_line_y);
+            println!("[Click] Closest baseline_y: {}", closest_line_y);
             
-            // 然后在该行中找到最近的grapheme（通过 X 坐标）
             for layout in &self.char_layouts {
                 if layout.y == closest_line_y {
                     let grapheme_center_x = layout.x + layout.width / 2.0;
@@ -312,7 +319,7 @@ impl TextEdit {
             }
             
             println!("[Click] Final grapheme_index={}, byte_index={}", best_grapheme_idx, best_byte_idx);
-            return best_grapheme_idx;  // 返回grapheme索引
+            return best_grapheme_idx;
         }
         
         println!("[Click] No char_layouts, returning 0");
@@ -398,12 +405,14 @@ impl Widget for TextEdit {
         if self.selection_start != self.selection_end && !self.char_layouts.is_empty() {
             let start = self.selection_start.min(self.selection_end);
             let end = self.selection_start.max(self.selection_end);
+            let max_bearing_y = self.cached_max_bearing_y;
             
             // 找到选择范围的grapheme，绘制高亮矩形
             for layout in &self.char_layouts {
                 if layout.grapheme_index >= start && layout.grapheme_index < end {
+                    let highlight_y = layout.y - max_bearing_y;
                     canvas.draw_rect(
-                        Rect::new(layout.x, layout.y, layout.width, layout.height),
+                        Rect::new(layout.x, highlight_y, layout.width, layout.height),
                         &Style::new().with_background(Color::new(0.3, 0.5, 0.8, 0.3)),
                     );
                 }
@@ -423,7 +432,6 @@ impl Widget for TextEdit {
             let text_start_y = 10.0;
             let font_size = self.text_style.font_size * 2.0;
             
-            // 只在布局 dirty 时重新计算
             if self.layout_dirty || self.char_layouts.is_empty() {
                 let wrap_width = Some(self.layout.width - 20.0);
                 
@@ -440,7 +448,7 @@ impl Widget for TextEdit {
                 self.char_layouts = char_positions.iter().map(|(x, baseline_y, width, grapheme_idx, start_byte, end_byte)| {
                     CharLayout {
                         x: *x,
-                        y: *baseline_y - max_bearing_y,
+                        y: *baseline_y,
                         width: *width,
                         height: font_size,
                         grapheme_index: *grapheme_idx,
@@ -450,16 +458,17 @@ impl Widget for TextEdit {
                 }).collect();
                 
                 self.cached_max_bearing_y = max_bearing_y;
-                self.cached_line_height = font_size * 1.5;
+                self.cached_line_height = font_size * 2.0;
                 self.layout_dirty = false;
             }
             
-            // 计算光标位置
+            let max_bearing_y = self.cached_max_bearing_y;
+            
             let (cursor_x, cursor_y) = if self.cursor_grapheme_index == 0 {
-                (text_start_x, text_start_y)
+                (text_start_x, text_start_y + max_bearing_y)
             } else {
                 let mut found_x = text_start_x;
-                let mut found_y = text_start_y;
+                let mut found_y = text_start_y + max_bearing_y;
                 
                 for layout in &self.char_layouts {
                     if layout.grapheme_index < self.cursor_grapheme_index {
@@ -473,14 +482,11 @@ impl Widget for TextEdit {
                 (found_x, found_y)
             };
             
-            let cursor_height = font_size * 0.75;
-            
             canvas.draw_rect(
-                Rect::new(cursor_x, cursor_y, 2.0, cursor_height),
+                Rect::new(cursor_x, cursor_y - max_bearing_y, 2.0, font_size),
                 &Style::new().with_background(Color::white()),
             );
         } else {
-            // 即使不显示光标，也需要更新布局（如果 dirty）
             if self.layout_dirty && canvas.get_font_atlas().is_some() && !self.text.is_empty() {
                 let text_start_x = 10.0;
                 let text_start_y = 10.0;
@@ -500,7 +506,7 @@ impl Widget for TextEdit {
                 self.char_layouts = char_positions.iter().map(|(x, baseline_y, width, grapheme_idx, start_byte, end_byte)| {
                     CharLayout {
                         x: *x,
-                        y: *baseline_y - max_bearing_y,
+                        y: *baseline_y,
                         width: *width,
                         height: font_size,
                         grapheme_index: *grapheme_idx,
@@ -510,7 +516,7 @@ impl Widget for TextEdit {
                 }).collect();
                 
                 self.cached_max_bearing_y = max_bearing_y;
-                self.cached_line_height = font_size * 1.5;
+                self.cached_line_height = font_size * 2.0;
                 self.layout_dirty = false;
             }
         }
@@ -563,8 +569,8 @@ impl Widget for TextEdit {
                         }
                         println!("[TextEdit] Selection: {} to {}", self.selection_start, self.selection_end);
                     } else {
-                        self.selection_start = 0;
-                        self.selection_end = 0;
+                        self.selection_start = new_grapheme_idx;
+                        self.selection_end = new_grapheme_idx;
                         self.cursor_grapheme_index = new_grapheme_idx;
                         self.cursor_byte_index = new_byte_idx;
                     }
@@ -575,6 +581,30 @@ impl Widget for TextEdit {
                 
                 self.flags.dirty_render = true;
                 return EventResult::Handled;
+            }
+            EventType::TouchMove => {
+                if self.focused {
+                    if let EventData::Touch(touch_data) = &event.data {
+                        let click_x = touch_data.x;
+                        let click_y = touch_data.y;
+                        
+                        let new_grapheme_idx = self.find_cursor_position_at(click_x, click_y);
+                        let new_byte_idx = self.grapheme_index_to_byte_index(new_grapheme_idx);
+                        
+                        self.selection_end = new_grapheme_idx;
+                        self.cursor_grapheme_index = new_grapheme_idx;
+                        self.cursor_byte_index = new_byte_idx;
+                        
+                        println!("[Drag] Selection: {} to {}", self.selection_start, self.selection_end);
+                        self.flags.dirty_render = true;
+                        return EventResult::Handled;
+                    }
+                }
+            }
+            EventType::TouchEnd => {
+                if self.focused {
+                    println!("[TextEdit] TouchEnd, finalizing selection");
+                }
             }
             EventType::KeyDown => {
                 println!("[TextEdit] KeyDown received, focused={}", self.focused);

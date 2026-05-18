@@ -4,7 +4,7 @@ use ash::khr::swapchain::Device as SwapchainLoader;
 use glfw::{Glfw, PWindow, GlfwReceiver, WindowEvent, WindowMode, Action, Key};
 use std::ffi::CString;
 use std::collections::HashMap;
-use hezhou_ui::{UISystem, UIInputHandler, Panel, Button, Label, Layout, DrawCommand, Widget, Style, Color, TextStyle, ffi::WidgetTreeHandle, ffi::ui_set_primary_button_id};
+use hezhou_ui::{UISystem, UIInputHandler, Panel, Button, Label, TextEdit, Layout, DrawCommand, Widget, Style, Color, TextStyle, ffi::WidgetTreeHandle, ffi::ui_set_primary_button_id};
 use hezhou_platform::{MouseAction, MouseEvent, MouseButton, CharEvent, KeyEvent, KeyAction, KeyCode, KeyModifiers};
 use hezhou_dfx::{DfxSystem, LogLevel};
 use parking_lot::Mutex;
@@ -94,6 +94,7 @@ pub struct UIVulkanRenderer {
     swapchain_format: vk::Format,
     physical_device: vk::PhysicalDevice,
     triangle_angle: f32,
+    last_frame_time: f64,
 }
 
 impl UIVulkanRenderer {
@@ -573,6 +574,7 @@ impl UIVulkanRenderer {
                 swapchain_format: format,
                 physical_device,
                 triangle_angle: 0.0,
+                last_frame_time: 0.0,
             })
         }
     }
@@ -735,6 +737,11 @@ pub fn setup_ui(&mut self) {
             let mut label = Label::new("Welcome to Hezhou UI!");
             label.set_text_style(TextStyle::new().with_size(16.0).with_color(Color::white()));
             tree_guard.add_widget(Box::new(label), vstack_id);
+            
+            let mut text_edit = TextEdit::new();
+            text_edit.set_text("Type here...");
+            text_edit.set_layout(Layout::new(0.0, 0.0, 200.0, 40.0));
+            tree_guard.add_widget(Box::new(text_edit), vstack_id);
             
             let mut hint_label = Label::new("Press SPACE to change text");
             hint_label.set_text_style(TextStyle::new().with_size(16.0).with_color(Color::new(1.0, 1.0, 0.0, 1.0)));
@@ -1070,6 +1077,16 @@ let font_atlas = ui.get_font_atlas();
             return Ok(false);
         }
         
+        let current_time = self.glfw.get_time();
+        let delta_time = if self.last_frame_time > 0.0 {
+            (current_time - self.last_frame_time) as f32 * 1000.0
+        } else {
+            16.0
+        };
+        self.last_frame_time = current_time;
+        
+        hezhou_ui::ffi::ui_trigger_update(delta_time);
+        
         if self.needs_resize {
             unsafe {
                 self.recreate_swapchain()?;
@@ -1276,6 +1293,7 @@ DrawCommand::Text { bounds, width, height, font_color, text, text_len, font_size
                             let font_atlas = ui_lock.get_font_atlas();
                             
                             let glyphs = if alignment.horizontal == hezhou_ui::HorizontalAlignment::Left {
+                                let vertical_center = alignment.vertical == hezhou_ui::VerticalAlignment::Center;
                                 font_atlas.layout_text_left(
                                     0,
                                     text_str,
@@ -1283,6 +1301,7 @@ DrawCommand::Text { bounds, width, height, font_color, text, text_len, font_size
                                     bounds.x,
                                     bounds.y,
                                     *height,
+                                    vertical_center,
                                 )
                             } else {
                                 font_atlas.layout_text_centered(

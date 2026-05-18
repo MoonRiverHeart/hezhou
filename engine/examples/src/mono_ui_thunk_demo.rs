@@ -3,6 +3,8 @@ use hezhou_scripting::{MonoUIExecutor, ffi_context::{FfiContext, WidgetTreeHandl
 use hezhou_ui::ffi as ui_ffi;
 use std::time::Duration;
 
+pub extern "C" fn trigger_hot_reload() {}
+
 fn main() {
     println!("=== Thunk + Mono JIT UI Demo ===\n");
     
@@ -53,6 +55,7 @@ fn main() {
         ui_text_edit_delete_char: unsafe { std::mem::transmute(ui_ffi::ui_text_edit_delete_char as *const std::ffi::c_void) },
         ui_text_edit_get_text_len: unsafe { std::mem::transmute(ui_ffi::ui_text_edit_get_text_len as *const std::ffi::c_void) },
         ui_text_edit_get_text: unsafe { std::mem::transmute(ui_ffi::ui_text_edit_get_text as *const std::ffi::c_void) },
+        ui_trigger_hot_reload: trigger_hot_reload,
         widget_tree_ptr: widget_tree_handle,
     };
     hezhou_scripting::ffi_context::set_ffi_context(ffi_ctx);

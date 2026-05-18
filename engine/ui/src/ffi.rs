@@ -462,6 +462,22 @@ pub extern "C" fn ui_create_button(
 }
 
 #[unsafe(no_mangle)]
+pub extern "C" fn ui_get_text_width(
+    text: *const c_char,
+    font_size: f32,
+) -> f32 {
+    if text.is_null() {
+        return 0.0;
+    }
+    unsafe {
+        let text_str = CStr::from_ptr(text).to_string_lossy().into_owned();
+        let font_atlas = create_font_atlas();
+        let (width, _) = font_atlas.measure_text(0, &text_str, font_size * 2.0);
+        width + 40.0
+    }
+}
+
+#[unsafe(no_mangle)]
 pub extern "C" fn ui_create_label(
     handle: WidgetTreeHandle,
     x: f32,
@@ -1046,4 +1062,16 @@ pub extern "C" fn ui_text_edit_get_text(
             }
         }
     }
+}
+
+pub extern "C" fn ui_clear_widget_tree(handle: WidgetTreeHandle) {
+    if handle.is_null() {
+        return;
+    }
+    unsafe {
+        let arc = &*(handle as *const Arc<Mutex<WidgetTree>>);
+        let mut tree = arc.lock();
+        tree.clear();
+    }
+    crate::thunk_manager::ui_clear_callbacks();
 }

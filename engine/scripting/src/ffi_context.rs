@@ -34,6 +34,7 @@ pub type TextEditInsertCharFn = extern "C" fn(WidgetTreeHandle, u64, c_char);
 pub type TextEditDeleteCharFn = extern "C" fn(WidgetTreeHandle, u64);
 pub type TextEditGetTextLenFn = extern "C" fn(WidgetTreeHandle, u64) -> usize;
 pub type TextEditGetTextFn = extern "C" fn(WidgetTreeHandle, u64, *mut c_char, usize);
+pub type TriggerHotReloadFn = extern "C" fn();
 
 #[repr(C)]
 pub struct FfiContext {
@@ -68,6 +69,7 @@ pub struct FfiContext {
     pub ui_text_edit_delete_char: TextEditDeleteCharFn,
     pub ui_text_edit_get_text_len: TextEditGetTextLenFn,
     pub ui_text_edit_get_text: TextEditGetTextFn,
+    pub ui_trigger_hot_reload: TriggerHotReloadFn,
     pub widget_tree_ptr: WidgetTreeHandle,
 }
 

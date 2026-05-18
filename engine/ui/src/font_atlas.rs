@@ -144,10 +144,10 @@ impl FontAtlas {
                     
                     if src_idx < bitmap.len() && dst_idx + 3 < self.atlas_texture.len() {
                         let val = bitmap[src_idx];
-                        self.atlas_texture[dst_idx] = val;
-                        self.atlas_texture[dst_idx + 1] = val;
-                        self.atlas_texture[dst_idx + 2] = val;
-                        self.atlas_texture[dst_idx + 3] = 255;
+                        self.atlas_texture[dst_idx] = 255;
+                        self.atlas_texture[dst_idx + 1] = 255;
+                        self.atlas_texture[dst_idx + 2] = 255;
+                        self.atlas_texture[dst_idx + 3] = val;
                     }
                 }
             }
@@ -196,16 +196,21 @@ impl FontAtlas {
         }
         
         let mut total_width: f32 = 0.0;
-        let mut max_height: f32 = 0.0;
+        let mut max_bearing_y: f32 = 0.0;
+        let mut max_glyph_bottom: f32 = 0.0;
         
         for character in text.chars() {
             if let Some(info) = self.get_char_info(font_index, character, font_size) {
                 total_width += info.advance_x;
-                max_height = max_height.max(info.height);
+                max_bearing_y = max_bearing_y.max(info.bearing_y);
+                let glyph_bottom = info.height - info.bearing_y;
+                max_glyph_bottom = max_glyph_bottom.max(glyph_bottom);
             }
         }
         
-        (total_width, max_height)
+        let total_height = max_bearing_y + max_glyph_bottom;
+        
+        (total_width, total_height)
     }
     
     pub fn layout_text_left(
@@ -216,6 +221,7 @@ impl FontAtlas {
         container_x: f32,
         container_y: f32,
         container_height: f32,
+        vertical_center: bool,
     ) -> Vec<(f32, f32, usize, usize, f32, f32, f32, f32)> {
         if font_index >= self.fonts.len() || text.is_empty() {
             return Vec::new();
@@ -226,12 +232,18 @@ impl FontAtlas {
             .map(|info| info.bearing_y)
             .fold(0.0f32, f32::max);
         
-        let baseline_y = container_y + max_bearing_y;
+        let (_, text_height) = self.measure_text(font_index, text, font_size);
+        
+        let baseline_y = if vertical_center {
+            container_y + (container_height - text_height) / 2.0 + max_bearing_y
+        } else {
+            container_y + max_bearing_y
+        };
         
         let mut result = Vec::new();
         let mut cursor_x = container_x;
         let mut cursor_y = baseline_y;
-        let mut line_height = font_size * 1.5;  // 行高
+        let line_height = font_size * 2.0;
         
         for character in text.chars() {
             if character == '\n' {
@@ -275,14 +287,15 @@ impl FontAtlas {
             return Vec::new();
         }
         
-        let (text_width, _) = self.measure_text(font_index, text, font_size);
+        let (text_width, text_height) = self.measure_text(font_index, text, font_size);
         
         let max_bearing_y = text.chars()
             .filter_map(|c| self.get_char_info(font_index, c, font_size))
             .map(|info| info.bearing_y)
             .fold(0.0f32, f32::max);
         
-        let baseline_y = container_y + container_height / 2.0 + max_bearing_y / 2.0;
+        let text_top = container_y + (container_height - text_height) / 2.0;
+        let baseline_y = text_top + max_bearing_y;
         let start_x = container_x + (container_width - text_width) / 2.0;
         
         let mut result = Vec::new();

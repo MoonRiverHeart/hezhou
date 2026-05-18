@@ -16,6 +16,19 @@ pub struct ScriptManager {
 
 impl ScriptManager {
     pub fn new() -> ScriptResult<Self> {
+        // Set Mono assembly path before initialization
+        // Mono needs to find mscorlib.dll, System.dll, etc.
+        // The lib path should point to the lib directory, Mono will append mono/4.5/ internally
+        let mono_lib_path = "C:\\Program Files\\Mono\\lib";
+        let mono_config_path = "C:\\Program Files\\Mono\\etc";
+        
+        let lib_cstr = std::ffi::CString::new(mono_lib_path).unwrap();
+        let config_cstr = std::ffi::CString::new(mono_config_path).unwrap();
+        
+        unsafe {
+            wrapped_mono::binds::mono_set_dirs(lib_cstr.as_ptr(), config_cstr.as_ptr());
+        }
+        
         let domain = jit::init("ScriptDomain", None);
         Ok(Self {
             domain: Some(domain),

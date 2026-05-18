@@ -34,6 +34,20 @@ impl WidgetTree {
             children_map: HashMap::new(),
         }
     }
+    
+    pub fn clear(&mut self) {
+        if let Some(root_id) = self.root {
+            let children = self.children_map.get(&root_id).cloned().unwrap_or_default();
+            for child in children {
+                self.remove_widget(child);
+            }
+            self.children_map.insert(root_id, Vec::new());
+        } else {
+            self.nodes.clear();
+            self.parent_map.clear();
+            self.children_map.clear();
+        }
+    }
 
     pub fn node_count(&self) -> usize {
         self.nodes.len()
@@ -230,19 +244,19 @@ pub fn perform_layout(&mut self, font_atlas: &FontAtlas) {
             "HStack" => {
                 let mut total_width: f32 = 0.0;
                 let mut max_height: f32 = 0.0;
-                let spacing = self
+                let (spacing, padding) = self
                     .nodes
                     .get(&id)
                     .and_then(|n| {
                         if let Some(hstack) =
                             n.widget.as_any().downcast_ref::<crate::widgets::HStack>()
                         {
-                            Some(hstack.spacing)
+                            Some((hstack.spacing, hstack.padding))
                         } else {
                             None
                         }
                     })
-                    .unwrap_or(8.0);
+                    .unwrap_or((8.0, crate::types::EdgeInsets::zero()));
 
                 for (i, (w, h)) in child_sizes.iter().enumerate() {
                     total_width += w;
@@ -251,25 +265,28 @@ pub fn perform_layout(&mut self, font_atlas: &FontAtlas) {
                         total_width += spacing;
                     }
                 }
+                
+                total_width += padding.left + padding.right;
+                max_height += padding.top + padding.bottom;
 
                 (total_width, max_height)
             }
             "VStack" => {
                 let mut max_width: f32 = 0.0;
                 let mut total_height: f32 = 0.0;
-                let spacing = self
+                let (spacing, padding) = self
                     .nodes
                     .get(&id)
                     .and_then(|n| {
                         if let Some(vstack) =
                             n.widget.as_any().downcast_ref::<crate::widgets::VStack>()
                         {
-                            Some(vstack.spacing)
+                            Some((vstack.spacing, vstack.padding))
                         } else {
                             None
                         }
                     })
-                    .unwrap_or(8.0);
+                    .unwrap_or((8.0, crate::types::EdgeInsets::zero()));
 
                 for (i, (w, h)) in child_sizes.iter().enumerate() {
                     max_width = max_width.max(*w);
@@ -278,6 +295,9 @@ pub fn perform_layout(&mut self, font_atlas: &FontAtlas) {
                         total_height += spacing;
                     }
                 }
+                
+                max_width += padding.left + padding.right;
+                total_height += padding.top + padding.bottom;
 
                 (max_width, total_height)
             }
@@ -328,26 +348,26 @@ pub fn perform_layout(&mut self, font_atlas: &FontAtlas) {
         children: &[WidgetId],
         child_sizes: &[(f32, f32)],
     ) {
-        let spacing = self
+        let (spacing, padding) = self
             .nodes
             .get(&parent_id)
             .and_then(|n| {
                 if let Some(hstack) = n.widget.as_any().downcast_ref::<crate::widgets::HStack>() {
-                    Some(hstack.spacing)
+                    Some((hstack.spacing, hstack.padding))
                 } else {
                     None
                 }
             })
-            .unwrap_or(8.0);
+            .unwrap_or((8.0, crate::types::EdgeInsets::zero()));
 
-        let mut current_x = 0.0;
+        let mut current_x = padding.left;
 
         for (i, &child_id) in children.iter().enumerate() {
             let (w, h) = child_sizes[i];
 
             if let Some(node) = self.nodes.get_mut(&child_id) {
                 let child_layout = *node.widget.layout();
-                let y = 0.0;
+                let y = padding.top;
 
                 node.widget.set_layout(crate::layout::Layout::new(
                     current_x,
@@ -367,26 +387,26 @@ pub fn perform_layout(&mut self, font_atlas: &FontAtlas) {
         children: &[WidgetId],
         child_sizes: &[(f32, f32)],
     ) {
-        let spacing = self
+        let (spacing, padding) = self
             .nodes
             .get(&parent_id)
             .and_then(|n| {
                 if let Some(vstack) = n.widget.as_any().downcast_ref::<crate::widgets::VStack>() {
-                    Some(vstack.spacing)
+                    Some((vstack.spacing, vstack.padding))
                 } else {
                     None
                 }
             })
-            .unwrap_or(8.0);
+            .unwrap_or((8.0, crate::types::EdgeInsets::zero()));
         
-        let mut current_y = 0.0;
+        let mut current_y = padding.top;
 
         for (i, &child_id) in children.iter().enumerate() {
             let (w, h) = child_sizes[i];
 
             if let Some(node) = self.nodes.get_mut(&child_id) {
                 let child_layout = *node.widget.layout();
-                let x = 0.0;
+                let x = padding.left;
 
                 node.widget.set_layout(crate::layout::Layout::new(
                     x,

@@ -125,7 +125,7 @@ impl Widget for Button {
         let (text_width, text_height) =
             font_atlas.measure_text(0, &self.text, self.text_style.font_size * 2.0);
 
-        let padding = 20.0;
+        let padding = 15.0;
         let width = text_width + padding * 2.0;
         let height = text_height + padding * 2.0;
 
@@ -147,6 +147,7 @@ impl Widget for Button {
     fn draw(&mut self, canvas: &mut Canvas) {
         let width = self.layout.width;
         let height = self.layout.height;
+        let padding = 15.0;
 
         let current_style = match self.state {
             WidgetState::Hovered => Style::new()
@@ -163,7 +164,7 @@ impl Widget for Button {
 
         canvas.draw_rect(Rect::new(0.0, 0.0, width, height), &current_style);
 
-        canvas.draw_text(Rect::new(0.0, 0.0, width, height), &self.text, &self.text_style);
+        canvas.draw_text(Rect::new(padding, padding, width - padding * 2.0, height - padding * 2.0), &self.text, &self.text_style);
     }
 
     fn on_event(&mut self, event: &Event) -> EventResult {
@@ -193,7 +194,7 @@ impl Widget for Button {
             }
 
             EventType::MouseLeave => {
-                if self.state == WidgetState::Hovered {
+                if self.state == WidgetState::Hovered || self.state == WidgetState::Pressed {
                     self.set_state(WidgetState::Normal);
                     return EventResult::Handled;
                 }

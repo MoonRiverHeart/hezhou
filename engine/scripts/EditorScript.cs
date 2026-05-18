@@ -31,10 +31,12 @@ namespace Hezhou
         private static float _screenHeight = 720f;
 
         private const float TOOLBAR_HEIGHT = 40f;
-        private const float STATUS_BAR_HEIGHT = 30f;
+        private const float STATUS_BAR_HEIGHT = 40f;
         private const float LEFT_PANEL_WIDTH = 250f;
         private const float RIGHT_PANEL_WIDTH = 250f;
         private const float BOTTOM_PANEL_HEIGHT = 200f;
+        
+        private static UI.UpdateCallbackDelegate _updateCallback;
 
         public static void Initialize(IntPtr contextPtr)
         {
@@ -44,6 +46,9 @@ namespace Hezhou
             UI.GetScreenSize(out _screenWidth, out _screenHeight);
             
             Console.WriteLine($"[Editor] 屏幕尺寸: {_screenWidth}x{_screenHeight}");
+            
+            _updateCallback = Update;
+            UI.RegisterUpdateCallback(_updateCallback);
             
             CreateEditorLayout();
             
@@ -71,20 +76,20 @@ namespace Hezhou
             _toolbarButtons = new HStack(_toolbar.Id, 10f);
             _toolbarButtons.SetPosition(10f, 5f);
             
-            var newBtn = _toolbarButtons.AddButton(80f, 30f, "新建");
+            var newBtn = _toolbarButtons.AddButton(100f, 30f, "新建");
             newBtn.SetOnClick(OnNewClick);
             
-            var openBtn = _toolbarButtons.AddButton(80f, 30f, "打开");
+            var openBtn = _toolbarButtons.AddButton(100f, 30f, "打开");
             openBtn.SetOnClick(OnOpenClick);
             
-            var saveBtn = _toolbarButtons.AddButton(80f, 30f, "保存");
+            var saveBtn = _toolbarButtons.AddButton(100f, 30f, "保存");
             saveBtn.SetOnClick(OnSaveClick);
             
-            var runBtn = _toolbarButtons.AddButton(80f, 30f, "运行");
+            var runBtn = _toolbarButtons.AddButton(100f, 30f, "运行");
             runBtn.SetOnClick(OnRunClick);
             
-            _toggleEditorBtn = new Button(_toolbar.Id, 80f, 30f, "编辑器");
-            UI.SetWidgetLayout(_toggleEditorBtn.Id, _screenWidth - 100f, 5f, 80f, 30f);
+            _toggleEditorBtn = new Button(_toolbar.Id, 100f, 30f, "编辑器");
+            UI.SetWidgetLayout(_toggleEditorBtn.Id, _screenWidth - 120f, 5f, 100f, 30f);
             _toggleEditorBtn.SetOnClick(OnToggleEditorClick);
             
             Console.WriteLine("[Editor] 工具栏创建完成");
@@ -123,7 +128,7 @@ namespace Hezhou
             _statusBar = new Panel(rootId, 0, statusY, _screenWidth, STATUS_BAR_HEIGHT, 0.12f, 0.12f, 0.12f, 1.0f);
             _statusItems = new HStack(_statusBar.Id, 20f);
             _statusItems.SetPosition(10f, 5f);
-            _fpsLabel = new Label(_statusItems.Id, 100f, 20f, "FPS: 0");
+            _fpsLabel = new Label(_statusItems.Id, 120f, 25f, "FPS: 0");
             _statusItems.AddLabel(150f, 20f, "状态: 就绪");
             _statusItems.AddLabel(150f, 20f, "项目: 未命名");
             Console.WriteLine("[Editor] 状态栏创建完成");
@@ -151,6 +156,8 @@ namespace Hezhou
 
             if (_toolbar != null)
                 UI.SetWidgetLayout(_toolbar.Id, 0, toolbarY, _screenWidth, TOOLBAR_HEIGHT);
+            if (_toggleEditorBtn != null)
+                UI.SetWidgetLayout(_toggleEditorBtn.Id, _screenWidth - 100f, 5f, 80f, 30f);
             if (_projectPanel != null)
                 UI.SetWidgetLayout(_projectPanel.Id, 0, mainY, LEFT_PANEL_WIDTH, mainHeight);
             if (_assetPanel != null)
@@ -296,7 +303,7 @@ namespace Hezhou
                 
                 // 编译（覆盖EditorScript.dll）
                 var compileProcess = new System.Diagnostics.Process();
-                compileProcess.StartInfo.FileName = "mcs";
+                compileProcess.StartInfo.FileName = "C:\\Program Files\\Mono\\bin\\mcs.bat";
                 compileProcess.StartInfo.Arguments = $"-target:library -out:scripts/bin/Mono/EditorScript.dll {tempPath} scripts/UI.cs scripts/DFX.cs";
                 compileProcess.StartInfo.UseShellExecute = false;
                 compileProcess.StartInfo.RedirectStandardOutput = true;

@@ -18,6 +18,7 @@ pub enum EventType {
 
     MouseEnter,
     MouseLeave,
+    MouseMove,
 
     FocusGain,
     FocusLost,
@@ -40,6 +41,7 @@ impl fmt::Display for EventType {
             EventType::KeyUp => write!(f, "KeyUp"),
             EventType::MouseEnter => write!(f, "MouseEnter"),
             EventType::MouseLeave => write!(f, "MouseLeave"),
+            EventType::MouseMove => write!(f, "MouseMove"),
             EventType::FocusGain => write!(f, "FocusGain"),
             EventType::FocusLost => write!(f, "FocusLost"),
             EventType::LayoutChanged => write!(f, "LayoutChanged"),

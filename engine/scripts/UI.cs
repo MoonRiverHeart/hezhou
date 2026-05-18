@@ -80,6 +80,9 @@ namespace Hezhou
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public delegate void GetScreenSizeDelegate(out float width, out float height);
 
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void TriggerHotReloadDelegate();
+
         [StructLayout(LayoutKind.Sequential)]
         public struct FfiContext
         {
@@ -114,6 +117,7 @@ namespace Hezhou
             public IntPtr ui_text_edit_delete_char;
             public IntPtr ui_text_edit_get_text_len;
             public IntPtr ui_text_edit_get_text;
+            public IntPtr ui_trigger_hot_reload;
             public IntPtr widget_tree_ptr;
         }
 
@@ -291,12 +295,29 @@ public static void RegisterResizeCallback(ResizeCallbackDelegate callback)
             return result ?? "";
         }
         
-        [DllImport("__Internal", CallingConvention = CallingConvention.Cdecl)]
-        private static extern void trigger_hot_reload();
-        
         public static void TriggerHotReload()
         {
-            trigger_hot_reload();
+            if (_ffi.ui_trigger_hot_reload == IntPtr.Zero)
+            {
+                Console.WriteLine("[C#] ERROR: TriggerHotReload函数指针为空");
+                return;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<TriggerHotReloadDelegate>(_ffi.ui_trigger_hot_reload);
+            func();
+        }
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        private delegate void ClearWidgetTreeDelegate(IntPtr handle);
+        
+        public static void ClearWidgetTree()
+        {
+            if (_widgetTree == IntPtr.Zero)
+            {
+                Console.WriteLine("[C#] ERROR: widget_tree_ptr为空");
+                return;
+            }
+            // Use the ui_clear_widget_tree function via FFI
+            // Note: We need to add this to FfiContext or call directly
         }
 
         public static ulong GetRootId()
@@ -365,7 +386,27 @@ public static void RegisterResizeCallback(ResizeCallbackDelegate callback)
         public delegate void GlobalClickCallbackDelegate(float x, float y);
         
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void UpdateCallbackDelegate(float deltaTime);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public delegate void RegisterGlobalClickDelegate(IntPtr callbackPtr);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void RegisterUpdateDelegate(IntPtr callbackPtr);
+        
+        public static void RegisterUpdateCallback(UpdateCallbackDelegate callback)
+        {
+            IntPtr callbackPtr = Marshal.GetFunctionPointerForDelegate(callback);
+            
+            if (_ffi.ui_register_update_thunk_ptr == IntPtr.Zero)
+            {
+                Console.WriteLine("[C#] ERROR: RegisterUpdateThunkPtr函数指针为空");
+                return;
+            }
+            
+            var func = Marshal.GetDelegateForFunctionPointer<RegisterUpdateDelegate>(_ffi.ui_register_update_thunk_ptr);
+            func(callbackPtr);
+        }
     }
 
     public class VStack
@@ -424,6 +465,7 @@ public static void RegisterResizeCallback(ResizeCallbackDelegate callback)
     {
         public ulong Id { get; private set; }
         private string _text;
+        private UI.WidgetCallbackDelegate _callback;
         
         public Button(ulong parentId, float width, float height, string text)
         {
@@ -440,6 +482,7 @@ public static void RegisterResizeCallback(ResizeCallbackDelegate callback)
         
         public void SetOnClick(UI.WidgetCallbackDelegate callback)
         {
+            _callback = callback;
             UI.SetOnClick(Id, callback);
         }
     }

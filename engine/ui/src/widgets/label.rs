@@ -110,7 +110,7 @@ impl Widget for Label {
         self
     }
 
-    fn draw(&mut self, canvas: &mut Canvas) {
+fn draw(&mut self, canvas: &mut Canvas) {
         let width = self.layout.width;
         let height = self.layout.height;
 
@@ -118,7 +118,15 @@ impl Widget for Label {
             canvas.draw_rect(Rect::new(0.0, 0.0, width, height), &self.style);
         }
 
-        canvas.draw_text(Rect::new(0.0, 0.0, width, height), &self.text, &self.text_style);
+        let text_style = TextStyle::new()
+            .with_size(self.text_style.font_size)
+            .with_color(self.text_style.font_color)
+            .with_alignment(TextAlignment {
+                horizontal: HorizontalAlignment::Left,
+                vertical: VerticalAlignment::Center,
+            });
+
+        canvas.draw_text(Rect::new(0.0, 0.0, width, height), &self.text, &text_style);
     }
 
     fn measure(&self, font_atlas: &crate::font_atlas::FontAtlas) -> (f32, f32) {

@@ -71,6 +71,7 @@ fn main() {
         ui_text_edit_delete_char: unsafe { std::mem::transmute(ui_ffi::ui_text_edit_delete_char as *const std::ffi::c_void) },
         ui_text_edit_get_text_len: unsafe { std::mem::transmute(ui_ffi::ui_text_edit_get_text_len as *const std::ffi::c_void) },
         ui_text_edit_get_text: unsafe { std::mem::transmute(ui_ffi::ui_text_edit_get_text as *const std::ffi::c_void) },
+        ui_trigger_hot_reload: trigger_hot_reload,
         widget_tree_ptr: widget_tree_handle,
     };
     hezhou_scripting::ffi_context::set_ffi_context(ffi_ctx);
@@ -111,6 +112,10 @@ fn main() {
             
             unsafe {
                 if let Some(ref mut executor) = EXECUTOR {
+                    // 先清理widget tree
+                    println!("[HotReload] 清理旧的UI...");
+                    ui_ffi::ui_clear_widget_tree(widget_tree_handle as ui_ffi::WidgetTreeHandle);
+                    
                     match executor.reload() {
                         Ok(_) => {
                             println!("[HotReload] Assembly reload成功!");
@@ -151,7 +156,7 @@ fn main() {
 fn compile_editor_script() {
     use std::process::Command;
     
-    let result = Command::new("mcs")
+    let result = Command::new("C:\\Program Files\\Mono\\bin\\mcs.bat")
         .args([
             "-target:library",
             "-out:scripts/bin/Mono/EditorScript.dll",
@@ -169,8 +174,8 @@ fn compile_editor_script() {
                 println!("    编译失败: {}", String::from_utf8_lossy(&output.stderr));
             }
         }
-        Err(_) => {
-            println!("    mcs not found");
+        Err(e) => {
+            println!("    mcs not found: {:?}", e);
         }
     }
 }

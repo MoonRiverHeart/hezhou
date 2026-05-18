@@ -215,7 +215,7 @@ impl GLFWPlatform {
         let timestamp = (time * 1000.0) as u64;
 
         match event {
-            glfw::WindowEvent::Key(key, _scancode, action, _mods) => {
+            glfw::WindowEvent::Key(key, _scancode, action, mods) => {
                 let keycode = GLFWPlatform::convert_glfw_key(key);
                 let key_action = match action {
                     glfw::Action::Press => KeyAction::Press,
@@ -223,12 +223,21 @@ impl GLFWPlatform {
                     glfw::Action::Repeat => KeyAction::Repeat,
                 };
                 
-                println!("[GLFW] Key event: glfw_key={}, keycode={}, action={}", 
+                let key_modifiers = KeyModifiers {
+                    shift: mods.contains(glfw::Modifiers::Shift),
+                    ctrl: mods.contains(glfw::Modifiers::Control),
+                    alt: mods.contains(glfw::Modifiers::Alt),
+                };
+                
+                println!("[GLFW] Key event: glfw_key={}, keycode={}, action={}, modifiers(shift={},ctrl={},alt={})", 
                          match key {
                              glfw::Key::Left => "Left",
                              glfw::Key::Right => "Right",
                              glfw::Key::Up => "Up",
                              glfw::Key::Down => "Down",
+                             glfw::Key::C => "C",
+                             glfw::Key::V => "V",
+                             glfw::Key::X => "X",
                              _ => "Other"
                          },
                          keycode as u32,
@@ -236,7 +245,10 @@ impl GLFWPlatform {
                              KeyAction::Press => "Press",
                              KeyAction::Release => "Release",
                              KeyAction::Repeat => "Repeat",
-                         });
+                         },
+                         key_modifiers.shift,
+                         key_modifiers.ctrl,
+                         key_modifiers.alt);
 
                 PlatformEvent {
                     kind: PlatformEventKind::Key,
@@ -245,7 +257,7 @@ impl GLFWPlatform {
                         key: KeyEvent {
                             action: key_action,
                             keycode,
-                            modifiers: KeyModifiers::default(),
+                            modifiers: key_modifiers,
                         },
                     },
                 }

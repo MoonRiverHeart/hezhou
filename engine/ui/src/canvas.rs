@@ -58,7 +58,6 @@ impl Canvas {
     
     pub fn layout_text_for_cursor_with_wrap(&self, text: &str, font_size: f32, container_x: f32, container_y: f32, wrap_width: Option<f32>) -> Vec<(f32, f32, f32, usize, usize, usize)> {
         if let Some(atlas) = self.get_font_atlas() {
-            // 使用grapheme clusters计算max_bearing_y
             let max_bearing_y = text.graphemes(true)
                 .flat_map(|g| g.chars())
                 .filter_map(|c| atlas.get_char_info(self.font_index, c, font_size))
@@ -66,21 +65,19 @@ impl Canvas {
                 .fold(0.0f32, f32::max);
             
             let baseline_y = container_y + max_bearing_y;
-            let line_height = font_size * 1.5;
+            let line_height = font_size * 2.0;
             
             let mut cursor_x = container_x;
-            let mut cursor_y = baseline_y;
+            let mut current_baseline_y = baseline_y;
             let mut results = Vec::new();
             
             for (grapheme_index, (byte_idx, grapheme)) in text.grapheme_indices(true).enumerate() {
-                // 检查换行符
                 if grapheme == "\n" {
                     cursor_x = container_x;
-                    cursor_y += line_height;
+                    current_baseline_y += line_height;
                     continue;
                 }
                 
-                // 计算grapheme的总宽度（所有字符advance之和）
                 let mut grapheme_width = 0.0;
                 for c in grapheme.chars() {
                     if let Some(info) = atlas.get_char_info(self.font_index, c, font_size) {
@@ -88,16 +85,15 @@ impl Canvas {
                     }
                 }
                 
-                // 检查自动换行
                 if let Some(max_width) = wrap_width {
                     if cursor_x + grapheme_width > container_x + max_width {
                         cursor_x = container_x;
-                        cursor_y += line_height;
+                        current_baseline_y += line_height;
                     }
                 }
                 
                 let grapheme_end_byte = byte_idx + grapheme.len();
-                results.push((cursor_x, cursor_y, grapheme_width, grapheme_index, byte_idx, grapheme_end_byte));
+                results.push((cursor_x, current_baseline_y, grapheme_width, grapheme_index, byte_idx, grapheme_end_byte));
                 cursor_x += grapheme_width;
             }
             

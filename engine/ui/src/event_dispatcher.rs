@@ -12,6 +12,7 @@ pub struct EventDispatcher {
     widget_tree: Arc<Mutex<WidgetTree>>,
     gesture_recognizer: Arc<Mutex<GestureRecognizer>>,
     dfx: Arc<Mutex<DfxSystem>>,
+    hovered_widget: Option<WidgetId>,
 }
 
 impl EventDispatcher {
@@ -20,6 +21,7 @@ impl EventDispatcher {
             widget_tree: Arc::new(Mutex::new(WidgetTree::new())),
             gesture_recognizer: Arc::new(Mutex::new(GestureRecognizer::new(Arc::clone(&dfx)))),
             dfx,
+            hovered_widget: None,
         }
     }
 
@@ -32,6 +34,47 @@ impl EventDispatcher {
     }
 
     pub fn dispatch_event(&mut self, event: &mut Event) {
+        // 对于 MouseMove 事件，处理 hover 状态变化
+        if event.event_type == EventType::MouseMove {
+            let target = match &event.data {
+                EventData::Mouse(mouse) => {
+                    let point = Point::new(mouse.x, mouse.y);
+                    self.widget_tree.lock().hit_test(point)
+                }
+                _ => None,
+            };
+            
+            let new_hovered = target;
+            let old_hovered = self.hovered_widget;
+            
+            // 如果 hover 状态发生变化
+            if new_hovered != old_hovered {
+                // 发送 MouseLeave 给旧的 widget
+                if let Some(old_id) = old_hovered {
+                    let timestamp = event.timestamp;
+                    let mut leave_event = Event::new(EventType::MouseLeave, timestamp);
+                    leave_event.target = old_id;
+                    let path = self.widget_tree.lock().find_path(old_id);
+                    self.dispatch_bubbling(&path, &mut leave_event);
+                }
+                
+                // 发送 MouseEnter 给新的 widget
+                if let Some(new_id) = new_hovered {
+                    let timestamp = event.timestamp;
+                    if let EventData::Mouse(mouse_data) = &event.data {
+                        let mut enter_event = Event::new(EventType::MouseEnter, timestamp)
+                            .with_data(EventData::Mouse(*mouse_data));
+                        enter_event.target = new_id;
+                        let path = self.widget_tree.lock().find_path(new_id);
+                        self.dispatch_bubbling(&path, &mut enter_event);
+                    }
+                }
+                
+                self.hovered_widget = new_hovered;
+            }
+            return;
+        }
+        
         let (target, click_point) = match &event.data {
             EventData::Touch(touch) => {
                 let point = Point::new(touch.x, touch.y);
@@ -139,6 +182,28 @@ impl EventDispatcher {
         for widget_id in path.iter().rev() {
             if event.stopped || event.immediate_stopped {
                 break;
+            }
+
+            // 计算widget的绝对坐标（用于坐标转换）
+            let abs_layout = {
+                let tree = self.widget_tree.lock();
+                tree.get_absolute_layout(*widget_id)
+            };
+            
+            // 如果是Touch事件，将窗口坐标转换成widget相对坐标
+            if let Some(abs_layout) = abs_layout {
+                if let EventData::Touch(ref mut touch_data) = event.data {
+                    // 保存原始窗口坐标（用于全局事件）
+                    let window_x = touch_data.x;
+                    let window_y = touch_data.y;
+                    
+                    // 转换成widget相对坐标
+                    touch_data.x = window_x - abs_layout.x;
+                    touch_data.y = window_y - abs_layout.y;
+                    
+                    println!("[Dispatch] Widget {}: window ({}, {}) -> relative ({}, {})", 
+                             widget_id.id, window_x, window_y, touch_data.x, touch_data.y);
+                }
             }
 
             let mut tree = self.widget_tree.lock();

@@ -18,18 +18,18 @@ void main() {
     if (frag_uv.x == 0.0 && frag_uv.y == 0.0) {
         out_color = frag_color;
     } else {
-        vec3 texture_color = texture(font_texture, frag_uv).rgb;
+        vec4 texture_color = texture(font_texture, frag_uv);
+        float alpha = texture_color.a;
         
-        float dist = texture_color.r;
-        
-        float px_range = pc.px_range;
-        if (px_range <= 0.0) {
-            px_range = 4.0;
+        if (pc.enable_msdf) {
+            float dist = texture_color.r;
+            float px_range = pc.px_range;
+            if (px_range <= 0.0) {
+                px_range = 4.0;
+            }
+            float d = (dist - 0.5) * px_range;
+            alpha = smoothstep(-1.0, 1.0, d);
         }
-        
-        float d = (dist - 0.5) * px_range;
-        
-        float alpha = smoothstep(-1.0, 1.0, d);
         
         out_color = vec4(frag_color.rgb, frag_color.a * alpha);
     }
