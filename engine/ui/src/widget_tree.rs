@@ -400,11 +400,11 @@ pub fn perform_layout(&mut self, font_atlas: &FontAtlas) {
         }
     }
 
-    pub fn generate_render_data(&mut self) -> Vec<RenderData> {
+    pub fn generate_render_data(&mut self, font_atlas: &FontAtlas) -> Vec<RenderData> {
         let mut render_data = Vec::new();
 
         if let Some(root_id) = self.root {
-            self.generate_render_data_recursive(root_id, 0.0, 0.0, &mut render_data);
+            self.generate_render_data_recursive(root_id, 0.0, 0.0, &mut render_data, font_atlas);
         }
 
         render_data
@@ -416,6 +416,7 @@ pub fn perform_layout(&mut self, font_atlas: &FontAtlas) {
         parent_abs_x: f32,
         parent_abs_y: f32,
         render_data: &mut Vec<RenderData>,
+        font_atlas: &FontAtlas,
     ) {
         if let Some(node) = self.nodes.get_mut(&id) {
             if node.widget.as_ref().state() != WidgetState::Disabled {
@@ -423,7 +424,7 @@ pub fn perform_layout(&mut self, font_atlas: &FontAtlas) {
                 let abs_x = parent_abs_x + layout.x;
                 let abs_y = parent_abs_y + layout.y;
                 
-                let mut canvas = Canvas::new();
+                let mut canvas = Canvas::with_font_atlas(font_atlas as *const FontAtlas, 0);
                 node.widget.as_mut().draw(&mut canvas);
                 
                 let commands = canvas.get_commands().to_vec();
@@ -448,7 +449,7 @@ pub fn perform_layout(&mut self, font_atlas: &FontAtlas) {
         
         let children = self.get_children(id).to_vec();
         for child in children {
-            self.generate_render_data_recursive(child, abs_x, abs_y, render_data);
+            self.generate_render_data_recursive(child, abs_x, abs_y, render_data, font_atlas);
         }
     }
     

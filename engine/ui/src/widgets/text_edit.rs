@@ -291,36 +291,45 @@ impl Widget for TextEdit {
         }
         
         if self.focused && self.cursor_visible {
-            // 更新字符布局
-            self.update_char_layouts();
+            // 使用 Canvas 的 font_atlas 精确计算字符位置
+            let text_start_x = 10.0;
+            let text_start_y = 10.0;
+            let line_height = self.text_style.font_size * 1.5;
             
-            // 找到光标位置对应的字符
+            let char_positions = canvas.layout_text_for_cursor(
+                &self.text,
+                self.text_style.font_size * 2.0,
+                text_start_x,
+                text_start_y,
+            );
+            
+            // 计算光标位置
             let (cursor_x, cursor_y) = if self.cursor_position == 0 {
-                // 光标在最开始
-                (10.0, 10.0)
+                (text_start_x, text_start_y)
             } else {
-                // 查找光标前一个字符
-                let mut found = None;
-                for layout in &self.char_layouts {
-                    if layout.byte_index + 1 == self.cursor_position || 
-                       (layout.byte_index < self.cursor_position && 
-                        (layout.char_index + 1 >= self.char_layouts.len() || 
-                         self.char_layouts[layout.char_index + 1].byte_index >= self.cursor_position)) {
-                        found = Some(*layout);
+                // 查找 cursor_position 对应的字符位置
+                let mut found_x = text_start_x;
+                let mut found_y = text_start_y;
+                
+                for (x, y, char_idx, byte_idx) in &char_positions {
+                    if *byte_idx < self.cursor_position {
+                        // 使用 font_atlas 计算该字符的 advance_x
+                        let char = self.text.chars().nth(*char_idx).unwrap_or(' ');
+                        let advance = if let Some(atlas) = canvas.get_font_atlas() {
+                            atlas.get_char_info(0, char, self.text_style.font_size * 2.0)
+                                .map(|info| info.advance_x)
+                                .unwrap_or(self.text_style.font_size * 0.6)
+                        } else {
+                            self.text_style.font_size * 0.6
+                        };
+                        found_x = *x + advance;
+                        found_y = *y;
+                    } else {
                         break;
                     }
                 }
                 
-                if let Some(layout) = found {
-                    (layout.x + layout.width, layout.y)
-                } else {
-                    // 找不到，放到最后
-                    if let Some(last) = self.char_layouts.last() {
-                        (last.x + last.width, last.y)
-                    } else {
-                        (10.0, 10.0)
-                    }
-                }
+                (found_x, found_y)
             };
             
             let cursor_height = self.text_style.font_size * 1.2;

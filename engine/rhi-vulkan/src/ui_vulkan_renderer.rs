@@ -1207,7 +1207,7 @@ let font_atlas = self.ui_system.lock().get_font_atlas();
                 let mut tree_guard = tree.lock();
                 let font_atlas = ui.get_font_atlas();
                 tree_guard.perform_layout(font_atlas);
-                tree_guard.generate_render_data()
+                tree_guard.generate_render_data(font_atlas)
             };
             
             let mut vertices: Vec<f32> = Vec::new();

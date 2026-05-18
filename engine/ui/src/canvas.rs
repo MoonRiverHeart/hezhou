@@ -1,5 +1,17 @@
 use crate::style::*;
 use crate::types::*;
+use crate::font_atlas::FontAtlas;
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug)]
+pub struct CharLayoutInfo {
+    pub x: f32,
+    pub y: f32,
+    pub width: f32,
+    pub height: f32,
+    pub char_idx: usize,
+    pub byte_idx: usize,
+}
 
 #[repr(C)]
 pub struct Canvas {
@@ -7,6 +19,8 @@ pub struct Canvas {
     clip_rect: Option<Rect>,
     transform: Transform,
     opacity: f32,
+    font_atlas_ptr: Option<*const FontAtlas>,
+    font_index: usize,
 }
 
 impl Canvas {
@@ -16,6 +30,42 @@ impl Canvas {
             clip_rect: None,
             transform: Transform::identity(),
             opacity: 1.0,
+            font_atlas_ptr: None,
+            font_index: 0,
+        }
+    }
+    
+    pub fn with_font_atlas(font_atlas: *const FontAtlas, font_index: usize) -> Self {
+        Self {
+            commands: Vec::new(),
+            clip_rect: None,
+            transform: Transform::identity(),
+            opacity: 1.0,
+            font_atlas_ptr: Some(font_atlas),
+            font_index,
+        }
+    }
+    
+    pub fn get_font_atlas(&self) -> Option<&FontAtlas> {
+        self.font_atlas_ptr.map(|ptr| unsafe { &*ptr })
+    }
+    
+    pub fn layout_text_for_cursor(&self, text: &str, font_size: f32, container_x: f32, container_y: f32) -> Vec<(f32, f32, usize, usize)> {
+        if let Some(atlas) = self.get_font_atlas() {
+            let layouts = atlas.layout_text_left(self.font_index, text, font_size, container_x, container_y, font_size * 1.5);
+            
+            text.char_indices().enumerate().map(|(char_idx, (byte_idx, c))| {
+                if c == '\n' {
+                    (0.0, 0.0, char_idx, byte_idx)
+                } else if char_idx < layouts.len() {
+                    let (x, y, _, _, _, _, _, _) = layouts[char_idx];
+                    (x, y, char_idx, byte_idx)
+                } else {
+                    (0.0, 0.0, char_idx, byte_idx)
+                }
+            }).collect()
+        } else {
+            Vec::new()
         }
     }
 
