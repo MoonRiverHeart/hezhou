@@ -40,9 +40,9 @@ impl FontAtlas {
         Self {
             fonts: Vec::new(),
             font_data: Vec::new(),
-            atlas_texture: vec![0u8; 2048 * 2048 * 4],
-            atlas_width: 2048,
-            atlas_height: 2048,
+            atlas_texture: vec![0u8; 4096 * 4096 * 4],
+            atlas_width: 4096,
+            atlas_height: 4096,
             character_cache: HashMap::new(),
             current_x: 0,
             current_y: 0,
@@ -148,7 +148,9 @@ impl FontAtlas {
             return;
         }
         
-        let (metrics, bitmap) = self.fonts[font_index].rasterize(character, font_size);
+        let supersample_scale = 4.0;
+        let raster_size = font_size * supersample_scale;
+        let (metrics, bitmap) = self.fonts[font_index].rasterize(character, raster_size);
         
         let char_width = metrics.width as u32;
         let char_height = metrics.height as u32;
@@ -161,9 +163,9 @@ impl FontAtlas {
                 uv_h: 0.0,
                 width: 0.0,
                 height: 0.0,
-                advance_x: metrics.advance_width,
-                bearing_x: metrics.bounds.xmin,
-                bearing_y: metrics.bounds.height + metrics.bounds.ymin,
+                advance_x: metrics.advance_width / supersample_scale,
+                bearing_x: metrics.bounds.xmin / supersample_scale,
+                bearing_y: (metrics.bounds.height + metrics.bounds.ymin) / supersample_scale,
             };
             self.character_cache.insert(key, info);
             return;
@@ -196,17 +198,17 @@ impl FontAtlas {
             }
         }
         
-        let bearing_x = metrics.bounds.xmin;
-        let bearing_y = metrics.bounds.height + metrics.bounds.ymin;
+        let bearing_x = metrics.bounds.xmin / supersample_scale;
+        let bearing_y = (metrics.bounds.height + metrics.bounds.ymin) / supersample_scale;
         
         let info = CharacterInfo {
             uv_x: self.current_x as f32 / self.atlas_width as f32,
             uv_y: self.current_y as f32 / self.atlas_height as f32,
             uv_w: char_width as f32 / self.atlas_width as f32,
             uv_h: char_height as f32 / self.atlas_height as f32,
-            width: char_width as f32,
-            height: char_height as f32,
-            advance_x: metrics.advance_width,
+            width: char_width as f32 / supersample_scale,
+            height: char_height as f32 / supersample_scale,
+            advance_x: metrics.advance_width / supersample_scale,
             bearing_x,
             bearing_y,
         };
