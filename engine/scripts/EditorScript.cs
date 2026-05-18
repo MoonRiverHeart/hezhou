@@ -582,6 +582,13 @@ private static void ShowDropdownMenu(float x, float y, string[] items, UI.Widget
             {
                 if (Directory.Exists(_currentDirectory))
                 {
+                    // 添加返回上一级按钮
+                    if (_currentDirectory != "scripts" && Directory.GetParent(_currentDirectory) != null)
+                    {
+                        ulong backBtnId = _projectTree.AddButton(LEFT_PANEL_WIDTH - 40f, 20f, "⬆ 返回上级");
+                        UI.SetOnClick(backBtnId, OnBackClick);
+                    }
+                    
                     AddDirectoryItems(_projectTree, _currentDirectory, 0);
                 }
             }
@@ -626,6 +633,17 @@ private static void ShowDropdownMenu(float x, float y, string[] items, UI.Widget
             }
         }
         
+        private static void OnBackClick(ulong widgetId)
+        {
+            var parent = Directory.GetParent(_currentDirectory);
+            if (parent != null)
+            {
+                _currentDirectory = parent.FullName;
+                Console.WriteLine($"[Editor] 返回上级目录: {_currentDirectory}");
+                RefreshDirectoryTree();
+            }
+        }
+        
         private static void OnDirectoryClick(ulong widgetId)
         {
             if (_dirItemPaths.TryGetValue(widgetId, out string path))
@@ -652,26 +670,77 @@ private static void ShowDropdownMenu(float x, float y, string[] items, UI.Widget
                 string content = File.ReadAllText(filePath);
                 string fileName = Path.GetFileName(filePath);
                 
+                Console.WriteLine($"[Editor] 读取文件: {fileName} ({content.Length} chars)");
+                
+                // 确保编辑器已显示
                 if (!_scriptEditorVisible)
                 {
-                    HideMainLayout();
-                    ShowScriptEditor();
+                    Console.WriteLine("[Editor] 编辑器未显示，先显示编辑器...");
+                    
+                    // 先创建编辑器（不刷新目录树）
+                    ulong rootId = UI.GetRootId();
+                    float editorX = LEFT_PANEL_WIDTH;
+                    float editorY = TOOLBAR_HEIGHT;
+                    float editorWidth = _screenWidth - LEFT_PANEL_WIDTH;
+                    float editorHeight = _screenHeight - TOOLBAR_HEIGHT - STATUS_BAR_HEIGHT;
+                    
+                    // 移除主界面panel
+                    if (_previewPanel != null)
+                    {
+                        UI.RemoveWidget(_previewPanel.Id);
+                        _previewPanel = null;
+                    }
+                    if (_assetPanel != null)
+                    {
+                        UI.RemoveWidget(_assetPanel.Id);
+                        _assetPanel = null;
+                    }
+                    if (_propertiesPanel != null)
+                    {
+                        UI.RemoveWidget(_propertiesPanel.Id);
+                        _propertiesPanel = null;
+                    }
+                    
+                    // 创建编辑器面板
+                    _scriptEditorPanel = new Panel(rootId, editorX, editorY, editorWidth, editorHeight, 0.12f, 0.12f, 0.14f, 1.0f);
+                    
+                    var hotReloadBtn = new Button(_scriptEditorPanel.Id, 100f, 30f, "Hot Reload");
+                    UI.SetWidgetLayout(hotReloadBtn.Id, 10f, 10f, 100f, 30f);
+                    hotReloadBtn.SetOnClick(OnHotReloadClick);
+                    
+                    _scriptEditorLabel = new Label(_scriptEditorPanel.Id, 200f, 25f, fileName);
+                    UI.SetWidgetLayout(_scriptEditorLabel.Id, 120f, 10f, 300f, 25f);
+                    
+                    _scriptTextEditId = UI.CreateTextEdit(_scriptEditorPanel.Id, editorWidth - 20f, editorHeight - 50f);
+                    UI.SetWidgetLayout(_scriptTextEditId, 10f, 50f, editorWidth - 20f, editorHeight - 50f);
+                    
+                    _scriptEditorVisible = true;
+                    Console.WriteLine("[Editor] 编辑器面板创建完成");
+                    
+                    // 刷新目录树（保持点击回调有效）
+                    RefreshDirectoryTree();
                 }
                 
+                // 设置文本内容
                 if (_scriptTextEditId != 0)
                 {
+                    Console.WriteLine($"[Editor] 设置TextEdit内容，id={_scriptTextEditId}");
                     UI.TextEditSetText(_scriptTextEditId, content);
-                    Console.WriteLine($"[Editor] 文件已加载: {fileName} ({content.Length} chars)");
+                    Console.WriteLine($"[Editor] ✓ 文件已加载: {fileName}");
                     
                     if (_scriptEditorLabel != null)
                     {
                         _scriptEditorLabel.Text = $"Script Editor - {fileName}";
                     }
                 }
+                else
+                {
+                    Console.WriteLine("[Editor] ERROR: TextEdit id为0");
+                }
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[Editor] ERROR loading file: {ex.Message}");
+                Console.WriteLine($"[Editor] ERROR loading file: {ex.Message}\n{ex.StackTrace}");
             }
         }
     }
