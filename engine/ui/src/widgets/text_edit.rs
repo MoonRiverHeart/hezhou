@@ -454,6 +454,22 @@ impl Widget for TextEdit {
         
         canvas.draw_rect(Rect::new(0.0, 0.0, width, height), &self.style);
         
+        // 渲染选择高亮（在文本之前）
+        if self.selection_start != self.selection_end && !self.char_layouts.is_empty() {
+            let start = self.selection_start.min(self.selection_end);
+            let end = self.selection_start.max(self.selection_end);
+            
+            // 找到选择范围的字符，绘制高亮矩形
+            for layout in &self.char_layouts {
+                if layout.byte_index >= start && layout.byte_index < end {
+                    canvas.draw_rect(
+                        Rect::new(layout.x, layout.y, layout.width, layout.height),
+                        &Style::new().with_background(Color::new(0.3, 0.5, 0.8, 0.3)),
+                    );
+                }
+            }
+        }
+        
         if !self.text.is_empty() {
             canvas.draw_text(
                 Rect::new(10.0, 10.0, width - 20.0, height - 20.0),
@@ -588,18 +604,33 @@ impl Widget for TextEdit {
                 self.focused = true;
                 self.cursor_visible = true;
                 
-                // 不调用 update_char_layouts()（使用估算值）
-                // 而是依赖 draw() 更新的精确 char_layouts
-                
                 // 根据点击位置计算cursor_position
                 if let EventData::Touch(touch_data) = &event.data {
                     let click_x = touch_data.x;
                     let click_y = touch_data.y;
-                    println!("[Click] Click at ({}, {})", click_x, click_y);
+                    let shift_pressed = touch_data.modifiers & 1 != 0;
+                    println!("[Click] Click at ({}, {}), shift={}", click_x, click_y, shift_pressed);
                     
-                    // 反向映射：像素位置 -> 字符索引
-                    // 使用上次 draw() 更新的精确 char_layouts
-                    self.cursor_position = self.find_cursor_position_at(click_x, click_y);
+                    let new_position = self.find_cursor_position_at(click_x, click_y);
+                    
+                    // Shift+点击：文本选择
+                    if shift_pressed {
+                        if self.selection_start == self.selection_end {
+                            // 第一次选择：设置起始位置
+                            self.selection_start = self.cursor_position;
+                            self.selection_end = new_position;
+                        } else {
+                            // 扩展选择：更新结束位置
+                            self.selection_end = new_position;
+                        }
+                        println!("[TextEdit] Selection: {} to {}", self.selection_start, self.selection_end);
+                    } else {
+                        // 普通点击：清除选择，移动光标
+                        self.selection_start = 0;
+                        self.selection_end = 0;
+                        self.cursor_position = new_position;
+                    }
+                    
                     println!("[Click] cursor_position set to {}", self.cursor_position);
                 }
                 
@@ -613,11 +644,20 @@ impl Widget for TextEdit {
                         let ctrl_pressed = key_data.modifiers & 2 != 0;
                         
                         if ctrl_pressed {
-                            // Ctrl+C: 复制全部文本
+                            // Ctrl+C: 复制文本（选中部分或全部）
                             if key_data.keycode == KeyCode::C as u32 {
                                 let mut clipboard = CLIPBOARD.lock();
-                                *clipboard = self.text.clone();
-                                println!("[TextEdit] Ctrl+C: copied {} chars", self.text.len());
+                                if self.selection_start != self.selection_end {
+                                    // 复制选中部分
+                                    let start = self.selection_start.min(self.selection_end);
+                                    let end = self.selection_start.max(self.selection_end);
+                                    *clipboard = self.text[start..end].to_string();
+                                    println!("[TextEdit] Ctrl+C: copied selection {} chars", clipboard.len());
+                                } else {
+                                    // 复制全部文本
+                                    *clipboard = self.text.clone();
+                                    println!("[TextEdit] Ctrl+C: copied all {} chars", self.text.len());
+                                }
                                 return EventResult::Handled;
                             }
                             // Ctrl+V: 粘贴clipboard

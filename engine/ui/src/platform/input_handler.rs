@@ -11,6 +11,8 @@ pub struct UIInputHandler {
     active_pointer_id: i32,
     screen_width: f32,
     screen_height: f32,
+    shift_pressed: bool,
+    ctrl_pressed: bool,
 }
 
 impl UIInputHandler {
@@ -22,6 +24,8 @@ impl UIInputHandler {
             active_pointer_id: 0,
             screen_width: 800.0,
             screen_height: 600.0,
+            shift_pressed: false,
+            ctrl_pressed: false,
         }
     }
     
@@ -114,11 +118,13 @@ impl UIInputHandler {
         let ui_button = convert_mouse_button(mouse.button);
         let x = mouse.x;
         let y = mouse.y;
+        
+        let modifiers = self.get_current_modifiers();
 
         match mouse.action {
             MouseAction::Press => {
                 let mut event = Event::new(EventType::TouchBegin, timestamp)
-                    .with_data(EventData::Touch(TouchData::new(x, y, 0)));
+                    .with_data(EventData::Touch(TouchData::new(x, y, 0).with_modifiers(modifiers)));
 
                 self.event_dispatcher.lock().dispatch_event(&mut event);
             }
@@ -141,6 +147,20 @@ impl UIInputHandler {
     }
 
     pub fn on_key_event(&mut self, key: &KeyEvent, timestamp: u64) {
+        // 追踪 Shift 和 Ctrl 键状态
+        if key.keycode == KeyCode::Shift {
+            match key.action {
+                KeyAction::Press | KeyAction::Repeat => self.shift_pressed = true,
+                KeyAction::Release => self.shift_pressed = false,
+            }
+        }
+        if key.keycode == KeyCode::Ctrl {
+            match key.action {
+                KeyAction::Press | KeyAction::Repeat => self.ctrl_pressed = true,
+                KeyAction::Release => self.ctrl_pressed = false,
+            }
+        }
+
         let modifiers = convert_key_modifiers(&key.modifiers);
 
         let mut event = match key.action {
@@ -151,6 +171,13 @@ impl UIInputHandler {
         };
 
         self.event_dispatcher.lock().dispatch_event(&mut event);
+    }
+    
+    fn get_current_modifiers(&self) -> u32 {
+        let mut flags = 0u32;
+        if self.shift_pressed { flags |= 1; }
+        if self.ctrl_pressed { flags |= 2; }
+        flags
     }
 
     pub fn on_char_event(&mut self, char_event: &CharEvent, timestamp: u64) {

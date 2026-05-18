@@ -115,6 +115,7 @@ pub struct TouchData {
     pub y: f32,
     pub pointer_id: u32,
     pub pressure: f32,
+    pub modifiers: u32,
 }
 
 impl TouchData {
@@ -124,11 +125,17 @@ impl TouchData {
             y,
             pointer_id,
             pressure: 1.0,
+            modifiers: 0,
         }
     }
 
     pub fn with_pressure(mut self, pressure: f32) -> Self {
         self.pressure = pressure;
+        self
+    }
+    
+    pub fn with_modifiers(mut self, modifiers: u32) -> Self {
+        self.modifiers = modifiers;
         self
     }
 }
