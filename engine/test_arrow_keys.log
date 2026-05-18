@@ -1,0 +1,2091 @@
+=== Hezhou Game Editor ===
+
+[布局说明]
+  - 顶部: 工具栏 (40px)
+  - 左侧: 项目结构 (250px)
+  - 左下: 资产管理 (200px)
+  - 中间: 游戏预览区域
+  - 右侧: 属性面板 (250px)
+  - 底部: 状态栏 (30px)
+
+[1] 创建编辑器窗口 (1280x720)...
+[2026-05-18 14:39:01.838][INFO][Vulkan] Creating window 1280x720
+[2026-05-18 14:39:01.856][INFO][Vulkan] Window created 1280x720
+[2026-05-18 14:39:01.861][INFO][Vulkan] Instance created
+[2026-05-18 14:39:01.909][INFO][Vulkan] Instance created
+[2026-05-18 14:39:01.930][INFO][Vulkan] Device created
+[2026-05-18 14:39:01.983][INFO][Vulkan] Swapchain created 1280x720
+[2026-05-18 14:39:01.984][INFO][Vulkan] Render pass created
+[2026-05-18 14:39:01.987][INFO][Vulkan] Pipeline created
+[2026-05-18 14:39:01.987][INFO][Vulkan] Vertex buffer created (64KB)
+[2026-05-18 14:39:02.191][INFO][FontAtlas] Pre-rasterized 426 chars at sizes [32.0, 16.0, 14.0]
+[2026-05-18 14:39:02.194][INFO][UI] UI system initialized
+    窗口创建成功!
+
+[2] 设置UI Root Panel...
+[2026-05-18 14:39:02.195][INFO][UI] Root panel created (C# will create widgets)
+[2026-05-18 14:39:02.197][INFO][UI] UI setup complete (script will create widgets)
+    Root Panel设置完成!
+
+[3] 编译C#编辑器脚本...
+    mcs not found
+[4] 设置FFI Context...
+    FfiContext已设置, ptr=0x1c4fa0bb9f0
+
+[5] 加载Mono DLL...
+    加载成功!
+
+[6] 调用EditorScript.Initialize...
+[Editor] 编辑器初始化开始
+[C#] FfiContext初始化成功
+[Editor] 屏幕尺寸: 1280x720
+[Editor] RootId=10781550615991329865
+[Editor] Panel创建成功: id=10176768383651126819
+[C#] HStack创建成功: id=11075100854149130696, parent=10176768383651126819
+[C#] Button创建成功: id=9596510359867695166, text="新建"
+[Info][UI] 注册OnClick回调: widget=9596510359867695166 callback=0x1c4efbbccf0
+[C#] Button创建成功: id=12338873591276231083, text="打开"
+[Info][UI] 注册OnClick回调: widget=12338873591276231083 callback=0x1c4efbbcf40
+[C#] Button创建成功: id=11785532200113479011, text="保存"
+[Info][UI] 注册OnClick回调: widget=11785532200113479011 callback=0x1c4efbbd150
+[C#] Button创建成功: id=13488973178777614976, text="运行"
+[Info][UI] 注册OnClick回调: widget=13488973178777614976 callback=0x1c4efbbd240
+[C#] Button创建成功: id=12699147518891662575, text="编辑器"
+[Info][UI] 注册OnClick回调: widget=12699147518891662575 callback=0x1c4efbbd330
+[Editor] 工具栏创建完成
+[Editor] Panel创建成功: id=12980793235696532777
+[C#] VStack创建成功: id=13603161712469793101, parent=12980793235696532777
+[Editor] 项目结构面板创建完成
+[Editor] Panel创建成功: id=9607359225180365888
+[C#] VStack创建成功: id=9843569165435079996, parent=9607359225180365888
+[Editor] 资产管理面板创建完成
+[Editor] Panel创建成功: id=11972442000313240050
+[Editor] 游戏预览面板创建完成
+[Editor] Panel创建成功: id=10949536188520323654
+[C#] VStack创建成功: id=11952086891399535719, parent=10949536188520323654
+[Editor] 属性面板创建完成
+[Editor] Panel创建成功: id=10885828342776600110
+[C#] HStack创建成功: id=11816408138806826023, parent=10885828342776600110
+[C#] Label创建成功: id=11826143808593126007, text="FPS: 0"
+[Editor] 状态栏创建完成
+[Info][UI] 注册Resize回调: 0x1c4efbbde10
+[Info][UI] 注册GlobalClick回调: 0x1c4efbbe150
+[Editor] 编辑器初始化完成
+    编辑器UI创建成功!
+
+[7] 开始主循环...
+    FPS显示在状态栏
+
+    Hot Reload: 点击脚本编辑器按钮
+
+[2026-05-18 14:39:02.242][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:39:53.102][INFO][GLFW] process_events: 2 events received
+[2026-05-18 14:39:53.124][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:39:53.143][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:39:53.162][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:39:53.181][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:39:53.201][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:39:53.219][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:39:53.238][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:39:53.257][INFO][GLFW] process_events: 2 events received
+[2026-05-18 14:39:53.277][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:39:53.296][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:39:53.316][INFO][GLFW] process_events: 2 events received
+[2026-05-18 14:39:53.336][INFO][GLFW] process_events: 2 events received
+[2026-05-18 14:39:53.354][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:39:53.373][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:39:53.392][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:39:53.412][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:39:53.431][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:39:53.450][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:39:53.470][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:39:53.489][INFO][GLFW] process_events: 2 events received
+[2026-05-18 14:39:53.507][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:39:53.527][INFO][GLFW] process_events: 2 events received
+[2026-05-18 14:39:53.545][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:39:53.566][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:39:53.585][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:39:53.604][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:39:53.623][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:39:53.642][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:39:53.661][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:39:53.680][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:39:53.699][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:39:53.733][INFO][GLFW] process_events: 3 events received
+[2026-05-18 14:39:53.735][INFO][GLFW] MouseButton: Left Press at (1214, 34)
+[GestureRecognizer] TouchBegin: target=12699147518891662575
+[2026-05-18 14:39:53.857][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:39:53.859][INFO][GLFW] MouseButton: Left Release at (1214, 34)
+[GestureRecognizer] Tap recognized: target=12699147518891662575
+[Editor] 点击"编辑器"切换按钮, id=12699147518891662575
+[Editor] 隐藏主界面...
+[C#] VStack创建成功: id=9495024827548233467, parent=12980793235696532777
+[Editor] 主界面隐藏完成
+[Editor] ShowScriptEditor开始...
+[C#] VStack创建成功: id=9841446685261932540, parent=12980793235696532777
+[Editor] 左侧目录树添加脚本项
+[Editor] Panel创建成功: id=11722472502489928974
+[C#] Button创建成功: id=11110817997883900994, text="Hot Reload"
+[Info][UI] 注册OnClick回调: widget=11110817997883900994 callback=0x1c4efbbf9b0
+[C#] Label创建成功: id=11686656621498338442, text="Script Editor - NewScript.cs"
+[Editor] Script Editor显示成功
+[2026-05-18 14:39:54.251][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:39:54.276][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:39:54.296][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:39:54.315][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:39:54.333][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:39:54.353][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:39:54.371][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:39:54.390][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:39:54.409][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:39:54.628][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:39:54.647][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:39:54.667][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:39:54.686][INFO][GLFW] process_events: 2 events received
+[2026-05-18 14:39:54.705][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:39:54.724][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:39:54.743][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:39:54.763][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:39:54.784][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:39:54.786][INFO][GLFW] MouseButton: Left Press at (492, 337)
+[TextEdit] TouchBegin received
+[Click] Click at (492, 337), shift=false
+[Click] Finding cursor position at (492, 337)
+[Click] Using precise char_layouts (227 graphemes)
+[Click] Closest line_y: 346
+[Click] grapheme 94: x=10, width=8, center_x=14
+[Click]   -> x_distance=478, best_grapheme_idx=95
+[Click] grapheme 95: x=18, width=8, center_x=22
+[Click]   -> x_distance=470, best_grapheme_idx=96
+[Click] grapheme 96: x=26, width=8, center_x=30
+[Click]   -> x_distance=462, best_grapheme_idx=97
+[Click] grapheme 97: x=34, width=8, center_x=38
+[Click]   -> x_distance=454, best_grapheme_idx=98
+[Click] grapheme 98: x=42, width=11.808001, center_x=47.904
+[Click]   -> x_distance=444.096, best_grapheme_idx=99
+[Click] Final grapheme_index=99, byte_index=99
+[Click] cursor_grapheme_index=99, cursor_byte_index=99
+[TextEdit] TouchBegin received
+[Click] Click at (492, 337), shift=false
+[Click] Finding cursor position at (492, 337)
+[Click] Using precise char_layouts (227 graphemes)
+[Click] Closest line_y: 346
+[Click] grapheme 94: x=10, width=8, center_x=14
+[Click]   -> x_distance=478, best_grapheme_idx=95
+[Click] grapheme 95: x=18, width=8, center_x=22
+[Click]   -> x_distance=470, best_grapheme_idx=96
+[Click] grapheme 96: x=26, width=8, center_x=30
+[Click]   -> x_distance=462, best_grapheme_idx=97
+[Click] grapheme 97: x=34, width=8, center_x=38
+[Click]   -> x_distance=454, best_grapheme_idx=98
+[Click] grapheme 98: x=42, width=11.808001, center_x=47.904
+[Click]   -> x_distance=444.096, best_grapheme_idx=99
+[Click] Final grapheme_index=99, byte_index=99
+[Click] cursor_grapheme_index=99, cursor_byte_index=99
+[GestureRecognizer] TouchBegin: target=9717146474332855797
+[2026-05-18 14:39:54.908][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:39:54.910][INFO][GLFW] MouseButton: Left Release at (492, 337)
+[GestureRecognizer] Tap recognized: target=9717146474332855797
+[Editor] GlobalClick at (492, 337)
+[2026-05-18 14:39:55.233][INFO][GLFW] process_events: 2 events received
+[2026-05-18 14:39:55.252][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:39:55.850][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:39:55.859][INFO][GLFW] Key pressed: Up mods=(empty)
+[2026-05-18 14:39:55.960][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:39:56.197][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:39:56.206][INFO][GLFW] Key pressed: Left mods=(empty)
+[2026-05-18 14:39:56.372][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:39:56.558][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:39:56.560][INFO][GLFW] Key pressed: Right mods=(empty)
+[2026-05-18 14:39:56.726][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:39:56.862][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:39:56.864][INFO][GLFW] Key pressed: Down mods=(empty)
+[2026-05-18 14:39:57.049][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:39:57.085][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:39:57.087][INFO][GLFW] Key pressed: Left mods=(empty)
+[2026-05-18 14:39:57.303][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:39:57.312][INFO][GLFW] Key pressed: Up mods=(empty)
+[2026-05-18 14:39:57.329][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:39:57.365][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:39:57.367][INFO][GLFW] Key pressed: Down mods=(empty)
+[2026-05-18 14:39:57.418][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:39:57.488][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:39:57.539][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:39:57.541][INFO][GLFW] Key pressed: Right mods=(empty)
+[2026-05-18 14:39:57.675][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:39:57.676][INFO][GLFW] Key pressed: Down mods=(empty)
+[2026-05-18 14:39:57.777][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:39:57.814][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:39:57.815][INFO][GLFW] Key pressed: Left mods=(empty)
+[2026-05-18 14:39:57.849][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:39:57.968][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:39:57.970][INFO][GLFW] Key pressed: Up mods=(empty)
+[2026-05-18 14:39:58.021][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:39:58.074][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:39:58.076][INFO][GLFW] Key pressed: Right mods=(empty)
+[2026-05-18 14:39:58.110][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:39:58.212][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:39:58.214][INFO][GLFW] Key pressed: Down mods=(empty)
+[2026-05-18 14:39:58.300][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:39:58.335][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:39:58.337][INFO][GLFW] Key pressed: Left mods=(empty)
+[2026-05-18 14:39:58.371][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:39:58.506][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:39:58.507][INFO][GLFW] Key pressed: Up mods=(empty)
+[2026-05-18 14:39:58.542][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:39:58.543][INFO][GLFW] Key pressed: Right mods=(empty)
+[2026-05-18 14:39:58.578][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:39:58.615][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:39:58.700][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:39:58.702][INFO][GLFW] Key pressed: Down mods=(empty)
+[2026-05-18 14:39:58.803][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:39:58.838][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:39:58.839][INFO][GLFW] Key pressed: Left mods=(empty)
+[2026-05-18 14:39:58.874][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:39:58.943][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:39:58.945][INFO][GLFW] Key pressed: Up mods=(empty)
+[2026-05-18 14:39:59.030][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:39:59.032][INFO][GLFW] Key pressed: Right mods=(empty)
+[2026-05-18 14:39:59.084][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:39:59.119][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:39:59.204][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:39:59.206][INFO][GLFW] Key pressed: Down mods=(empty)
+[2026-05-18 14:39:59.308][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:39:59.343][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:39:59.345][INFO][GLFW] Key pressed: Left mods=(empty)
+[2026-05-18 14:39:59.379][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:39:59.449][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:39:59.450][INFO][GLFW] Key pressed: Right mods=(empty)
+[2026-05-18 14:39:59.467][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:39:59.469][INFO][GLFW] Key pressed: Up mods=(empty)
+[2026-05-18 14:39:59.487][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:39:59.523][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:39:59.624][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:39:59.627][INFO][GLFW] Key pressed: Down mods=(empty)
+[2026-05-18 14:39:59.746][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:39:59.766][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:39:59.768][INFO][GLFW] Key pressed: Left mods=(empty)
+[2026-05-18 14:39:59.802][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:39:59.886][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:39:59.888][INFO][GLFW] Key pressed: Right mods=(empty)
+[2026-05-18 14:39:59.939][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:00.058][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:00.060][INFO][GLFW] Key pressed: Down mods=(empty)
+[2026-05-18 14:40:00.209][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:00.248][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:00.250][INFO][GLFW] Key pressed: Left mods=(empty)
+[2026-05-18 14:40:00.267][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:00.303][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:12.613][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:12.639][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:12.659][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:12.678][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:12.697][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:12.715][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:12.734][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:12.752][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:12.771][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:12.790][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:12.810][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:12.829][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:12.882][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:12.901][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:12.920][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:12.940][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:12.959][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:12.979][INFO][GLFW] process_events: 2 events received
+[2026-05-18 14:40:12.981][INFO][GLFW] MouseButton: Left Press at (387, 425)
+[TextEdit] TouchBegin received
+[Click] Click at (387, 425), shift=false
+[Click] Finding cursor position at (387, 425)
+[Click] Using precise char_layouts (227 graphemes)
+[Click] Closest line_y: 442
+[Click] grapheme 149: x=10, width=8, center_x=14
+[Click]   -> x_distance=373, best_grapheme_idx=150
+[Click] grapheme 150: x=18, width=8, center_x=22
+[Click]   -> x_distance=365, best_grapheme_idx=151
+[Click] grapheme 151: x=26, width=8, center_x=30
+[Click]   -> x_distance=357, best_grapheme_idx=152
+[Click] grapheme 152: x=34, width=8, center_x=38
+[Click]   -> x_distance=349, best_grapheme_idx=153
+[Click] grapheme 153: x=42, width=11.808001, center_x=47.904
+[Click]   -> x_distance=339.096, best_grapheme_idx=154
+[Click] Final grapheme_index=154, byte_index=154
+[Click] cursor_grapheme_index=154, cursor_byte_index=154
+[TextEdit] TouchBegin received
+[Click] Click at (387, 425), shift=false
+[Click] Finding cursor position at (387, 425)
+[Click] Using precise char_layouts (227 graphemes)
+[Click] Closest line_y: 442
+[Click] grapheme 149: x=10, width=8, center_x=14
+[Click]   -> x_distance=373, best_grapheme_idx=150
+[Click] grapheme 150: x=18, width=8, center_x=22
+[Click]   -> x_distance=365, best_grapheme_idx=151
+[Click] grapheme 151: x=26, width=8, center_x=30
+[Click]   -> x_distance=357, best_grapheme_idx=152
+[Click] grapheme 152: x=34, width=8, center_x=38
+[Click]   -> x_distance=349, best_grapheme_idx=153
+[Click] grapheme 153: x=42, width=11.808001, center_x=47.904
+[Click]   -> x_distance=339.096, best_grapheme_idx=154
+[Click] Final grapheme_index=154, byte_index=154
+[Click] cursor_grapheme_index=154, cursor_byte_index=154
+[GestureRecognizer] TouchBegin: target=9717146474332855797
+[2026-05-18 14:40:13.117][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:13.119][INFO][GLFW] MouseButton: Left Release at (387, 425)
+[GestureRecognizer] Tap recognized: target=9717146474332855797
+[Editor] GlobalClick at (387, 425)
+[2026-05-18 14:40:13.255][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:13.275][INFO][GLFW] process_events: 2 events received
+[2026-05-18 14:40:13.294][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:13.313][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:13.333][INFO][GLFW] process_events: 2 events received
+[2026-05-18 14:40:13.351][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:13.371][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:13.407][INFO][GLFW] process_events: 2 events received
+[2026-05-18 14:40:13.429][INFO][GLFW] process_events: 2 events received
+[2026-05-18 14:40:13.448][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:13.467][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:13.486][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:13.505][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:13.526][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:13.530][INFO][GLFW] MouseButton: Left Press at (370, 410)
+[TextEdit] TouchBegin received
+[Click] Click at (370, 410), shift=false
+[Click] Finding cursor position at (370, 410)
+[Click] Using precise char_layouts (227 graphemes)
+[Click] Closest line_y: 394
+[Click] grapheme 100: x=10, width=8, center_x=14
+[Click]   -> x_distance=356, best_grapheme_idx=101
+[Click] grapheme 101: x=18, width=8, center_x=22
+[Click]   -> x_distance=348, best_grapheme_idx=102
+[Click] grapheme 102: x=26, width=8, center_x=30
+[Click]   -> x_distance=340, best_grapheme_idx=103
+[Click] grapheme 103: x=34, width=8, center_x=38
+[Click]   -> x_distance=332, best_grapheme_idx=104
+[Click] grapheme 104: x=42, width=8, center_x=46
+[Click]   -> x_distance=324, best_grapheme_idx=105
+[Click] grapheme 105: x=50, width=8, center_x=54
+[Click]   -> x_distance=316, best_grapheme_idx=106
+[Click] grapheme 106: x=58, width=8, center_x=62
+[Click]   -> x_distance=308, best_grapheme_idx=107
+[Click] grapheme 107: x=66, width=8, center_x=70
+[Click]   -> x_distance=300, best_grapheme_idx=108
+[Click] grapheme 108: x=74, width=20.832, center_x=84.416
+[Click]   -> x_distance=285.58398, best_grapheme_idx=109
+[Click] grapheme 109: x=94.832, width=18.912, center_x=104.288
+[Click]   -> x_distance=265.712, best_grapheme_idx=110
+[Click] grapheme 110: x=113.744, width=18.560001, center_x=123.024
+[Click]   -> x_distance=246.976, best_grapheme_idx=111
+[Click] grapheme 111: x=132.304, width=14.56, center_x=139.584
+[Click]   -> x_distance=230.416, best_grapheme_idx=112
+[Click] grapheme 112: x=146.864, width=18.912, center_x=156.31999
+[Click]   -> x_distance=213.68001, best_grapheme_idx=113
+[Click] grapheme 113: x=165.776, width=7.6480002, center_x=169.6
+[Click]   -> x_distance=200.4, best_grapheme_idx=114
+[Click] grapheme 114: x=173.424, width=17.504002, center_x=182.176
+[Click]   -> x_distance=187.824, best_grapheme_idx=115
+[Click] grapheme 115: x=190.928, width=7.392, center_x=194.624
+[Click]   -> x_distance=175.376, best_grapheme_idx=116
+[Click] grapheme 116: x=198.31999, width=30.912, center_x=213.77599
+[Click]   -> x_distance=156.22401, best_grapheme_idx=117
+[Click] grapheme 117: x=229.232, width=11.968, center_x=235.21599
+[Click]   -> x_distance=134.78401, best_grapheme_idx=118
+[Click] grapheme 118: x=241.2, width=7.7120004, center_x=245.056
+[Click]   -> x_distance=124.944, best_grapheme_idx=119
+[Click] grapheme 119: x=248.912, width=11.776001, center_x=254.8
+[Click]   -> x_distance=115.2, best_grapheme_idx=120
+[Click] grapheme 120: x=260.688, width=17.504002, center_x=269.44
+[Click]   -> x_distance=100.56, best_grapheme_idx=121
+[Click] grapheme 121: x=278.192, width=18.112001, center_x=287.248
+[Click]   -> x_distance=82.752014, best_grapheme_idx=122
+[Click] grapheme 122: x=296.304, width=7.7120004, center_x=300.15997
+[Click]   -> x_distance=69.84003, best_grapheme_idx=123
+[Click] grapheme 123: x=304.016, width=18.560001, center_x=313.296
+[Click]   -> x_distance=56.70401, best_grapheme_idx=124
+[Click] grapheme 124: x=322.576, width=17.504002, center_x=331.328
+[Click]   -> x_distance=38.671997, best_grapheme_idx=125
+[Click] grapheme 125: x=340.08, width=11.008, center_x=345.58398
+[Click]   -> x_distance=24.416016, best_grapheme_idx=126
+[Click] grapheme 126: x=351.08798, width=0, center_x=351.08798
+[Click]   -> x_distance=18.912018, best_grapheme_idx=127
+[Click] grapheme 127: x=351.08798, width=23.68, center_x=362.92798
+[Click]   -> x_distance=7.0720215, best_grapheme_idx=128
+[Click] grapheme 128: x=374.76797, width=17.504002, center_x=383.52
+[Click] grapheme 129: x=392.27197, width=24.928001, center_x=404.73596
+[Click] grapheme 130: x=417.19998, width=18.336, center_x=426.36798
+[Click] grapheme 131: x=435.53598, width=15.776001, center_x=443.42398
+[Click] grapheme 132: x=451.31198, width=11.968, center_x=457.296
+[Click] grapheme 133: x=463.27997, width=7.7120004, center_x=467.13596
+[Click] grapheme 134: x=470.99197, width=19.424002, center_x=480.70398
+[Click] grapheme 135: x=490.416, width=11.776001, center_x=496.304
+[Click] grapheme 136: x=502.192, width=8, center_x=506.192
+[Click] grapheme 137: x=510.192, width=14.56, center_x=517.472
+[Click] grapheme 138: x=524.752, width=11.776001, center_x=530.64
+[Click] grapheme 139: x=536.528, width=17.472, center_x=545.26404
+[Click] grapheme 140: x=554, width=11.968, center_x=559.984
+[Click] grapheme 141: x=565.968, width=11.776001, center_x=571.856
+[Click] grapheme 142: x=577.744, width=17.504002, center_x=586.49603
+[Click] grapheme 143: x=595.24805, width=19.424002, center_x=604.96
+[Click] grapheme 144: x=614.67206, width=7.5200005, center_x=618.43207
+[Click] grapheme 145: x=622.1921, width=0, center_x=622.1921
+[Click] grapheme 146: x=622.1921, width=11.008, center_x=627.6961
+[Click] grapheme 147: x=633.2001, width=8.4800005, center_x=637.44006
+[Click] Final grapheme_index=128, byte_index=128
+[Click] cursor_grapheme_index=128, cursor_byte_index=128
+[TextEdit] TouchBegin received
+[Click] Click at (370, 410), shift=false
+[Click] Finding cursor position at (370, 410)
+[Click] Using precise char_layouts (227 graphemes)
+[Click] Closest line_y: 394
+[Click] grapheme 100: x=10, width=8, center_x=14
+[Click]   -> x_distance=356, best_grapheme_idx=101
+[Click] grapheme 101: x=18, width=8, center_x=22
+[Click]   -> x_distance=348, best_grapheme_idx=102
+[Click] grapheme 102: x=26, width=8, center_x=30
+[Click]   -> x_distance=340, best_grapheme_idx=103
+[Click] grapheme 103: x=34, width=8, center_x=38
+[Click]   -> x_distance=332, best_grapheme_idx=104
+[Click] grapheme 104: x=42, width=8, center_x=46
+[Click]   -> x_distance=324, best_grapheme_idx=105
+[Click] grapheme 105: x=50, width=8, center_x=54
+[Click]   -> x_distance=316, best_grapheme_idx=106
+[Click] grapheme 106: x=58, width=8, center_x=62
+[Click]   -> x_distance=308, best_grapheme_idx=107
+[Click] grapheme 107: x=66, width=8, center_x=70
+[Click]   -> x_distance=300, best_grapheme_idx=108
+[Click] grapheme 108: x=74, width=20.832, center_x=84.416
+[Click]   -> x_distance=285.58398, best_grapheme_idx=109
+[Click] grapheme 109: x=94.832, width=18.912, center_x=104.288
+[Click]   -> x_distance=265.712, best_grapheme_idx=110
+[Click] grapheme 110: x=113.744, width=18.560001, center_x=123.024
+[Click]   -> x_distance=246.976, best_grapheme_idx=111
+[Click] grapheme 111: x=132.304, width=14.56, center_x=139.584
+[Click]   -> x_distance=230.416, best_grapheme_idx=112
+[Click] grapheme 112: x=146.864, width=18.912, center_x=156.31999
+[Click]   -> x_distance=213.68001, best_grapheme_idx=113
+[Click] grapheme 113: x=165.776, width=7.6480002, center_x=169.6
+[Click]   -> x_distance=200.4, best_grapheme_idx=114
+[Click] grapheme 114: x=173.424, width=17.504002, center_x=182.176
+[Click]   -> x_distance=187.824, best_grapheme_idx=115
+[Click] grapheme 115: x=190.928, width=7.392, center_x=194.624
+[Click]   -> x_distance=175.376, best_grapheme_idx=116
+[Click] grapheme 116: x=198.31999, width=30.912, center_x=213.77599
+[Click]   -> x_distance=156.22401, best_grapheme_idx=117
+[Click] grapheme 117: x=229.232, width=11.968, center_x=235.21599
+[Click]   -> x_distance=134.78401, best_grapheme_idx=118
+[Click] grapheme 118: x=241.2, width=7.7120004, center_x=245.056
+[Click]   -> x_distance=124.944, best_grapheme_idx=119
+[Click] grapheme 119: x=248.912, width=11.776001, center_x=254.8
+[Click]   -> x_distance=115.2, best_grapheme_idx=120
+[Click] grapheme 120: x=260.688, width=17.504002, center_x=269.44
+[Click]   -> x_distance=100.56, best_grapheme_idx=121
+[Click] grapheme 121: x=278.192, width=18.112001, center_x=287.248
+[Click]   -> x_distance=82.752014, best_grapheme_idx=122
+[Click] grapheme 122: x=296.304, width=7.7120004, center_x=300.15997
+[Click]   -> x_distance=69.84003, best_grapheme_idx=123
+[Click] grapheme 123: x=304.016, width=18.560001, center_x=313.296
+[Click]   -> x_distance=56.70401, best_grapheme_idx=124
+[Click] grapheme 124: x=322.576, width=17.504002, center_x=331.328
+[Click]   -> x_distance=38.671997, best_grapheme_idx=125
+[Click] grapheme 125: x=340.08, width=11.008, center_x=345.58398
+[Click]   -> x_distance=24.416016, best_grapheme_idx=126
+[Click] grapheme 126: x=351.08798, width=0, center_x=351.08798
+[Click]   -> x_distance=18.912018, best_grapheme_idx=127
+[Click] grapheme 127: x=351.08798, width=23.68, center_x=362.92798
+[Click]   -> x_distance=7.0720215, best_grapheme_idx=128
+[Click] grapheme 128: x=374.76797, width=17.504002, center_x=383.52
+[Click] grapheme 129: x=392.27197, width=24.928001, center_x=404.73596
+[Click] grapheme 130: x=417.19998, width=18.336, center_x=426.36798
+[Click] grapheme 131: x=435.53598, width=15.776001, center_x=443.42398
+[Click] grapheme 132: x=451.31198, width=11.968, center_x=457.296
+[Click] grapheme 133: x=463.27997, width=7.7120004, center_x=467.13596
+[Click] grapheme 134: x=470.99197, width=19.424002, center_x=480.70398
+[Click] grapheme 135: x=490.416, width=11.776001, center_x=496.304
+[Click] grapheme 136: x=502.192, width=8, center_x=506.192
+[Click] grapheme 137: x=510.192, width=14.56, center_x=517.472
+[Click] grapheme 138: x=524.752, width=11.776001, center_x=530.64
+[Click] grapheme 139: x=536.528, width=17.472, center_x=545.26404
+[Click] grapheme 140: x=554, width=11.968, center_x=559.984
+[Click] grapheme 141: x=565.968, width=11.776001, center_x=571.856
+[Click] grapheme 142: x=577.744, width=17.504002, center_x=586.49603
+[Click] grapheme 143: x=595.24805, width=19.424002, center_x=604.96
+[Click] grapheme 144: x=614.67206, width=7.5200005, center_x=618.43207
+[Click] grapheme 145: x=622.1921, width=0, center_x=622.1921
+[Click] grapheme 146: x=622.1921, width=11.008, center_x=627.6961
+[Click] grapheme 147: x=633.2001, width=8.4800005, center_x=637.44006
+[Click] Final grapheme_index=128, byte_index=128
+[Click] cursor_grapheme_index=128, cursor_byte_index=128
+[GestureRecognizer] TouchBegin: target=9717146474332855797
+[2026-05-18 14:40:13.634][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:13.636][INFO][GLFW] MouseButton: Left Release at (370, 410)
+[GestureRecognizer] Tap recognized: target=9717146474332855797
+[Editor] GlobalClick at (370, 410)
+[2026-05-18 14:40:13.938][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:13.964][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:13.983][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:14.004][INFO][GLFW] process_events: 2 events received
+[2026-05-18 14:40:14.024][INFO][GLFW] process_events: 2 events received
+[2026-05-18 14:40:14.044][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:14.063][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:14.082][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:14.101][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:14.120][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:14.138][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:14.157][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:14.176][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:14.195][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:14.214][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:14.233][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:14.252][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:14.288][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:14.307][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:14.328][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:14.413][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:14.482][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:14.500][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:14.519][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:14.555][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:14.575][INFO][GLFW] process_events: 2 events received
+[2026-05-18 14:40:14.594][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:14.613][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:14.633][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:14.652][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:14.671][INFO][GLFW] process_events: 2 events received
+[2026-05-18 14:40:14.690][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:14.709][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:14.729][INFO][GLFW] process_events: 2 events received
+[2026-05-18 14:40:14.748][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:14.766][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:14.785][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:14.803][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:14.839][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:14.859][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:14.913][INFO][GLFW] process_events: 2 events received
+[2026-05-18 14:40:14.932][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:14.951][INFO][GLFW] process_events: 2 events received
+[2026-05-18 14:40:14.953][INFO][GLFW] MouseButton: Left Press at (494, 500)
+[TextEdit] TouchBegin received
+[Click] Click at (494, 500), shift=false
+[Click] Finding cursor position at (494, 500)
+[Click] Using precise char_layouts (227 graphemes)
+[Click] Closest line_y: 490
+[Click] grapheme 155: x=10, width=8, center_x=14
+[Click]   -> x_distance=480, best_grapheme_idx=156
+[Click] grapheme 156: x=18, width=8, center_x=22
+[Click]   -> x_distance=472, best_grapheme_idx=157
+[Click] grapheme 157: x=26, width=8, center_x=30
+[Click]   -> x_distance=464, best_grapheme_idx=158
+[Click] grapheme 158: x=34, width=8, center_x=38
+[Click]   -> x_distance=456, best_grapheme_idx=159
+[Click] Final grapheme_index=159, byte_index=159
+[Click] cursor_grapheme_index=159, cursor_byte_index=159
+[TextEdit] TouchBegin received
+[Click] Click at (494, 500), shift=false
+[Click] Finding cursor position at (494, 500)
+[Click] Using precise char_layouts (227 graphemes)
+[Click] Closest line_y: 490
+[Click] grapheme 155: x=10, width=8, center_x=14
+[Click]   -> x_distance=480, best_grapheme_idx=156
+[Click] grapheme 156: x=18, width=8, center_x=22
+[Click]   -> x_distance=472, best_grapheme_idx=157
+[Click] grapheme 157: x=26, width=8, center_x=30
+[Click]   -> x_distance=464, best_grapheme_idx=158
+[Click] grapheme 158: x=34, width=8, center_x=38
+[Click]   -> x_distance=456, best_grapheme_idx=159
+[Click] Final grapheme_index=159, byte_index=159
+[Click] cursor_grapheme_index=159, cursor_byte_index=159
+[GestureRecognizer] TouchBegin: target=9717146474332855797
+[2026-05-18 14:40:15.095][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:15.097][INFO][GLFW] MouseButton: Left Release at (494, 500)
+[GestureRecognizer] Tap recognized: target=9717146474332855797
+[Editor] GlobalClick at (494, 500)
+[2026-05-18 14:40:15.513][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:15.533][INFO][GLFW] process_events: 2 events received
+[2026-05-18 14:40:15.551][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:15.570][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:15.589][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:15.607][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:15.627][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:15.646][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:15.648][INFO][GLFW] MouseButton: Left Press at (444, 492)
+[TextEdit] TouchBegin received
+[Click] Click at (444, 492), shift=false
+[Click] Finding cursor position at (444, 492)
+[Click] Using precise char_layouts (227 graphemes)
+[Click] Closest line_y: 490
+[Click] grapheme 155: x=10, width=8, center_x=14
+[Click]   -> x_distance=430, best_grapheme_idx=156
+[Click] grapheme 156: x=18, width=8, center_x=22
+[Click]   -> x_distance=422, best_grapheme_idx=157
+[Click] grapheme 157: x=26, width=8, center_x=30
+[Click]   -> x_distance=414, best_grapheme_idx=158
+[Click] grapheme 158: x=34, width=8, center_x=38
+[Click]   -> x_distance=406, best_grapheme_idx=159
+[Click] Final grapheme_index=159, byte_index=159
+[Click] cursor_grapheme_index=159, cursor_byte_index=159
+[TextEdit] TouchBegin received
+[Click] Click at (444, 492), shift=false
+[Click] Finding cursor position at (444, 492)
+[Click] Using precise char_layouts (227 graphemes)
+[Click] Closest line_y: 490
+[Click] grapheme 155: x=10, width=8, center_x=14
+[Click]   -> x_distance=430, best_grapheme_idx=156
+[Click] grapheme 156: x=18, width=8, center_x=22
+[Click]   -> x_distance=422, best_grapheme_idx=157
+[Click] grapheme 157: x=26, width=8, center_x=30
+[Click]   -> x_distance=414, best_grapheme_idx=158
+[Click] grapheme 158: x=34, width=8, center_x=38
+[Click]   -> x_distance=406, best_grapheme_idx=159
+[Click] Final grapheme_index=159, byte_index=159
+[Click] cursor_grapheme_index=159, cursor_byte_index=159
+[GestureRecognizer] TouchBegin: target=9717146474332855797
+[2026-05-18 14:40:15.787][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:15.789][INFO][GLFW] MouseButton: Left Release at (444, 492)
+[GestureRecognizer] Tap recognized: target=9717146474332855797
+[Editor] GlobalClick at (444, 492)
+[2026-05-18 14:40:16.054][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:16.080][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:16.099][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:16.118][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:16.137][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:16.157][INFO][GLFW] process_events: 2 events received
+[2026-05-18 14:40:16.159][INFO][GLFW] MouseButton: Left Press at (399, 496)
+[TextEdit] TouchBegin received
+[Click] Click at (399, 496), shift=false
+[Click] Finding cursor position at (399, 496)
+[Click] Using precise char_layouts (227 graphemes)
+[Click] Closest line_y: 490
+[Click] grapheme 155: x=10, width=8, center_x=14
+[Click]   -> x_distance=385, best_grapheme_idx=156
+[Click] grapheme 156: x=18, width=8, center_x=22
+[Click]   -> x_distance=377, best_grapheme_idx=157
+[Click] grapheme 157: x=26, width=8, center_x=30
+[Click]   -> x_distance=369, best_grapheme_idx=158
+[Click] grapheme 158: x=34, width=8, center_x=38
+[Click]   -> x_distance=361, best_grapheme_idx=159
+[Click] Final grapheme_index=159, byte_index=159
+[Click] cursor_grapheme_index=159, cursor_byte_index=159
+[TextEdit] TouchBegin received
+[Click] Click at (399, 496), shift=false
+[Click] Finding cursor position at (399, 496)
+[Click] Using precise char_layouts (227 graphemes)
+[Click] Closest line_y: 490
+[Click] grapheme 155: x=10, width=8, center_x=14
+[Click]   -> x_distance=385, best_grapheme_idx=156
+[Click] grapheme 156: x=18, width=8, center_x=22
+[Click]   -> x_distance=377, best_grapheme_idx=157
+[Click] grapheme 157: x=26, width=8, center_x=30
+[Click]   -> x_distance=369, best_grapheme_idx=158
+[Click] grapheme 158: x=34, width=8, center_x=38
+[Click]   -> x_distance=361, best_grapheme_idx=159
+[Click] Final grapheme_index=159, byte_index=159
+[Click] cursor_grapheme_index=159, cursor_byte_index=159
+[GestureRecognizer] TouchBegin: target=9717146474332855797
+[2026-05-18 14:40:16.315][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:16.317][INFO][GLFW] MouseButton: Left Release at (399, 496)
+[GestureRecognizer] Tap recognized: target=9717146474332855797
+[Editor] GlobalClick at (399, 496)
+[2026-05-18 14:40:16.400][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:16.419][INFO][GLFW] process_events: 2 events received
+[2026-05-18 14:40:16.438][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:16.457][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:16.476][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:16.496][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:16.515][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:16.534][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:16.536][INFO][GLFW] MouseButton: Left Press at (372, 515)
+[TextEdit] TouchBegin received
+[Click] Click at (372, 515), shift=false
+[Click] Finding cursor position at (372, 515)
+[Click] Using precise char_layouts (227 graphemes)
+[Click] Closest line_y: 538
+[Click] grapheme 160: x=10, width=8, center_x=14
+[Click]   -> x_distance=358, best_grapheme_idx=161
+[Click] grapheme 161: x=18, width=8, center_x=22
+[Click]   -> x_distance=350, best_grapheme_idx=162
+[Click] grapheme 162: x=26, width=8, center_x=30
+[Click]   -> x_distance=342, best_grapheme_idx=163
+[Click] grapheme 163: x=34, width=8, center_x=38
+[Click]   -> x_distance=334, best_grapheme_idx=164
+[Click] grapheme 164: x=42, width=19.424002, center_x=51.712
+[Click]   -> x_distance=320.288, best_grapheme_idx=165
+[Click] grapheme 165: x=61.424004, width=18.592001, center_x=70.72
+[Click]   -> x_distance=301.28, best_grapheme_idx=166
+[Click] grapheme 166: x=80.01601, width=19.424002, center_x=89.728004
+[Click]   -> x_distance=282.272, best_grapheme_idx=167
+[Click] grapheme 167: x=99.44001, width=7.6480002, center_x=103.26401
+[Click]   -> x_distance=268.736, best_grapheme_idx=168
+[Click] grapheme 168: x=107.08801, width=7.7120004, center_x=110.944016
+[Click]   -> x_distance=261.05597, best_grapheme_idx=169
+[Click] grapheme 169: x=114.80001, width=15.776001, center_x=122.68801
+[Click]   -> x_distance=249.31198, best_grapheme_idx=170
+[Click] grapheme 170: x=130.57602, width=8, center_x=134.57602
+[Click]   -> x_distance=237.42398, best_grapheme_idx=171
+[Click] grapheme 171: x=138.57602, width=16.480001, center_x=146.81602
+[Click]   -> x_distance=225.18398, best_grapheme_idx=172
+[Click] grapheme 172: x=155.05602, width=18.912, center_x=164.51201
+[Click]   -> x_distance=207.48799, best_grapheme_idx=173
+[Click] grapheme 173: x=173.96802, width=7.7120004, center_x=177.82402
+[Click]   -> x_distance=194.17598, best_grapheme_idx=174
+[Click] grapheme 174: x=181.68002, width=19.424002, center_x=191.39203
+[Click]   -> x_distance=180.60797, best_grapheme_idx=175
+[Click] grapheme 175: x=201.10402, width=8, center_x=205.10402
+[Click]   -> x_distance=166.89598, best_grapheme_idx=176
+[Click] grapheme 176: x=209.10402, width=23.392, center_x=220.80002
+[Click]   -> x_distance=151.19998, best_grapheme_idx=177
+[Click] grapheme 177: x=232.49602, width=19.424002, center_x=242.20802
+[Click]   -> x_distance=129.79198, best_grapheme_idx=178
+[Click] grapheme 178: x=251.92001, width=19.424002, center_x=261.63202
+[Click]   -> x_distance=110.36798, best_grapheme_idx=179
+[Click] grapheme 179: x=271.34402, width=17.472, center_x=280.08002
+[Click]   -> x_distance=91.91998, best_grapheme_idx=180
+[Click] grapheme 180: x=288.81604, width=11.776001, center_x=294.70404
+[Click]   -> x_distance=77.29596, best_grapheme_idx=181
+[Click] grapheme 181: x=300.59204, width=17.504002, center_x=309.34406
+[Click]   -> x_distance=62.655945, best_grapheme_idx=182
+[Click] grapheme 182: x=318.09604, width=11.008, center_x=323.60004
+[Click]   -> x_distance=48.399963, best_grapheme_idx=183
+[Click] grapheme 183: x=329.10403, width=11.008, center_x=334.60803
+[Click]   -> x_distance=37.391968, best_grapheme_idx=184
+[Click] grapheme 184: x=340.11203, width=7.6480002, center_x=343.93604
+[Click]   -> x_distance=28.063965, best_grapheme_idx=185
+[Click] grapheme 185: x=347.76004, width=18.912, center_x=357.21603
+[Click]   -> x_distance=14.783966, best_grapheme_idx=186
+[Click] grapheme 186: x=366.67203, width=17.472, center_x=375.40802
+[Click]   -> x_distance=3.40802, best_grapheme_idx=186
+[Click] grapheme 187: x=384.14404, width=11.776001, center_x=390.03204
+[Click] grapheme 188: x=395.92004, width=8, center_x=399.92004
+[Click] grapheme 189: x=403.92004, width=19.424002, center_x=413.63205
+[Click] grapheme 190: x=423.34406, width=17.504002, center_x=432.09607
+[Click] grapheme 191: x=440.84805, width=7.6480002, center_x=444.67206
+[Click] grapheme 192: x=448.49606, width=11.776001, center_x=454.38406
+[Click] grapheme 193: x=460.27206, width=17.472, center_x=469.00806
+[Click] grapheme 194: x=477.74408, width=18.176, center_x=486.8321
+[Click] grapheme 195: x=495.92007, width=7.7120004, center_x=499.77606
+[Click] grapheme 196: x=503.63208, width=27.328001, center_x=517.2961
+[Click] grapheme 197: x=530.9601, width=17.504002, center_x=539.7121
+[Click] grapheme 198: x=548.4641, width=11.008, center_x=553.96814
+[Click] Final grapheme_index=186, byte_index=186
+[Click] cursor_grapheme_index=186, cursor_byte_index=186
+[TextEdit] TouchBegin received
+[Click] Click at (372, 515), shift=false
+[Click] Finding cursor position at (372, 515)
+[Click] Using precise char_layouts (227 graphemes)
+[Click] Closest line_y: 538
+[Click] grapheme 160: x=10, width=8, center_x=14
+[Click]   -> x_distance=358, best_grapheme_idx=161
+[Click] grapheme 161: x=18, width=8, center_x=22
+[Click]   -> x_distance=350, best_grapheme_idx=162
+[Click] grapheme 162: x=26, width=8, center_x=30
+[Click]   -> x_distance=342, best_grapheme_idx=163
+[Click] grapheme 163: x=34, width=8, center_x=38
+[Click]   -> x_distance=334, best_grapheme_idx=164
+[Click] grapheme 164: x=42, width=19.424002, center_x=51.712
+[Click]   -> x_distance=320.288, best_grapheme_idx=165
+[Click] grapheme 165: x=61.424004, width=18.592001, center_x=70.72
+[Click]   -> x_distance=301.28, best_grapheme_idx=166
+[Click] grapheme 166: x=80.01601, width=19.424002, center_x=89.728004
+[Click]   -> x_distance=282.272, best_grapheme_idx=167
+[Click] grapheme 167: x=99.44001, width=7.6480002, center_x=103.26401
+[Click]   -> x_distance=268.736, best_grapheme_idx=168
+[Click] grapheme 168: x=107.08801, width=7.7120004, center_x=110.944016
+[Click]   -> x_distance=261.05597, best_grapheme_idx=169
+[Click] grapheme 169: x=114.80001, width=15.776001, center_x=122.68801
+[Click]   -> x_distance=249.31198, best_grapheme_idx=170
+[Click] grapheme 170: x=130.57602, width=8, center_x=134.57602
+[Click]   -> x_distance=237.42398, best_grapheme_idx=171
+[Click] grapheme 171: x=138.57602, width=16.480001, center_x=146.81602
+[Click]   -> x_distance=225.18398, best_grapheme_idx=172
+[Click] grapheme 172: x=155.05602, width=18.912, center_x=164.51201
+[Click]   -> x_distance=207.48799, best_grapheme_idx=173
+[Click] grapheme 173: x=173.96802, width=7.7120004, center_x=177.82402
+[Click]   -> x_distance=194.17598, best_grapheme_idx=174
+[Click] grapheme 174: x=181.68002, width=19.424002, center_x=191.39203
+[Click]   -> x_distance=180.60797, best_grapheme_idx=175
+[Click] grapheme 175: x=201.10402, width=8, center_x=205.10402
+[Click]   -> x_distance=166.89598, best_grapheme_idx=176
+[Click] grapheme 176: x=209.10402, width=23.392, center_x=220.80002
+[Click]   -> x_distance=151.19998, best_grapheme_idx=177
+[Click] grapheme 177: x=232.49602, width=19.424002, center_x=242.20802
+[Click]   -> x_distance=129.79198, best_grapheme_idx=178
+[Click] grapheme 178: x=251.92001, width=19.424002, center_x=261.63202
+[Click]   -> x_distance=110.36798, best_grapheme_idx=179
+[Click] grapheme 179: x=271.34402, width=17.472, center_x=280.08002
+[Click]   -> x_distance=91.91998, best_grapheme_idx=180
+[Click] grapheme 180: x=288.81604, width=11.776001, center_x=294.70404
+[Click]   -> x_distance=77.29596, best_grapheme_idx=181
+[Click] grapheme 181: x=300.59204, width=17.504002, center_x=309.34406
+[Click]   -> x_distance=62.655945, best_grapheme_idx=182
+[Click] grapheme 182: x=318.09604, width=11.008, center_x=323.60004
+[Click]   -> x_distance=48.399963, best_grapheme_idx=183
+[Click] grapheme 183: x=329.10403, width=11.008, center_x=334.60803
+[Click]   -> x_distance=37.391968, best_grapheme_idx=184
+[Click] grapheme 184: x=340.11203, width=7.6480002, center_x=343.93604
+[Click]   -> x_distance=28.063965, best_grapheme_idx=185
+[Click] grapheme 185: x=347.76004, width=18.912, center_x=357.21603
+[Click]   -> x_distance=14.783966, best_grapheme_idx=186
+[Click] grapheme 186: x=366.67203, width=17.472, center_x=375.40802
+[Click]   -> x_distance=3.40802, best_grapheme_idx=186
+[Click] grapheme 187: x=384.14404, width=11.776001, center_x=390.03204
+[Click] grapheme 188: x=395.92004, width=8, center_x=399.92004
+[Click] grapheme 189: x=403.92004, width=19.424002, center_x=413.63205
+[Click] grapheme 190: x=423.34406, width=17.504002, center_x=432.09607
+[Click] grapheme 191: x=440.84805, width=7.6480002, center_x=444.67206
+[Click] grapheme 192: x=448.49606, width=11.776001, center_x=454.38406
+[Click] grapheme 193: x=460.27206, width=17.472, center_x=469.00806
+[Click] grapheme 194: x=477.74408, width=18.176, center_x=486.8321
+[Click] grapheme 195: x=495.92007, width=7.7120004, center_x=499.77606
+[Click] grapheme 196: x=503.63208, width=27.328001, center_x=517.2961
+[Click] grapheme 197: x=530.9601, width=17.504002, center_x=539.7121
+[Click] grapheme 198: x=548.4641, width=11.008, center_x=553.96814
+[Click] Final grapheme_index=186, byte_index=186
+[Click] cursor_grapheme_index=186, cursor_byte_index=186
+[GestureRecognizer] TouchBegin: target=9717146474332855797
+[2026-05-18 14:40:16.655][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:16.657][INFO][GLFW] MouseButton: Left Release at (372, 515)
+[GestureRecognizer] Tap recognized: target=9717146474332855797
+[Editor] GlobalClick at (372, 515)
+[2026-05-18 14:40:16.940][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:16.966][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:16.985][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:17.003][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:17.022][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:17.041][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:17.060][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:17.080][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:17.099][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:17.101][INFO][GLFW] MouseButton: Left Press at (357, 597)
+[TextEdit] TouchBegin received
+[Click] Click at (357, 597), shift=false
+[Click] Finding cursor position at (357, 597)
+[Click] Using precise char_layouts (227 graphemes)
+[Click] Closest line_y: 586
+[Click] grapheme 200: x=10, width=8, center_x=14
+[Click]   -> x_distance=343, best_grapheme_idx=201
+[Click] grapheme 201: x=18, width=8, center_x=22
+[Click]   -> x_distance=335, best_grapheme_idx=202
+[Click] grapheme 202: x=26, width=8, center_x=30
+[Click]   -> x_distance=327, best_grapheme_idx=203
+[Click] grapheme 203: x=34, width=8, center_x=38
+[Click]   -> x_distance=319, best_grapheme_idx=204
+[Click] grapheme 204: x=42, width=11.808001, center_x=47.904
+[Click]   -> x_distance=309.096, best_grapheme_idx=205
+[Click] Final grapheme_index=205, byte_index=205
+[Click] cursor_grapheme_index=205, cursor_byte_index=205
+[TextEdit] TouchBegin received
+[Click] Click at (357, 597), shift=false
+[Click] Finding cursor position at (357, 597)
+[Click] Using precise char_layouts (227 graphemes)
+[Click] Closest line_y: 586
+[Click] grapheme 200: x=10, width=8, center_x=14
+[Click]   -> x_distance=343, best_grapheme_idx=201
+[Click] grapheme 201: x=18, width=8, center_x=22
+[Click]   -> x_distance=335, best_grapheme_idx=202
+[Click] grapheme 202: x=26, width=8, center_x=30
+[Click]   -> x_distance=327, best_grapheme_idx=203
+[Click] grapheme 203: x=34, width=8, center_x=38
+[Click]   -> x_distance=319, best_grapheme_idx=204
+[Click] grapheme 204: x=42, width=11.808001, center_x=47.904
+[Click]   -> x_distance=309.096, best_grapheme_idx=205
+[Click] Final grapheme_index=205, byte_index=205
+[Click] cursor_grapheme_index=205, cursor_byte_index=205
+[GestureRecognizer] TouchBegin: target=9717146474332855797
+[2026-05-18 14:40:17.239][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:17.241][INFO][GLFW] MouseButton: Left Release at (357, 597)
+[GestureRecognizer] Tap recognized: target=9717146474332855797
+[Editor] GlobalClick at (357, 597)
+[2026-05-18 14:40:17.379][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:17.398][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:17.418][INFO][GLFW] process_events: 2 events received
+[2026-05-18 14:40:17.437][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:17.456][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:17.475][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:17.494][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:17.513][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:17.532][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:17.551][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:17.571][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:17.607][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:17.712][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:17.714][INFO][GLFW] MouseButton: Left Press at (380, 550)
+[TextEdit] TouchBegin received
+[Click] Click at (380, 550), shift=false
+[Click] Finding cursor position at (380, 550)
+[Click] Using precise char_layouts (227 graphemes)
+[Click] Closest line_y: 538
+[Click] grapheme 160: x=10, width=8, center_x=14
+[Click]   -> x_distance=366, best_grapheme_idx=161
+[Click] grapheme 161: x=18, width=8, center_x=22
+[Click]   -> x_distance=358, best_grapheme_idx=162
+[Click] grapheme 162: x=26, width=8, center_x=30
+[Click]   -> x_distance=350, best_grapheme_idx=163
+[Click] grapheme 163: x=34, width=8, center_x=38
+[Click]   -> x_distance=342, best_grapheme_idx=164
+[Click] grapheme 164: x=42, width=19.424002, center_x=51.712
+[Click]   -> x_distance=328.288, best_grapheme_idx=165
+[Click] grapheme 165: x=61.424004, width=18.592001, center_x=70.72
+[Click]   -> x_distance=309.28, best_grapheme_idx=166
+[Click] grapheme 166: x=80.01601, width=19.424002, center_x=89.728004
+[Click]   -> x_distance=290.272, best_grapheme_idx=167
+[Click] grapheme 167: x=99.44001, width=7.6480002, center_x=103.26401
+[Click]   -> x_distance=276.736, best_grapheme_idx=168
+[Click] grapheme 168: x=107.08801, width=7.7120004, center_x=110.944016
+[Click]   -> x_distance=269.05597, best_grapheme_idx=169
+[Click] grapheme 169: x=114.80001, width=15.776001, center_x=122.68801
+[Click]   -> x_distance=257.31198, best_grapheme_idx=170
+[Click] grapheme 170: x=130.57602, width=8, center_x=134.57602
+[Click]   -> x_distance=245.42398, best_grapheme_idx=171
+[Click] grapheme 171: x=138.57602, width=16.480001, center_x=146.81602
+[Click]   -> x_distance=233.18398, best_grapheme_idx=172
+[Click] grapheme 172: x=155.05602, width=18.912, center_x=164.51201
+[Click]   -> x_distance=215.48799, best_grapheme_idx=173
+[Click] grapheme 173: x=173.96802, width=7.7120004, center_x=177.82402
+[Click]   -> x_distance=202.17598, best_grapheme_idx=174
+[Click] grapheme 174: x=181.68002, width=19.424002, center_x=191.39203
+[Click]   -> x_distance=188.60797, best_grapheme_idx=175
+[Click] grapheme 175: x=201.10402, width=8, center_x=205.10402
+[Click]   -> x_distance=174.89598, best_grapheme_idx=176
+[Click] grapheme 176: x=209.10402, width=23.392, center_x=220.80002
+[Click]   -> x_distance=159.19998, best_grapheme_idx=177
+[Click] grapheme 177: x=232.49602, width=19.424002, center_x=242.20802
+[Click]   -> x_distance=137.79198, best_grapheme_idx=178
+[Click] grapheme 178: x=251.92001, width=19.424002, center_x=261.63202
+[Click]   -> x_distance=118.36798, best_grapheme_idx=179
+[Click] grapheme 179: x=271.34402, width=17.472, center_x=280.08002
+[Click]   -> x_distance=99.91998, best_grapheme_idx=180
+[Click] grapheme 180: x=288.81604, width=11.776001, center_x=294.70404
+[Click]   -> x_distance=85.29596, best_grapheme_idx=181
+[Click] grapheme 181: x=300.59204, width=17.504002, center_x=309.34406
+[Click]   -> x_distance=70.655945, best_grapheme_idx=182
+[Click] grapheme 182: x=318.09604, width=11.008, center_x=323.60004
+[Click]   -> x_distance=56.399963, best_grapheme_idx=183
+[Click] grapheme 183: x=329.10403, width=11.008, center_x=334.60803
+[Click]   -> x_distance=45.391968, best_grapheme_idx=184
+[Click] grapheme 184: x=340.11203, width=7.6480002, center_x=343.93604
+[Click]   -> x_distance=36.063965, best_grapheme_idx=185
+[Click] grapheme 185: x=347.76004, width=18.912, center_x=357.21603
+[Click]   -> x_distance=22.783966, best_grapheme_idx=186
+[Click] grapheme 186: x=366.67203, width=17.472, center_x=375.40802
+[Click]   -> x_distance=4.59198, best_grapheme_idx=187
+[Click] grapheme 187: x=384.14404, width=11.776001, center_x=390.03204
+[Click] grapheme 188: x=395.92004, width=8, center_x=399.92004
+[Click] grapheme 189: x=403.92004, width=19.424002, center_x=413.63205
+[Click] grapheme 190: x=423.34406, width=17.504002, center_x=432.09607
+[Click] grapheme 191: x=440.84805, width=7.6480002, center_x=444.67206
+[Click] grapheme 192: x=448.49606, width=11.776001, center_x=454.38406
+[Click] grapheme 193: x=460.27206, width=17.472, center_x=469.00806
+[Click] grapheme 194: x=477.74408, width=18.176, center_x=486.8321
+[Click] grapheme 195: x=495.92007, width=7.7120004, center_x=499.77606
+[Click] grapheme 196: x=503.63208, width=27.328001, center_x=517.2961
+[Click] grapheme 197: x=530.9601, width=17.504002, center_x=539.7121
+[Click] grapheme 198: x=548.4641, width=11.008, center_x=553.96814
+[Click] Final grapheme_index=187, byte_index=187
+[Click] cursor_grapheme_index=187, cursor_byte_index=187
+[TextEdit] TouchBegin received
+[Click] Click at (380, 550), shift=false
+[Click] Finding cursor position at (380, 550)
+[Click] Using precise char_layouts (227 graphemes)
+[Click] Closest line_y: 538
+[Click] grapheme 160: x=10, width=8, center_x=14
+[Click]   -> x_distance=366, best_grapheme_idx=161
+[Click] grapheme 161: x=18, width=8, center_x=22
+[Click]   -> x_distance=358, best_grapheme_idx=162
+[Click] grapheme 162: x=26, width=8, center_x=30
+[Click]   -> x_distance=350, best_grapheme_idx=163
+[Click] grapheme 163: x=34, width=8, center_x=38
+[Click]   -> x_distance=342, best_grapheme_idx=164
+[Click] grapheme 164: x=42, width=19.424002, center_x=51.712
+[Click]   -> x_distance=328.288, best_grapheme_idx=165
+[Click] grapheme 165: x=61.424004, width=18.592001, center_x=70.72
+[Click]   -> x_distance=309.28, best_grapheme_idx=166
+[Click] grapheme 166: x=80.01601, width=19.424002, center_x=89.728004
+[Click]   -> x_distance=290.272, best_grapheme_idx=167
+[Click] grapheme 167: x=99.44001, width=7.6480002, center_x=103.26401
+[Click]   -> x_distance=276.736, best_grapheme_idx=168
+[Click] grapheme 168: x=107.08801, width=7.7120004, center_x=110.944016
+[Click]   -> x_distance=269.05597, best_grapheme_idx=169
+[Click] grapheme 169: x=114.80001, width=15.776001, center_x=122.68801
+[Click]   -> x_distance=257.31198, best_grapheme_idx=170
+[Click] grapheme 170: x=130.57602, width=8, center_x=134.57602
+[Click]   -> x_distance=245.42398, best_grapheme_idx=171
+[Click] grapheme 171: x=138.57602, width=16.480001, center_x=146.81602
+[Click]   -> x_distance=233.18398, best_grapheme_idx=172
+[Click] grapheme 172: x=155.05602, width=18.912, center_x=164.51201
+[Click]   -> x_distance=215.48799, best_grapheme_idx=173
+[Click] grapheme 173: x=173.96802, width=7.7120004, center_x=177.82402
+[Click]   -> x_distance=202.17598, best_grapheme_idx=174
+[Click] grapheme 174: x=181.68002, width=19.424002, center_x=191.39203
+[Click]   -> x_distance=188.60797, best_grapheme_idx=175
+[Click] grapheme 175: x=201.10402, width=8, center_x=205.10402
+[Click]   -> x_distance=174.89598, best_grapheme_idx=176
+[Click] grapheme 176: x=209.10402, width=23.392, center_x=220.80002
+[Click]   -> x_distance=159.19998, best_grapheme_idx=177
+[Click] grapheme 177: x=232.49602, width=19.424002, center_x=242.20802
+[Click]   -> x_distance=137.79198, best_grapheme_idx=178
+[Click] grapheme 178: x=251.92001, width=19.424002, center_x=261.63202
+[Click]   -> x_distance=118.36798, best_grapheme_idx=179
+[Click] grapheme 179: x=271.34402, width=17.472, center_x=280.08002
+[Click]   -> x_distance=99.91998, best_grapheme_idx=180
+[Click] grapheme 180: x=288.81604, width=11.776001, center_x=294.70404
+[Click]   -> x_distance=85.29596, best_grapheme_idx=181
+[Click] grapheme 181: x=300.59204, width=17.504002, center_x=309.34406
+[Click]   -> x_distance=70.655945, best_grapheme_idx=182
+[Click] grapheme 182: x=318.09604, width=11.008, center_x=323.60004
+[Click]   -> x_distance=56.399963, best_grapheme_idx=183
+[Click] grapheme 183: x=329.10403, width=11.008, center_x=334.60803
+[Click]   -> x_distance=45.391968, best_grapheme_idx=184
+[Click] grapheme 184: x=340.11203, width=7.6480002, center_x=343.93604
+[Click]   -> x_distance=36.063965, best_grapheme_idx=185
+[Click] grapheme 185: x=347.76004, width=18.912, center_x=357.21603
+[Click]   -> x_distance=22.783966, best_grapheme_idx=186
+[Click] grapheme 186: x=366.67203, width=17.472, center_x=375.40802
+[Click]   -> x_distance=4.59198, best_grapheme_idx=187
+[Click] grapheme 187: x=384.14404, width=11.776001, center_x=390.03204
+[Click] grapheme 188: x=395.92004, width=8, center_x=399.92004
+[Click] grapheme 189: x=403.92004, width=19.424002, center_x=413.63205
+[Click] grapheme 190: x=423.34406, width=17.504002, center_x=432.09607
+[Click] grapheme 191: x=440.84805, width=7.6480002, center_x=444.67206
+[Click] grapheme 192: x=448.49606, width=11.776001, center_x=454.38406
+[Click] grapheme 193: x=460.27206, width=17.472, center_x=469.00806
+[Click] grapheme 194: x=477.74408, width=18.176, center_x=486.8321
+[Click] grapheme 195: x=495.92007, width=7.7120004, center_x=499.77606
+[Click] grapheme 196: x=503.63208, width=27.328001, center_x=517.2961
+[Click] grapheme 197: x=530.9601, width=17.504002, center_x=539.7121
+[Click] grapheme 198: x=548.4641, width=11.008, center_x=553.96814
+[Click] Final grapheme_index=187, byte_index=187
+[Click] cursor_grapheme_index=187, cursor_byte_index=187
+[GestureRecognizer] TouchBegin: target=9717146474332855797
+[2026-05-18 14:40:17.834][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:17.836][INFO][GLFW] MouseButton: Left Release at (380, 550)
+[GestureRecognizer] Tap recognized: target=9717146474332855797
+[Editor] GlobalClick at (380, 550)
+[2026-05-18 14:40:18.369][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:18.396][INFO][GLFW] process_events: 2 events received
+[2026-05-18 14:40:18.415][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:18.434][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:18.453][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:18.472][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:18.492][INFO][GLFW] process_events: 2 events received
+[2026-05-18 14:40:18.511][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:18.530][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:18.549][INFO][GLFW] process_events: 2 events received
+[2026-05-18 14:40:18.568][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:18.586][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:18.605][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:18.626][INFO][GLFW] process_events: 2 events received
+[2026-05-18 14:40:18.627][INFO][GLFW] MouseButton: Left Press at (377, 508)
+[TextEdit] TouchBegin received
+[Click] Click at (377, 508), shift=false
+[Click] Finding cursor position at (377, 508)
+[Click] Using precise char_layouts (227 graphemes)
+[Click] Closest line_y: 490
+[Click] grapheme 155: x=10, width=8, center_x=14
+[Click]   -> x_distance=363, best_grapheme_idx=156
+[Click] grapheme 156: x=18, width=8, center_x=22
+[Click]   -> x_distance=355, best_grapheme_idx=157
+[Click] grapheme 157: x=26, width=8, center_x=30
+[Click]   -> x_distance=347, best_grapheme_idx=158
+[Click] grapheme 158: x=34, width=8, center_x=38
+[Click]   -> x_distance=339, best_grapheme_idx=159
+[Click] Final grapheme_index=159, byte_index=159
+[Click] cursor_grapheme_index=159, cursor_byte_index=159
+[TextEdit] TouchBegin received
+[Click] Click at (377, 508), shift=false
+[Click] Finding cursor position at (377, 508)
+[Click] Using precise char_layouts (227 graphemes)
+[Click] Closest line_y: 490
+[Click] grapheme 155: x=10, width=8, center_x=14
+[Click]   -> x_distance=363, best_grapheme_idx=156
+[Click] grapheme 156: x=18, width=8, center_x=22
+[Click]   -> x_distance=355, best_grapheme_idx=157
+[Click] grapheme 157: x=26, width=8, center_x=30
+[Click]   -> x_distance=347, best_grapheme_idx=158
+[Click] grapheme 158: x=34, width=8, center_x=38
+[Click]   -> x_distance=339, best_grapheme_idx=159
+[Click] Final grapheme_index=159, byte_index=159
+[Click] cursor_grapheme_index=159, cursor_byte_index=159
+[GestureRecognizer] TouchBegin: target=9717146474332855797
+[2026-05-18 14:40:18.732][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:18.735][INFO][GLFW] MouseButton: Left Release at (377, 508)
+[GestureRecognizer] Tap recognized: target=9717146474332855797
+[Editor] GlobalClick at (377, 508)
+[2026-05-18 14:40:18.884][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:18.903][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:18.922][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:18.941][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:18.961][INFO][GLFW] process_events: 2 events received
+[2026-05-18 14:40:18.980][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:18.998][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:19.018][INFO][GLFW] process_events: 2 events received
+[2026-05-18 14:40:19.036][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:19.055][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:19.074][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:19.095][INFO][GLFW] process_events: 2 events received
+[2026-05-18 14:40:19.097][INFO][GLFW] MouseButton: Left Press at (349, 431)
+[TextEdit] TouchBegin received
+[Click] Click at (349, 431), shift=false
+[Click] Finding cursor position at (349, 431)
+[Click] Using precise char_layouts (227 graphemes)
+[Click] Closest line_y: 442
+[Click] grapheme 149: x=10, width=8, center_x=14
+[Click]   -> x_distance=335, best_grapheme_idx=150
+[Click] grapheme 150: x=18, width=8, center_x=22
+[Click]   -> x_distance=327, best_grapheme_idx=151
+[Click] grapheme 151: x=26, width=8, center_x=30
+[Click]   -> x_distance=319, best_grapheme_idx=152
+[Click] grapheme 152: x=34, width=8, center_x=38
+[Click]   -> x_distance=311, best_grapheme_idx=153
+[Click] grapheme 153: x=42, width=11.808001, center_x=47.904
+[Click]   -> x_distance=301.096, best_grapheme_idx=154
+[Click] Final grapheme_index=154, byte_index=154
+[Click] cursor_grapheme_index=154, cursor_byte_index=154
+[TextEdit] TouchBegin received
+[Click] Click at (349, 431), shift=false
+[Click] Finding cursor position at (349, 431)
+[Click] Using precise char_layouts (227 graphemes)
+[Click] Closest line_y: 442
+[Click] grapheme 149: x=10, width=8, center_x=14
+[Click]   -> x_distance=335, best_grapheme_idx=150
+[Click] grapheme 150: x=18, width=8, center_x=22
+[Click]   -> x_distance=327, best_grapheme_idx=151
+[Click] grapheme 151: x=26, width=8, center_x=30
+[Click]   -> x_distance=319, best_grapheme_idx=152
+[Click] grapheme 152: x=34, width=8, center_x=38
+[Click]   -> x_distance=311, best_grapheme_idx=153
+[Click] grapheme 153: x=42, width=11.808001, center_x=47.904
+[Click]   -> x_distance=301.096, best_grapheme_idx=154
+[Click] Final grapheme_index=154, byte_index=154
+[Click] cursor_grapheme_index=154, cursor_byte_index=154
+[GestureRecognizer] TouchBegin: target=9717146474332855797
+[2026-05-18 14:40:19.219][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:19.221][INFO][GLFW] MouseButton: Left Release at (349, 431)
+[GestureRecognizer] Tap recognized: target=9717146474332855797
+[Editor] GlobalClick at (349, 431)
+[2026-05-18 14:40:19.338][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:19.359][INFO][GLFW] process_events: 2 events received
+[2026-05-18 14:40:19.377][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:19.396][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:19.415][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:19.434][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:19.452][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:19.471][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:19.490][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:19.511][INFO][GLFW] process_events: 2 events received
+[2026-05-18 14:40:19.547][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:19.549][INFO][GLFW] MouseButton: Left Press at (327, 371)
+[TextEdit] TouchBegin received
+[Click] Click at (327, 371), shift=false
+[Click] Finding cursor position at (327, 371)
+[Click] Using precise char_layouts (227 graphemes)
+[Click] Closest line_y: 394
+[Click] grapheme 100: x=10, width=8, center_x=14
+[Click]   -> x_distance=313, best_grapheme_idx=101
+[Click] grapheme 101: x=18, width=8, center_x=22
+[Click]   -> x_distance=305, best_grapheme_idx=102
+[Click] grapheme 102: x=26, width=8, center_x=30
+[Click]   -> x_distance=297, best_grapheme_idx=103
+[Click] grapheme 103: x=34, width=8, center_x=38
+[Click]   -> x_distance=289, best_grapheme_idx=104
+[Click] grapheme 104: x=42, width=8, center_x=46
+[Click]   -> x_distance=281, best_grapheme_idx=105
+[Click] grapheme 105: x=50, width=8, center_x=54
+[Click]   -> x_distance=273, best_grapheme_idx=106
+[Click] grapheme 106: x=58, width=8, center_x=62
+[Click]   -> x_distance=265, best_grapheme_idx=107
+[Click] grapheme 107: x=66, width=8, center_x=70
+[Click]   -> x_distance=257, best_grapheme_idx=108
+[Click] grapheme 108: x=74, width=20.832, center_x=84.416
+[Click]   -> x_distance=242.584, best_grapheme_idx=109
+[Click] grapheme 109: x=94.832, width=18.912, center_x=104.288
+[Click]   -> x_distance=222.712, best_grapheme_idx=110
+[Click] grapheme 110: x=113.744, width=18.560001, center_x=123.024
+[Click]   -> x_distance=203.976, best_grapheme_idx=111
+[Click] grapheme 111: x=132.304, width=14.56, center_x=139.584
+[Click]   -> x_distance=187.416, best_grapheme_idx=112
+[Click] grapheme 112: x=146.864, width=18.912, center_x=156.31999
+[Click]   -> x_distance=170.68001, best_grapheme_idx=113
+[Click] grapheme 113: x=165.776, width=7.6480002, center_x=169.6
+[Click]   -> x_distance=157.4, best_grapheme_idx=114
+[Click] grapheme 114: x=173.424, width=17.504002, center_x=182.176
+[Click]   -> x_distance=144.824, best_grapheme_idx=115
+[Click] grapheme 115: x=190.928, width=7.392, center_x=194.624
+[Click]   -> x_distance=132.376, best_grapheme_idx=116
+[Click] grapheme 116: x=198.31999, width=30.912, center_x=213.77599
+[Click]   -> x_distance=113.224014, best_grapheme_idx=117
+[Click] grapheme 117: x=229.232, width=11.968, center_x=235.21599
+[Click]   -> x_distance=91.78401, best_grapheme_idx=118
+[Click] grapheme 118: x=241.2, width=7.7120004, center_x=245.056
+[Click]   -> x_distance=81.944, best_grapheme_idx=119
+[Click] grapheme 119: x=248.912, width=11.776001, center_x=254.8
+[Click]   -> x_distance=72.2, best_grapheme_idx=120
+[Click] grapheme 120: x=260.688, width=17.504002, center_x=269.44
+[Click]   -> x_distance=57.559998, best_grapheme_idx=121
+[Click] grapheme 121: x=278.192, width=18.112001, center_x=287.248
+[Click]   -> x_distance=39.752014, best_grapheme_idx=122
+[Click] grapheme 122: x=296.304, width=7.7120004, center_x=300.15997
+[Click]   -> x_distance=26.840027, best_grapheme_idx=123
+[Click] grapheme 123: x=304.016, width=18.560001, center_x=313.296
+[Click]   -> x_distance=13.70401, best_grapheme_idx=124
+[Click] grapheme 124: x=322.576, width=17.504002, center_x=331.328
+[Click]   -> x_distance=4.328003, best_grapheme_idx=124
+[Click] grapheme 125: x=340.08, width=11.008, center_x=345.58398
+[Click] grapheme 126: x=351.08798, width=0, center_x=351.08798
+[Click] grapheme 127: x=351.08798, width=23.68, center_x=362.92798
+[Click] grapheme 128: x=374.76797, width=17.504002, center_x=383.52
+[Click] grapheme 129: x=392.27197, width=24.928001, center_x=404.73596
+[Click] grapheme 130: x=417.19998, width=18.336, center_x=426.36798
+[Click] grapheme 131: x=435.53598, width=15.776001, center_x=443.42398
+[Click] grapheme 132: x=451.31198, width=11.968, center_x=457.296
+[Click] grapheme 133: x=463.27997, width=7.7120004, center_x=467.13596
+[Click] grapheme 134: x=470.99197, width=19.424002, center_x=480.70398
+[Click] grapheme 135: x=490.416, width=11.776001, center_x=496.304
+[Click] grapheme 136: x=502.192, width=8, center_x=506.192
+[Click] grapheme 137: x=510.192, width=14.56, center_x=517.472
+[Click] grapheme 138: x=524.752, width=11.776001, center_x=530.64
+[Click] grapheme 139: x=536.528, width=17.472, center_x=545.26404
+[Click] grapheme 140: x=554, width=11.968, center_x=559.984
+[Click] grapheme 141: x=565.968, width=11.776001, center_x=571.856
+[Click] grapheme 142: x=577.744, width=17.504002, center_x=586.49603
+[Click] grapheme 143: x=595.24805, width=19.424002, center_x=604.96
+[Click] grapheme 144: x=614.67206, width=7.5200005, center_x=618.43207
+[Click] grapheme 145: x=622.1921, width=0, center_x=622.1921
+[Click] grapheme 146: x=622.1921, width=11.008, center_x=627.6961
+[Click] grapheme 147: x=633.2001, width=8.4800005, center_x=637.44006
+[Click] Final grapheme_index=124, byte_index=124
+[Click] cursor_grapheme_index=124, cursor_byte_index=124
+[TextEdit] TouchBegin received
+[Click] Click at (327, 371), shift=false
+[Click] Finding cursor position at (327, 371)
+[Click] Using precise char_layouts (227 graphemes)
+[Click] Closest line_y: 394
+[Click] grapheme 100: x=10, width=8, center_x=14
+[Click]   -> x_distance=313, best_grapheme_idx=101
+[Click] grapheme 101: x=18, width=8, center_x=22
+[Click]   -> x_distance=305, best_grapheme_idx=102
+[Click] grapheme 102: x=26, width=8, center_x=30
+[Click]   -> x_distance=297, best_grapheme_idx=103
+[Click] grapheme 103: x=34, width=8, center_x=38
+[Click]   -> x_distance=289, best_grapheme_idx=104
+[Click] grapheme 104: x=42, width=8, center_x=46
+[Click]   -> x_distance=281, best_grapheme_idx=105
+[Click] grapheme 105: x=50, width=8, center_x=54
+[Click]   -> x_distance=273, best_grapheme_idx=106
+[Click] grapheme 106: x=58, width=8, center_x=62
+[Click]   -> x_distance=265, best_grapheme_idx=107
+[Click] grapheme 107: x=66, width=8, center_x=70
+[Click]   -> x_distance=257, best_grapheme_idx=108
+[Click] grapheme 108: x=74, width=20.832, center_x=84.416
+[Click]   -> x_distance=242.584, best_grapheme_idx=109
+[Click] grapheme 109: x=94.832, width=18.912, center_x=104.288
+[Click]   -> x_distance=222.712, best_grapheme_idx=110
+[Click] grapheme 110: x=113.744, width=18.560001, center_x=123.024
+[Click]   -> x_distance=203.976, best_grapheme_idx=111
+[Click] grapheme 111: x=132.304, width=14.56, center_x=139.584
+[Click]   -> x_distance=187.416, best_grapheme_idx=112
+[Click] grapheme 112: x=146.864, width=18.912, center_x=156.31999
+[Click]   -> x_distance=170.68001, best_grapheme_idx=113
+[Click] grapheme 113: x=165.776, width=7.6480002, center_x=169.6
+[Click]   -> x_distance=157.4, best_grapheme_idx=114
+[Click] grapheme 114: x=173.424, width=17.504002, center_x=182.176
+[Click]   -> x_distance=144.824, best_grapheme_idx=115
+[Click] grapheme 115: x=190.928, width=7.392, center_x=194.624
+[Click]   -> x_distance=132.376, best_grapheme_idx=116
+[Click] grapheme 116: x=198.31999, width=30.912, center_x=213.77599
+[Click]   -> x_distance=113.224014, best_grapheme_idx=117
+[Click] grapheme 117: x=229.232, width=11.968, center_x=235.21599
+[Click]   -> x_distance=91.78401, best_grapheme_idx=118
+[Click] grapheme 118: x=241.2, width=7.7120004, center_x=245.056
+[Click]   -> x_distance=81.944, best_grapheme_idx=119
+[Click] grapheme 119: x=248.912, width=11.776001, center_x=254.8
+[Click]   -> x_distance=72.2, best_grapheme_idx=120
+[Click] grapheme 120: x=260.688, width=17.504002, center_x=269.44
+[Click]   -> x_distance=57.559998, best_grapheme_idx=121
+[Click] grapheme 121: x=278.192, width=18.112001, center_x=287.248
+[Click]   -> x_distance=39.752014, best_grapheme_idx=122
+[Click] grapheme 122: x=296.304, width=7.7120004, center_x=300.15997
+[Click]   -> x_distance=26.840027, best_grapheme_idx=123
+[Click] grapheme 123: x=304.016, width=18.560001, center_x=313.296
+[Click]   -> x_distance=13.70401, best_grapheme_idx=124
+[Click] grapheme 124: x=322.576, width=17.504002, center_x=331.328
+[Click]   -> x_distance=4.328003, best_grapheme_idx=124
+[Click] grapheme 125: x=340.08, width=11.008, center_x=345.58398
+[Click] grapheme 126: x=351.08798, width=0, center_x=351.08798
+[Click] grapheme 127: x=351.08798, width=23.68, center_x=362.92798
+[Click] grapheme 128: x=374.76797, width=17.504002, center_x=383.52
+[Click] grapheme 129: x=392.27197, width=24.928001, center_x=404.73596
+[Click] grapheme 130: x=417.19998, width=18.336, center_x=426.36798
+[Click] grapheme 131: x=435.53598, width=15.776001, center_x=443.42398
+[Click] grapheme 132: x=451.31198, width=11.968, center_x=457.296
+[Click] grapheme 133: x=463.27997, width=7.7120004, center_x=467.13596
+[Click] grapheme 134: x=470.99197, width=19.424002, center_x=480.70398
+[Click] grapheme 135: x=490.416, width=11.776001, center_x=496.304
+[Click] grapheme 136: x=502.192, width=8, center_x=506.192
+[Click] grapheme 137: x=510.192, width=14.56, center_x=517.472
+[Click] grapheme 138: x=524.752, width=11.776001, center_x=530.64
+[Click] grapheme 139: x=536.528, width=17.472, center_x=545.26404
+[Click] grapheme 140: x=554, width=11.968, center_x=559.984
+[Click] grapheme 141: x=565.968, width=11.776001, center_x=571.856
+[Click] grapheme 142: x=577.744, width=17.504002, center_x=586.49603
+[Click] grapheme 143: x=595.24805, width=19.424002, center_x=604.96
+[Click] grapheme 144: x=614.67206, width=7.5200005, center_x=618.43207
+[Click] grapheme 145: x=622.1921, width=0, center_x=622.1921
+[Click] grapheme 146: x=622.1921, width=11.008, center_x=627.6961
+[Click] grapheme 147: x=633.2001, width=8.4800005, center_x=637.44006
+[Click] Final grapheme_index=124, byte_index=124
+[Click] cursor_grapheme_index=124, cursor_byte_index=124
+[GestureRecognizer] TouchBegin: target=9717146474332855797
+[2026-05-18 14:40:19.721][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:19.723][INFO][GLFW] MouseButton: Left Release at (327, 371)
+[GestureRecognizer] Tap recognized: target=9717146474332855797
+[Editor] GlobalClick at (327, 371)
+[2026-05-18 14:40:20.259][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:20.285][INFO][GLFW] process_events: 2 events received
+[2026-05-18 14:40:20.304][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:20.322][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:20.342][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:20.360][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:20.379][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:20.397][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:20.433][INFO][GLFW] process_events: 2 events received
+[2026-05-18 14:40:20.435][INFO][GLFW] MouseButton: Left Press at (314, 346)
+[TextEdit] TouchBegin received
+[Click] Click at (314, 346), shift=false
+[Click] Finding cursor position at (314, 346)
+[Click] Using precise char_layouts (227 graphemes)
+[Click] Closest line_y: 346
+[Click] grapheme 94: x=10, width=8, center_x=14
+[Click]   -> x_distance=300, best_grapheme_idx=95
+[Click] grapheme 95: x=18, width=8, center_x=22
+[Click]   -> x_distance=292, best_grapheme_idx=96
+[Click] grapheme 96: x=26, width=8, center_x=30
+[Click]   -> x_distance=284, best_grapheme_idx=97
+[Click] grapheme 97: x=34, width=8, center_x=38
+[Click]   -> x_distance=276, best_grapheme_idx=98
+[Click] grapheme 98: x=42, width=11.808001, center_x=47.904
+[Click]   -> x_distance=266.096, best_grapheme_idx=99
+[Click] Final grapheme_index=99, byte_index=99
+[Click] cursor_grapheme_index=99, cursor_byte_index=99
+[TextEdit] TouchBegin received
+[Click] Click at (314, 346), shift=false
+[Click] Finding cursor position at (314, 346)
+[Click] Using precise char_layouts (227 graphemes)
+[Click] Closest line_y: 346
+[Click] grapheme 94: x=10, width=8, center_x=14
+[Click]   -> x_distance=300, best_grapheme_idx=95
+[Click] grapheme 95: x=18, width=8, center_x=22
+[Click]   -> x_distance=292, best_grapheme_idx=96
+[Click] grapheme 96: x=26, width=8, center_x=30
+[Click]   -> x_distance=284, best_grapheme_idx=97
+[Click] grapheme 97: x=34, width=8, center_x=38
+[Click]   -> x_distance=276, best_grapheme_idx=98
+[Click] grapheme 98: x=42, width=11.808001, center_x=47.904
+[Click]   -> x_distance=266.096, best_grapheme_idx=99
+[Click] Final grapheme_index=99, byte_index=99
+[Click] cursor_grapheme_index=99, cursor_byte_index=99
+[GestureRecognizer] TouchBegin: target=9717146474332855797
+[2026-05-18 14:40:20.639][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:20.641][INFO][GLFW] MouseButton: Left Release at (314, 346)
+[GestureRecognizer] Tap recognized: target=9717146474332855797
+[Editor] GlobalClick at (314, 346)
+[2026-05-18 14:40:20.760][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:20.779][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:20.798][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:20.817][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:20.836][INFO][GLFW] process_events: 2 events received
+[2026-05-18 14:40:20.855][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:20.875][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:20.895][INFO][GLFW] process_events: 2 events received
+[2026-05-18 14:40:20.913][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:20.932][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:20.951][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:20.969][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:20.988][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:21.009][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:21.077][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:21.078][INFO][GLFW] MouseButton: Left Press at (319, 317)
+[TextEdit] TouchBegin received
+[Click] Click at (319, 317), shift=false
+[Click] Finding cursor position at (319, 317)
+[Click] Using precise char_layouts (227 graphemes)
+[Click] Closest line_y: 298
+[Click] grapheme 70: x=10, width=8, center_x=14
+[Click]   -> x_distance=305, best_grapheme_idx=71
+[Click] grapheme 71: x=18, width=8, center_x=22
+[Click]   -> x_distance=297, best_grapheme_idx=72
+[Click] grapheme 72: x=26, width=8, center_x=30
+[Click]   -> x_distance=289, best_grapheme_idx=73
+[Click] grapheme 73: x=34, width=8, center_x=38
+[Click]   -> x_distance=281, best_grapheme_idx=74
+[Click] grapheme 74: x=42, width=19.424002, center_x=51.712
+[Click]   -> x_distance=267.288, best_grapheme_idx=75
+[Click] grapheme 75: x=61.424004, width=18.592001, center_x=70.72
+[Click]   -> x_distance=248.28, best_grapheme_idx=76
+[Click] grapheme 76: x=80.01601, width=19.424002, center_x=89.728004
+[Click]   -> x_distance=229.272, best_grapheme_idx=77
+[Click] grapheme 77: x=99.44001, width=7.6480002, center_x=103.26401
+[Click]   -> x_distance=215.736, best_grapheme_idx=78
+[Click] grapheme 78: x=107.08801, width=7.7120004, center_x=110.944016
+[Click]   -> x_distance=208.05598, best_grapheme_idx=79
+[Click] grapheme 79: x=114.80001, width=15.776001, center_x=122.68801
+[Click]   -> x_distance=196.31198, best_grapheme_idx=80
+[Click] grapheme 80: x=130.57602, width=8, center_x=134.57602
+[Click]   -> x_distance=184.42398, best_grapheme_idx=81
+[Click] grapheme 81: x=138.57602, width=16.480001, center_x=146.81602
+[Click]   -> x_distance=172.18398, best_grapheme_idx=82
+[Click] grapheme 82: x=155.05602, width=18.912, center_x=164.51201
+[Click]   -> x_distance=154.48799, best_grapheme_idx=83
+[Click] grapheme 83: x=173.96802, width=7.7120004, center_x=177.82402
+[Click]   -> x_distance=141.17598, best_grapheme_idx=84
+[Click] grapheme 84: x=181.68002, width=19.424002, center_x=191.39203
+[Click]   -> x_distance=127.60797, best_grapheme_idx=85
+[Click] grapheme 85: x=201.10402, width=8, center_x=205.10402
+[Click]   -> x_distance=113.89598, best_grapheme_idx=86
+[Click] grapheme 86: x=209.10402, width=18.336, center_x=218.27202
+[Click]   -> x_distance=100.72798, best_grapheme_idx=87
+[Click] grapheme 87: x=227.44002, width=11.776001, center_x=233.32802
+[Click]   -> x_distance=85.67198, best_grapheme_idx=88
+[Click] grapheme 88: x=239.21602, width=17.472, center_x=247.95203
+[Click]   -> x_distance=71.04797, best_grapheme_idx=89
+[Click] grapheme 89: x=256.68802, width=11.968, center_x=262.67203
+[Click]   -> x_distance=56.327972, best_grapheme_idx=90
+[Click] grapheme 90: x=268.656, width=11.776001, center_x=274.544
+[Click]   -> x_distance=44.455994, best_grapheme_idx=91
+[Click] grapheme 91: x=280.432, width=11.008, center_x=285.936
+[Click]   -> x_distance=33.063995, best_grapheme_idx=92
+[Click] grapheme 92: x=291.44, width=11.008, center_x=296.944
+[Click]   -> x_distance=22.056, best_grapheme_idx=93
+[Click] Final grapheme_index=93, byte_index=93
+[Click] cursor_grapheme_index=93, cursor_byte_index=93
+[TextEdit] TouchBegin received
+[Click] Click at (319, 317), shift=false
+[Click] Finding cursor position at (319, 317)
+[Click] Using precise char_layouts (227 graphemes)
+[Click] Closest line_y: 298
+[Click] grapheme 70: x=10, width=8, center_x=14
+[Click]   -> x_distance=305, best_grapheme_idx=71
+[Click] grapheme 71: x=18, width=8, center_x=22
+[Click]   -> x_distance=297, best_grapheme_idx=72
+[Click] grapheme 72: x=26, width=8, center_x=30
+[Click]   -> x_distance=289, best_grapheme_idx=73
+[Click] grapheme 73: x=34, width=8, center_x=38
+[Click]   -> x_distance=281, best_grapheme_idx=74
+[Click] grapheme 74: x=42, width=19.424002, center_x=51.712
+[Click]   -> x_distance=267.288, best_grapheme_idx=75
+[Click] grapheme 75: x=61.424004, width=18.592001, center_x=70.72
+[Click]   -> x_distance=248.28, best_grapheme_idx=76
+[Click] grapheme 76: x=80.01601, width=19.424002, center_x=89.728004
+[Click]   -> x_distance=229.272, best_grapheme_idx=77
+[Click] grapheme 77: x=99.44001, width=7.6480002, center_x=103.26401
+[Click]   -> x_distance=215.736, best_grapheme_idx=78
+[Click] grapheme 78: x=107.08801, width=7.7120004, center_x=110.944016
+[Click]   -> x_distance=208.05598, best_grapheme_idx=79
+[Click] grapheme 79: x=114.80001, width=15.776001, center_x=122.68801
+[Click]   -> x_distance=196.31198, best_grapheme_idx=80
+[Click] grapheme 80: x=130.57602, width=8, center_x=134.57602
+[Click]   -> x_distance=184.42398, best_grapheme_idx=81
+[Click] grapheme 81: x=138.57602, width=16.480001, center_x=146.81602
+[Click]   -> x_distance=172.18398, best_grapheme_idx=82
+[Click] grapheme 82: x=155.05602, width=18.912, center_x=164.51201
+[Click]   -> x_distance=154.48799, best_grapheme_idx=83
+[Click] grapheme 83: x=173.96802, width=7.7120004, center_x=177.82402
+[Click]   -> x_distance=141.17598, best_grapheme_idx=84
+[Click] grapheme 84: x=181.68002, width=19.424002, center_x=191.39203
+[Click]   -> x_distance=127.60797, best_grapheme_idx=85
+[Click] grapheme 85: x=201.10402, width=8, center_x=205.10402
+[Click]   -> x_distance=113.89598, best_grapheme_idx=86
+[Click] grapheme 86: x=209.10402, width=18.336, center_x=218.27202
+[Click]   -> x_distance=100.72798, best_grapheme_idx=87
+[Click] grapheme 87: x=227.44002, width=11.776001, center_x=233.32802
+[Click]   -> x_distance=85.67198, best_grapheme_idx=88
+[Click] grapheme 88: x=239.21602, width=17.472, center_x=247.95203
+[Click]   -> x_distance=71.04797, best_grapheme_idx=89
+[Click] grapheme 89: x=256.68802, width=11.968, center_x=262.67203
+[Click]   -> x_distance=56.327972, best_grapheme_idx=90
+[Click] grapheme 90: x=268.656, width=11.776001, center_x=274.544
+[Click]   -> x_distance=44.455994, best_grapheme_idx=91
+[Click] grapheme 91: x=280.432, width=11.008, center_x=285.936
+[Click]   -> x_distance=33.063995, best_grapheme_idx=92
+[Click] grapheme 92: x=291.44, width=11.008, center_x=296.944
+[Click]   -> x_distance=22.056, best_grapheme_idx=93
+[Click] Final grapheme_index=93, byte_index=93
+[Click] cursor_grapheme_index=93, cursor_byte_index=93
+[GestureRecognizer] TouchBegin: target=9717146474332855797
+[2026-05-18 14:40:21.245][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:21.245][INFO][GLFW] MouseButton: Left Release at (319, 317)
+[GestureRecognizer] Tap recognized: target=9717146474332855797
+[Editor] GlobalClick at (319, 317)
+[2026-05-18 14:40:21.794][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:21.821][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:21.840][INFO][GLFW] process_events: 2 events received
+[2026-05-18 14:40:21.860][INFO][GLFW] process_events: 2 events received
+[2026-05-18 14:40:21.879][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:21.898][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:21.917][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:21.970][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:22.008][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:22.011][INFO][GLFW] MouseButton: Left Press at (362, 447)
+[TextEdit] TouchBegin received
+[Click] Click at (362, 447), shift=false
+[Click] Finding cursor position at (362, 447)
+[Click] Using precise char_layouts (227 graphemes)
+[Click] Closest line_y: 442
+[Click] grapheme 149: x=10, width=8, center_x=14
+[Click]   -> x_distance=348, best_grapheme_idx=150
+[Click] grapheme 150: x=18, width=8, center_x=22
+[Click]   -> x_distance=340, best_grapheme_idx=151
+[Click] grapheme 151: x=26, width=8, center_x=30
+[Click]   -> x_distance=332, best_grapheme_idx=152
+[Click] grapheme 152: x=34, width=8, center_x=38
+[Click]   -> x_distance=324, best_grapheme_idx=153
+[Click] grapheme 153: x=42, width=11.808001, center_x=47.904
+[Click]   -> x_distance=314.096, best_grapheme_idx=154
+[Click] Final grapheme_index=154, byte_index=154
+[Click] cursor_grapheme_index=154, cursor_byte_index=154
+[TextEdit] TouchBegin received
+[Click] Click at (362, 447), shift=false
+[Click] Finding cursor position at (362, 447)
+[Click] Using precise char_layouts (227 graphemes)
+[Click] Closest line_y: 442
+[Click] grapheme 149: x=10, width=8, center_x=14
+[Click]   -> x_distance=348, best_grapheme_idx=150
+[Click] grapheme 150: x=18, width=8, center_x=22
+[Click]   -> x_distance=340, best_grapheme_idx=151
+[Click] grapheme 151: x=26, width=8, center_x=30
+[Click]   -> x_distance=332, best_grapheme_idx=152
+[Click] grapheme 152: x=34, width=8, center_x=38
+[Click]   -> x_distance=324, best_grapheme_idx=153
+[Click] grapheme 153: x=42, width=11.808001, center_x=47.904
+[Click]   -> x_distance=314.096, best_grapheme_idx=154
+[Click] Final grapheme_index=154, byte_index=154
+[Click] cursor_grapheme_index=154, cursor_byte_index=154
+[GestureRecognizer] TouchBegin: target=9717146474332855797
+[2026-05-18 14:40:22.134][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:22.135][INFO][GLFW] MouseButton: Left Release at (362, 447)
+[GestureRecognizer] Tap recognized: target=9717146474332855797
+[Editor] GlobalClick at (362, 447)
+[2026-05-18 14:40:22.436][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:22.679][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:22.698][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:22.718][INFO][GLFW] process_events: 2 events received
+[2026-05-18 14:40:22.737][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:22.757][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:22.777][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:22.796][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:22.815][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:22.817][INFO][GLFW] MouseButton: Left Press at (436, 467)
+[TextEdit] TouchBegin received
+[Click] Click at (436, 467), shift=false
+[Click] Finding cursor position at (436, 467)
+[Click] Using precise char_layouts (227 graphemes)
+[Click] Closest line_y: 490
+[Click] grapheme 155: x=10, width=8, center_x=14
+[Click]   -> x_distance=422, best_grapheme_idx=156
+[Click] grapheme 156: x=18, width=8, center_x=22
+[Click]   -> x_distance=414, best_grapheme_idx=157
+[Click] grapheme 157: x=26, width=8, center_x=30
+[Click]   -> x_distance=406, best_grapheme_idx=158
+[Click] grapheme 158: x=34, width=8, center_x=38
+[Click]   -> x_distance=398, best_grapheme_idx=159
+[Click] Final grapheme_index=159, byte_index=159
+[Click] cursor_grapheme_index=159, cursor_byte_index=159
+[TextEdit] TouchBegin received
+[Click] Click at (436, 467), shift=false
+[Click] Finding cursor position at (436, 467)
+[Click] Using precise char_layouts (227 graphemes)
+[Click] Closest line_y: 490
+[Click] grapheme 155: x=10, width=8, center_x=14
+[Click]   -> x_distance=422, best_grapheme_idx=156
+[Click] grapheme 156: x=18, width=8, center_x=22
+[Click]   -> x_distance=414, best_grapheme_idx=157
+[Click] grapheme 157: x=26, width=8, center_x=30
+[Click]   -> x_distance=406, best_grapheme_idx=158
+[Click] grapheme 158: x=34, width=8, center_x=38
+[Click]   -> x_distance=398, best_grapheme_idx=159
+[Click] Final grapheme_index=159, byte_index=159
+[Click] cursor_grapheme_index=159, cursor_byte_index=159
+[GestureRecognizer] TouchBegin: target=9717146474332855797
+[2026-05-18 14:40:23.040][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:23.041][INFO][GLFW] MouseButton: Left Release at (436, 467)
+[GestureRecognizer] Tap recognized: target=9717146474332855797
+[Editor] GlobalClick at (436, 467)
+[2026-05-18 14:40:23.163][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:23.181][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:23.201][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:23.219][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:23.238][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:23.257][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:23.277][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:23.296][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:23.315][INFO][GLFW] process_events: 2 events received
+[2026-05-18 14:40:23.317][INFO][GLFW] MouseButton: Left Press at (422, 442)
+[TextEdit] TouchBegin received
+[Click] Click at (422, 442), shift=false
+[Click] Finding cursor position at (422, 442)
+[Click] Using precise char_layouts (227 graphemes)
+[Click] Closest line_y: 442
+[Click] grapheme 149: x=10, width=8, center_x=14
+[Click]   -> x_distance=408, best_grapheme_idx=150
+[Click] grapheme 150: x=18, width=8, center_x=22
+[Click]   -> x_distance=400, best_grapheme_idx=151
+[Click] grapheme 151: x=26, width=8, center_x=30
+[Click]   -> x_distance=392, best_grapheme_idx=152
+[Click] grapheme 152: x=34, width=8, center_x=38
+[Click]   -> x_distance=384, best_grapheme_idx=153
+[Click] grapheme 153: x=42, width=11.808001, center_x=47.904
+[Click]   -> x_distance=374.096, best_grapheme_idx=154
+[Click] Final grapheme_index=154, byte_index=154
+[Click] cursor_grapheme_index=154, cursor_byte_index=154
+[TextEdit] TouchBegin received
+[Click] Click at (422, 442), shift=false
+[Click] Finding cursor position at (422, 442)
+[Click] Using precise char_layouts (227 graphemes)
+[Click] Closest line_y: 442
+[Click] grapheme 149: x=10, width=8, center_x=14
+[Click]   -> x_distance=408, best_grapheme_idx=150
+[Click] grapheme 150: x=18, width=8, center_x=22
+[Click]   -> x_distance=400, best_grapheme_idx=151
+[Click] grapheme 151: x=26, width=8, center_x=30
+[Click]   -> x_distance=392, best_grapheme_idx=152
+[Click] grapheme 152: x=34, width=8, center_x=38
+[Click]   -> x_distance=384, best_grapheme_idx=153
+[Click] grapheme 153: x=42, width=11.808001, center_x=47.904
+[Click]   -> x_distance=374.096, best_grapheme_idx=154
+[Click] Final grapheme_index=154, byte_index=154
+[Click] cursor_grapheme_index=154, cursor_byte_index=154
+[GestureRecognizer] TouchBegin: target=9717146474332855797
+[2026-05-18 14:40:23.421][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:23.422][INFO][GLFW] MouseButton: Left Release at (422, 442)
+[GestureRecognizer] Tap recognized: target=9717146474332855797
+[Editor] GlobalClick at (422, 442)
+[2026-05-18 14:40:23.508][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:23.526][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:23.545][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:23.565][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:23.584][INFO][GLFW] process_events: 2 events received
+[2026-05-18 14:40:23.603][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:23.624][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:23.643][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:23.662][INFO][GLFW] process_events: 2 events received
+[2026-05-18 14:40:23.664][INFO][GLFW] MouseButton: Left Press at (466, 427)
+[TextEdit] TouchBegin received
+[Click] Click at (466, 427), shift=false
+[Click] Finding cursor position at (466, 427)
+[Click] Using precise char_layouts (227 graphemes)
+[Click] Closest line_y: 442
+[Click] grapheme 149: x=10, width=8, center_x=14
+[Click]   -> x_distance=452, best_grapheme_idx=150
+[Click] grapheme 150: x=18, width=8, center_x=22
+[Click]   -> x_distance=444, best_grapheme_idx=151
+[Click] grapheme 151: x=26, width=8, center_x=30
+[Click]   -> x_distance=436, best_grapheme_idx=152
+[Click] grapheme 152: x=34, width=8, center_x=38
+[Click]   -> x_distance=428, best_grapheme_idx=153
+[Click] grapheme 153: x=42, width=11.808001, center_x=47.904
+[Click]   -> x_distance=418.096, best_grapheme_idx=154
+[Click] Final grapheme_index=154, byte_index=154
+[Click] cursor_grapheme_index=154, cursor_byte_index=154
+[TextEdit] TouchBegin received
+[Click] Click at (466, 427), shift=false
+[Click] Finding cursor position at (466, 427)
+[Click] Using precise char_layouts (227 graphemes)
+[Click] Closest line_y: 442
+[Click] grapheme 149: x=10, width=8, center_x=14
+[Click]   -> x_distance=452, best_grapheme_idx=150
+[Click] grapheme 150: x=18, width=8, center_x=22
+[Click]   -> x_distance=444, best_grapheme_idx=151
+[Click] grapheme 151: x=26, width=8, center_x=30
+[Click]   -> x_distance=436, best_grapheme_idx=152
+[Click] grapheme 152: x=34, width=8, center_x=38
+[Click]   -> x_distance=428, best_grapheme_idx=153
+[Click] grapheme 153: x=42, width=11.808001, center_x=47.904
+[Click]   -> x_distance=418.096, best_grapheme_idx=154
+[Click] Final grapheme_index=154, byte_index=154
+[Click] cursor_grapheme_index=154, cursor_byte_index=154
+[GestureRecognizer] TouchBegin: target=9717146474332855797
+[2026-05-18 14:40:23.819][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:23.821][INFO][GLFW] MouseButton: Left Release at (466, 427)
+[GestureRecognizer] Tap recognized: target=9717146474332855797
+[Editor] GlobalClick at (466, 427)
+[2026-05-18 14:40:23.922][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:23.941][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:23.959][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:23.978][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:23.997][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:24.017][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:24.018][INFO][GLFW] MouseButton: Left Press at (491, 414)
+[TextEdit] TouchBegin received
+[Click] Click at (491, 414), shift=false
+[Click] Finding cursor position at (491, 414)
+[Click] Using precise char_layouts (227 graphemes)
+[Click] Closest line_y: 394
+[Click] grapheme 100: x=10, width=8, center_x=14
+[Click]   -> x_distance=477, best_grapheme_idx=101
+[Click] grapheme 101: x=18, width=8, center_x=22
+[Click]   -> x_distance=469, best_grapheme_idx=102
+[Click] grapheme 102: x=26, width=8, center_x=30
+[Click]   -> x_distance=461, best_grapheme_idx=103
+[Click] grapheme 103: x=34, width=8, center_x=38
+[Click]   -> x_distance=453, best_grapheme_idx=104
+[Click] grapheme 104: x=42, width=8, center_x=46
+[Click]   -> x_distance=445, best_grapheme_idx=105
+[Click] grapheme 105: x=50, width=8, center_x=54
+[Click]   -> x_distance=437, best_grapheme_idx=106
+[Click] grapheme 106: x=58, width=8, center_x=62
+[Click]   -> x_distance=429, best_grapheme_idx=107
+[Click] grapheme 107: x=66, width=8, center_x=70
+[Click]   -> x_distance=421, best_grapheme_idx=108
+[Click] grapheme 108: x=74, width=20.832, center_x=84.416
+[Click]   -> x_distance=406.58398, best_grapheme_idx=109
+[Click] grapheme 109: x=94.832, width=18.912, center_x=104.288
+[Click]   -> x_distance=386.712, best_grapheme_idx=110
+[Click] grapheme 110: x=113.744, width=18.560001, center_x=123.024
+[Click]   -> x_distance=367.976, best_grapheme_idx=111
+[Click] grapheme 111: x=132.304, width=14.56, center_x=139.584
+[Click]   -> x_distance=351.41602, best_grapheme_idx=112
+[Click] grapheme 112: x=146.864, width=18.912, center_x=156.31999
+[Click]   -> x_distance=334.68, best_grapheme_idx=113
+[Click] grapheme 113: x=165.776, width=7.6480002, center_x=169.6
+[Click]   -> x_distance=321.4, best_grapheme_idx=114
+[Click] grapheme 114: x=173.424, width=17.504002, center_x=182.176
+[Click]   -> x_distance=308.824, best_grapheme_idx=115
+[Click] grapheme 115: x=190.928, width=7.392, center_x=194.624
+[Click]   -> x_distance=296.376, best_grapheme_idx=116
+[Click] grapheme 116: x=198.31999, width=30.912, center_x=213.77599
+[Click]   -> x_distance=277.224, best_grapheme_idx=117
+[Click] grapheme 117: x=229.232, width=11.968, center_x=235.21599
+[Click]   -> x_distance=255.78401, best_grapheme_idx=118
+[Click] grapheme 118: x=241.2, width=7.7120004, center_x=245.056
+[Click]   -> x_distance=245.944, best_grapheme_idx=119
+[Click] grapheme 119: x=248.912, width=11.776001, center_x=254.8
+[Click]   -> x_distance=236.2, best_grapheme_idx=120
+[Click] grapheme 120: x=260.688, width=17.504002, center_x=269.44
+[Click]   -> x_distance=221.56, best_grapheme_idx=121
+[Click] grapheme 121: x=278.192, width=18.112001, center_x=287.248
+[Click]   -> x_distance=203.75201, best_grapheme_idx=122
+[Click] grapheme 122: x=296.304, width=7.7120004, center_x=300.15997
+[Click]   -> x_distance=190.84003, best_grapheme_idx=123
+[Click] grapheme 123: x=304.016, width=18.560001, center_x=313.296
+[Click]   -> x_distance=177.70401, best_grapheme_idx=124
+[Click] grapheme 124: x=322.576, width=17.504002, center_x=331.328
+[Click]   -> x_distance=159.672, best_grapheme_idx=125
+[Click] grapheme 125: x=340.08, width=11.008, center_x=345.58398
+[Click]   -> x_distance=145.41602, best_grapheme_idx=126
+[Click] grapheme 126: x=351.08798, width=0, center_x=351.08798
+[Click]   -> x_distance=139.91202, best_grapheme_idx=127
+[Click] grapheme 127: x=351.08798, width=23.68, center_x=362.92798
+[Click]   -> x_distance=128.07202, best_grapheme_idx=128
+[Click] grapheme 128: x=374.76797, width=17.504002, center_x=383.52
+[Click]   -> x_distance=107.48001, best_grapheme_idx=129
+[Click] grapheme 129: x=392.27197, width=24.928001, center_x=404.73596
+[Click]   -> x_distance=86.26404, best_grapheme_idx=130
+[Click] grapheme 130: x=417.19998, width=18.336, center_x=426.36798
+[Click]   -> x_distance=64.63202, best_grapheme_idx=131
+[Click] grapheme 131: x=435.53598, width=15.776001, center_x=443.42398
+[Click]   -> x_distance=47.57602, best_grapheme_idx=132
+[Click] grapheme 132: x=451.31198, width=11.968, center_x=457.296
+[Click]   -> x_distance=33.70401, best_grapheme_idx=133
+[Click] grapheme 133: x=463.27997, width=7.7120004, center_x=467.13596
+[Click]   -> x_distance=23.864044, best_grapheme_idx=134
+[Click] grapheme 134: x=470.99197, width=19.424002, center_x=480.70398
+[Click]   -> x_distance=10.2960205, best_grapheme_idx=135
+[Click] grapheme 135: x=490.416, width=11.776001, center_x=496.304
+[Click]   -> x_distance=5.3039856, best_grapheme_idx=135
+[Click] grapheme 136: x=502.192, width=8, center_x=506.192
+[Click] grapheme 137: x=510.192, width=14.56, center_x=517.472
+[Click] grapheme 138: x=524.752, width=11.776001, center_x=530.64
+[Click] grapheme 139: x=536.528, width=17.472, center_x=545.26404
+[Click] grapheme 140: x=554, width=11.968, center_x=559.984
+[Click] grapheme 141: x=565.968, width=11.776001, center_x=571.856
+[Click] grapheme 142: x=577.744, width=17.504002, center_x=586.49603
+[Click] grapheme 143: x=595.24805, width=19.424002, center_x=604.96
+[Click] grapheme 144: x=614.67206, width=7.5200005, center_x=618.43207
+[Click] grapheme 145: x=622.1921, width=0, center_x=622.1921
+[Click] grapheme 146: x=622.1921, width=11.008, center_x=627.6961
+[Click] grapheme 147: x=633.2001, width=8.4800005, center_x=637.44006
+[Click] Final grapheme_index=135, byte_index=135
+[Click] cursor_grapheme_index=135, cursor_byte_index=135
+[TextEdit] TouchBegin received
+[Click] Click at (491, 414), shift=false
+[Click] Finding cursor position at (491, 414)
+[Click] Using precise char_layouts (227 graphemes)
+[Click] Closest line_y: 394
+[Click] grapheme 100: x=10, width=8, center_x=14
+[Click]   -> x_distance=477, best_grapheme_idx=101
+[Click] grapheme 101: x=18, width=8, center_x=22
+[Click]   -> x_distance=469, best_grapheme_idx=102
+[Click] grapheme 102: x=26, width=8, center_x=30
+[Click]   -> x_distance=461, best_grapheme_idx=103
+[Click] grapheme 103: x=34, width=8, center_x=38
+[Click]   -> x_distance=453, best_grapheme_idx=104
+[Click] grapheme 104: x=42, width=8, center_x=46
+[Click]   -> x_distance=445, best_grapheme_idx=105
+[Click] grapheme 105: x=50, width=8, center_x=54
+[Click]   -> x_distance=437, best_grapheme_idx=106
+[Click] grapheme 106: x=58, width=8, center_x=62
+[Click]   -> x_distance=429, best_grapheme_idx=107
+[Click] grapheme 107: x=66, width=8, center_x=70
+[Click]   -> x_distance=421, best_grapheme_idx=108
+[Click] grapheme 108: x=74, width=20.832, center_x=84.416
+[Click]   -> x_distance=406.58398, best_grapheme_idx=109
+[Click] grapheme 109: x=94.832, width=18.912, center_x=104.288
+[Click]   -> x_distance=386.712, best_grapheme_idx=110
+[Click] grapheme 110: x=113.744, width=18.560001, center_x=123.024
+[Click]   -> x_distance=367.976, best_grapheme_idx=111
+[Click] grapheme 111: x=132.304, width=14.56, center_x=139.584
+[Click]   -> x_distance=351.41602, best_grapheme_idx=112
+[Click] grapheme 112: x=146.864, width=18.912, center_x=156.31999
+[Click]   -> x_distance=334.68, best_grapheme_idx=113
+[Click] grapheme 113: x=165.776, width=7.6480002, center_x=169.6
+[Click]   -> x_distance=321.4, best_grapheme_idx=114
+[Click] grapheme 114: x=173.424, width=17.504002, center_x=182.176
+[Click]   -> x_distance=308.824, best_grapheme_idx=115
+[Click] grapheme 115: x=190.928, width=7.392, center_x=194.624
+[Click]   -> x_distance=296.376, best_grapheme_idx=116
+[Click] grapheme 116: x=198.31999, width=30.912, center_x=213.77599
+[Click]   -> x_distance=277.224, best_grapheme_idx=117
+[Click] grapheme 117: x=229.232, width=11.968, center_x=235.21599
+[Click]   -> x_distance=255.78401, best_grapheme_idx=118
+[Click] grapheme 118: x=241.2, width=7.7120004, center_x=245.056
+[Click]   -> x_distance=245.944, best_grapheme_idx=119
+[Click] grapheme 119: x=248.912, width=11.776001, center_x=254.8
+[Click]   -> x_distance=236.2, best_grapheme_idx=120
+[Click] grapheme 120: x=260.688, width=17.504002, center_x=269.44
+[Click]   -> x_distance=221.56, best_grapheme_idx=121
+[Click] grapheme 121: x=278.192, width=18.112001, center_x=287.248
+[Click]   -> x_distance=203.75201, best_grapheme_idx=122
+[Click] grapheme 122: x=296.304, width=7.7120004, center_x=300.15997
+[Click]   -> x_distance=190.84003, best_grapheme_idx=123
+[Click] grapheme 123: x=304.016, width=18.560001, center_x=313.296
+[Click]   -> x_distance=177.70401, best_grapheme_idx=124
+[Click] grapheme 124: x=322.576, width=17.504002, center_x=331.328
+[Click]   -> x_distance=159.672, best_grapheme_idx=125
+[Click] grapheme 125: x=340.08, width=11.008, center_x=345.58398
+[Click]   -> x_distance=145.41602, best_grapheme_idx=126
+[Click] grapheme 126: x=351.08798, width=0, center_x=351.08798
+[Click]   -> x_distance=139.91202, best_grapheme_idx=127
+[Click] grapheme 127: x=351.08798, width=23.68, center_x=362.92798
+[Click]   -> x_distance=128.07202, best_grapheme_idx=128
+[Click] grapheme 128: x=374.76797, width=17.504002, center_x=383.52
+[Click]   -> x_distance=107.48001, best_grapheme_idx=129
+[Click] grapheme 129: x=392.27197, width=24.928001, center_x=404.73596
+[Click]   -> x_distance=86.26404, best_grapheme_idx=130
+[Click] grapheme 130: x=417.19998, width=18.336, center_x=426.36798
+[Click]   -> x_distance=64.63202, best_grapheme_idx=131
+[Click] grapheme 131: x=435.53598, width=15.776001, center_x=443.42398
+[Click]   -> x_distance=47.57602, best_grapheme_idx=132
+[Click] grapheme 132: x=451.31198, width=11.968, center_x=457.296
+[Click]   -> x_distance=33.70401, best_grapheme_idx=133
+[Click] grapheme 133: x=463.27997, width=7.7120004, center_x=467.13596
+[Click]   -> x_distance=23.864044, best_grapheme_idx=134
+[Click] grapheme 134: x=470.99197, width=19.424002, center_x=480.70398
+[Click]   -> x_distance=10.2960205, best_grapheme_idx=135
+[Click] grapheme 135: x=490.416, width=11.776001, center_x=496.304
+[Click]   -> x_distance=5.3039856, best_grapheme_idx=135
+[Click] grapheme 136: x=502.192, width=8, center_x=506.192
+[Click] grapheme 137: x=510.192, width=14.56, center_x=517.472
+[Click] grapheme 138: x=524.752, width=11.776001, center_x=530.64
+[Click] grapheme 139: x=536.528, width=17.472, center_x=545.26404
+[Click] grapheme 140: x=554, width=11.968, center_x=559.984
+[Click] grapheme 141: x=565.968, width=11.776001, center_x=571.856
+[Click] grapheme 142: x=577.744, width=17.504002, center_x=586.49603
+[Click] grapheme 143: x=595.24805, width=19.424002, center_x=604.96
+[Click] grapheme 144: x=614.67206, width=7.5200005, center_x=618.43207
+[Click] grapheme 145: x=622.1921, width=0, center_x=622.1921
+[Click] grapheme 146: x=622.1921, width=11.008, center_x=627.6961
+[Click] grapheme 147: x=633.2001, width=8.4800005, center_x=637.44006
+[Click] Final grapheme_index=135, byte_index=135
+[Click] cursor_grapheme_index=135, cursor_byte_index=135
+[GestureRecognizer] TouchBegin: target=9717146474332855797
+[2026-05-18 14:40:24.140][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:24.141][INFO][GLFW] MouseButton: Left Release at (491, 414)
+[GestureRecognizer] Tap recognized: target=9717146474332855797
+[Editor] GlobalClick at (491, 414)
+[2026-05-18 14:40:25.559][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:25.561][INFO][GLFW] Key pressed: Left mods=(empty)
+[2026-05-18 14:40:25.744][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:25.829][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:25.831][INFO][GLFW] Key pressed: Right mods=(empty)
+[2026-05-18 14:40:26.047][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:26.056][INFO][GLFW] Key pressed: Up mods=(empty)
+[2026-05-18 14:40:26.125][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:26.178][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:26.264][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:26.265][INFO][GLFW] Key pressed: Right mods=(empty)
+[2026-05-18 14:40:26.299][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:26.301][INFO][GLFW] Key pressed: Down mods=(empty)
+[2026-05-18 14:40:26.353][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:26.372][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:26.410][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:26.411][INFO][GLFW] Key pressed: Left mods=(empty)
+[2026-05-18 14:40:26.478][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:26.480][INFO][GLFW] Key pressed: Right mods=(empty)
+[2026-05-18 14:40:26.531][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:26.602][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:27.385][INFO][GLFW] process_events: 1 events received
+[TextEdit] KeyDown received, focused=true
+[TextEdit] keycode=40, unicode=0, modifiers=0
+[TextEdit] Backspace, deleting grapheme
+[2026-05-18 14:40:27.394][INFO][GLFW] Key pressed: Backspace mods=(empty)
+[2026-05-18 14:40:27.461][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:29.526][INFO][GLFW] process_events: 2 events received
+[TextEdit] KeyDown received, focused=true
+[TextEdit] keycode=0, unicode=112, modifiers=0
+[TextEdit] Inserting char: 'p' (unicode=112)
+[2026-05-18 14:40:29.528][INFO][GLFW] Char input: p (112)
+[2026-05-18 14:40:30.408][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:30.427][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:30.446][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:30.465][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:30.484][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:30.504][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:30.523][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:30.542][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:30.561][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:30.580][INFO][GLFW] process_events: 2 events received
+[2026-05-18 14:40:30.599][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:30.619][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:30.656][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:30.674][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:30.693][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:30.712][INFO][GLFW] process_events: 2 events received
+[2026-05-18 14:40:30.731][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:30.752][INFO][GLFW] process_events: 2 events received
+[2026-05-18 14:40:30.753][INFO][GLFW] MouseButton: Left Press at (946, 428)
+[TextEdit] TouchBegin received
+[Click] Click at (946, 428), shift=false
+[Click] Finding cursor position at (946, 428)
+[Click] Using precise char_layouts (227 graphemes)
+[Click] Closest line_y: 442
+[Click] grapheme 149: x=10, width=8, center_x=14
+[Click]   -> x_distance=932, best_grapheme_idx=150
+[Click] grapheme 150: x=18, width=8, center_x=22
+[Click]   -> x_distance=924, best_grapheme_idx=151
+[Click] grapheme 151: x=26, width=8, center_x=30
+[Click]   -> x_distance=916, best_grapheme_idx=152
+[Click] grapheme 152: x=34, width=8, center_x=38
+[Click]   -> x_distance=908, best_grapheme_idx=153
+[Click] grapheme 153: x=42, width=11.808001, center_x=47.904
+[Click]   -> x_distance=898.096, best_grapheme_idx=154
+[Click] Final grapheme_index=154, byte_index=154
+[Click] cursor_grapheme_index=154, cursor_byte_index=154
+[TextEdit] TouchBegin received
+[Click] Click at (946, 428), shift=false
+[Click] Finding cursor position at (946, 428)
+[Click] Using precise char_layouts (227 graphemes)
+[Click] Closest line_y: 442
+[Click] grapheme 149: x=10, width=8, center_x=14
+[Click]   -> x_distance=932, best_grapheme_idx=150
+[Click] grapheme 150: x=18, width=8, center_x=22
+[Click]   -> x_distance=924, best_grapheme_idx=151
+[Click] grapheme 151: x=26, width=8, center_x=30
+[Click]   -> x_distance=916, best_grapheme_idx=152
+[Click] grapheme 152: x=34, width=8, center_x=38
+[Click]   -> x_distance=908, best_grapheme_idx=153
+[Click] grapheme 153: x=42, width=11.808001, center_x=47.904
+[Click]   -> x_distance=898.096, best_grapheme_idx=154
+[Click] Final grapheme_index=154, byte_index=154
+[Click] cursor_grapheme_index=154, cursor_byte_index=154
+[GestureRecognizer] TouchBegin: target=9717146474332855797
+[2026-05-18 14:40:30.843][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:30.845][INFO][GLFW] MouseButton: Left Release at (946, 428)
+[GestureRecognizer] Tap recognized: target=9717146474332855797
+[Editor] GlobalClick at (946, 428)
+[2026-05-18 14:40:31.344][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:31.371][INFO][GLFW] process_events: 2 events received
+[2026-05-18 14:40:31.391][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:31.411][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:31.429][INFO][GLFW] process_events: 2 events received
+[2026-05-18 14:40:31.448][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:31.466][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:31.485][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:31.504][INFO][GLFW] process_events: 2 events received
+[2026-05-18 14:40:31.524][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:31.543][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:31.562][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:31.581][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:31.599][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:31.617][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:31.638][INFO][GLFW] process_events: 2 events received
+[2026-05-18 14:40:31.657][INFO][GLFW] process_events: 2 events received
+[2026-05-18 14:40:31.677][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:31.695][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:31.713][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:31.732][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:31.751][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:31.770][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:31.806][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:31.824][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:31.858][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:31.893][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:31.912][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:31.931][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:31.967][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:31.987][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:32.007][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:32.026][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:32.045][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:32.065][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:32.085][INFO][GLFW] process_events: 2 events received
+[2026-05-18 14:40:32.105][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:32.126][INFO][GLFW] process_events: 2 events received
+[2026-05-18 14:40:32.144][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:32.163][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:32.182][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:32.199][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:32.219][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:32.256][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:32.258][INFO][GLFW] MouseButton: Left Press at (1194, 24)
+[GestureRecognizer] TouchBegin: target=12699147518891662575
+[2026-05-18 14:40:32.343][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:32.345][INFO][GLFW] MouseButton: Left Release at (1194, 24)
+[GestureRecognizer] Tap recognized: target=12699147518891662575
+[Editor] 点击"编辑器"切换按钮, id=12699147518891662575
+[Editor] 脚本编辑器隐藏
+[Editor] 显示主界面...
+[C#] VStack创建成功: id=12024813295911339711, parent=12980793235696532777
+[Editor] Panel创建成功: id=12025905939271132146
+[Editor] Panel创建成功: id=11505247999594704110
+[C#] VStack创建成功: id=11638094821340669866, parent=11505247999594704110
+[Editor] Panel创建成功: id=11802548677940413213
+[Editor] 主界面显示完成
+[2026-05-18 14:40:32.717][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:32.736][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:32.756][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:32.774][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:32.794][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:32.813][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:32.832][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:32.852][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:32.871][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:32.891][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:32.927][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:32.929][INFO][GLFW] MouseButton: Left Press at (1215, 22)
+[GestureRecognizer] TouchBegin: target=12699147518891662575
+[2026-05-18 14:40:33.029][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:33.030][INFO][GLFW] MouseButton: Left Release at (1215, 22)
+[GestureRecognizer] Tap recognized: target=12699147518891662575
+[Editor] 点击"编辑器"切换按钮, id=12699147518891662575
+[Editor] 隐藏主界面...
+[C#] VStack创建成功: id=9638484171540656367, parent=12980793235696532777
+[Editor] 主界面隐藏完成
+[Editor] ShowScriptEditor开始...
+[C#] VStack创建成功: id=12735573379645683697, parent=12980793235696532777
+[Editor] 左侧目录树添加脚本项
+[Editor] Panel创建成功: id=13073482617745504133
+[C#] Button创建成功: id=11588311562126488873, text="Hot Reload"
+[Info][UI] 注册OnClick回调: widget=11588311562126488873 callback=0x1c4efbbf9b0
+[C#] Label创建成功: id=9376344579555374517, text="Script Editor - NewScript.cs"
+[Editor] Script Editor显示成功
+[2026-05-18 14:40:33.383][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:33.401][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:33.420][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:33.440][INFO][GLFW] process_events: 2 events received
+[2026-05-18 14:40:33.460][INFO][GLFW] process_events: 2 events received
+[2026-05-18 14:40:33.478][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:33.497][INFO][GLFW] process_events: 1 events received
+[2026-05-18 14:40:33.849][INFO][GLFW] process_events: 1 events received
+
+[8] 清理资源...
+[2026-05-18 14:40:33.882][INFO][Vulkan] Cleanup complete
+
+=== Editor Closed ===

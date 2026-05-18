@@ -580,6 +580,9 @@ impl Widget for TextEdit {
                 println!("[TextEdit] KeyDown received, focused={}", self.focused);
                 if self.focused {
                     if let EventData::Key(key_data) = &event.data {
+                        println!("[TextEdit] keycode={}, unicode={}, modifiers={}", 
+                                 key_data.keycode, key_data.unicode_char, key_data.modifiers);
+                        
                         let ctrl_pressed = key_data.modifiers & 2 != 0;
                         
                         if ctrl_pressed {
@@ -654,19 +657,26 @@ impl Widget for TextEdit {
                         }
                         
                         // 方向键导航
+                        println!("[TextEdit] Checking arrow keys: keycode={}, Left={}, Right={}, Up={}, Down={}", 
+                                 key_data.keycode, KeyCode::Left as u32, KeyCode::Right as u32, KeyCode::Up as u32, KeyCode::Down as u32);
+                        
                         if key_data.keycode == KeyCode::Left as u32 {
+                            println!("[TextEdit] ArrowLeft detected!");
                             self.move_cursor_left();
                             return EventResult::Handled;
                         }
                         if key_data.keycode == KeyCode::Right as u32 {
+                            println!("[TextEdit] ArrowRight detected!");
                             self.move_cursor_right();
                             return EventResult::Handled;
                         }
                         if key_data.keycode == KeyCode::Up as u32 {
+                            println!("[TextEdit] ArrowUp detected!");
                             self.move_cursor_up();
                             return EventResult::Handled;
                         }
                         if key_data.keycode == KeyCode::Down as u32 {
+                            println!("[TextEdit] ArrowDown detected!");
                             self.move_cursor_down();
                             return EventResult::Handled;
                         }

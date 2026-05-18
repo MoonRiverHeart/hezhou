@@ -216,20 +216,35 @@ impl GLFWPlatform {
 
         match event {
             glfw::WindowEvent::Key(key, _scancode, action, _mods) => {
-                let _keycode = GLFWPlatform::convert_glfw_key(key);
-                let _key_action = match action {
+                let keycode = GLFWPlatform::convert_glfw_key(key);
+                let key_action = match action {
                     glfw::Action::Press => KeyAction::Press,
                     glfw::Action::Release => KeyAction::Release,
                     glfw::Action::Repeat => KeyAction::Repeat,
                 };
+                
+                println!("[GLFW] Key event: glfw_key={}, keycode={}, action={}", 
+                         match key {
+                             glfw::Key::Left => "Left",
+                             glfw::Key::Right => "Right",
+                             glfw::Key::Up => "Up",
+                             glfw::Key::Down => "Down",
+                             _ => "Other"
+                         },
+                         keycode as u32,
+                         match key_action {
+                             KeyAction::Press => "Press",
+                             KeyAction::Release => "Release",
+                             KeyAction::Repeat => "Repeat",
+                         });
 
                 PlatformEvent {
                     kind: PlatformEventKind::Key,
                     timestamp,
                     data: PlatformEventData {
                         key: KeyEvent {
-                            action: _key_action,
-                            keycode: _keycode,
+                            action: key_action,
+                            keycode,
                             modifiers: KeyModifiers::default(),
                         },
                     },

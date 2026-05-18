@@ -1512,6 +1512,52 @@ self.dfx.lock().get_logger().lock().log(
                             }, self.frame_count);
                         }
                         
+                        // 方向键
+                        if key == Key::Left {
+                            self.input_handler.lock().on_key_event(&KeyEvent {
+                                action: KeyAction::Press,
+                                keycode: KeyCode::Left,
+                                modifiers: KeyModifiers::default(),
+                            }, self.frame_count);
+                        }
+                        if key == Key::Right {
+                            self.input_handler.lock().on_key_event(&KeyEvent {
+                                action: KeyAction::Press,
+                                keycode: KeyCode::Right,
+                                modifiers: KeyModifiers::default(),
+                            }, self.frame_count);
+                        }
+                        if key == Key::Up {
+                            self.input_handler.lock().on_key_event(&KeyEvent {
+                                action: KeyAction::Press,
+                                keycode: KeyCode::Up,
+                                modifiers: KeyModifiers::default(),
+                            }, self.frame_count);
+                        }
+                        if key == Key::Down {
+                            self.input_handler.lock().on_key_event(&KeyEvent {
+                                action: KeyAction::Press,
+                                keycode: KeyCode::Down,
+                                modifiers: KeyModifiers::default(),
+                            }, self.frame_count);
+                        }
+                        
+                        // Home/End键
+                        if key == Key::Home {
+                            self.input_handler.lock().on_key_event(&KeyEvent {
+                                action: KeyAction::Press,
+                                keycode: KeyCode::Home,
+                                modifiers: KeyModifiers::default(),
+                            }, self.frame_count);
+                        }
+                        if key == Key::End {
+                            self.input_handler.lock().on_key_event(&KeyEvent {
+                                action: KeyAction::Press,
+                                keycode: KeyCode::End,
+                                modifiers: KeyModifiers::default(),
+                            }, self.frame_count);
+                        }
+                        
                         // Ctrl+C/V/X 复制粘贴剪切
                         if mods == glfw::Modifiers::Control {
                             if key == Key::C {
