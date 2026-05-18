@@ -1499,7 +1499,7 @@ self.dfx.lock().get_logger().lock().log(
                     
                     self.input_handler.lock().on_mouse_event(&mouse_event, self.frame_count);
                 }
-                WindowEvent::Key(key, _, action, _) => {
+                WindowEvent::Key(key, _, action, mods) => {
                     if action == Action::Press {
                         if key == Key::Space {
                             self.space_pressed = true;
@@ -1511,7 +1511,33 @@ self.dfx.lock().get_logger().lock().log(
                                 modifiers: KeyModifiers::default(),
                             }, self.frame_count);
                         }
-                        self.dfx.lock().get_logger().lock().log(LogLevel::Info, "GLFW", &format!("Key pressed: {:?}", key), file!(), line!());
+                        
+                        // Ctrl+C/V/X 复制粘贴剪切
+                        if mods == glfw::Modifiers::Control {
+                            if key == Key::C {
+                                self.input_handler.lock().on_key_event(&KeyEvent {
+                                    action: KeyAction::Press,
+                                    keycode: KeyCode::C,
+                                    modifiers: KeyModifiers { ctrl: true, shift: false, alt: false },
+                                }, self.frame_count);
+                            }
+                            if key == Key::V {
+                                self.input_handler.lock().on_key_event(&KeyEvent {
+                                    action: KeyAction::Press,
+                                    keycode: KeyCode::V,
+                                    modifiers: KeyModifiers { ctrl: true, shift: false, alt: false },
+                                }, self.frame_count);
+                            }
+                            if key == Key::X {
+                                self.input_handler.lock().on_key_event(&KeyEvent {
+                                    action: KeyAction::Press,
+                                    keycode: KeyCode::X,
+                                    modifiers: KeyModifiers { ctrl: true, shift: false, alt: false },
+                                }, self.frame_count);
+                            }
+                        }
+                        
+                        self.dfx.lock().get_logger().lock().log(LogLevel::Info, "GLFW", &format!("Key pressed: {:?} mods={:?}", key, mods), file!(), line!());
                     }
                 }
                 WindowEvent::Char(codepoint) => {

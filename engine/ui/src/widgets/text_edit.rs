@@ -4,6 +4,11 @@ use crate::layout::*;
 use crate::style::*;
 use crate::types::*;
 use crate::widget::*;
+use hezhou_platform::KeyCode;
+use parking_lot::Mutex;
+use std::sync::LazyLock;
+
+static CLIPBOARD: LazyLock<Mutex<String>> = LazyLock::new(|| Mutex::new(String::new()));
 
 pub struct TextEdit {
     id: WidgetId,
@@ -204,6 +209,38 @@ impl Widget for TextEdit {
             EventType::KeyDown => {
                 if self.focused {
                     if let EventData::Key(key_data) = &event.data {
+                        let ctrl_pressed = key_data.modifiers & 2 != 0;
+                        
+                        if ctrl_pressed {
+                            // Ctrl+C: 复制全部文本
+                            if key_data.keycode == KeyCode::C as u32 {
+                                let mut clipboard = CLIPBOARD.lock();
+                                *clipboard = self.text.clone();
+                                println!("[TextEdit] Ctrl+C: copied {} chars", self.text.len());
+                                return EventResult::Handled;
+                            }
+                            // Ctrl+V: 粘贴clipboard
+                            if key_data.keycode == KeyCode::V as u32 {
+                                let clipboard = CLIPBOARD.lock();
+                                for c in clipboard.chars() {
+                                    self.insert_char(c);
+                                }
+                                println!("[TextEdit] Ctrl+V: pasted {} chars", clipboard.len());
+                                return EventResult::Handled;
+                            }
+                            // Ctrl+X: 剪切
+                            if key_data.keycode == KeyCode::X as u32 {
+                                let mut clipboard = CLIPBOARD.lock();
+                                *clipboard = self.text.clone();
+                                self.text.clear();
+                                self.cursor_position = 0;
+                                self.flags.dirty_render = true;
+                                println!("[TextEdit] Ctrl+X: cut {} chars", clipboard.len());
+                                return EventResult::Handled;
+                            }
+                        }
+                        
+                        // Unicode字符输入
                         if key_data.unicode_char > 0 && key_data.unicode_char < 128 {
                             let c = char::from_u32(key_data.unicode_char).unwrap_or('\0');
                             if c != '\0' {
@@ -211,7 +248,8 @@ impl Widget for TextEdit {
                                 return EventResult::Handled;
                             }
                         }
-                        if key_data.keycode == 40 {
+                        // Backspace删除
+                        if key_data.keycode == KeyCode::Backspace as u32 {
                             self.delete_char();
                             return EventResult::Handled;
                         }
