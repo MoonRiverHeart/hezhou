@@ -19,6 +19,7 @@ pub enum EventType {
     MouseEnter,
     MouseLeave,
     MouseMove,
+    MouseWheel,
 
     FocusGain,
     FocusLost,
@@ -42,6 +43,7 @@ impl fmt::Display for EventType {
             EventType::MouseEnter => write!(f, "MouseEnter"),
             EventType::MouseLeave => write!(f, "MouseLeave"),
             EventType::MouseMove => write!(f, "MouseMove"),
+            EventType::MouseWheel => write!(f, "MouseWheel"),
             EventType::FocusGain => write!(f, "FocusGain"),
             EventType::FocusLost => write!(f, "FocusLost"),
             EventType::LayoutChanged => write!(f, "LayoutChanged"),
@@ -107,6 +109,7 @@ pub enum EventData {
     Touch(TouchData),
     Key(KeyData),
     Mouse(MouseData),
+    Wheel(WheelData),
     Layout(LayoutData),
 }
 
@@ -180,12 +183,27 @@ impl MouseData {
 }
 
 #[repr(C)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy)]
 pub enum MouseButton {
     None,
     Left,
     Right,
     Middle,
+}
+
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct WheelData {
+    pub x: f32,
+    pub y: f32,
+    pub delta_x: f32,
+    pub delta_y: f32,
+}
+
+impl WheelData {
+    pub fn new(x: f32, y: f32, delta_x: f32, delta_y: f32) -> Self {
+        Self { x, y, delta_x, delta_y }
+    }
 }
 
 #[repr(C)]

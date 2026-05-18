@@ -32,6 +32,11 @@ pub struct TextEdit {
     layout_dirty: bool,
     cached_line_height: f32,
     cached_max_bearing_y: f32,
+    scroll_offset_y: f32,
+    total_content_height: f32,
+    scrollbar_dragging: bool,
+    scrollbar_drag_start_y: f32,
+    scrollbar_drag_start_offset: f32,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -69,6 +74,11 @@ impl TextEdit {
             layout_dirty: true,
             cached_line_height: 0.0,
             cached_max_bearing_y: 0.0,
+            scroll_offset_y: 0.0,
+            total_content_height: 0.0,
+            scrollbar_dragging: false,
+            scrollbar_drag_start_y: 0.0,
+            scrollbar_drag_start_offset: 0.0,
         }
     }
     
@@ -413,6 +423,8 @@ impl Widget for TextEdit {
         let line_number_width = 50.0;
         let text_margin_x = 10.0;
         let text_start_x = line_number_width + text_margin_x;
+        let scrollbar_width = 12.0;
+        let text_area_width = width - line_number_width - scrollbar_width - 2.0 * text_margin_x;
         
         canvas.draw_rect(Rect::new(0.0, 0.0, width, height), &self.style);
         
@@ -432,13 +444,18 @@ impl Widget for TextEdit {
             canvas.get_line_height(font_size)
         };
         
+        self.total_content_height = 10.0 + max_bearing_y + num_lines as f32 * line_height;
+        
+        let max_scroll = (self.total_content_height - height).max(0.0);
+        self.scroll_offset_y = self.scroll_offset_y.min(max_scroll).max(0.0);
+        
         let line_number_text_style = TextStyle::new()
             .with_size(font_size)
             .with_color(Color::new(0.5, 0.5, 0.5, 1.0));
         
         for line_num in 1..=num_lines {
-            let line_y = 10.0 + max_bearing_y + (line_num - 1) as f32 * line_height;
-            if line_y - max_bearing_y < height {
+            let line_y = 10.0 + max_bearing_y + (line_num - 1) as f32 * line_height - self.scroll_offset_y;
+            if line_y - max_bearing_y >= 0.0 && line_y - max_bearing_y < height {
                 let line_num_str = line_num.to_string();
                 canvas.draw_text(
                     Rect::new(5.0, line_y - max_bearing_y, line_number_width - 10.0, font_size),
@@ -462,7 +479,7 @@ impl Widget for TextEdit {
             
             for layout in &self.char_layouts {
                 if layout.grapheme_index >= start && layout.grapheme_index < end {
-                    let y = layout.y;
+                    let y = layout.y - self.scroll_offset_y;
                     
                     if let Some(last_line) = lines.last_mut() {
                         if last_line.0 == y {
@@ -478,32 +495,54 @@ impl Widget for TextEdit {
             
             for (y, start_x, end_x) in &lines {
                 let highlight_y = y - max_bearing_y;
-                canvas.draw_rect(
-                    Rect::new(*start_x, highlight_y, *end_x - *start_x, font_size),
-                    &Style::new().with_background(Color::new(0.3, 0.5, 0.8, 0.3)),
-                );
+                if highlight_y >= 0.0 && highlight_y < height {
+                    canvas.draw_rect(
+                        Rect::new(*start_x, highlight_y, *end_x - *start_x, font_size),
+                        &Style::new().with_background(Color::new(0.3, 0.5, 0.8, 0.3)),
+                    );
+                }
             }
         }
         
         if !self.text.is_empty() {
+            let text_start_y = 10.0 - self.scroll_offset_y;
             canvas.draw_text(
-                Rect::new(text_start_x, 10.0, width - text_start_x - text_margin_x, height - 20.0),
+                Rect::new(text_start_x, text_start_y, text_area_width, self.total_content_height),
                 &self.text,
                 &self.text_style,
             );
         }
         
+        if self.total_content_height > height {
+            let scrollbar_x = width - scrollbar_width;
+            let scrollbar_bg_style = Style::new()
+                .with_background(Color::new(0.08, 0.08, 0.08, 1.0));
+            canvas.draw_rect(Rect::new(scrollbar_x, 0.0, scrollbar_width, height), &scrollbar_bg_style);
+            
+            let scrollbar_ratio = height / self.total_content_height;
+            let scrollbar_height = (height * scrollbar_ratio).max(30.0);
+            let scrollbar_y = (self.scroll_offset_y / max_scroll) * (height - scrollbar_height);
+            
+            let scrollbar_style = Style::new()
+                .with_background(Color::new(0.3, 0.3, 0.3, 1.0))
+                .with_border(Color::new(0.4, 0.4, 0.4, 1.0), 1.0, 3.0);
+            canvas.draw_rect(
+                Rect::new(scrollbar_x + 1.0, scrollbar_y, scrollbar_width - 2.0, scrollbar_height),
+                &scrollbar_style,
+            );
+        }
+        
         if self.focused && self.cursor_visible {
-            let text_start_y = 10.0;
+            let text_start_y = 10.0 - self.scroll_offset_y;
             
             if self.layout_dirty || self.char_layouts.is_empty() {
-                let wrap_width = Some(self.layout.width - line_number_width - 2.0 * text_margin_x);
+                let wrap_width = Some(text_area_width);
                 
                 let char_positions = canvas.layout_text_for_cursor_with_wrap(
                     &self.text,
                     font_size,
                     text_start_x,
-                    text_start_y,
+                    10.0,
                     wrap_width,
                 );
                 
@@ -537,7 +576,7 @@ impl Widget for TextEdit {
                 for layout in &self.char_layouts {
                     if layout.grapheme_index < self.cursor_grapheme_index {
                         found_x = layout.x + layout.width;
-                        found_y = layout.y;
+                        found_y = layout.y - self.scroll_offset_y;
                     } else {
                         break;
                     }
@@ -546,14 +585,16 @@ impl Widget for TextEdit {
                 (found_x, found_y)
             };
             
-            canvas.draw_rect(
-                Rect::new(cursor_x, cursor_y - max_bearing_y, 2.0, canvas.get_font_height(font_size)),
-                &Style::new().with_background(Color::white()),
-            );
+            if cursor_y - max_bearing_y >= 0.0 && cursor_y - max_bearing_y < height {
+                canvas.draw_rect(
+                    Rect::new(cursor_x, cursor_y - max_bearing_y, 2.0, canvas.get_font_height(font_size)),
+                    &Style::new().with_background(Color::white()),
+                );
+            }
         } else {
             if self.layout_dirty && canvas.get_font_atlas().is_some() && !self.text.is_empty() {
                 let text_start_y = 10.0;
-                let wrap_width = Some(self.layout.width - line_number_width - 2.0 * text_margin_x);
+                let wrap_width = Some(text_area_width);
                 
                 let char_positions = canvas.layout_text_for_cursor_with_wrap(
                     &self.text,
@@ -608,14 +649,49 @@ impl Widget for TextEdit {
 
     fn on_event(&mut self, event: &Event) -> EventResult {
         match event.event_type {
+            EventType::MouseWheel => {
+                if let EventData::Wheel(wheel_data) = &event.data {
+                    let max_scroll = (self.total_content_height - self.layout.height).max(0.0);
+                    self.scroll_offset_y = (self.scroll_offset_y + wheel_data.delta_y * 30.0)
+                        .min(max_scroll)
+                        .max(0.0);
+                    self.flags.dirty_render = true;
+                    return EventResult::Handled;
+                }
+            }
             EventType::TouchBegin => {
+                let width = self.layout.width;
+                let height = self.layout.height;
+                let scrollbar_width = 12.0;
+                let scrollbar_x = width - scrollbar_width;
+                
+                if let EventData::Touch(touch_data) = &event.data {
+                    let click_x = touch_data.x;
+                    let click_y = touch_data.y;
+                    
+                    if self.total_content_height > height && click_x >= scrollbar_x {
+                        let max_scroll = (self.total_content_height - height).max(0.0);
+                        let scrollbar_ratio = height / self.total_content_height;
+                        let scrollbar_height = (height * scrollbar_ratio).max(30.0);
+                        let scrollbar_y = (self.scroll_offset_y / max_scroll) * (height - scrollbar_height);
+                        
+                        if click_y >= scrollbar_y && click_y <= scrollbar_y + scrollbar_height {
+                            self.scrollbar_dragging = true;
+                            self.scrollbar_drag_start_y = click_y;
+                            self.scrollbar_drag_start_offset = self.scroll_offset_y;
+                            self.flags.dirty_render = true;
+                            return EventResult::Handled;
+                        }
+                    }
+                }
+                
                 println!("[TextEdit] TouchBegin received");
                 self.focused = true;
                 self.cursor_visible = true;
                 
                 if let EventData::Touch(touch_data) = &event.data {
                     let click_x = touch_data.x;
-                    let click_y = touch_data.y;
+                    let click_y = touch_data.y + self.scroll_offset_y;
                     let shift_pressed = touch_data.modifiers & 1 != 0;
                     println!("[Click] Click at ({}, {}), shift={}", click_x, click_y, shift_pressed);
                     
@@ -646,10 +722,28 @@ impl Widget for TextEdit {
                 return EventResult::Handled;
             }
             EventType::TouchMove => {
+                if self.scrollbar_dragging {
+                    if let EventData::Touch(touch_data) = &event.data {
+                        let height = self.layout.height;
+                        let drag_delta_y = touch_data.y - self.scrollbar_drag_start_y;
+                        let max_scroll = (self.total_content_height - height).max(0.0);
+                        let scrollbar_ratio = height / self.total_content_height;
+                        let scrollbar_height = (height * scrollbar_ratio).max(30.0);
+                        let scrollable_track = height - scrollbar_height;
+                        
+                        let scroll_delta = (drag_delta_y / scrollable_track) * max_scroll;
+                        self.scroll_offset_y = (self.scrollbar_drag_start_offset + scroll_delta)
+                            .min(max_scroll)
+                            .max(0.0);
+                        self.flags.dirty_render = true;
+                        return EventResult::Handled;
+                    }
+                }
+                
                 if self.focused {
                     if let EventData::Touch(touch_data) = &event.data {
                         let click_x = touch_data.x;
-                        let click_y = touch_data.y;
+                        let click_y = touch_data.y + self.scroll_offset_y;
                         
                         let num_graphemes = self.text.graphemes(true).count();
                         let new_grapheme_idx = self.find_cursor_position_at(click_x, click_y).min(num_graphemes);
@@ -666,6 +760,12 @@ impl Widget for TextEdit {
                 }
             }
             EventType::TouchEnd => {
+                if self.scrollbar_dragging {
+                    self.scrollbar_dragging = false;
+                    self.flags.dirty_render = true;
+                    return EventResult::Handled;
+                }
+                
                 if self.focused {
                     println!("[TextEdit] TouchEnd, finalizing selection");
                 }

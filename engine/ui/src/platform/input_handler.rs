@@ -1,4 +1,4 @@
-use crate::event::MouseButton;
+use crate::event::{MouseButton, WheelData};
 use crate::*;
 use hezhou_platform::*;
 use parking_lot::Mutex;
@@ -150,6 +150,10 @@ impl UIInputHandler {
                 }
             }
             MouseAction::Scroll => {
+                let mut event = Event::new(EventType::MouseWheel, timestamp).with_data(
+                    EventData::Wheel(WheelData::new(x, y, mouse.dx, mouse.dy)),
+                );
+                self.event_dispatcher.lock().dispatch_event(&mut event);
             }
         }
     }

@@ -344,7 +344,7 @@ impl GLFWPlatform {
                 }
             }
 
-            glfw::WindowEvent::Scroll(_x, _y) => PlatformEvent {
+            glfw::WindowEvent::Scroll(x, y) => PlatformEvent {
                 kind: PlatformEventKind::Mouse,
                 timestamp,
                 data: PlatformEventData {
@@ -353,8 +353,8 @@ impl GLFWPlatform {
                         button: MouseButton::None,
                         x: *last_mouse_x as f32,
                         y: *last_mouse_y as f32,
-                        dx: 0.0,
-                        dy: 0.0,
+                        dx: x as f32,
+                        dy: y as f32,
                     },
                 },
             },
