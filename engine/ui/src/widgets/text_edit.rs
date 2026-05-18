@@ -458,7 +458,7 @@ impl Widget for TextEdit {
                 }).collect();
                 
                 self.cached_max_bearing_y = max_bearing_y;
-                self.cached_line_height = font_size * 2.0;
+                self.cached_line_height = canvas.get_line_height(font_size);
                 self.layout_dirty = false;
             }
             
@@ -516,7 +516,7 @@ impl Widget for TextEdit {
                 }).collect();
                 
                 self.cached_max_bearing_y = max_bearing_y;
-                self.cached_line_height = font_size * 2.0;
+                self.cached_line_height = canvas.get_line_height(font_size);
                 self.layout_dirty = false;
             }
         }

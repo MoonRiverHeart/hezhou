@@ -65,6 +65,18 @@ impl FontAtlas {
         }
     }
     
+    pub fn get_font_line_height(&self, font_index: usize, font_size: f32) -> f32 {
+        if font_index < self.fonts.len() {
+            if let Some(metrics) = self.fonts[font_index].horizontal_line_metrics(font_size) {
+                metrics.ascent - metrics.descent + metrics.line_gap
+            } else {
+                font_size * 1.2
+            }
+        } else {
+            font_size * 1.2
+        }
+    }
+    
     pub fn prerasterize_chars(&mut self, font_index: usize, chars: &str, sizes: &[f32]) {
         if font_index >= self.fonts.len() {
             return;
@@ -252,7 +264,7 @@ impl FontAtlas {
         let mut result = Vec::new();
         let mut cursor_x = container_x;
         let mut cursor_y = baseline_y;
-        let line_height = font_size * 2.0;
+        let line_height = self.get_font_line_height(font_index, font_size);
         
         for character in text.chars() {
             if character == '\n' {

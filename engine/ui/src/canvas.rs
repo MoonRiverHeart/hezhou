@@ -59,9 +59,9 @@ impl Canvas {
     pub fn layout_text_for_cursor_with_wrap(&self, text: &str, font_size: f32, container_x: f32, container_y: f32, wrap_width: Option<f32>) -> Vec<(f32, f32, f32, usize, usize, usize)> {
         if let Some(atlas) = self.get_font_atlas() {
             let max_bearing_y = atlas.get_font_ascent(self.font_index, font_size);
+            let line_height = atlas.get_font_line_height(self.font_index, font_size);
             
             let baseline_y = container_y + max_bearing_y;
-            let line_height = font_size * 2.0;
             
             let mut cursor_x = container_x;
             let mut current_baseline_y = baseline_y;
@@ -104,6 +104,14 @@ impl Canvas {
             atlas.get_font_ascent(self.font_index, font_size)
         } else {
             font_size * 0.75
+        }
+    }
+    
+    pub fn get_line_height(&self, font_size: f32) -> f32 {
+        if let Some(atlas) = self.get_font_atlas() {
+            atlas.get_font_line_height(self.font_index, font_size)
+        } else {
+            font_size * 1.2
         }
     }
 
