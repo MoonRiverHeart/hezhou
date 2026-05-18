@@ -391,6 +391,8 @@ impl GLFWPlatform {
             glfw::Key::Right => KeyCode::Right,
             glfw::Key::Up => KeyCode::Up,
             glfw::Key::Down => KeyCode::Down,
+            glfw::Key::Home => KeyCode::Home,
+            glfw::Key::End => KeyCode::End,
             glfw::Key::Num0 => KeyCode::Num0,
             glfw::Key::Num1 => KeyCode::Num1,
             glfw::Key::Num2 => KeyCode::Num2,

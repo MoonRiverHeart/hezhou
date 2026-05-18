@@ -122,6 +122,7 @@ pub enum KeyCode {
     Up = 47,
     Down = 48,
     Home = 1001,
+    End = 1006,
     Back = 1002,
     Menu = 1003,
     VolumeUp = 1004,

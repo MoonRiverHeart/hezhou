@@ -26,6 +26,9 @@ pub struct TextEdit {
     selection_end: usize,
     focused: bool,
     char_layouts: Vec<CharLayout>,
+    layout_dirty: bool,
+    cached_max_bearing_y: f32,
+    cached_line_height: f32,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -58,6 +61,9 @@ impl TextEdit {
             selection_end: 0,
             focused: false,
             char_layouts: Vec::new(),
+            layout_dirty: true,
+            cached_max_bearing_y: 0.0,
+            cached_line_height: 0.0,
         }
     }
     
@@ -72,6 +78,7 @@ impl TextEdit {
         self.text = text.to_string();
         self.cursor_position = self.text.len();
         self.char_layouts.clear();
+        self.layout_dirty = true;
         self.flags.dirty_render = true;
     }
 
@@ -83,19 +90,156 @@ impl TextEdit {
         self.text.insert(self.cursor_position, c);
         self.cursor_position += c.len_utf8();
         self.char_layouts.clear();
+        self.layout_dirty = true;
         self.flags.dirty_render = true;
     }
     
     pub fn delete_char(&mut self) {
         if self.cursor_position > 0 {
             let delete_pos = self.cursor_position - 1;
-            if delete_pos < self.text.len() {
+            if delete_pos < self.text.len() && self.is_char_boundary(delete_pos) {
                 self.text.remove(delete_pos);
                 self.cursor_position = delete_pos;
                 self.char_layouts.clear();
+                self.layout_dirty = true;
                 self.flags.dirty_render = true;
             }
         }
+    }
+    
+    fn is_char_boundary(&self, pos: usize) -> bool {
+        if pos == 0 || pos == self.text.len() {
+            return true;
+        }
+        self.text.is_char_boundary(pos)
+    }
+    
+    fn move_cursor_left(&mut self) {
+        if self.cursor_position > 0 {
+            // 找到前一个字符的起始位置
+            let prev_char_start = self.text[..self.cursor_position]
+                .char_indices()
+                .rev()
+                .next()
+                .map(|(i, _)| i)
+                .unwrap_or(0);
+            self.cursor_position = prev_char_start;
+            self.flags.dirty_render = true;
+            println!("[TextEdit] Move left: cursor_position={}", self.cursor_position);
+        }
+    }
+    
+    fn move_cursor_right(&mut self) {
+        if self.cursor_position < self.text.len() {
+            // 找到当前字符并移动到下一个字符的起始位置
+            if let Some(c) = self.text[self.cursor_position..].chars().next() {
+                self.cursor_position += c.len_utf8();
+                self.flags.dirty_render = true;
+                println!("[TextEdit] Move right: cursor_position={}", self.cursor_position);
+            }
+        }
+    }
+    
+    fn move_cursor_up(&mut self) {
+        // 找到上一行的相同x位置
+        if let Some(current_layout) = self.find_char_layout_at_cursor() {
+            let current_x = current_layout.x;
+            let current_y = current_layout.y;
+            
+            // 找到上一行（y更小）
+            let prev_line_y = self.char_layouts.iter()
+                .filter(|l| l.y < current_y)
+                .map(|l| l.y)
+                .max_by(|a, b| a.partial_cmp(b).unwrap());
+            
+            if let Some(prev_y) = prev_line_y {
+                // 在上一行找到最接近 current_x 的字符
+                let best = self.char_layouts.iter()
+                    .filter(|l| l.y == prev_y)
+                    .min_by(|a, b| {
+                        let dist_a = (a.x - current_x).abs();
+                        let dist_b = (b.x - current_x).abs();
+                        dist_a.partial_cmp(&dist_b).unwrap()
+                    });
+                
+                if let Some(layout) = best {
+                    self.cursor_position = layout.byte_index;
+                    self.flags.dirty_render = true;
+                    println!("[TextEdit] Move up: cursor_position={}", self.cursor_position);
+                }
+            }
+        }
+    }
+    
+    fn move_cursor_down(&mut self) {
+        // 找到下一行的相同x位置
+        if let Some(current_layout) = self.find_char_layout_at_cursor() {
+            let current_x = current_layout.x;
+            let current_y = current_layout.y;
+            
+            // 找到下一行（y更大）
+            let next_line_y = self.char_layouts.iter()
+                .filter(|l| l.y > current_y)
+                .map(|l| l.y)
+                .min_by(|a, b| a.partial_cmp(b).unwrap());
+            
+            if let Some(next_y) = next_line_y {
+                // 在下一行找到最接近 current_x 的字符
+                let best = self.char_layouts.iter()
+                    .filter(|l| l.y == next_y)
+                    .min_by(|a, b| {
+                        let dist_a = (a.x - current_x).abs();
+                        let dist_b = (b.x - current_x).abs();
+                        dist_a.partial_cmp(&dist_b).unwrap()
+                    });
+                
+                if let Some(layout) = best {
+                    self.cursor_position = layout.byte_index;
+                    self.flags.dirty_render = true;
+                    println!("[TextEdit] Move down: cursor_position={}", self.cursor_position);
+                }
+            }
+        }
+    }
+    
+    fn move_cursor_to_line_start(&mut self) {
+        // 找到当前行的起始位置
+        if self.cursor_position > 0 {
+            let line_start = self.text[..self.cursor_position]
+                .match_indices('\n')
+                .last()
+                .map(|(i, _)| i + 1)
+                .unwrap_or(0);
+            self.cursor_position = line_start;
+        } else {
+            self.cursor_position = 0;
+        }
+        self.flags.dirty_render = true;
+        println!("[TextEdit] Move to line start: cursor_position={}", self.cursor_position);
+    }
+    
+    fn move_cursor_to_line_end(&mut self) {
+        // 找到当前行的结束位置（下一个\n或文本末尾）
+        let line_end = self.text[self.cursor_position..]
+            .match_indices('\n')
+            .next()
+            .map(|(i, _)| self.cursor_position + i)
+            .unwrap_or(self.text.len());
+        self.cursor_position = line_end;
+        self.flags.dirty_render = true;
+        println!("[TextEdit] Move to line end: cursor_position={}", self.cursor_position);
+    }
+    
+    fn find_char_layout_at_cursor(&self) -> Option<&CharLayout> {
+        // 找到光标前一个字符的布局
+        if self.cursor_position == 0 {
+            return None;
+        }
+        
+        self.char_layouts.iter()
+            .find(|l| l.byte_index == self.cursor_position - 1 || 
+                      (l.byte_index < self.cursor_position && 
+                       l.byte_index + 1 >= self.cursor_position))
     }
     
     pub fn set_focused(&mut self, focused: bool) {
@@ -321,90 +465,90 @@ impl Widget for TextEdit {
         if self.focused && self.cursor_visible {
             let text_start_x = 10.0;
             let text_start_y = 10.0;
+            let font_size = self.text_style.font_size * 2.0;
             
-            // 使用 Canvas 的 font_atlas 精确计算字符位置
-            let char_positions = canvas.layout_text_for_cursor(
-                &self.text,
-                self.text_style.font_size * 2.0,
-                text_start_x,
-                text_start_y,
-            );
-            
-            // 获取 max_bearing_y 用于光标 y 计算
-            let max_bearing_y = canvas.get_max_bearing_y(&self.text, self.text_style.font_size * 2.0);
-            
-            // 无条件保存字符位置供 TouchBegin 使用（确保总是精确值）
-            self.char_layouts = char_positions.iter().map(|(x, baseline_y, advance, char_idx, byte_idx)| {
-                CharLayout {
-                    x: *x,
-                    y: *baseline_y - max_bearing_y,
-                    width: *advance,
-                    height: self.text_style.font_size * 2.0,
-                    char_index: *char_idx,
-                    byte_index: *byte_idx,
-                }
-            }).collect();
-            
-            // 计算光标位置
-            let (cursor_x, cursor_y) = if self.cursor_position == 0 {
-                (text_start_x, text_start_y)
-            } else {
-                let mut found_x = text_start_x;
-                let mut found_y = text_start_y;
-                
-                println!("[Cursor] Calculating position for cursor_position={}", self.cursor_position);
-                
-                for (x, baseline_y, advance, char_idx, byte_idx) in &char_positions {
-                    println!("[Cursor] char_idx={}, byte_idx={}, x={}, advance={}, baseline_y={}", 
-                             char_idx, byte_idx, x, advance, baseline_y);
-                    
-                    if *byte_idx < self.cursor_position {
-                        found_x = *x + *advance;
-                        found_y = *baseline_y - max_bearing_y;
-                        println!("[Cursor]   -> byte_idx {} < cursor_position {}, found_x={}, found_y={} (baseline_y={} - max_bearing_y={})", 
-                                 byte_idx, self.cursor_position, found_x, found_y, baseline_y, max_bearing_y);
-                    } else {
-                        println!("[Cursor]   -> byte_idx {} >= cursor_position {}, stopping", 
-                                 byte_idx, self.cursor_position);
-                        break;
-                    }
-                }
-                
-                println!("[Cursor] Final cursor position: ({}, {})", found_x, found_y);
-                (found_x, found_y)
-            };
-            
-            let cursor_height = self.text_style.font_size * 2.0 * 0.75;
-            
-            canvas.draw_rect(
-                Rect::new(cursor_x, cursor_y, 2.0, cursor_height),
-                &Style::new().with_background(Color::white()),
-            );
-        } else {
-            // 即使不显示光标，也更新 char_layouts（确保点击时可用）
-            if canvas.get_font_atlas().is_some() && !self.text.is_empty() {
-                let text_start_x = 10.0;
-                let text_start_y = 10.0;
-                
+            // 只在布局 dirty 时重新计算
+            if self.layout_dirty || self.char_layouts.is_empty() {
                 let char_positions = canvas.layout_text_for_cursor(
                     &self.text,
-                    self.text_style.font_size * 2.0,
+                    font_size,
                     text_start_x,
                     text_start_y,
                 );
                 
-                let max_bearing_y = canvas.get_max_bearing_y(&self.text, self.text_style.font_size * 2.0);
+                let max_bearing_y = canvas.get_max_bearing_y(&self.text, font_size);
                 
                 self.char_layouts = char_positions.iter().map(|(x, baseline_y, advance, char_idx, byte_idx)| {
                     CharLayout {
                         x: *x,
                         y: *baseline_y - max_bearing_y,
                         width: *advance,
-                        height: self.text_style.font_size * 2.0,
+                        height: font_size,
                         char_index: *char_idx,
                         byte_index: *byte_idx,
                     }
                 }).collect();
+                
+                self.cached_max_bearing_y = max_bearing_y;
+                self.cached_line_height = font_size * 1.5;
+                self.layout_dirty = false;
+            }
+            
+            // 计算光标位置（使用缓存的布局）
+            let (cursor_x, cursor_y) = if self.cursor_position == 0 {
+                (text_start_x, text_start_y)
+            } else {
+                let mut found_x = text_start_x;
+                let mut found_y = text_start_y;
+                
+                for layout in &self.char_layouts {
+                    if layout.byte_index < self.cursor_position {
+                        found_x = layout.x + layout.width;
+                        found_y = layout.y;
+                    } else {
+                        break;
+                    }
+                }
+                
+                (found_x, found_y)
+            };
+            
+            let cursor_height = font_size * 0.75;
+            
+            canvas.draw_rect(
+                Rect::new(cursor_x, cursor_y, 2.0, cursor_height),
+                &Style::new().with_background(Color::white()),
+            );
+        } else {
+            // 即使不显示光标，也需要更新布局（如果 dirty）
+            if self.layout_dirty && canvas.get_font_atlas().is_some() && !self.text.is_empty() {
+                let text_start_x = 10.0;
+                let text_start_y = 10.0;
+                let font_size = self.text_style.font_size * 2.0;
+                
+                let char_positions = canvas.layout_text_for_cursor(
+                    &self.text,
+                    font_size,
+                    text_start_x,
+                    text_start_y,
+                );
+                
+                let max_bearing_y = canvas.get_max_bearing_y(&self.text, font_size);
+                
+                self.char_layouts = char_positions.iter().map(|(x, baseline_y, advance, char_idx, byte_idx)| {
+                    CharLayout {
+                        x: *x,
+                        y: *baseline_y - max_bearing_y,
+                        width: *advance,
+                        height: font_size,
+                        char_index: *char_idx,
+                        byte_index: *byte_idx,
+                    }
+                }).collect();
+                
+                self.cached_max_bearing_y = max_bearing_y;
+                self.cached_line_height = font_size * 1.5;
+                self.layout_dirty = false;
             }
         }
     }
@@ -504,6 +648,34 @@ impl Widget for TextEdit {
                         if key_data.keycode == KeyCode::Backspace as u32 {
                             println!("[TextEdit] Backspace, deleting char");
                             self.delete_char();
+                            return EventResult::Handled;
+                        }
+                        
+                        // 方向键导航
+                        if key_data.keycode == KeyCode::Left as u32 {
+                            self.move_cursor_left();
+                            return EventResult::Handled;
+                        }
+                        if key_data.keycode == KeyCode::Right as u32 {
+                            self.move_cursor_right();
+                            return EventResult::Handled;
+                        }
+                        if key_data.keycode == KeyCode::Up as u32 {
+                            self.move_cursor_up();
+                            return EventResult::Handled;
+                        }
+                        if key_data.keycode == KeyCode::Down as u32 {
+                            self.move_cursor_down();
+                            return EventResult::Handled;
+                        }
+                        
+                        // Home/End键
+                        if key_data.keycode == KeyCode::Home as u32 {
+                            self.move_cursor_to_line_start();
+                            return EventResult::Handled;
+                        }
+                        if key_data.keycode == KeyCode::End as u32 {
+                            self.move_cursor_to_line_end();
                             return EventResult::Handled;
                         }
                         
