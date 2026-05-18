@@ -184,31 +184,39 @@ impl EventDispatcher {
                 break;
             }
 
-            // 计算widget的绝对坐标（用于坐标转换）
             let abs_layout = {
                 let tree = self.widget_tree.lock();
                 tree.get_absolute_layout(*widget_id)
             };
             
-            // 如果是Touch事件，将窗口坐标转换成widget相对坐标
-            if let Some(abs_layout) = abs_layout {
-                if let EventData::Touch(ref mut touch_data) = event.data {
-                    // 保存原始窗口坐标（用于全局事件）
+            // 如果是Touch事件且需要坐标转换，创建转换后的副本
+            let converted_event = if let Some(abs_layout) = abs_layout {
+                if let EventData::Touch(touch_data) = &event.data {
                     let window_x = touch_data.x;
                     let window_y = touch_data.y;
-                    
-                    // 转换成widget相对坐标
-                    touch_data.x = window_x - abs_layout.x;
-                    touch_data.y = window_y - abs_layout.y;
+                    let relative_x = window_x - abs_layout.x;
+                    let relative_y = window_y - abs_layout.y;
                     
                     println!("[Dispatch] Widget {}: window ({}, {}) -> relative ({}, {})", 
-                             widget_id.id, window_x, window_y, touch_data.x, touch_data.y);
+                             widget_id.id, window_x, window_y, relative_x, relative_y);
+                    
+                    let mut converted = event.clone();
+                    converted.data = EventData::Touch(TouchData::new(relative_x, relative_y, touch_data.pointer_id));
+                    Some(converted)
+                } else {
+                    None
                 }
-            }
+            } else {
+                None
+            };
 
             let mut tree = self.widget_tree.lock();
             if let Some(widget) = tree.get_widget_mut(*widget_id) {
-                let result = widget.as_mut().on_event(event);
+                let result = if let Some(converted) = converted_event {
+                    widget.as_mut().on_event(&converted)
+                } else {
+                    widget.as_mut().on_event(event)
+                };
                 match result {
                     EventResult::Stopped => {
                         event.stopped = true;

@@ -399,20 +399,34 @@ impl Widget for TextEdit {
         
         canvas.draw_rect(Rect::new(0.0, 0.0, width, height), &self.style);
         
+        let num_graphemes = self.text.graphemes(true).count();
+        
+        // 修复：确保 selection 在有效范围内
+        self.selection_start = self.selection_start.min(num_graphemes);
+        self.selection_end = self.selection_end.min(num_graphemes);
+        self.cursor_grapheme_index = self.cursor_grapheme_index.min(num_graphemes);
+        
+        if self.selection_start != self.selection_end {
+            println!("[Draw] Selection: {} to {}, num_graphemes={}, char_layouts.len()={}", 
+                     self.selection_start, self.selection_end, num_graphemes, self.char_layouts.len());
+        }
+        
         // 渲染选择高亮（在文本之前）
-        if self.selection_start != self.selection_end && !self.char_layouts.is_empty() {
-            let num_graphemes = self.text.graphemes(true).count();
-            let start = self.selection_start.min(self.selection_end).min(num_graphemes);
-            let end = self.selection_start.max(self.selection_end).min(num_graphemes);
-            let max_bearing_y = self.cached_max_bearing_y;
+        if self.selection_start != self.selection_end {
+            let start = self.selection_start.min(self.selection_end);
+            let end = self.selection_start.max(self.selection_end);
             
-            for layout in &self.char_layouts {
-                if layout.grapheme_index >= start && layout.grapheme_index < end {
-                    let highlight_y = layout.y - max_bearing_y;
-                    canvas.draw_rect(
-                        Rect::new(layout.x, highlight_y, layout.width, layout.height),
-                        &Style::new().with_background(Color::new(0.3, 0.5, 0.8, 0.3)),
-                    );
+            if start < end && !self.char_layouts.is_empty() {
+                let max_bearing_y = self.cached_max_bearing_y;
+                
+                for layout in &self.char_layouts {
+                    if layout.grapheme_index >= start && layout.grapheme_index < end {
+                        let highlight_y = layout.y - max_bearing_y;
+                        canvas.draw_rect(
+                            Rect::new(layout.x, highlight_y, layout.width, layout.height),
+                            &Style::new().with_background(Color::new(0.3, 0.5, 0.8, 0.3)),
+                        );
+                    }
                 }
             }
         }
