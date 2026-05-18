@@ -123,7 +123,7 @@ impl Widget for Button {
 
     fn measure(&self, font_atlas: &crate::font_atlas::FontAtlas) -> (f32, f32) {
         let (text_width, text_height) =
-            font_atlas.measure_text(0, &self.text, self.text_style.font_size * 2.0);
+            font_atlas.measure_text(0, &self.text, self.text_style.font_size);
 
         let padding = 15.0;
         let width = text_width + padding * 2.0;

@@ -154,9 +154,9 @@ cargo run --bin rotation_demo --features native-aot
 - `max_bearing_y`: Maximum bearing_y across all characters in text, used for unified baseline
 
 ### Key Formula
-- `baseline_y = container_y + max_bearing_y`
-- `cursor_draw_y = baseline_y - max_bearing_y` (matches text render start y)
-- `line_height = font_size * 2.0` (must be consistent across font_atlas.rs and canvas.rs)
+- `baseline_y = container_y + font_ascent`
+- `cursor_draw_y = baseline_y - font_ascent` (matches text render start y)
+- `line_height = ascent - descent + line_gap` (from fontdue horizontal_line_metrics)
 
 ### Click Position Calculation
 - Find closest line by comparing `click_y` against `cursor_draw_y` (not baseline_y)
@@ -164,8 +164,8 @@ cargo run --bin rotation_demo --features native-aot
 - Then find closest grapheme by x-coordinate within that line
 
 ### Common Issues
-1. **Cursor/Click position mismatch**: Ensure `line_height` is consistent (`font_size * 2.0`)
-2. **Second line cursor offset**: Use `baseline_y - max_bearing_y` for comparison, not raw baseline_y
+1. **Cursor/Click position mismatch**: Ensure font metrics are used consistently
+2. **Second line cursor offset**: Use `baseline_y - font_ascent` for comparison
 3. **Selection highlight offset**: Highlight rect y should be `baseline_y - max_bearing_y`
 4. **Ctrl+C/V not working**: GLFW `mods` parameter must be parsed and passed to `KeyModifiers`
 

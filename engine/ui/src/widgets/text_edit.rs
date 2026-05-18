@@ -269,7 +269,7 @@ impl TextEdit {
             println!("[Click] Using precise char_layouts ({} graphemes)", self.char_layouts.len());
             
             let max_bearing_y = self.cached_max_bearing_y;
-            let font_size = self.text_style.font_size * 2.0;
+            let font_size = self.text_style.font_size;
             
             let mut best_grapheme_idx = 0;
             let mut best_byte_idx = 0;
@@ -430,7 +430,7 @@ impl Widget for TextEdit {
         if self.focused && self.cursor_visible {
             let text_start_x = 10.0;
             let text_start_y = 10.0;
-            let font_size = self.text_style.font_size * 2.0;
+            let font_size = self.text_style.font_size;
             
             if self.layout_dirty || self.char_layouts.is_empty() {
                 let wrap_width = Some(self.layout.width - 20.0);
@@ -490,7 +490,7 @@ impl Widget for TextEdit {
             if self.layout_dirty && canvas.get_font_atlas().is_some() && !self.text.is_empty() {
                 let text_start_x = 10.0;
                 let text_start_y = 10.0;
-                let font_size = self.text_style.font_size * 2.0;
+                let font_size = self.text_style.font_size;
                 let wrap_width = Some(self.layout.width - 20.0);
                 
                 let char_positions = canvas.layout_text_for_cursor_with_wrap(
@@ -527,7 +527,7 @@ impl Widget for TextEdit {
         // 这里不更新 char_layouts（需要 &mut self）
         
         let (text_width, text_height) =
-            font_atlas.measure_text(0, &self.text, self.text_style.font_size * 2.0);
+            font_atlas.measure_text(0, &self.text, self.text_style.font_size);
 
         let width = if self.layout.width > 0.0 {
             self.layout.width.max(text_width + 20.0)

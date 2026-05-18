@@ -1297,7 +1297,7 @@ DrawCommand::Text { bounds, width, height, font_color, text, text_len, font_size
                                 font_atlas.layout_text_left(
                                     0,
                                     text_str,
-                                    *font_size * 2.0,
+                                    *font_size,
                                     bounds.x,
                                     bounds.y,
                                     *height,
@@ -1307,7 +1307,7 @@ DrawCommand::Text { bounds, width, height, font_color, text, text_len, font_size
                                 font_atlas.layout_text_centered(
                                     0,
                                     text_str,
-                                    *font_size * 2.0,
+                                    *font_size,
                                     bounds.x,
                                     bounds.y,
                                     *width,

@@ -131,7 +131,7 @@ fn draw(&mut self, canvas: &mut Canvas) {
 
     fn measure(&self, font_atlas: &crate::font_atlas::FontAtlas) -> (f32, f32) {
         let (text_width, text_height) =
-            font_atlas.measure_text(0, &self.text, self.text_style.font_size * 2.0);
+            font_atlas.measure_text(0, &self.text, self.text_style.font_size);
 
         let width = if self.layout.width > 0.0 {
             self.layout.width.max(text_width)
