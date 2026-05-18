@@ -192,9 +192,16 @@ namespace Hezhou
 
         public static void Update(float deltaTime)
         {
-            if (deltaTime > 0)
+            if (deltaTime > 0 && _fpsLabel != null)
             {
-                _fpsLabel.Text = $"FPS: {((int)(1000f / deltaTime))}";
+                try
+                {
+                    _fpsLabel.Text = $"FPS: {((int)(1000f / deltaTime))}";
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[Editor] Update error: {ex.Message}");
+                }
             }
         }
         

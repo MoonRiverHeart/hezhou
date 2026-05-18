@@ -821,7 +821,9 @@ pub extern "C" fn ui_create_label_in_parent(
         label.set_layout(Layout::new(0.0, 0.0, width, height));
         
         let content_scale = crate::thunk_manager::ui_get_content_scale();
-        label.set_font_size(18.0 * content_scale);
+        let font_size = 16.0 * content_scale;
+        println!("[FFI] CreateLabel: content_scale={}, font_size={}", content_scale, font_size);
+        label.set_font_size(font_size);
         
         let id = label.id();
         
