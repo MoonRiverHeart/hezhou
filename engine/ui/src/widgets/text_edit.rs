@@ -25,6 +25,17 @@ pub struct TextEdit {
     selection_start: usize,
     selection_end: usize,
     focused: bool,
+    char_layouts: Vec<CharLayout>,
+}
+
+#[derive(Clone, Copy, Debug)]
+struct CharLayout {
+    x: f32,
+    y: f32,
+    width: f32,
+    height: f32,
+    char_index: usize,
+    byte_index: usize,
 }
 
 impl TextEdit {
@@ -46,6 +57,7 @@ impl TextEdit {
             selection_start: 0,
             selection_end: 0,
             focused: false,
+            char_layouts: Vec::new(),
         }
     }
     
@@ -59,6 +71,7 @@ impl TextEdit {
     pub fn set_text(&mut self, text: &str) {
         self.text = text.to_string();
         self.cursor_position = self.text.len();
+        self.char_layouts.clear();
         self.flags.dirty_render = true;
     }
 
@@ -69,6 +82,7 @@ impl TextEdit {
     pub fn insert_char(&mut self, c: char) {
         self.text.insert(self.cursor_position, c);
         self.cursor_position += c.len_utf8();
+        self.char_layouts.clear();
         self.flags.dirty_render = true;
     }
     
@@ -78,6 +92,7 @@ impl TextEdit {
             if delete_pos < self.text.len() {
                 self.text.remove(delete_pos);
                 self.cursor_position = delete_pos;
+                self.char_layouts.clear();
                 self.flags.dirty_render = true;
             }
         }
@@ -86,6 +101,110 @@ impl TextEdit {
     pub fn set_focused(&mut self, focused: bool) {
         self.focused = focused;
         self.flags.dirty_render = true;
+    }
+    
+    fn update_char_layouts(&mut self) {
+        if !self.char_layouts.is_empty() {
+            return;
+        }
+        
+        let text_start_x = 10.0;
+        let text_start_y = 10.0;
+        let line_height = self.text_style.font_size * 1.5;
+        let char_width = self.text_style.font_size * 0.6;
+        
+        let mut cursor_x = text_start_x;
+        let mut cursor_y = text_start_y;
+        
+        for (byte_index, c) in self.text.char_indices() {
+            if c == '\n' {
+                cursor_x = text_start_x;
+                cursor_y += line_height;
+                continue;
+            }
+            
+            let char_layout = CharLayout {
+                x: cursor_x,
+                y: cursor_y,
+                width: char_width,
+                height: self.text_style.font_size,
+                char_index: self.char_layouts.len(),
+                byte_index,
+            };
+            
+            self.char_layouts.push(char_layout);
+            cursor_x += char_width;
+        }
+    }
+    
+    fn find_cursor_position_at(&self, click_x: f32, click_y: f32) -> usize {
+        let text_start_x = 10.0;
+        let text_start_y = 10.0;
+        let line_height = self.text_style.font_size * 1.5;
+        let char_width = self.text_style.font_size * 0.6;
+        
+        // 计算点击的行号
+        let relative_y = click_y - text_start_y;
+        let line_index = if relative_y < 0.0 {
+            0
+        } else {
+            (relative_y / line_height) as usize
+        };
+        
+        // 找到该行的所有字符
+        let mut current_line = 0;
+        let mut line_chars: Vec<&CharLayout> = Vec::new();
+        
+        for layout in &self.char_layouts {
+            if layout.y == text_start_y + (current_line as f32 * line_height) {
+                line_chars.push(layout);
+            } else if layout.y > text_start_y + (current_line as f32 * line_height) {
+                current_line += 1;
+                if current_line > line_index {
+                    break;
+                }
+                line_chars.clear();
+                line_chars.push(layout);
+            }
+        }
+        
+        // 如果点击的行没有字符（可能是空行）
+        if line_chars.is_empty() {
+            // 找到该行的起始位置
+            let mut byte_pos = 0;
+            let mut current_line = 0;
+            for (i, c) in self.text.char_indices() {
+                if c == '\n' {
+                    current_line += 1;
+                    if current_line > line_index {
+                        break;
+                    }
+                    byte_pos = i + 1;
+                }
+            }
+            return byte_pos;
+        }
+        
+        // 在该行中找到最近的字符
+        let relative_x = click_x - text_start_x;
+        let mut best_pos = 0;
+        let mut best_distance = f32::MAX;
+        
+        for layout in &line_chars {
+            let char_center_x = layout.x + layout.width / 2.0;
+            let distance = (relative_x - char_center_x).abs();
+            
+            if distance < best_distance {
+                best_distance = distance;
+                best_pos = if relative_x < char_center_x {
+                    layout.byte_index
+                } else {
+                    layout.byte_index + 1
+                };
+            }
+        }
+        
+        best_pos
     }
 }
 
@@ -172,19 +291,39 @@ impl Widget for TextEdit {
         }
         
         if self.focused && self.cursor_visible {
-            // 计算光标位置：前面所有字符的总宽度
-            let text_before_cursor = if self.cursor_position <= self.text.len() {
-                &self.text[..self.cursor_position]
+            // 更新字符布局
+            self.update_char_layouts();
+            
+            // 找到光标位置对应的字符
+            let (cursor_x, cursor_y) = if self.cursor_position == 0 {
+                // 光标在最开始
+                (10.0, 10.0)
             } else {
-                &self.text
+                // 查找光标前一个字符
+                let mut found = None;
+                for layout in &self.char_layouts {
+                    if layout.byte_index + 1 == self.cursor_position || 
+                       (layout.byte_index < self.cursor_position && 
+                        (layout.char_index + 1 >= self.char_layouts.len() || 
+                         self.char_layouts[layout.char_index + 1].byte_index >= self.cursor_position)) {
+                        found = Some(*layout);
+                        break;
+                    }
+                }
+                
+                if let Some(layout) = found {
+                    (layout.x + layout.width, layout.y)
+                } else {
+                    // 找不到，放到最后
+                    if let Some(last) = self.char_layouts.last() {
+                        (last.x + last.width, last.y)
+                    } else {
+                        (10.0, 10.0)
+                    }
+                }
             };
             
-            // 简化版：每个字符约8px（实际应该用font_atlas测量）
-            let cursor_x = 10.0 + text_before_cursor.len() as f32 * 8.0;
-            
-            // 光标高度使用字体高度
             let cursor_height = self.text_style.font_size * 1.2;
-            let cursor_y = 10.0;
             
             canvas.draw_rect(
                 Rect::new(cursor_x, cursor_y, 2.0, cursor_height),
@@ -219,24 +358,16 @@ impl Widget for TextEdit {
                 self.focused = true;
                 self.cursor_visible = true;
                 
+                // 更新字符布局
+                self.update_char_layouts();
+                
                 // 根据点击位置计算cursor_position
                 if let EventData::Touch(touch_data) = &event.data {
                     let click_x = touch_data.x;
-                    println!("[TextEdit] Click at x={}", click_x);
+                    let click_y = touch_data.y;
+                    println!("[TextEdit] Click at ({}, {})", click_x, click_y);
                     
-                    // 点击相对于TextEdit的位置（TextEdit本身从(0,0)开始，文本从(10,10)开始）
-                    let text_start_x = 10.0;
-                    let relative_x = click_x - text_start_x;
-                    
-                    // 计算点击位置应该在哪个字符
-                    // 简化版：假设每个字符约8px宽度（实际应该用font_atlas）
-                    if relative_x <= 0.0 {
-                        self.cursor_position = 0;
-                    } else {
-                        // 估算位置（每个字符约8px）
-                        let estimated_pos = (relative_x / 8.0) as usize;
-                        self.cursor_position = estimated_pos.min(self.text.len());
-                    }
+                    self.cursor_position = self.find_cursor_position_at(click_x, click_y);
                     println!("[TextEdit] cursor_position set to {}", self.cursor_position);
                 }
                 
