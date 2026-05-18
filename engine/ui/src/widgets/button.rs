@@ -47,6 +47,11 @@ impl Button {
         self.on_click = Some(callback);
     }
     
+    pub fn set_font_size(&mut self, size: f32) {
+        self.text_style.font_size = size;
+        self.flags.dirty_render = true;
+    }
+    
     pub fn with_on_click(mut self, callback: Box<dyn FnMut() + Send + Sync>) -> Self {
         self.on_click = Some(callback);
         self

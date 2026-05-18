@@ -95,6 +95,10 @@ impl TextEdit {
         self.layout_dirty = true;
         self.flags.dirty_render = true;
     }
+    
+    pub fn get_text_style(&self) -> &TextStyle {
+        &self.text_style
+    }
 
     pub fn get_text(&self) -> &str {
         &self.text

@@ -41,6 +41,11 @@ impl Label {
         self.text_style = style;
         self.flags.dirty_render = true;
     }
+    
+    pub fn set_font_size(&mut self, size: f32) {
+        self.text_style.font_size = size;
+        self.flags.dirty_render = true;
+    }
 
     pub fn get_text(&self) -> &str {
         &self.text

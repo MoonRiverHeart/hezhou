@@ -783,6 +783,10 @@ pub extern "C" fn ui_create_button_in_parent(
         let mut tree = arc.lock();
         let mut button = Button::new(&text_str);
         button.set_layout(Layout::new(0.0, 0.0, width, height));
+        
+        let content_scale = crate::thunk_manager::ui_get_content_scale();
+        button.set_font_size(16.0 * content_scale);
+        
         let id = button.id();
         
         let parent = if parent_id == 0 {
@@ -813,6 +817,10 @@ pub extern "C" fn ui_create_label_in_parent(
         let mut tree = arc.lock();
         let mut label = Label::new(&text_str);
         label.set_layout(Layout::new(0.0, 0.0, width, height));
+        
+        let content_scale = crate::thunk_manager::ui_get_content_scale();
+        label.set_font_size(16.0 * content_scale);
+        
         let id = label.id();
         
         let parent = if parent_id == 0 {
@@ -957,20 +965,27 @@ pub extern "C" fn ui_text_edit_set_text(
     text: *const std::ffi::c_char,
 ) {
     if handle.is_null() || text.is_null() {
+        println!("[FFI] ui_text_edit_set_text: handle or text is null");
         return;
     }
     unsafe {
         let arc = &*(handle as *const Arc<Mutex<WidgetTree>>);
         let mut tree = arc.lock();
         let id = WidgetId::from_raw(widget_id);
+        println!("[FFI] ui_text_edit_set_text: widget_id={}, looking for widget", widget_id);
         if let Some(widget) = tree.get_widget_mut(id) {
+            println!("[FFI] Found widget, type={}", widget.widget_type());
             if widget.widget_type() == "TextEdit" {
                 use crate::widgets::TextEdit;
                 if let Some(text_edit) = widget.as_any_mut().downcast_mut::<TextEdit>() {
                     let text_str = std::ffi::CStr::from_ptr(text).to_string_lossy();
+                    println!("[FFI] Setting text: {} chars, font_size={}", text_str.len(), text_edit.get_text_style().font_size);
                     text_edit.set_text(&text_str);
+                    println!("[FFI] ✓ Text set successfully");
                 }
             }
+        } else {
+            println!("[FFI] Widget not found for id={}", widget_id);
         }
     }
 }
