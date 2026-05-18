@@ -500,10 +500,10 @@ impl UIVulkanRenderer {
             }).map_err(|e| format!("Failed to allocate command buffers: {}", e))?;
             
             let (vertex_buffer, vertex_buffer_memory) = Self::create_vertex_buffer(
-                &instance, &device, physical_device, 65536
+                &instance, &device, physical_device, 33554432
             )?;
             
-            logger.lock().log(LogLevel::Info, "Vulkan", "Vertex buffer created (64KB)", file!(), line!());
+            logger.lock().log(LogLevel::Info, "Vulkan", "Vertex buffer created (32MB)", file!(), line!());
             
             let image_available_semaphores = (0..2)
                 .map(|_| device.create_semaphore(&vk::SemaphoreCreateInfo::default(), None))
@@ -1290,13 +1290,11 @@ DrawCommand::Rect { bounds, width, height, fill_color, .. } => {
                             x, y + h, r, g, b, a, 0.0, 0.0,
                         ]);
                     }
-DrawCommand::Text { bounds, width, height, font_color, text, text_len, font_size, alignment, .. } => {
-                            let text_str = if text.is_null() || *text_len == 0 {
+DrawCommand::Text { bounds, width, height, font_color, text, font_size, alignment, .. } => {
+                            let text_str = if text.is_empty() {
                                 ""
                             } else {
-                                unsafe {
-                                    std::str::from_utf8_unchecked(std::slice::from_raw_parts(*text, *text_len))
-                                }
+                                std::str::from_utf8(text).unwrap_or("")
                             };
                             
                             let ui_lock = self.ui_system.lock();

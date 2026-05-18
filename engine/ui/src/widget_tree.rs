@@ -420,16 +420,16 @@ pub fn perform_layout(&mut self, font_atlas: &FontAtlas) {
         }
     }
 
-    pub fn generate_render_data(&mut self, font_atlas: &FontAtlas) -> Vec<RenderData> {
+pub fn generate_render_data(&mut self, font_atlas: &FontAtlas) -> Vec<RenderData> {
         let mut render_data = Vec::new();
-
+        
         if let Some(root_id) = self.root {
             self.generate_render_data_recursive(root_id, 0.0, 0.0, &mut render_data, font_atlas);
         }
-
+        
         render_data
     }
-
+    
     fn generate_render_data_recursive(
         &mut self,
         id: WidgetId,
@@ -486,13 +486,12 @@ pub fn perform_layout(&mut self, font_atlas: &FontAtlas) {
                     border_radius: *border_radius,
                 }
             }
-            DrawCommand::Text { bounds, width, height, text, text_len, font_size, font_color, alignment } => {
+            DrawCommand::Text { bounds, width, height, text, font_size, font_color, alignment } => {
                 DrawCommand::Text {
                     bounds: Point::new(bounds.x + offset_x, bounds.y + offset_y),
                     width: *width,
                     height: *height,
-                    text: *text,
-                    text_len: *text_len,
+                    text: text.clone(),
                     font_size: *font_size,
                     font_color: *font_color,
                     alignment: *alignment,
