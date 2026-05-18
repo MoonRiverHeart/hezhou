@@ -651,6 +651,16 @@ pub extern "C" fn ui_get_screen_size(out_width: *mut f32, out_height: *mut f32) 
 }
 
 #[unsafe(no_mangle)]
+pub extern "C" fn ui_set_content_scale(scale: f32) {
+    crate::thunk_manager::ui_set_content_scale(scale);
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_get_content_scale() -> f32 {
+    crate::thunk_manager::ui_get_content_scale()
+}
+
+#[unsafe(no_mangle)]
 pub extern "C" fn ui_remove_widget(
     handle: WidgetTreeHandle,
     widget_id: u64,
@@ -922,7 +932,13 @@ pub extern "C" fn ui_create_text_edit_in_parent(
     unsafe {
         let arc = &*(handle as *const Arc<Mutex<WidgetTree>>);
         let mut tree = arc.lock();
-        let text_edit = TextEdit::with_size(width, height);
+        let mut text_edit = TextEdit::with_size(width, height);
+        
+        let content_scale = crate::thunk_manager::ui_get_content_scale();
+        let base_font_size = 16.0;
+        let scaled_font_size = base_font_size * content_scale;
+        text_edit.set_font_size(scaled_font_size);
+        
         let id = text_edit.id();
         let parent = if parent_id == 0 {
             tree.root.unwrap_or(WidgetId::invalid())

@@ -95,6 +95,7 @@ pub struct UIVulkanRenderer {
     physical_device: vk::PhysicalDevice,
     triangle_angle: f32,
     last_frame_time: f64,
+    content_scale: f32,
 }
 
 impl UIVulkanRenderer {
@@ -115,6 +116,10 @@ impl UIVulkanRenderer {
                 .expect("Failed to create GLFW window");
             
             window.set_all_polling(true);
+            
+            let (scale_x, scale_y) = window.get_content_scale();
+            let content_scale = scale_x;
+            logger.lock().log(LogLevel::Info, "Vulkan", &format!("Content scale: {} (DPI: {})", content_scale, content_scale * 96.0), file!(), line!());
             
             logger.lock().log(LogLevel::Info, "Vulkan", &format!("Window created {}x{}", width, height), file!(), line!());
             
@@ -575,6 +580,7 @@ impl UIVulkanRenderer {
                 physical_device,
                 triangle_angle: 0.0,
                 last_frame_time: 0.0,
+                content_scale,
             })
         }
     }
@@ -930,6 +936,10 @@ let font_atlas = ui.get_font_atlas();
     
     pub fn get_ui_system(&self) -> Arc<Mutex<UISystem>> {
         Arc::clone(&self.ui_system)
+    }
+    
+    pub fn get_content_scale(&self) -> f32 {
+        self.content_scale
     }
     
     pub fn is_space_pressed(&self) -> bool {
@@ -1606,7 +1616,7 @@ self.dfx.lock().get_logger().lock().log(
                     }
                 }
                 WindowEvent::Char(codepoint) => {
-                    if codepoint >= '\0' && codepoint <= '\x7F' {
+                    if codepoint >= ' ' {
                         self.input_handler.lock().on_char_event(&CharEvent {
                             codepoint: codepoint as u32,
                         }, self.frame_count);

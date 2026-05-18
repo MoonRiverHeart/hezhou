@@ -81,6 +81,12 @@ namespace Hezhou
         public delegate void GetScreenSizeDelegate(out float width, out float height);
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void SetContentScaleDelegate(float scale);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate float GetContentScaleDelegate();
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public delegate void TriggerHotReloadDelegate();
 
         [StructLayout(LayoutKind.Sequential)]
@@ -95,6 +101,8 @@ namespace Hezhou
             public IntPtr ui_register_global_click_thunk_ptr;
             public IntPtr ui_trigger_resize;
             public IntPtr ui_get_screen_size;
+            public IntPtr ui_set_content_scale;
+            public IntPtr ui_get_content_scale;
             public IntPtr ui_create_button;
             public IntPtr ui_create_label;
             public IntPtr ui_create_panel;
@@ -138,6 +146,27 @@ namespace Hezhou
             }
             var func = Marshal.GetDelegateForFunctionPointer<GetScreenSizeDelegate>(_ffi.ui_get_screen_size);
             func(out width, out height);
+        }
+
+        public static float GetContentScale()
+        {
+            if (_ffi.ui_get_content_scale == IntPtr.Zero)
+            {
+                return 1.0f;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<GetContentScaleDelegate>(_ffi.ui_get_content_scale);
+            return func();
+        }
+
+        public static void SetContentScale(float scale)
+        {
+            if (_ffi.ui_set_content_scale == IntPtr.Zero)
+            {
+                Console.WriteLine("[C#] ERROR: SetContentScale函数指针为空");
+                return;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<SetContentScaleDelegate>(_ffi.ui_set_content_scale);
+            func(scale);
         }
 
 public static void RegisterResizeCallback(ResizeCallbackDelegate callback)

@@ -21,6 +21,8 @@ pub trait Platform {
     fn set_window_title(&mut self, window: &WindowHandle, title: &str);
     fn set_window_size(&mut self, window: &WindowHandle, width: i32, height: i32);
     fn get_window_size(&self, window: &WindowHandle) -> (i32, i32);
+    
+    fn get_content_scale(&self) -> (f32, f32) { (1.0, 1.0) }
 
     fn poll_events(&mut self) -> Vec<PlatformEvent>;
     fn wait_events(&mut self) -> Vec<PlatformEvent>;

@@ -13,6 +13,8 @@ pub struct GLFWPlatform {
     running: bool,
     last_mouse_x: f64,
     last_mouse_y: f64,
+    content_scale_x: f32,
+    content_scale_y: f32,
 }
 
 impl GLFWPlatform {
@@ -25,7 +27,13 @@ impl GLFWPlatform {
             running: false,
             last_mouse_x: 0.0,
             last_mouse_y: 0.0,
+            content_scale_x: 1.0,
+            content_scale_y: 1.0,
         }
+    }
+    
+    pub fn get_content_scale(&self) -> (f32, f32) {
+        (self.content_scale_x, self.content_scale_y)
     }
 }
 
@@ -73,6 +81,11 @@ impl Platform for GLFWPlatform {
 
         window.set_all_polling(true);
         window.make_current();
+        
+        let (scale_x, scale_y) = window.get_content_scale();
+        self.content_scale_x = scale_x;
+        self.content_scale_y = scale_y;
+        println!("[GLFW] Content scale: x={}, y={} (DPI: {})", scale_x, scale_y, scale_x * 96.0);
 
         let handle = WindowHandle::new(
             NativeWindowType::GLFW,
@@ -202,6 +215,10 @@ impl Platform for GLFWPlatform {
 
     fn get_native_display(&self) -> Option<usize> {
         None
+    }
+    
+    fn get_content_scale(&self) -> (f32, f32) {
+        (self.content_scale_x, self.content_scale_y)
     }
 }
 

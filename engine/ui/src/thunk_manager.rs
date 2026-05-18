@@ -19,6 +19,9 @@ static PRIMARY_BUTTON_ID: LazyLock<Mutex<Option<u64>>> =
 static SCREEN_SIZE: LazyLock<Mutex<(f32, f32)>> =
     LazyLock::new(|| Mutex::new((800.0, 600.0)));
 
+static CONTENT_SCALE: LazyLock<Mutex<f32>> =
+    LazyLock::new(|| Mutex::new(1.0));
+
 pub struct UICallbacks {
     update: Option<UpdateCallback>,
     onclicks: HashMap<u64, WidgetCallback>,
@@ -100,6 +103,16 @@ pub fn ui_set_screen_size(width: f32, height: f32) {
 pub fn ui_get_screen_size() -> (f32, f32) {
     let size = SCREEN_SIZE.lock();
     *size
+}
+
+pub fn ui_set_content_scale(scale: f32) {
+    let mut content_scale = CONTENT_SCALE.lock();
+    *content_scale = scale;
+}
+
+pub fn ui_get_content_scale() -> f32 {
+    let content_scale = CONTENT_SCALE.lock();
+    *content_scale
 }
 
 #[unsafe(no_mangle)]

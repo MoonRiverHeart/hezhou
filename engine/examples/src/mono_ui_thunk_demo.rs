@@ -33,6 +33,8 @@ fn main() {
         ui_register_global_click_thunk_ptr: ui_ffi::ui_register_global_click_thunk_ptr,
         ui_trigger_resize: ui_ffi::ui_trigger_resize,
         ui_get_screen_size: ui_ffi::ui_get_screen_size,
+        ui_set_content_scale: ui_ffi::ui_set_content_scale,
+        ui_get_content_scale: ui_ffi::ui_get_content_scale,
         ui_create_button: unsafe { std::mem::transmute(ui_ffi::ui_create_button as *const std::ffi::c_void) },
         ui_create_label: unsafe { std::mem::transmute(ui_ffi::ui_create_label as *const std::ffi::c_void) },
         ui_create_panel: unsafe { std::mem::transmute(ui_ffi::ui_create_panel as *const std::ffi::c_void) },

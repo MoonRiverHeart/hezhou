@@ -88,6 +88,13 @@ impl TextEdit {
         self.layout_dirty = true;
         self.flags.dirty_render = true;
     }
+    
+    pub fn set_font_size(&mut self, size: f32) {
+        self.text_style.font_size = size;
+        self.char_layouts.clear();
+        self.layout_dirty = true;
+        self.flags.dirty_render = true;
+    }
 
     pub fn get_text(&self) -> &str {
         &self.text

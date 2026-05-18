@@ -31,6 +31,9 @@ fn main() {
     println!("[2] 设置UI Root Panel...");
     renderer.setup_ui_for_script();
     ui_ffi::ui_set_screen_size(1280.0, 720.0);
+    let content_scale = renderer.get_content_scale();
+    ui_ffi::ui_set_content_scale(content_scale);
+    println!("    Content scale: {} (DPI: {})", content_scale, content_scale * 96.0);
     println!("    Root Panel设置完成!\n");
 
     println!("[3] 编译C#编辑器脚本...");
@@ -49,6 +52,8 @@ fn main() {
         ui_register_global_click_thunk_ptr: ui_ffi::ui_register_global_click_thunk_ptr,
         ui_trigger_resize: ui_ffi::ui_trigger_resize,
         ui_get_screen_size: ui_ffi::ui_get_screen_size,
+        ui_set_content_scale: ui_ffi::ui_set_content_scale,
+        ui_get_content_scale: ui_ffi::ui_get_content_scale,
         ui_create_button: unsafe { std::mem::transmute(ui_ffi::ui_create_button as *const std::ffi::c_void) },
         ui_create_label: unsafe { std::mem::transmute(ui_ffi::ui_create_label as *const std::ffi::c_void) },
         ui_create_panel: unsafe { std::mem::transmute(ui_ffi::ui_create_panel as *const std::ffi::c_void) },

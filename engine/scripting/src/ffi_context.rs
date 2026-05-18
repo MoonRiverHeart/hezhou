@@ -11,6 +11,8 @@ pub type RegisterResizeThunkPtrFn = extern "C" fn(*const c_void);
 pub type RegisterGlobalClickThunkPtrFn = extern "C" fn(*const c_void);
 pub type TriggerResizeFn = extern "C" fn(f32, f32);
 pub type GetScreenSizeFn = extern "C" fn(*mut f32, *mut f32);
+pub type SetContentScaleFn = extern "C" fn(f32);
+pub type GetContentScaleFn = extern "C" fn() -> f32;
 
 pub type CreateButtonFn = extern "C" fn(WidgetTreeHandle, f32, f32, f32, f32, *const c_char) -> u64;
 pub type CreateLabelFn = extern "C" fn(WidgetTreeHandle, f32, f32, f32, f32, *const c_char) -> u64;
@@ -47,6 +49,8 @@ pub struct FfiContext {
     pub ui_register_global_click_thunk_ptr: RegisterGlobalClickThunkPtrFn,
     pub ui_trigger_resize: TriggerResizeFn,
     pub ui_get_screen_size: GetScreenSizeFn,
+    pub ui_set_content_scale: SetContentScaleFn,
+    pub ui_get_content_scale: GetContentScaleFn,
     pub ui_create_button: CreateButtonFn,
     pub ui_create_label: CreateLabelFn,
     pub ui_create_panel: CreatePanelFn,
