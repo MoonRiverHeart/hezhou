@@ -7,6 +7,7 @@ use crate::widget::*;
 use hezhou_platform::KeyCode;
 use parking_lot::Mutex;
 use std::sync::LazyLock;
+use unicode_segmentation::UnicodeSegmentation;
 
 static CLIPBOARD: LazyLock<Mutex<String>> = LazyLock::new(|| Mutex::new(String::new()));
 
@@ -20,7 +21,8 @@ pub struct TextEdit {
     flags: crate::widget::WidgetFlags,
     text: String,
     text_style: TextStyle,
-    cursor_position: usize,
+    cursor_grapheme_index: usize,  // 光标在grapheme cluster的位置
+    cursor_byte_index: usize,      // 光标对应的byte位置（用于插入/删除）
     cursor_visible: bool,
     selection_start: usize,
     selection_end: usize,
@@ -37,8 +39,9 @@ struct CharLayout {
     y: f32,
     width: f32,
     height: f32,
-    char_index: usize,
-    byte_index: usize,
+    grapheme_index: usize,      // grapheme cluster索引
+    grapheme_start_byte: usize, // 该grapheme在String中的起始字节
+    grapheme_end_byte: usize,   // 该grapheme结束字节（exclusive）
 }
 
 impl TextEdit {
@@ -55,7 +58,8 @@ impl TextEdit {
             flags: crate::widget::WidgetFlags::default(),
             text: String::new(),
             text_style: TextStyle::new().with_size(16.0).with_color(Color::new(0.9, 0.9, 0.9, 1.0)),
-            cursor_position: 0,
+            cursor_grapheme_index: 0,
+            cursor_byte_index: 0,
             cursor_visible: true,
             selection_start: 0,
             selection_end: 0,
@@ -76,7 +80,9 @@ impl TextEdit {
 
     pub fn set_text(&mut self, text: &str) {
         self.text = text.to_string();
-        self.cursor_position = self.text.len();
+        let num_graphemes = self.text.graphemes(true).count();
+        self.cursor_grapheme_index = num_graphemes;
+        self.cursor_byte_index = self.text.len();
         self.char_layouts.clear();
         self.layout_dirty = true;
         self.flags.dirty_render = true;
@@ -86,20 +92,52 @@ impl TextEdit {
         &self.text
     }
     
+    fn grapheme_index_to_byte_index(&self, grapheme_index: usize) -> usize {
+        self.text.grapheme_indices(true)
+            .nth(grapheme_index)
+            .map(|(byte_idx, _)| byte_idx)
+            .unwrap_or(self.text.len())
+    }
+    
+    fn byte_index_to_grapheme_index(&self, byte_index: usize) -> usize {
+        self.text.grapheme_indices(true)
+            .position(|(byte_idx, _)| byte_idx == byte_index)
+            .unwrap_or(self.text.graphemes(true).count())
+    }
+    
+    fn get_current_grapheme(&self) -> Option<&str> {
+        self.text.graphemes(true).nth(self.cursor_grapheme_index)
+    }
+    
     pub fn insert_char(&mut self, c: char) {
-        self.text.insert(self.cursor_position, c);
-        self.cursor_position += c.len_utf8();
+        self.text.insert(self.cursor_byte_index, c);
+        self.cursor_byte_index += c.len_utf8();
+        self.cursor_grapheme_index = self.byte_index_to_grapheme_index(self.cursor_byte_index);
+        self.char_layouts.clear();
+        self.layout_dirty = true;
+        self.flags.dirty_render = true;
+    }
+    
+    pub fn insert_grapheme(&mut self, grapheme: &str) {
+        self.text.insert_str(self.cursor_byte_index, grapheme);
+        self.cursor_byte_index += grapheme.len();
+        self.cursor_grapheme_index += 1;
         self.char_layouts.clear();
         self.layout_dirty = true;
         self.flags.dirty_render = true;
     }
     
     pub fn delete_char(&mut self) {
-        if self.cursor_position > 0 {
-            let delete_pos = self.cursor_position - 1;
-            if delete_pos < self.text.len() && self.is_char_boundary(delete_pos) {
-                self.text.remove(delete_pos);
-                self.cursor_position = delete_pos;
+        if self.cursor_grapheme_index > 0 {
+            // 找到前一个grapheme的起始和结束位置
+            let prev_grapheme = self.text.grapheme_indices(true)
+                .nth(self.cursor_grapheme_index - 1);
+            
+            if let Some((start_byte, grapheme_str)) = prev_grapheme {
+                let end_byte = start_byte + grapheme_str.len();
+                self.text.drain(start_byte..end_byte);
+                self.cursor_byte_index = start_byte;
+                self.cursor_grapheme_index -= 1;
                 self.char_layouts.clear();
                 self.layout_dirty = true;
                 self.flags.dirty_render = true;
@@ -107,53 +145,38 @@ impl TextEdit {
         }
     }
     
-    fn is_char_boundary(&self, pos: usize) -> bool {
-        if pos == 0 || pos == self.text.len() {
-            return true;
-        }
-        self.text.is_char_boundary(pos)
-    }
-    
     fn move_cursor_left(&mut self) {
-        if self.cursor_position > 0 {
-            // 找到前一个字符的起始位置
-            let prev_char_start = self.text[..self.cursor_position]
-                .char_indices()
-                .rev()
-                .next()
-                .map(|(i, _)| i)
-                .unwrap_or(0);
-            self.cursor_position = prev_char_start;
+        if self.cursor_grapheme_index > 0 {
+            self.cursor_grapheme_index -= 1;
+            self.cursor_byte_index = self.grapheme_index_to_byte_index(self.cursor_grapheme_index);
             self.flags.dirty_render = true;
-            println!("[TextEdit] Move left: cursor_position={}", self.cursor_position);
+            println!("[TextEdit] Move left: grapheme_index={}, byte_index={}", 
+                     self.cursor_grapheme_index, self.cursor_byte_index);
         }
     }
     
     fn move_cursor_right(&mut self) {
-        if self.cursor_position < self.text.len() {
-            // 找到当前字符并移动到下一个字符的起始位置
-            if let Some(c) = self.text[self.cursor_position..].chars().next() {
-                self.cursor_position += c.len_utf8();
-                self.flags.dirty_render = true;
-                println!("[TextEdit] Move right: cursor_position={}", self.cursor_position);
-            }
+        let num_graphemes = self.text.graphemes(true).count();
+        if self.cursor_grapheme_index < num_graphemes {
+            self.cursor_grapheme_index += 1;
+            self.cursor_byte_index = self.grapheme_index_to_byte_index(self.cursor_grapheme_index);
+            self.flags.dirty_render = true;
+            println!("[TextEdit] Move right: grapheme_index={}, byte_index={}", 
+                     self.cursor_grapheme_index, self.cursor_byte_index);
         }
     }
     
     fn move_cursor_up(&mut self) {
-        // 找到上一行的相同x位置
         if let Some(current_layout) = self.find_char_layout_at_cursor() {
             let current_x = current_layout.x;
             let current_y = current_layout.y;
             
-            // 找到上一行（y更小）
             let prev_line_y = self.char_layouts.iter()
                 .filter(|l| l.y < current_y)
                 .map(|l| l.y)
                 .max_by(|a, b| a.partial_cmp(b).unwrap());
             
             if let Some(prev_y) = prev_line_y {
-                // 在上一行找到最接近 current_x 的字符
                 let best = self.char_layouts.iter()
                     .filter(|l| l.y == prev_y)
                     .min_by(|a, b| {
@@ -163,28 +186,26 @@ impl TextEdit {
                     });
                 
                 if let Some(layout) = best {
-                    self.cursor_position = layout.byte_index;
+                    self.cursor_grapheme_index = layout.grapheme_index;
+                    self.cursor_byte_index = layout.grapheme_start_byte;
                     self.flags.dirty_render = true;
-                    println!("[TextEdit] Move up: cursor_position={}", self.cursor_position);
+                    println!("[TextEdit] Move up: grapheme_index={}", self.cursor_grapheme_index);
                 }
             }
         }
     }
     
     fn move_cursor_down(&mut self) {
-        // 找到下一行的相同x位置
         if let Some(current_layout) = self.find_char_layout_at_cursor() {
             let current_x = current_layout.x;
             let current_y = current_layout.y;
             
-            // 找到下一行（y更大）
             let next_line_y = self.char_layouts.iter()
                 .filter(|l| l.y > current_y)
                 .map(|l| l.y)
                 .min_by(|a, b| a.partial_cmp(b).unwrap());
             
             if let Some(next_y) = next_line_y {
-                // 在下一行找到最接近 current_x 的字符
                 let best = self.char_layouts.iter()
                     .filter(|l| l.y == next_y)
                     .min_by(|a, b| {
@@ -194,52 +215,46 @@ impl TextEdit {
                     });
                 
                 if let Some(layout) = best {
-                    self.cursor_position = layout.byte_index;
+                    self.cursor_grapheme_index = layout.grapheme_index;
+                    self.cursor_byte_index = layout.grapheme_start_byte;
                     self.flags.dirty_render = true;
-                    println!("[TextEdit] Move down: cursor_position={}", self.cursor_position);
+                    println!("[TextEdit] Move down: grapheme_index={}", self.cursor_grapheme_index);
                 }
             }
         }
     }
     
     fn move_cursor_to_line_start(&mut self) {
-        // 找到当前行的起始位置
-        if self.cursor_position > 0 {
-            let line_start = self.text[..self.cursor_position]
-                .match_indices('\n')
-                .last()
-                .map(|(i, _)| i + 1)
-                .unwrap_or(0);
-            self.cursor_position = line_start;
-        } else {
-            self.cursor_position = 0;
-        }
+        // 找到当前行的起始位置（上一个\n或文本开头）
+        let line_start_byte = self.text[..self.cursor_byte_index]
+            .match_indices('\n')
+            .last()
+            .map(|(i, _)| i + 1)
+            .unwrap_or(0);
+        
+        self.cursor_byte_index = line_start_byte;
+        self.cursor_grapheme_index = self.byte_index_to_grapheme_index(line_start_byte);
         self.flags.dirty_render = true;
-        println!("[TextEdit] Move to line start: cursor_position={}", self.cursor_position);
+        println!("[TextEdit] Move to line start: grapheme_index={}", self.cursor_grapheme_index);
     }
     
     fn move_cursor_to_line_end(&mut self) {
         // 找到当前行的结束位置（下一个\n或文本末尾）
-        let line_end = self.text[self.cursor_position..]
+        let line_end_byte = self.text[self.cursor_byte_index..]
             .match_indices('\n')
             .next()
-            .map(|(i, _)| self.cursor_position + i)
+            .map(|(i, _)| self.cursor_byte_index + i)
             .unwrap_or(self.text.len());
-        self.cursor_position = line_end;
+        
+        self.cursor_byte_index = line_end_byte;
+        self.cursor_grapheme_index = self.byte_index_to_grapheme_index(line_end_byte);
         self.flags.dirty_render = true;
-        println!("[TextEdit] Move to line end: cursor_position={}", self.cursor_position);
+        println!("[TextEdit] Move to line end: grapheme_index={}", self.cursor_grapheme_index);
     }
     
     fn find_char_layout_at_cursor(&self) -> Option<&CharLayout> {
-        // 找到光标前一个字符的布局
-        if self.cursor_position == 0 {
-            return None;
-        }
-        
         self.char_layouts.iter()
-            .find(|l| l.byte_index == self.cursor_position - 1 || 
-                      (l.byte_index < self.cursor_position && 
-                       l.byte_index + 1 >= self.cursor_position))
+            .find(|l| l.grapheme_index == self.cursor_grapheme_index)
     }
     
     pub fn set_focused(&mut self, focused: bool) {
@@ -247,58 +262,14 @@ impl TextEdit {
         self.flags.dirty_render = true;
     }
     
-    fn estimate_cursor_x(&self) -> f32 {
-        // 估算光标 x 位置（用于验证反向映射）
-        let text_start_x = 10.0;
-        let char_width = self.text_style.font_size * 0.6;
-        
-        // 简化计算：cursor_position * char_width
-        // 这只是估算，实际渲染时使用 font_atlas 精确值
-        text_start_x + self.cursor_position.min(self.text.len()) as f32 * char_width
-    }
-    
-    fn update_char_layouts(&mut self) {
-        if !self.char_layouts.is_empty() {
-            return;
-        }
-        
-        let text_start_x = 10.0;
-        let text_start_y = 10.0;
-        let line_height = self.text_style.font_size * 1.5;
-        let char_width = self.text_style.font_size * 0.6;
-        
-        let mut cursor_x = text_start_x;
-        let mut cursor_y = text_start_y;
-        
-        for (byte_index, c) in self.text.char_indices() {
-            if c == '\n' {
-                cursor_x = text_start_x;
-                cursor_y += line_height;
-                continue;
-            }
-            
-            let char_layout = CharLayout {
-                x: cursor_x,
-                y: cursor_y,
-                width: char_width,
-                height: self.text_style.font_size,
-                char_index: self.char_layouts.len(),
-                byte_index,
-            };
-            
-            self.char_layouts.push(char_layout);
-            cursor_x += char_width;
-        }
-    }
-    
     fn find_cursor_position_at(&self, click_x: f32, click_y: f32) -> usize {
         println!("[Click] Finding cursor position at ({}, {})", click_x, click_y);
         
         if !self.char_layouts.is_empty() {
-            println!("[Click] Using precise char_layouts ({} chars)", self.char_layouts.len());
+            println!("[Click] Using precise char_layouts ({} graphemes)", self.char_layouts.len());
             
-            // 找到点击位置最近的字符
-            let mut best_pos = 0;
+            let mut best_grapheme_idx = 0;
+            let mut best_byte_idx = 0;
             let mut best_distance = f32::MAX;
             
             // 首先找到最近的行（通过 Y 坐标）
@@ -314,69 +285,38 @@ impl TextEdit {
                 }
             }
             
-            println!("[Click] Closest line_y: {}, min_y_distance: {}", closest_line_y, min_y_distance);
+            println!("[Click] Closest line_y: {}", closest_line_y);
             
-            // 然后在该行中找到最近的字符（通过 X 坐标）
+            // 然后在该行中找到最近的grapheme（通过 X 坐标）
             for layout in &self.char_layouts {
-                // 只考虑同一行的字符
                 if layout.y == closest_line_y {
-                    let char_center_x = layout.x + layout.width / 2.0;
+                    let grapheme_center_x = layout.x + layout.width / 2.0;
                     
-                    println!("[Click] char {}: x={}, width={}, center_x={}, y={}", 
-                             layout.byte_index, layout.x, layout.width, char_center_x, layout.y);
+                    println!("[Click] grapheme {}: x={}, width={}, center_x={}", 
+                             layout.grapheme_index, layout.x, layout.width, grapheme_center_x);
                     
-                    let x_distance = (click_x - char_center_x).abs();
+                    let x_distance = (click_x - grapheme_center_x).abs();
                     
                     if x_distance < best_distance {
                         best_distance = x_distance;
-                        best_pos = if click_x < char_center_x {
-                            layout.byte_index
+                        if click_x < grapheme_center_x {
+                            best_grapheme_idx = layout.grapheme_index;
+                            best_byte_idx = layout.grapheme_start_byte;
                         } else {
-                            layout.byte_index + 1
-                        };
-                        println!("[Click]   -> x_distance={}, best_pos={}", x_distance, best_pos);
+                            best_grapheme_idx = layout.grapheme_index + 1;
+                            best_byte_idx = layout.grapheme_end_byte;
+                        }
+                        println!("[Click]   -> x_distance={}, best_grapheme_idx={}", x_distance, best_grapheme_idx);
                     }
                 }
             }
             
-            // 如果点击超出最后一个字符，放在末尾
-            if let Some(last) = self.char_layouts.last() {
-                if click_x > last.x + last.width && last.y == closest_line_y {
-                    best_pos = self.text.len();
-                    println!("[Click] Click beyond last char, pos={}", best_pos);
-                }
-            }
-            
-            println!("[Click] Final cursor_position from precise: {}", best_pos);
-            return best_pos;
+            println!("[Click] Final grapheme_index={}, byte_index={}", best_grapheme_idx, best_byte_idx);
+            return best_grapheme_idx;  // 返回grapheme索引
         }
         
-        // fallback 使用估算值
-        println!("[Click] No char_layouts, using estimation");
-        let text_start_x = 10.0;
-        let text_start_y = 10.0;
-        let line_height = self.text_style.font_size * 1.5;
-        let char_width = self.text_style.font_size * 0.6;
-        
-        let relative_y = click_y - text_start_y;
-        let line_index = if relative_y < 0.0 { 0 } else { (relative_y / line_height) as usize };
-        
-        let mut byte_pos = 0;
-        let mut current_line = 0;
-        for (i, c) in self.text.char_indices() {
-            if c == '\n' {
-                current_line += 1;
-                if current_line > line_index { break; }
-                byte_pos = i + 1;
-            }
-        }
-        
-        let relative_x = click_x - text_start_x;
-        let estimated_pos = if relative_x <= 0.0 { 0 } else { (relative_x / char_width) as usize };
-        
-        let result = byte_pos + estimated_pos.min(self.text.len() - byte_pos);
-        println!("[Click] Estimated cursor_position: {}", result);
-        result
+        println!("[Click] No char_layouts, returning 0");
+        0
     }
 }
 
@@ -459,9 +399,9 @@ impl Widget for TextEdit {
             let start = self.selection_start.min(self.selection_end);
             let end = self.selection_start.max(self.selection_end);
             
-            // 找到选择范围的字符，绘制高亮矩形
+            // 找到选择范围的grapheme，绘制高亮矩形
             for layout in &self.char_layouts {
-                if layout.byte_index >= start && layout.byte_index < end {
+                if layout.grapheme_index >= start && layout.grapheme_index < end {
                     canvas.draw_rect(
                         Rect::new(layout.x, layout.y, layout.width, layout.height),
                         &Style::new().with_background(Color::new(0.3, 0.5, 0.8, 0.3)),
@@ -485,7 +425,6 @@ impl Widget for TextEdit {
             
             // 只在布局 dirty 时重新计算
             if self.layout_dirty || self.char_layouts.is_empty() {
-                // 使用自动换行（容器宽度 - 20px 边距）
                 let wrap_width = Some(self.layout.width - 20.0);
                 
                 let char_positions = canvas.layout_text_for_cursor_with_wrap(
@@ -498,14 +437,15 @@ impl Widget for TextEdit {
                 
                 let max_bearing_y = canvas.get_max_bearing_y(&self.text, font_size);
                 
-                self.char_layouts = char_positions.iter().map(|(x, baseline_y, advance, char_idx, byte_idx)| {
+                self.char_layouts = char_positions.iter().map(|(x, baseline_y, width, grapheme_idx, start_byte, end_byte)| {
                     CharLayout {
                         x: *x,
                         y: *baseline_y - max_bearing_y,
-                        width: *advance,
+                        width: *width,
                         height: font_size,
-                        char_index: *char_idx,
-                        byte_index: *byte_idx,
+                        grapheme_index: *grapheme_idx,
+                        grapheme_start_byte: *start_byte,
+                        grapheme_end_byte: *end_byte,
                     }
                 }).collect();
                 
@@ -514,15 +454,15 @@ impl Widget for TextEdit {
                 self.layout_dirty = false;
             }
             
-            // 计算光标位置（使用缓存的布局）
-            let (cursor_x, cursor_y) = if self.cursor_position == 0 {
+            // 计算光标位置
+            let (cursor_x, cursor_y) = if self.cursor_grapheme_index == 0 {
                 (text_start_x, text_start_y)
             } else {
                 let mut found_x = text_start_x;
                 let mut found_y = text_start_y;
                 
                 for layout in &self.char_layouts {
-                    if layout.byte_index < self.cursor_position {
+                    if layout.grapheme_index < self.cursor_grapheme_index {
                         found_x = layout.x + layout.width;
                         found_y = layout.y;
                     } else {
@@ -557,14 +497,15 @@ impl Widget for TextEdit {
                 
                 let max_bearing_y = canvas.get_max_bearing_y(&self.text, font_size);
                 
-                self.char_layouts = char_positions.iter().map(|(x, baseline_y, advance, char_idx, byte_idx)| {
+                self.char_layouts = char_positions.iter().map(|(x, baseline_y, width, grapheme_idx, start_byte, end_byte)| {
                     CharLayout {
                         x: *x,
                         y: *baseline_y - max_bearing_y,
-                        width: *advance,
+                        width: *width,
                         height: font_size,
-                        char_index: *char_idx,
-                        byte_index: *byte_idx,
+                        grapheme_index: *grapheme_idx,
+                        grapheme_start_byte: *start_byte,
+                        grapheme_end_byte: *end_byte,
                     }
                 }).collect();
                 
@@ -604,34 +545,32 @@ impl Widget for TextEdit {
                 self.focused = true;
                 self.cursor_visible = true;
                 
-                // 根据点击位置计算cursor_position
                 if let EventData::Touch(touch_data) = &event.data {
                     let click_x = touch_data.x;
                     let click_y = touch_data.y;
                     let shift_pressed = touch_data.modifiers & 1 != 0;
                     println!("[Click] Click at ({}, {}), shift={}", click_x, click_y, shift_pressed);
                     
-                    let new_position = self.find_cursor_position_at(click_x, click_y);
+                    let new_grapheme_idx = self.find_cursor_position_at(click_x, click_y);
+                    let new_byte_idx = self.grapheme_index_to_byte_index(new_grapheme_idx);
                     
-                    // Shift+点击：文本选择
                     if shift_pressed {
                         if self.selection_start == self.selection_end {
-                            // 第一次选择：设置起始位置
-                            self.selection_start = self.cursor_position;
-                            self.selection_end = new_position;
+                            self.selection_start = self.cursor_grapheme_index;
+                            self.selection_end = new_grapheme_idx;
                         } else {
-                            // 扩展选择：更新结束位置
-                            self.selection_end = new_position;
+                            self.selection_end = new_grapheme_idx;
                         }
                         println!("[TextEdit] Selection: {} to {}", self.selection_start, self.selection_end);
                     } else {
-                        // 普通点击：清除选择，移动光标
                         self.selection_start = 0;
                         self.selection_end = 0;
-                        self.cursor_position = new_position;
+                        self.cursor_grapheme_index = new_grapheme_idx;
+                        self.cursor_byte_index = new_byte_idx;
                     }
                     
-                    println!("[Click] cursor_position set to {}", self.cursor_position);
+                    println!("[Click] cursor_grapheme_index={}, cursor_byte_index={}", 
+                             self.cursor_grapheme_index, self.cursor_byte_index);
                 }
                 
                 self.flags.dirty_render = true;
@@ -644,17 +583,16 @@ impl Widget for TextEdit {
                         let ctrl_pressed = key_data.modifiers & 2 != 0;
                         
                         if ctrl_pressed {
-                            // Ctrl+C: 复制文本（选中部分或全部）
                             if key_data.keycode == KeyCode::C as u32 {
                                 let mut clipboard = CLIPBOARD.lock();
                                 if self.selection_start != self.selection_end {
-                                    // 复制选中部分
-                                    let start = self.selection_start.min(self.selection_end);
-                                    let end = self.selection_start.max(self.selection_end);
-                                    *clipboard = self.text[start..end].to_string();
+                                    let start_g = self.selection_start.min(self.selection_end);
+                                    let end_g = self.selection_start.max(self.selection_end);
+                                    let start_byte = self.grapheme_index_to_byte_index(start_g);
+                                    let end_byte = self.grapheme_index_to_byte_index(end_g);
+                                    *clipboard = self.text[start_byte..end_byte].to_string();
                                     println!("[TextEdit] Ctrl+C: copied selection {} chars", clipboard.len());
                                 } else {
-                                    // 复制全部文本
                                     *clipboard = self.text.clone();
                                     println!("[TextEdit] Ctrl+C: copied all {} chars", self.text.len());
                                 }
@@ -664,17 +602,34 @@ impl Widget for TextEdit {
                             if key_data.keycode == KeyCode::V as u32 {
                                 let clipboard = CLIPBOARD.lock();
                                 println!("[TextEdit] Ctrl+V: pasting {} chars", clipboard.len());
-                                for c in clipboard.chars() {
-                                    self.insert_char(c);
+                                // 粘贴整个clipboard作为一个grapheme序列
+                                for grapheme in clipboard.graphemes(true) {
+                                    self.insert_grapheme(grapheme);
                                 }
                                 return EventResult::Handled;
                             }
                             // Ctrl+X: 剪切
                             if key_data.keycode == KeyCode::X as u32 {
                                 let mut clipboard = CLIPBOARD.lock();
-                                *clipboard = self.text.clone();
-                                self.text.clear();
-                                self.cursor_position = 0;
+                                if self.selection_start != self.selection_end {
+                                    let start_g = self.selection_start.min(self.selection_end);
+                                    let end_g = self.selection_start.max(self.selection_end);
+                                    let start_byte = self.grapheme_index_to_byte_index(start_g);
+                                    let end_byte = self.grapheme_index_to_byte_index(end_g);
+                                    *clipboard = self.text[start_byte..end_byte].to_string();
+                                    self.text.drain(start_byte..end_byte);
+                                    self.cursor_grapheme_index = start_g;
+                                    self.cursor_byte_index = start_byte;
+                                } else {
+                                    *clipboard = self.text.clone();
+                                    self.text.clear();
+                                    self.cursor_grapheme_index = 0;
+                                    self.cursor_byte_index = 0;
+                                }
+                                self.selection_start = 0;
+                                self.selection_end = 0;
+                                self.char_layouts.clear();
+                                self.layout_dirty = true;
                                 self.flags.dirty_render = true;
                                 println!("[TextEdit] Ctrl+X: cut {} chars", clipboard.len());
                                 return EventResult::Handled;
@@ -682,17 +637,18 @@ impl Widget for TextEdit {
                         }
                         
                         // Unicode字符输入
-                        if key_data.unicode_char > 0 && key_data.unicode_char < 128 {
-                            let c = char::from_u32(key_data.unicode_char).unwrap_or('\0');
-                            if c != '\0' {
+                        if key_data.unicode_char > 0 {
+                            let c = char::from_u32(key_data.unicode_char);
+                            if let Some(c) = c {
                                 println!("[TextEdit] Inserting char: '{}' (unicode={})", c, key_data.unicode_char);
                                 self.insert_char(c);
                                 return EventResult::Handled;
                             }
                         }
-                        // Backspace删除
+                        
+                        // Backspace删除（删除前一个grapheme）
                         if key_data.keycode == KeyCode::Backspace as u32 {
-                            println!("[TextEdit] Backspace, deleting char");
+                            println!("[TextEdit] Backspace, deleting grapheme");
                             self.delete_char();
                             return EventResult::Handled;
                         }

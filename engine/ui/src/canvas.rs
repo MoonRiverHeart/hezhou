@@ -1,6 +1,7 @@
 use crate::style::*;
 use crate::types::*;
 use crate::font_atlas::FontAtlas;
+use unicode_segmentation::UnicodeSegmentation;
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug)]
@@ -9,8 +10,9 @@ pub struct CharLayoutInfo {
     pub y: f32,
     pub width: f32,
     pub height: f32,
-    pub char_idx: usize,
-    pub byte_idx: usize,
+    pub grapheme_index: usize,
+    pub grapheme_start_byte: usize,
+    pub grapheme_end_byte: usize,
 }
 
 #[repr(C)]
@@ -50,14 +52,15 @@ impl Canvas {
         self.font_atlas_ptr.map(|ptr| unsafe { &*ptr })
     }
     
-    pub fn layout_text_for_cursor(&self, text: &str, font_size: f32, container_x: f32, container_y: f32) -> Vec<(f32, f32, f32, usize, usize)> {
+    pub fn layout_text_for_cursor(&self, text: &str, font_size: f32, container_x: f32, container_y: f32) -> Vec<(f32, f32, f32, usize, usize, usize)> {
         self.layout_text_for_cursor_with_wrap(text, font_size, container_x, container_y, None)
     }
     
-    pub fn layout_text_for_cursor_with_wrap(&self, text: &str, font_size: f32, container_x: f32, container_y: f32, wrap_width: Option<f32>) -> Vec<(f32, f32, f32, usize, usize)> {
+    pub fn layout_text_for_cursor_with_wrap(&self, text: &str, font_size: f32, container_x: f32, container_y: f32, wrap_width: Option<f32>) -> Vec<(f32, f32, f32, usize, usize, usize)> {
         if let Some(atlas) = self.get_font_atlas() {
-            let max_bearing_y = text.chars()
-                .filter(|c| *c != '\n')
+            // 使用grapheme clusters计算max_bearing_y
+            let max_bearing_y = text.graphemes(true)
+                .flat_map(|g| g.chars())
                 .filter_map(|c| atlas.get_char_info(self.font_index, c, font_size))
                 .map(|info| info.bearing_y)
                 .fold(0.0f32, f32::max);
@@ -69,26 +72,33 @@ impl Canvas {
             let mut cursor_y = baseline_y;
             let mut results = Vec::new();
             
-            for (char_idx, (byte_idx, c)) in text.char_indices().enumerate() {
-                if c == '\n' {
+            for (grapheme_index, (byte_idx, grapheme)) in text.grapheme_indices(true).enumerate() {
+                // 检查换行符
+                if grapheme == "\n" {
                     cursor_x = container_x;
                     cursor_y += line_height;
                     continue;
                 }
                 
-                if let Some(info) = atlas.get_char_info(self.font_index, c, font_size) {
-                    // 检查是否需要自动换行
-                    if let Some(max_width) = wrap_width {
-                        if cursor_x + info.advance_x > container_x + max_width {
-                            // 自动换行
-                            cursor_x = container_x;
-                            cursor_y += line_height;
-                        }
+                // 计算grapheme的总宽度（所有字符advance之和）
+                let mut grapheme_width = 0.0;
+                for c in grapheme.chars() {
+                    if let Some(info) = atlas.get_char_info(self.font_index, c, font_size) {
+                        grapheme_width += info.advance_x;
                     }
-                    
-                    results.push((cursor_x, cursor_y, info.advance_x, char_idx, byte_idx));
-                    cursor_x += info.advance_x;
                 }
+                
+                // 检查自动换行
+                if let Some(max_width) = wrap_width {
+                    if cursor_x + grapheme_width > container_x + max_width {
+                        cursor_x = container_x;
+                        cursor_y += line_height;
+                    }
+                }
+                
+                let grapheme_end_byte = byte_idx + grapheme.len();
+                results.push((cursor_x, cursor_y, grapheme_width, grapheme_index, byte_idx, grapheme_end_byte));
+                cursor_x += grapheme_width;
             }
             
             results
