@@ -238,12 +238,18 @@ namespace Hezhou
             // 在projectPanel添加脚本项
             if (_projectPanel != null)
             {
+                // 移除旧的projectTree（如果有）
+                if (_projectTree != null)
+                {
+                    UI.RemoveWidget(_projectTree.Id);
+                }
+                
                 // 重新创建projectTree以清空原有内容
                 _projectTree = new VStack(_projectPanel.Id, 5f);
                 _projectTree.SetPosition(10f, 40f);
                 
-                var scriptsLabel = _projectTree.AddLabel(LEFT_PANEL_WIDTH - 40f, 20f, "Scripts/");
-                var newScriptLabel = _projectTree.AddLabel(LEFT_PANEL_WIDTH - 40f, 20f, "  NewScript.cs");
+                _projectTree.AddLabel(LEFT_PANEL_WIDTH - 40f, 20f, "Scripts/");
+                _projectTree.AddLabel(LEFT_PANEL_WIDTH - 40f, 20f, "  NewScript.cs");
                 
                 Console.WriteLine("[Editor] 左侧目录树添加脚本项");
             }
@@ -452,6 +458,13 @@ private static void ShowDropdownMenu(float x, float y, string[] items, UI.Widget
             // 恢复projectTree内容
             if (_projectPanel != null)
             {
+                // 移除旧的projectTree（如果有）
+                if (_projectTree != null)
+                {
+                    UI.RemoveWidget(_projectTree.Id);
+                }
+                
+                // 创建新的projectTree
                 _projectTree = new VStack(_projectPanel.Id, 5f);
                 _projectTree.SetPosition(10f, 40f);
                 _projectTree.AddLabel(LEFT_PANEL_WIDTH - 40f, 20f, "├─ Assets");
@@ -514,6 +527,9 @@ private static void ShowDropdownMenu(float x, float y, string[] items, UI.Widget
             // 清空projectPanel中的脚本项，保留基础结构
             if (_projectPanel != null && _projectTree != null)
             {
+                // 先移除旧的projectTree
+                UI.RemoveWidget(_projectTree.Id);
+                
                 // 重新创建projectTree以清空内容
                 _projectTree = new VStack(_projectPanel.Id, 5f);
                 _projectTree.SetPosition(10f, 40f);
