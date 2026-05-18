@@ -238,11 +238,12 @@ namespace Hezhou
             // 在projectPanel添加脚本项
             if (_projectPanel != null)
             {
-                var scriptsLabel = new Label(_projectPanel.Id, 150f, 25f, "Scripts/");
-                UI.SetWidgetLayout(scriptsLabel.Id, 10f, 40f, 150f, 25f);
+                // 重新创建projectTree以清空原有内容
+                _projectTree = new VStack(_projectPanel.Id, 5f);
+                _projectTree.SetPosition(10f, 40f);
                 
-                var newScriptLabel = new Label(_projectPanel.Id, 150f, 25f, "  NewScript.cs");
-                UI.SetWidgetLayout(newScriptLabel.Id, 10f, 70f, 150f, 25f);
+                var scriptsLabel = _projectTree.AddLabel(LEFT_PANEL_WIDTH - 40f, 20f, "Scripts/");
+                var newScriptLabel = _projectTree.AddLabel(LEFT_PANEL_WIDTH - 40f, 20f, "  NewScript.cs");
                 
                 Console.WriteLine("[Editor] 左侧目录树添加脚本项");
             }
@@ -334,20 +335,33 @@ private static void ShowDropdownMenu(float x, float y, string[] items, UI.Widget
             }
         }
         
+        private static bool _isTransitioning = false;  // 防止快速点击
+        
         private static void OnToggleEditorClick(ulong widgetId)
         {
+            if (_isTransitioning) return;  // 正在切换中，忽略点击
+            
             Console.WriteLine($"[Editor] 点击\"编辑器\"切换按钮, id={widgetId}");
+            _isTransitioning = true;
+            
             HideDropdownMenu();
             
-            if (_scriptEditorVisible)
+            try
             {
-                HideScriptEditor();
-                ShowMainLayout();
+                if (_scriptEditorVisible)
+                {
+                    HideScriptEditor();
+                    ShowMainLayout();
+                }
+                else
+                {
+                    HideMainLayout();
+                    ShowScriptEditor();
+                }
             }
-            else
+            finally
             {
-                HideMainLayout();
-                ShowScriptEditor();
+                _isTransitioning = false;
             }
         }
         
@@ -381,6 +395,16 @@ private static void ShowDropdownMenu(float x, float y, string[] items, UI.Widget
             float previewWidth = _screenWidth - LEFT_PANEL_WIDTH - RIGHT_PANEL_WIDTH;
             float previewX = LEFT_PANEL_WIDTH;
             
+            // 恢复projectTree内容
+            if (_projectPanel != null)
+            {
+                _projectTree = new VStack(_projectPanel.Id, 5f);
+                _projectTree.SetPosition(10f, 40f);
+                _projectTree.AddLabel(LEFT_PANEL_WIDTH - 40f, 20f, "├─ Assets");
+                _projectTree.AddLabel(LEFT_PANEL_WIDTH - 40f, 20f, "├─ Scenes");
+                _projectTree.AddLabel(LEFT_PANEL_WIDTH - 40f, 20f, "└─ Scripts");
+            }
+            
             // 重新创建主界面panels
             if (_previewPanel == null)
             {
@@ -401,6 +425,11 @@ private static void ShowDropdownMenu(float x, float y, string[] items, UI.Widget
             {
                 _propertiesPanel = new Panel(rootId, _screenWidth - RIGHT_PANEL_WIDTH, mainY, RIGHT_PANEL_WIDTH, mainHeight + BOTTOM_PANEL_HEIGHT, 0.2f, 0.2f, 0.2f, 1.0f);
                 UI.CreateLabel(_propertiesPanel.Id, 10f, 10f, RIGHT_PANEL_WIDTH - 20f, 25f, "属性编辑");
+            }
+            
+            if (_toggleEditorBtn != null)
+            {
+                _toggleEditorBtn.Text = "编辑器";
             }
             
             Console.WriteLine("[Editor] 主界面显示完成");
@@ -426,6 +455,17 @@ private static void ShowDropdownMenu(float x, float y, string[] items, UI.Widget
             {
                 UI.RemoveWidget(_propertiesPanel.Id);
                 _propertiesPanel = null;
+            }
+            
+            // 清空projectPanel中的脚本项，保留基础结构
+            if (_projectPanel != null && _projectTree != null)
+            {
+                // 重新创建projectTree以清空内容
+                _projectTree = new VStack(_projectPanel.Id, 5f);
+                _projectTree.SetPosition(10f, 40f);
+                _projectTree.AddLabel(LEFT_PANEL_WIDTH - 40f, 20f, "├─ Assets");
+                _projectTree.AddLabel(LEFT_PANEL_WIDTH - 40f, 20f, "├─ Scenes");
+                _projectTree.AddLabel(LEFT_PANEL_WIDTH - 40f, 20f, "└─ Scripts");
             }
             
             if (_toggleEditorBtn != null)
