@@ -69,6 +69,7 @@ impl Canvas {
             
             for (grapheme_index, (byte_idx, grapheme)) in text.grapheme_indices(true).enumerate() {
                 if grapheme == "\n" {
+                    results.push((cursor_x, current_baseline_y, 0.0, grapheme_index, byte_idx, byte_idx + 1));
                     cursor_x = container_x;
                     current_baseline_y += line_height;
                     continue;
@@ -82,7 +83,7 @@ impl Canvas {
                 }
                 
                 if let Some(max_width) = wrap_width {
-                    if cursor_x + grapheme_width > container_x + max_width {
+                    if cursor_x + grapheme_width > container_x + max_width && cursor_x > container_x {
                         cursor_x = container_x;
                         current_baseline_y += line_height;
                     }

@@ -8,8 +8,9 @@ use hezhou_platform::KeyCode;
 use parking_lot::Mutex;
 use std::sync::LazyLock;
 use unicode_segmentation::UnicodeSegmentation;
+use arboard::Clipboard;
 
-static CLIPBOARD: LazyLock<Mutex<String>> = LazyLock::new(|| Mutex::new(String::new()));
+static CLIPBOARD_BACKUP: LazyLock<Mutex<String>> = LazyLock::new(|| Mutex::new(String::new()));
 
 pub struct TextEdit {
     id: WidgetId,
@@ -396,56 +397,96 @@ impl Widget for TextEdit {
     fn draw(&mut self, canvas: &mut Canvas) {
         let width = self.layout.width;
         let height = self.layout.height;
+        let font_size = self.text_style.font_size;
+        
+        let line_number_width = 50.0;
+        let text_margin_x = 10.0;
+        let text_start_x = line_number_width + text_margin_x;
         
         canvas.draw_rect(Rect::new(0.0, 0.0, width, height), &self.style);
         
+        let line_number_style = Style::new()
+            .with_background(Color::new(0.12, 0.12, 0.12, 1.0));
+        canvas.draw_rect(Rect::new(0.0, 0.0, line_number_width, height), &line_number_style);
+        
+        let num_lines = self.text.lines().count().max(1);
+        let max_bearing_y = if self.cached_max_bearing_y > 0.0 {
+            self.cached_max_bearing_y
+        } else {
+            canvas.get_max_bearing_y(&self.text, font_size)
+        };
+        let line_height = if self.cached_line_height > 0.0 {
+            self.cached_line_height
+        } else {
+            canvas.get_line_height(font_size)
+        };
+        
+        let line_number_text_style = TextStyle::new()
+            .with_size(font_size)
+            .with_color(Color::new(0.5, 0.5, 0.5, 1.0));
+        
+        for line_num in 1..=num_lines {
+            let line_y = 10.0 + max_bearing_y + (line_num - 1) as f32 * line_height;
+            if line_y - max_bearing_y < height {
+                let line_num_str = line_num.to_string();
+                canvas.draw_text(
+                    Rect::new(5.0, line_y - max_bearing_y, line_number_width - 10.0, font_size),
+                    &line_num_str,
+                    &line_number_text_style,
+                );
+            }
+        }
+        
         let num_graphemes = self.text.graphemes(true).count();
         
-        // 修复：确保 selection 在有效范围内
         self.selection_start = self.selection_start.min(num_graphemes);
         self.selection_end = self.selection_end.min(num_graphemes);
         self.cursor_grapheme_index = self.cursor_grapheme_index.min(num_graphemes);
         
-        if self.selection_start != self.selection_end {
-            println!("[Draw] Selection: {} to {}, num_graphemes={}, char_layouts.len()={}", 
-                     self.selection_start, self.selection_end, num_graphemes, self.char_layouts.len());
-        }
-        
-        // 渲染选择高亮（在文本之前）
-        if self.selection_start != self.selection_end {
+        if self.selection_start != self.selection_end && !self.char_layouts.is_empty() {
             let start = self.selection_start.min(self.selection_end);
             let end = self.selection_start.max(self.selection_end);
             
-            if start < end && !self.char_layouts.is_empty() {
-                let max_bearing_y = self.cached_max_bearing_y;
-                
-                for layout in &self.char_layouts {
-                    if layout.grapheme_index >= start && layout.grapheme_index < end {
-                        let highlight_y = layout.y - max_bearing_y;
-                        canvas.draw_rect(
-                            Rect::new(layout.x, highlight_y, layout.width, layout.height),
-                            &Style::new().with_background(Color::new(0.3, 0.5, 0.8, 0.3)),
-                        );
+            let mut lines: Vec<(f32, f32, f32)> = Vec::new();
+            
+            for layout in &self.char_layouts {
+                if layout.grapheme_index >= start && layout.grapheme_index < end {
+                    let y = layout.y;
+                    
+                    if let Some(last_line) = lines.last_mut() {
+                        if last_line.0 == y {
+                            last_line.2 = layout.x + layout.width.max(1.0);
+                        } else {
+                            lines.push((y, layout.x, layout.x + layout.width.max(1.0)));
+                        }
+                    } else {
+                        lines.push((y, layout.x, layout.x + layout.width.max(1.0)));
                     }
                 }
+            }
+            
+            for (y, start_x, end_x) in &lines {
+                let highlight_y = y - max_bearing_y;
+                canvas.draw_rect(
+                    Rect::new(*start_x, highlight_y, *end_x - *start_x, font_size),
+                    &Style::new().with_background(Color::new(0.3, 0.5, 0.8, 0.3)),
+                );
             }
         }
         
         if !self.text.is_empty() {
             canvas.draw_text(
-                Rect::new(10.0, 10.0, width - 20.0, height - 20.0),
+                Rect::new(text_start_x, 10.0, width - text_start_x - text_margin_x, height - 20.0),
                 &self.text,
                 &self.text_style,
             );
         }
         
         if self.focused && self.cursor_visible {
-            let text_start_x = 10.0;
             let text_start_y = 10.0;
-            let font_size = self.text_style.font_size;
             
             if self.layout_dirty || self.char_layouts.is_empty() {
-                let wrap_width = Some(self.layout.width - 20.0);
+                let wrap_width = Some(self.layout.width - line_number_width - 2.0 * text_margin_x);
                 
                 let char_positions = canvas.layout_text_for_cursor_with_wrap(
                     &self.text,
@@ -500,10 +541,8 @@ impl Widget for TextEdit {
             );
         } else {
             if self.layout_dirty && canvas.get_font_atlas().is_some() && !self.text.is_empty() {
-                let text_start_x = 10.0;
                 let text_start_y = 10.0;
-                let font_size = self.text_style.font_size;
-                let wrap_width = Some(self.layout.width - 20.0);
+                let wrap_width = Some(self.layout.width - line_number_width - 2.0 * text_margin_x);
                 
                 let char_positions = canvas.layout_text_for_cursor_with_wrap(
                     &self.text,
@@ -631,54 +670,84 @@ impl Widget for TextEdit {
                         
                         if ctrl_pressed {
                             if key_data.keycode == KeyCode::C as u32 {
-                                let mut clipboard = CLIPBOARD.lock();
-                                if self.selection_start != self.selection_end {
+                                let text_to_copy = if self.selection_start != self.selection_end {
                                     let start_g = self.selection_start.min(self.selection_end);
                                     let end_g = self.selection_start.max(self.selection_end);
                                     let start_byte = self.grapheme_index_to_byte_index(start_g);
                                     let end_byte = self.grapheme_index_to_byte_index(end_g);
-                                    *clipboard = self.text[start_byte..end_byte].to_string();
-                                    println!("[TextEdit] Ctrl+C: copied selection {} chars", clipboard.len());
+                                    self.text[start_byte..end_byte].to_string()
                                 } else {
-                                    *clipboard = self.text.clone();
-                                    println!("[TextEdit] Ctrl+C: copied all {} chars", self.text.len());
+                                    self.text.clone()
+                                };
+                                
+                                if let Ok(mut clipboard) = Clipboard::new() {
+                                    if let Err(e) = clipboard.set_text(&text_to_copy) {
+                                        println!("[TextEdit] Clipboard set error: {:?}", e);
+                                        let mut backup = CLIPBOARD_BACKUP.lock();
+                                        *backup = text_to_copy.clone();
+                                    } else {
+                                        println!("[TextEdit] Ctrl+C: copied {} chars to system clipboard", text_to_copy.len());
+                                    }
+                                } else {
+                                    let mut backup = CLIPBOARD_BACKUP.lock();
+                                    *backup = text_to_copy.clone();
+                                    println!("[TextEdit] Ctrl+C: copied {} chars to backup (no system clipboard)", text_to_copy.len());
                                 }
                                 return EventResult::Handled;
                             }
-                            // Ctrl+V: 粘贴clipboard
                             if key_data.keycode == KeyCode::V as u32 {
-                                let clipboard = CLIPBOARD.lock();
-                                println!("[TextEdit] Ctrl+V: pasting {} chars", clipboard.len());
-                                // 粘贴整个clipboard作为一个grapheme序列
-                                for grapheme in clipboard.graphemes(true) {
+                                let text_to_paste = if let Ok(mut clipboard) = Clipboard::new() {
+                                    clipboard.get_text().unwrap_or_else(|e| {
+                                        println!("[TextEdit] Clipboard get error: {:?}", e);
+                                        CLIPBOARD_BACKUP.lock().clone()
+                                    })
+                                } else {
+                                    CLIPBOARD_BACKUP.lock().clone()
+                                };
+                                
+                                println!("[TextEdit] Ctrl+V: pasting {} chars", text_to_paste.len());
+                                for grapheme in text_to_paste.graphemes(true) {
                                     self.insert_grapheme(grapheme);
                                 }
                                 return EventResult::Handled;
                             }
-                            // Ctrl+X: 剪切
                             if key_data.keycode == KeyCode::X as u32 {
-                                let mut clipboard = CLIPBOARD.lock();
-                                if self.selection_start != self.selection_end {
+                                let text_to_cut = if self.selection_start != self.selection_end {
                                     let start_g = self.selection_start.min(self.selection_end);
                                     let end_g = self.selection_start.max(self.selection_end);
                                     let start_byte = self.grapheme_index_to_byte_index(start_g);
                                     let end_byte = self.grapheme_index_to_byte_index(end_g);
-                                    *clipboard = self.text[start_byte..end_byte].to_string();
+                                    let cut_text = self.text[start_byte..end_byte].to_string();
                                     self.text.drain(start_byte..end_byte);
                                     self.cursor_grapheme_index = start_g;
                                     self.cursor_byte_index = start_byte;
+                                    cut_text
                                 } else {
-                                    *clipboard = self.text.clone();
+                                    let cut_text = self.text.clone();
                                     self.text.clear();
                                     self.cursor_grapheme_index = 0;
                                     self.cursor_byte_index = 0;
-                                }
+                                    cut_text
+                                };
                                 self.selection_start = 0;
                                 self.selection_end = 0;
+                                
+                                if let Ok(mut clipboard) = Clipboard::new() {
+                                    if let Err(e) = clipboard.set_text(&text_to_cut) {
+                                        println!("[TextEdit] Clipboard set error: {:?}", e);
+                                        let mut backup = CLIPBOARD_BACKUP.lock();
+                                        *backup = text_to_cut.clone();
+                                    } else {
+                                        println!("[TextEdit] Ctrl+X: cut {} chars to system clipboard", text_to_cut.len());
+                                    }
+                                } else {
+                                    let mut backup = CLIPBOARD_BACKUP.lock();
+                                    *backup = text_to_cut.clone();
+                                }
+                                
                                 self.char_layouts.clear();
                                 self.layout_dirty = true;
                                 self.flags.dirty_render = true;
-                                println!("[TextEdit] Ctrl+X: cut {} chars", clipboard.len());
                                 return EventResult::Handled;
                             }
                         }
