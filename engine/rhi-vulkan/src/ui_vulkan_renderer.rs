@@ -638,7 +638,7 @@ impl UIVulkanRenderer {
             let image = device.create_image(&vk::ImageCreateInfo {
                 image_type: vk::ImageType::TYPE_2D,
                 format: vk::Format::R8G8B8A8_UNORM,
-                extent: vk::Extent3D { width: 1024, height: 1024, depth: 1 },
+                extent: vk::Extent3D { width: 2048, height: 2048, depth: 1 },
                 mip_levels: 1,
                 array_layers: 1,
                 samples: vk::SampleCountFlags::TYPE_1,
@@ -670,8 +670,8 @@ impl UIVulkanRenderer {
             let data_ptr = device.map_memory(memory, 0, mem_requirements.size, vk::MemoryMapFlags::empty())
                 .map_err(|e| format!("Failed to map font texture memory: {}", e))?;
             
-            let texture_data = vec![0u8; 1024 * 1024 * 3];
-            std::ptr::copy_nonoverlapping(texture_data.as_ptr(), data_ptr as *mut u8, 1024 * 1024 * 3);
+            let texture_data = vec![0u8; 2048 * 2048 * 4];
+            std::ptr::copy_nonoverlapping(texture_data.as_ptr(), data_ptr as *mut u8, 2048 * 2048 * 4);
             
             device.unmap_memory(memory);
             
