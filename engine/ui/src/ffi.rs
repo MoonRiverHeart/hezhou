@@ -785,7 +785,9 @@ pub extern "C" fn ui_create_button_in_parent(
         button.set_layout(Layout::new(0.0, 0.0, width, height));
         
         let content_scale = crate::thunk_manager::ui_get_content_scale();
-        button.set_font_size(18.0 * content_scale);
+        let font_size = 16.0 * content_scale;
+        println!("[FFI] CreateButton: content_scale={}, font_size={}", content_scale, font_size);
+        button.set_font_size(font_size);
         
         let id = button.id();
         
@@ -943,9 +945,9 @@ pub extern "C" fn ui_create_text_edit_in_parent(
         let mut text_edit = TextEdit::with_size(width, height);
         
         let content_scale = crate::thunk_manager::ui_get_content_scale();
-        let base_font_size = 24.0;
-        let scaled_font_size = base_font_size * content_scale;
-        text_edit.set_font_size(scaled_font_size);
+        let font_size = 16.0 * content_scale;
+        println!("[FFI] CreateTextEdit: content_scale={}, font_size={}", content_scale, font_size);
+        text_edit.set_font_size(font_size);
         
         let id = text_edit.id();
         let parent = if parent_id == 0 {
