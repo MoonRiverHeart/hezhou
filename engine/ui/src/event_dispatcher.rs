@@ -41,8 +41,19 @@ impl EventDispatcher {
                 let point = Point::new(mouse.x, mouse.y);
                 (self.widget_tree.lock().hit_test(point), point)
             }
+            EventData::Key(_) => {
+                // KeyDown/KeyUp事件广播到所有widget（不做hit_test）
+                // TextEdit检查focused字段来决定是否处理
+                (None, Point::new(0.0, 0.0))
+            }
             _ => (None, Point::new(0.0, 0.0)),
         };
+        
+        // 如果是Key事件，广播到所有widget
+        if matches!(event.data, EventData::Key(_)) {
+            self.broadcast_key_event(event);
+            return;
+        }
         
         event.target = target.unwrap_or(WidgetId::invalid());
 
@@ -80,6 +91,28 @@ impl EventDispatcher {
             }
         } else if event.event_type == EventType::TouchEnd {
             crate::thunk_manager::ui_trigger_global_click(click_point.x, click_point.y);
+        }
+    }
+    
+    fn broadcast_key_event(&mut self, event: &mut Event) {
+        let mut tree = self.widget_tree.lock();
+        
+        let widget_ids: Vec<WidgetId> = tree.get_all_widget_ids();
+        
+        for widget_id in widget_ids {
+            if event.immediate_stopped {
+                break;
+            }
+            
+            if let Some(widget) = tree.get_widget_mut(widget_id) {
+                let result = widget.as_mut().on_event(event);
+                match result {
+                    EventResult::ImmediateStop => {
+                        event.immediate_stopped = true;
+                    }
+                    _ => {}
+                }
+            }
         }
     }
 

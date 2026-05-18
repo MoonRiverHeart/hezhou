@@ -1,0 +1,604 @@
+=== Hezhou Game Editor ===
+
+[布局说明]
+  - 顶部: 工具栏 (40px)
+  - 左侧: 项目结构 (250px)
+  - 左下: 资产管理 (200px)
+  - 中间: 游戏预览区域
+  - 右侧: 属性面板 (250px)
+  - 底部: 状态栏 (30px)
+
+[1] 创建编辑器窗口 (1280x720)...
+[2026-05-18 09:59:42.981][INFO][Vulkan] Creating window 1280x720
+[2026-05-18 09:59:42.997][INFO][Vulkan] Window created 1280x720
+[2026-05-18 09:59:43.002][INFO][Vulkan] Instance created
+[2026-05-18 09:59:43.053][INFO][Vulkan] Instance created
+[2026-05-18 09:59:43.087][INFO][Vulkan] Device created
+[2026-05-18 09:59:43.134][INFO][Vulkan] Swapchain created 1280x720
+[2026-05-18 09:59:43.136][INFO][Vulkan] Render pass created
+[2026-05-18 09:59:43.138][INFO][Vulkan] Pipeline created
+[2026-05-18 09:59:43.139][INFO][Vulkan] Vertex buffer created (64KB)
+[2026-05-18 09:59:43.336][INFO][FontAtlas] Pre-rasterized 426 chars at sizes [32.0, 16.0, 14.0]
+[2026-05-18 09:59:43.338][INFO][UI] UI system initialized
+    窗口创建成功!
+
+[2] 设置UI Root Panel...
+[2026-05-18 09:59:43.339][INFO][UI] Root panel created (C# will create widgets)
+[2026-05-18 09:59:43.341][INFO][UI] UI setup complete (script will create widgets)
+    Root Panel设置完成!
+
+[3] 编译C#编辑器脚本...
+    mcs not found
+[4] 设置FFI Context...
+    FfiContext已设置, ptr=0x220479b1f30
+
+[5] 加载Mono DLL...
+    加载成功!
+
+[6] 调用EditorScript.Initialize...
+[Editor] 编辑器初始化开始
+[C#] FfiContext初始化成功
+[Editor] 屏幕尺寸: 1280x720
+[Editor] RootId=9903153950179942529
+[Editor] Panel创建成功: id=11647611345212918685
+[C#] HStack创建成功: id=9621477087025756617, parent=11647611345212918685
+[C#] Button创建成功: id=12281896072643076829, text="新建"
+[Info][UI] 注册OnClick回调: widget=12281896072643076829 callback=0x2203feaccf0
+[C#] Button创建成功: id=12541241494419300406, text="打开"
+[Info][UI] 注册OnClick回调: widget=12541241494419300406 callback=0x2203feacf40
+[C#] Button创建成功: id=10829444901637423615, text="保存"
+[Info][UI] 注册OnClick回调: widget=10829444901637423615 callback=0x2203fead150
+[C#] Button创建成功: id=10890726424742714684, text="运行"
+[Info][UI] 注册OnClick回调: widget=10890726424742714684 callback=0x2203fead240
+[C#] Button创建成功: id=12112353040058321843, text="编辑器"
+[Info][UI] 注册OnClick回调: widget=12112353040058321843 callback=0x2203fead330
+[Editor] 工具栏创建完成
+[Editor] Panel创建成功: id=10252064149060527632
+[C#] VStack创建成功: id=10559896533826725510, parent=10252064149060527632
+[Editor] 项目结构面板创建完成
+[Editor] Panel创建成功: id=10866437950261735878
+[C#] VStack创建成功: id=9825800773407962570, parent=10866437950261735878
+[Editor] 资产管理面板创建完成
+[Editor] Panel创建成功: id=10617337335097847346
+[Editor] 游戏预览面板创建完成
+[Editor] Panel创建成功: id=13019272670916718014
+[C#] VStack创建成功: id=13108293855642808969, parent=13019272670916718014
+[Editor] 属性面板创建完成
+[Editor] Panel创建成功: id=13483536235939719609
+[C#] HStack创建成功: id=9949026945499157842, parent=13483536235939719609
+[C#] Label创建成功: id=10838072611407117816, text="FPS: 0"
+[Editor] 状态栏创建完成
+[Info][UI] 注册Resize回调: 0x2203feade10
+[Info][UI] 注册GlobalClick回调: 0x2203feae150
+[Editor] 编辑器初始化完成
+    编辑器UI创建成功!
+
+[7] 开始主循环...
+    FPS显示在状态栏
+
+    Hot Reload: 点击脚本编辑器按钮
+
+[2026-05-18 09:59:43.411][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:00:50.843][INFO][GLFW] process_events: 2 events received
+[2026-05-18 10:00:50.869][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:00:50.890][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:00:50.909][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:00:50.928][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:00:50.947][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:00:50.967][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:00:50.988][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:00:51.007][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:00:51.027][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:00:51.047][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:00:51.066][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:00:51.084][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:00:51.116][INFO][GLFW] process_events: 3 events received
+[2026-05-18 10:00:51.118][INFO][GLFW] MouseButton: Left Press at (1220, 20)
+[GestureRecognizer] TouchBegin: target=12112353040058321843
+[2026-05-18 10:00:51.222][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:00:51.224][INFO][GLFW] MouseButton: Left Release at (1220, 20)
+[GestureRecognizer] Tap recognized: target=12112353040058321843
+[Editor] 点击"编辑器"切换按钮, id=12112353040058321843
+[Editor] 隐藏主界面...
+[C#] VStack创建成功: id=13577422734052544188, parent=10252064149060527632
+[Editor] 主界面隐藏完成
+[Editor] ShowScriptEditor开始...
+[C#] VStack创建成功: id=11369738924005565388, parent=10252064149060527632
+[Editor] 左侧目录树添加脚本项
+[Editor] Panel创建成功: id=11982316718788366803
+[C#] Button创建成功: id=12733055114809040681, text="Hot Reload"
+[Info][UI] 注册OnClick回调: widget=12733055114809040681 callback=0x2203feaf9b0
+[C#] Label创建成功: id=9358678160896862274, text="Script Editor - NewScript.cs"
+[Editor] Script Editor显示成功
+[2026-05-18 10:00:51.660][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:00:51.681][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:00:51.700][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:00:51.719][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:00:51.738][INFO][GLFW] process_events: 2 events received
+[2026-05-18 10:00:51.757][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:00:51.992][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:00:52.012][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:00:52.029][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:00:52.049][INFO][GLFW] process_events: 2 events received
+[2026-05-18 10:00:52.068][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:00:52.088][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:00:52.107][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:00:52.126][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:00:52.145][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:00:52.163][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:00:52.183][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:00:52.201][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:00:52.221][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:00:52.307][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:00:52.326][INFO][GLFW] process_events: 2 events received
+[2026-05-18 10:00:52.344][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:00:52.362][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:00:52.380][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:00:52.397][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:00:52.415][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:00:52.432][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:00:52.450][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:00:52.469][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:00:52.490][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:00:52.509][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:00:52.528][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:00:52.548][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:00:52.566][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:00:52.852][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:00:52.873][INFO][GLFW] process_events: 2 events received
+[2026-05-18 10:00:52.891][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:00:52.908][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:00:52.926][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:00:53.226][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:00:53.253][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:00:53.272][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:00:53.291][INFO][GLFW] process_events: 2 events received
+[2026-05-18 10:00:53.310][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:00:53.329][INFO][GLFW] process_events: 2 events received
+[2026-05-18 10:00:53.348][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:00:53.366][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:00:53.385][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:00:53.405][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:00:53.590][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:00:53.592][INFO][GLFW] MouseButton: Left Press at (556, 352)
+[TextEdit] TouchBegin received, setting focused=true
+[TextEdit] TouchBegin received, setting focused=true
+[GestureRecognizer] TouchBegin: target=9857182454739016333
+[2026-05-18 10:00:53.726][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:00:53.728][INFO][GLFW] MouseButton: Left Release at (556, 352)
+[GestureRecognizer] Tap recognized: target=9857182454739016333
+[Editor] GlobalClick at (556, 352)
+[2026-05-18 10:00:53.877][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:00:53.896][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:00:53.915][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:00:53.934][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:00:53.952][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:00:53.972][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:00:53.991][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:00:54.010][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:00:54.029][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:00:54.048][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:00:54.086][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:00:54.087][INFO][GLFW] MouseButton: Left Press at (583, 259)
+[TextEdit] TouchBegin received, setting focused=true
+[TextEdit] TouchBegin received, setting focused=true
+[GestureRecognizer] TouchBegin: target=9857182454739016333
+[2026-05-18 10:00:54.306][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:00:54.323][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:00:54.340][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:00:54.358][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:00:54.377][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:00:54.396][INFO][GLFW] process_events: 2 events received
+[2026-05-18 10:00:54.398][INFO][GLFW] MouseButton: Left Release at (410, 228)
+[Editor] GlobalClick at (410, 228)
+[2026-05-18 10:00:54.647][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:00:54.665][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:00:54.684][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:00:54.705][INFO][GLFW] process_events: 2 events received
+[2026-05-18 10:00:54.724][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:00:54.744][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:00:54.763][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:00:54.782][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:00:54.801][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:00:54.821][INFO][GLFW] process_events: 2 events received
+[2026-05-18 10:00:54.822][INFO][GLFW] MouseButton: Left Press at (400, 203)
+[TextEdit] TouchBegin received, setting focused=true
+[TextEdit] TouchBegin received, setting focused=true
+[GestureRecognizer] TouchBegin: target=9857182454739016333
+[2026-05-18 10:00:54.973][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:00:54.976][INFO][GLFW] MouseButton: Left Release at (400, 203)
+[GestureRecognizer] Tap recognized: target=9857182454739016333
+[Editor] GlobalClick at (400, 203)
+[2026-05-18 10:00:55.111][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:00:55.112][INFO][GLFW] MouseButton: Left Press at (400, 203)
+[TextEdit] TouchBegin received, setting focused=true
+[TextEdit] TouchBegin received, setting focused=true
+[GestureRecognizer] TouchBegin: target=9857182454739016333
+[2026-05-18 10:00:55.395][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:00:55.396][INFO][GLFW] MouseButton: Left Release at (400, 203)
+[GestureRecognizer] DoubleTap recognized: target=9857182454739016333
+[2026-05-18 10:00:55.447][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:00:55.449][INFO][GLFW] MouseButton: Left Press at (400, 203)
+[TextEdit] TouchBegin received, setting focused=true
+[TextEdit] TouchBegin received, setting focused=true
+[GestureRecognizer] TouchBegin: target=9857182454739016333
+[2026-05-18 10:00:55.517][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:00:55.519][INFO][GLFW] MouseButton: Left Release at (400, 203)
+[GestureRecognizer] Tap recognized: target=9857182454739016333
+[Editor] GlobalClick at (400, 203)
+[2026-05-18 10:00:55.672][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:00:55.674][INFO][GLFW] MouseButton: Left Press at (400, 203)
+[TextEdit] TouchBegin received, setting focused=true
+[TextEdit] TouchBegin received, setting focused=true
+[GestureRecognizer] TouchBegin: target=9857182454739016333
+[2026-05-18 10:00:55.842][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:00:55.844][INFO][GLFW] MouseButton: Left Release at (400, 203)
+[GestureRecognizer] Tap recognized: target=9857182454739016333
+[Editor] GlobalClick at (400, 203)
+[2026-05-18 10:00:58.489][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:00:58.491][INFO][GLFW] Key pressed: LeftShift mods=Shift
+[2026-05-18 10:00:58.541][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:00:58.908][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:00:58.935][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:00:58.954][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:00:58.974][INFO][GLFW] process_events: 2 events received
+[2026-05-18 10:00:58.992][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:00:59.011][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:00:59.030][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:00:59.032][INFO][GLFW] MouseButton: Left Press at (520, 268)
+[TextEdit] TouchBegin received, setting focused=true
+[TextEdit] TouchBegin received, setting focused=true
+[GestureRecognizer] TouchBegin: target=9857182454739016333
+[2026-05-18 10:00:59.168][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:00:59.170][INFO][GLFW] MouseButton: Left Release at (520, 268)
+[GestureRecognizer] Tap recognized: target=9857182454739016333
+[Editor] GlobalClick at (520, 268)
+[2026-05-18 10:00:59.657][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:00:59.676][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:00:59.695][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:00:59.713][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:00:59.733][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:00:59.751][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:00:59.771][INFO][GLFW] process_events: 2 events received
+[2026-05-18 10:00:59.790][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:00:59.809][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:00:59.828][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:00:59.846][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:00:59.848][INFO][GLFW] MouseButton: Left Press at (495, 246)
+[TextEdit] TouchBegin received, setting focused=true
+[TextEdit] TouchBegin received, setting focused=true
+[GestureRecognizer] TouchBegin: target=9857182454739016333
+[2026-05-18 10:00:59.949][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:00:59.952][INFO][GLFW] MouseButton: Left Release at (495, 246)
+[GestureRecognizer] Tap recognized: target=9857182454739016333
+[Editor] GlobalClick at (495, 246)
+[2026-05-18 10:01:00.137][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:00.155][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:00.173][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:00.192][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:00.211][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:00.230][INFO][GLFW] process_events: 2 events received
+[2026-05-18 10:01:00.250][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:00.370][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:00.372][INFO][GLFW] MouseButton: Left Press at (489, 193)
+[TextEdit] TouchBegin received, setting focused=true
+[TextEdit] TouchBegin received, setting focused=true
+[GestureRecognizer] TouchBegin: target=9857182454739016333
+[2026-05-18 10:01:00.457][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:00.459][INFO][GLFW] MouseButton: Left Release at (489, 193)
+[GestureRecognizer] Tap recognized: target=9857182454739016333
+[Editor] GlobalClick at (489, 193)
+[2026-05-18 10:01:00.608][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:00.644][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:00.663][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:00.683][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:00.702][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:00.721][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:00.741][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:00.760][INFO][GLFW] process_events: 2 events received
+[2026-05-18 10:01:00.778][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:00.797][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:00.816][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:00.837][INFO][GLFW] process_events: 2 events received
+[2026-05-18 10:01:00.839][INFO][GLFW] MouseButton: Left Press at (468, 216)
+[TextEdit] TouchBegin received, setting focused=true
+[TextEdit] TouchBegin received, setting focused=true
+[GestureRecognizer] TouchBegin: target=9857182454739016333
+[2026-05-18 10:01:00.957][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:00.959][INFO][GLFW] MouseButton: Left Release at (468, 216)
+[GestureRecognizer] Tap recognized: target=9857182454739016333
+[Editor] GlobalClick at (468, 216)
+[2026-05-18 10:01:01.026][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:01.027][INFO][GLFW] MouseButton: Left Press at (468, 216)
+[TextEdit] TouchBegin received, setting focused=true
+[TextEdit] TouchBegin received, setting focused=true
+[GestureRecognizer] TouchBegin: target=9857182454739016333
+[2026-05-18 10:01:01.112][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:01.114][INFO][GLFW] MouseButton: Left Release at (468, 216)
+[GestureRecognizer] DoubleTap recognized: target=9857182454739016333
+[2026-05-18 10:01:01.430][INFO][GLFW] process_events: 3 events received
+[2026-05-18 10:01:01.439][INFO][GLFW] Key pressed: J mods=(empty)
+[2026-05-18 10:01:01.439][INFO][GLFW] Char input: j (106)
+[2026-05-18 10:01:01.506][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:01.591][INFO][GLFW] process_events: 3 events received
+[2026-05-18 10:01:01.593][INFO][GLFW] Key pressed: J mods=(empty)
+[2026-05-18 10:01:01.593][INFO][GLFW] Char input: j (106)
+[2026-05-18 10:01:01.662][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:01.763][INFO][GLFW] process_events: 3 events received
+[2026-05-18 10:01:01.765][INFO][GLFW] Key pressed: J mods=(empty)
+[2026-05-18 10:01:01.765][INFO][GLFW] Char input: j (106)
+[2026-05-18 10:01:01.833][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:02.522][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:02.539][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:02.559][INFO][GLFW] process_events: 2 events received
+[2026-05-18 10:01:02.578][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:02.597][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:02.617][INFO][GLFW] process_events: 2 events received
+[2026-05-18 10:01:02.636][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:02.656][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:02.675][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:02.693][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:02.712][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:02.731][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:02.752][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:02.772][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:02.791][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:02.810][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:02.829][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:02.847][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:02.867][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:02.887][INFO][GLFW] process_events: 2 events received
+[2026-05-18 10:01:02.906][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:02.925][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:04.206][INFO][GLFW] process_events: 5 events received
+[2026-05-18 10:01:04.216][INFO][GLFW] Window resized to 3072x1814
+[2026-05-18 10:01:04.268][INFO][Vulkan] Swapchain recreated 3072x1814
+[2026-05-18 10:01:04.270][INFO][UI] UI layout updated for 3072x1814
+[Editor] 窗口resize: 3072x1814
+[Editor] 布局更新完成
+[2026-05-18 10:01:04.290][INFO][GLFW] process_events: 3 events received
+[2026-05-18 10:01:04.292][INFO][GLFW] MouseButton: Left Release at (797, 52)
+[Editor] GlobalClick at (797, 52)
+[2026-05-18 10:01:04.608][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:04.627][INFO][GLFW] process_events: 2 events received
+[2026-05-18 10:01:04.646][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:04.666][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:04.685][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:04.705][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:04.724][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:04.743][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:04.762][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:04.781][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:05.000][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:05.019][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:05.038][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:05.057][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:05.076][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:05.095][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:05.115][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:05.116][INFO][GLFW] MouseButton: Left Press at (2386, 440)
+[TextEdit] TouchBegin received, setting focused=true
+[TextEdit] TouchBegin received, setting focused=true
+[GestureRecognizer] TouchBegin: target=9857182454739016333
+[2026-05-18 10:01:05.236][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:05.237][INFO][GLFW] MouseButton: Left Release at (2386, 440)
+[GestureRecognizer] Tap recognized: target=9857182454739016333
+[Editor] GlobalClick at (2386, 440)
+[2026-05-18 10:01:05.604][INFO][GLFW] process_events: 3 events received
+[2026-05-18 10:01:05.613][INFO][GLFW] Key pressed: N mods=(empty)
+[2026-05-18 10:01:05.613][INFO][GLFW] Char input: n (110)
+[2026-05-18 10:01:05.664][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:05.717][INFO][GLFW] process_events: 3 events received
+[2026-05-18 10:01:05.718][INFO][GLFW] Key pressed: N mods=(empty)
+[2026-05-18 10:01:05.719][INFO][GLFW] Char input: n (110)
+[2026-05-18 10:01:05.770][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:05.987][INFO][GLFW] process_events: 3 events received
+[2026-05-18 10:01:05.991][INFO][GLFW] Key pressed: J mods=(empty)
+[2026-05-18 10:01:05.992][INFO][GLFW] Char input: j (106)
+[2026-05-18 10:01:06.075][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:06.194][INFO][GLFW] process_events: 3 events received
+[2026-05-18 10:01:06.196][INFO][GLFW] Key pressed: H mods=(empty)
+[2026-05-18 10:01:06.197][INFO][GLFW] Char input: h (104)
+[2026-05-18 10:01:06.264][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:06.686][INFO][GLFW] process_events: 2 events received
+[2026-05-18 10:01:06.707][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:06.727][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:06.746][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:06.766][INFO][GLFW] process_events: 2 events received
+[2026-05-18 10:01:06.786][INFO][GLFW] process_events: 2 events received
+[2026-05-18 10:01:06.805][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:06.824][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:07.157][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:07.186][INFO][GLFW] process_events: 2 events received
+[2026-05-18 10:01:07.205][INFO][GLFW] process_events: 2 events received
+[2026-05-18 10:01:07.223][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:07.242][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:07.261][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:07.280][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:07.300][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:07.319][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:07.339][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:07.358][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:07.377][INFO][GLFW] process_events: 2 events received
+[2026-05-18 10:01:07.379][INFO][GLFW] MouseButton: Left Press at (828, 560)
+[TextEdit] TouchBegin received, setting focused=true
+[TextEdit] TouchBegin received, setting focused=true
+[GestureRecognizer] TouchBegin: target=9857182454739016333
+[2026-05-18 10:01:07.482][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:07.484][INFO][GLFW] MouseButton: Left Release at (828, 560)
+[GestureRecognizer] Tap recognized: target=9857182454739016333
+[Editor] GlobalClick at (828, 560)
+[2026-05-18 10:01:07.573][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:07.574][INFO][GLFW] MouseButton: Left Press at (828, 560)
+[TextEdit] TouchBegin received, setting focused=true
+[TextEdit] TouchBegin received, setting focused=true
+[GestureRecognizer] TouchBegin: target=9857182454739016333
+[2026-05-18 10:01:07.642][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:07.644][INFO][GLFW] MouseButton: Left Release at (828, 560)
+[GestureRecognizer] DoubleTap recognized: target=9857182454739016333
+[2026-05-18 10:01:07.943][INFO][GLFW] process_events: 3 events received
+[2026-05-18 10:01:07.951][INFO][GLFW] Key pressed: H mods=(empty)
+[2026-05-18 10:01:07.952][INFO][GLFW] Char input: h (104)
+[2026-05-18 10:01:08.085][INFO][GLFW] process_events: 3 events received
+[2026-05-18 10:01:08.087][INFO][GLFW] Key pressed: B mods=(empty)
+[2026-05-18 10:01:08.087][INFO][GLFW] Char input: b (98)
+[2026-05-18 10:01:08.138][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:08.224][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:08.460][INFO][GLFW] process_events: 3 events received
+[2026-05-18 10:01:08.462][INFO][GLFW] Key pressed: G mods=(empty)
+[2026-05-18 10:01:08.463][INFO][GLFW] Char input: g (103)
+[2026-05-18 10:01:08.530][INFO][GLFW] process_events: 3 events received
+[2026-05-18 10:01:08.532][INFO][GLFW] Key pressed: U mods=(empty)
+[2026-05-18 10:01:08.532][INFO][GLFW] Char input: u (117)
+[2026-05-18 10:01:08.567][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:08.602][INFO][GLFW] process_events: 3 events received
+[2026-05-18 10:01:08.604][INFO][GLFW] Key pressed: Y mods=(empty)
+[2026-05-18 10:01:08.604][INFO][GLFW] Char input: y (121)
+[2026-05-18 10:01:08.671][INFO][GLFW] process_events: 3 events received
+[2026-05-18 10:01:08.672][INFO][GLFW] Key pressed: G mods=(empty)
+[2026-05-18 10:01:08.673][INFO][GLFW] Char input: g (103)
+[2026-05-18 10:01:08.690][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:08.726][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:08.762][INFO][GLFW] process_events: 3 events received
+[2026-05-18 10:01:08.764][INFO][GLFW] Key pressed: Y mods=(empty)
+[2026-05-18 10:01:08.764][INFO][GLFW] Char input: y (121)
+[2026-05-18 10:01:08.800][INFO][GLFW] process_events: 3 events received
+[2026-05-18 10:01:08.802][INFO][GLFW] Key pressed: U mods=(empty)
+[2026-05-18 10:01:08.802][INFO][GLFW] Char input: u (117)
+[2026-05-18 10:01:08.819][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:08.838][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:08.873][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:09.273][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:09.291][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:09.311][INFO][GLFW] process_events: 2 events received
+[2026-05-18 10:01:09.331][INFO][GLFW] process_events: 2 events received
+[2026-05-18 10:01:09.352][INFO][GLFW] process_events: 2 events received
+[2026-05-18 10:01:09.371][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:09.389][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:09.408][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:09.427][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:09.447][INFO][GLFW] process_events: 2 events received
+[2026-05-18 10:01:09.467][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:09.486][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:09.505][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:09.524][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:09.542][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:09.561][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:09.580][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:09.599][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:09.617][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:09.637][INFO][GLFW] process_events: 2 events received
+[2026-05-18 10:01:09.656][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:09.675][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:09.694][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:09.714][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:09.735][INFO][GLFW] process_events: 2 events received
+[2026-05-18 10:01:09.771][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:09.789][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:09.809][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:09.828][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:09.847][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:09.867][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:09.886][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:09.905][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:09.924][INFO][GLFW] process_events: 2 events received
+[2026-05-18 10:01:09.942][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:09.961][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:09.980][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:10.309][INFO][GLFW] process_events: 5 events received
+[2026-05-18 10:01:10.318][INFO][GLFW] Window resized to 1280x720
+[2026-05-18 10:01:10.366][INFO][Vulkan] Swapchain recreated 1280x720
+[2026-05-18 10:01:10.369][INFO][UI] UI layout updated for 1280x720
+[Editor] 窗口resize: 1280x720
+[Editor] 布局更新完成
+[2026-05-18 10:01:10.788][INFO][GLFW] process_events: 2 events received
+[2026-05-18 10:01:10.814][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:10.834][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:10.852][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:10.871][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:10.890][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:11.126][INFO][GLFW] process_events: 2 events received
+[2026-05-18 10:01:11.152][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:11.171][INFO][GLFW] process_events: 2 events received
+[2026-05-18 10:01:11.190][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:11.208][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:11.227][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:11.246][INFO][GLFW] process_events: 2 events received
+[2026-05-18 10:01:11.268][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:11.287][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:11.504][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:11.523][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:11.542][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:11.561][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:11.581][INFO][GLFW] process_events: 2 events received
+[2026-05-18 10:01:11.600][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:11.619][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:11.638][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:11.656][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:11.675][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:11.693][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:11.712][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:11.732][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:11.751][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:11.770][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:11.790][INFO][GLFW] process_events: 2 events received
+[2026-05-18 10:01:11.809][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:11.844][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:11.880][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:11.882][INFO][GLFW] MouseButton: Left Press at (1231, 26)
+[GestureRecognizer] TouchBegin: target=12112353040058321843
+[2026-05-18 10:01:11.950][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:11.952][INFO][GLFW] MouseButton: Left Release at (1231, 26)
+[GestureRecognizer] Tap recognized: target=12112353040058321843
+[Editor] 点击"编辑器"切换按钮, id=12112353040058321843
+[Editor] 脚本编辑器隐藏
+[Editor] 显示主界面...
+[C#] VStack创建成功: id=9343586487916674076, parent=10252064149060527632
+[Editor] Panel创建成功: id=11108079382226529952
+[Editor] Panel创建成功: id=10626317155495490283
+[C#] VStack创建成功: id=11629235260204455381, parent=10626317155495490283
+[Editor] Panel创建成功: id=13408929139613814751
+[Editor] 主界面显示完成
+[2026-05-18 10:01:12.454][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:12.463][INFO][GLFW] MouseButton: Left Press at (1231, 26)
+[GestureRecognizer] TouchBegin: target=12112353040058321843
+[2026-05-18 10:01:12.515][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:12.517][INFO][GLFW] MouseButton: Left Release at (1231, 26)
+[GestureRecognizer] DoubleTap recognized: target=12112353040058321843
+[2026-05-18 10:01:12.917][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:12.943][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:12.962][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:12.980][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:13.000][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:13.019][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:13.038][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:13.057][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:13.077][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:13.079][INFO][GLFW] MouseButton: Left Press at (1213, 19)
+[GestureRecognizer] TouchBegin: target=12112353040058321843
+[2026-05-18 10:01:13.201][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:13.202][INFO][GLFW] MouseButton: Left Release at (1213, 19)
+[GestureRecognizer] Tap recognized: target=12112353040058321843
+[Editor] 点击"编辑器"切换按钮, id=12112353040058321843
+[Editor] 隐藏主界面...
+[C#] VStack创建成功: id=10068103664744688227, parent=10252064149060527632
+[Editor] 主界面隐藏完成
+[Editor] ShowScriptEditor开始...
+[C#] VStack创建成功: id=10089763793949145320, parent=10252064149060527632
+[Editor] 左侧目录树添加脚本项
+[Editor] Panel创建成功: id=9607955714437958291
+[C#] Button创建成功: id=11544929312227014432, text="Hot Reload"
+[Info][UI] 注册OnClick回调: widget=11544929312227014432 callback=0x2203feaf9b0
+[C#] Label创建成功: id=10026035591156652540, text="Script Editor - NewScript.cs"
+[Editor] Script Editor显示成功
+[2026-05-18 10:01:13.619][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:13.645][INFO][GLFW] process_events: 2 events received
+[2026-05-18 10:01:13.665][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:13.684][INFO][GLFW] process_events: 1 events received
+[2026-05-18 10:01:13.703][INFO][GLFW] process_events: 2 events received
+[2026-05-18 10:01:15.396][INFO][GLFW] process_events: 1 events received
+
+[8] 清理资源...
+[2026-05-18 10:01:15.453][INFO][Vulkan] Cleanup complete
+
+=== Editor Closed ===

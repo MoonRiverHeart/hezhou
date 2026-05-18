@@ -130,6 +130,10 @@ impl WidgetTree {
     pub fn hit_test(&self, point: Point) -> Option<WidgetId> {
         self.hit_test_recursive(self.root?, point, 0.0, 0.0)
     }
+    
+    pub fn get_all_widget_ids(&self) -> Vec<WidgetId> {
+        self.nodes.keys().cloned().collect()
+    }
 
     fn hit_test_recursive(&self, id: WidgetId, point: Point, parent_abs_x: f32, parent_abs_y: f32) -> Option<WidgetId> {
         if let Some(node) = self.nodes.get(&id) {

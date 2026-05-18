@@ -202,11 +202,14 @@ impl Widget for TextEdit {
     fn on_event(&mut self, event: &Event) -> EventResult {
         match event.event_type {
             EventType::TouchBegin => {
+                println!("[TextEdit] TouchBegin received, setting focused=true");
                 self.focused = true;
+                self.cursor_visible = true;
                 self.flags.dirty_render = true;
                 return EventResult::Handled;
             }
             EventType::KeyDown => {
+                println!("[TextEdit] KeyDown received, focused={}", self.focused);
                 if self.focused {
                     if let EventData::Key(key_data) = &event.data {
                         let ctrl_pressed = key_data.modifiers & 2 != 0;
@@ -222,10 +225,10 @@ impl Widget for TextEdit {
                             // Ctrl+V: 粘贴clipboard
                             if key_data.keycode == KeyCode::V as u32 {
                                 let clipboard = CLIPBOARD.lock();
+                                println!("[TextEdit] Ctrl+V: pasting {} chars", clipboard.len());
                                 for c in clipboard.chars() {
                                     self.insert_char(c);
                                 }
-                                println!("[TextEdit] Ctrl+V: pasted {} chars", clipboard.len());
                                 return EventResult::Handled;
                             }
                             // Ctrl+X: 剪切
@@ -244,15 +247,20 @@ impl Widget for TextEdit {
                         if key_data.unicode_char > 0 && key_data.unicode_char < 128 {
                             let c = char::from_u32(key_data.unicode_char).unwrap_or('\0');
                             if c != '\0' {
+                                println!("[TextEdit] Inserting char: '{}' (unicode={})", c, key_data.unicode_char);
                                 self.insert_char(c);
                                 return EventResult::Handled;
                             }
                         }
                         // Backspace删除
                         if key_data.keycode == KeyCode::Backspace as u32 {
+                            println!("[TextEdit] Backspace, deleting char");
                             self.delete_char();
                             return EventResult::Handled;
                         }
+                        
+                        println!("[TextEdit] KeyDown ignored: keycode={}, unicode={}, ctrl={}", 
+                            key_data.keycode, key_data.unicode_char, ctrl_pressed);
                     }
                 }
             }
