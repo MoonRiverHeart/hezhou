@@ -19,6 +19,7 @@ pub struct CharacterInfo {
     pub width: f32,
     pub height: f32,
     pub advance_x: f32,
+    pub bearing_x: f32,
     pub bearing_y: f32,
 }
 
@@ -36,9 +37,9 @@ impl FontAtlas {
         Self {
             fonts: Vec::new(),
             font_data: Vec::new(),
-            atlas_texture: vec![0u8; 1024 * 1024 * 4],
-            atlas_width: 1024,
-            atlas_height: 1024,
+            atlas_texture: vec![0u8; 2048 * 2048 * 4],
+            atlas_width: 2048,
+            atlas_height: 2048,
             character_cache: HashMap::new(),
         }
     }
@@ -63,6 +64,22 @@ impl FontAtlas {
         } else {
             font_size * 0.75
         }
+    }
+    
+    pub fn get_font_descent(&self, font_index: usize, font_size: f32) -> f32 {
+        if font_index < self.fonts.len() {
+            if let Some(metrics) = self.fonts[font_index].horizontal_line_metrics(font_size) {
+                metrics.descent
+            } else {
+                font_size * 0.25
+            }
+        } else {
+            font_size * 0.25
+        }
+    }
+    
+    pub fn get_font_height(&self, font_index: usize, font_size: f32) -> f32 {
+        self.get_font_ascent(font_index, font_size) - self.get_font_descent(font_index, font_size)
     }
     
     pub fn get_font_line_height(&self, font_index: usize, font_size: f32) -> f32 {
@@ -107,6 +124,7 @@ impl FontAtlas {
                     width: 0.0,
                     height: 0.0,
                     advance_x: space_width,
+                    bearing_x: 0.0,
                     bearing_y: 0.0,
                 };
                 self.character_cache.insert(key, info);
@@ -124,7 +142,9 @@ impl FontAtlas {
             return;
         }
         
-        let (metrics, bitmap) = self.fonts[font_index].rasterize(character, font_size);
+        let supersample_scale = 4.0;
+        let raster_size = font_size * supersample_scale;
+        let (metrics, bitmap) = self.fonts[font_index].rasterize(character, raster_size);
         
         let char_width = metrics.width as u32;
         let char_height = metrics.height as u32;
@@ -137,8 +157,9 @@ impl FontAtlas {
                 uv_h: 0.0,
                 width: 0.0,
                 height: 0.0,
-                advance_x: metrics.advance_width,
-                bearing_y: 0.0,
+                advance_x: metrics.advance_width / supersample_scale,
+                bearing_x: metrics.bounds.xmin / supersample_scale,
+                bearing_y: (metrics.bounds.height + metrics.bounds.ymin) / supersample_scale,
             };
             self.character_cache.insert(key, info);
             return;
@@ -176,16 +197,18 @@ impl FontAtlas {
                 }
             }
             
-            let bearing_y = metrics.bounds.height + metrics.bounds.ymin;
+            let bearing_x = metrics.bounds.xmin / supersample_scale;
+            let bearing_y = (metrics.bounds.height + metrics.bounds.ymin) / supersample_scale;
             
             let info = CharacterInfo {
                 uv_x: CURRENT_X as f32 / self.atlas_width as f32,
                 uv_y: CURRENT_Y as f32 / self.atlas_height as f32,
                 uv_w: char_width as f32 / self.atlas_width as f32,
                 uv_h: char_height as f32 / self.atlas_height as f32,
-                width: char_width as f32,
-                height: char_height as f32,
-                advance_x: metrics.advance_width,
+                width: char_width as f32 / supersample_scale,
+                height: char_height as f32 / supersample_scale,
+                advance_x: metrics.advance_width / supersample_scale,
+                bearing_x,
                 bearing_y,
             };
             
@@ -274,10 +297,11 @@ impl FontAtlas {
             }
             
             if let Some(info) = self.get_char_info(font_index, character, font_size) {
+                let char_x = cursor_x + info.bearing_x;
                 let char_y = cursor_y - info.bearing_y;
                 
                 result.push((
-                    cursor_x,
+                    char_x,
                     char_y,
                     info.width as usize,
                     info.height as usize,
@@ -321,10 +345,11 @@ impl FontAtlas {
         
         for character in text.chars() {
             if let Some(info) = self.get_char_info(font_index, character, font_size) {
+                let char_x = cursor_x + info.bearing_x;
                 let char_y = baseline_y - info.bearing_y;
                 
                 result.push((
-                    cursor_x,
+                    char_x,
                     char_y,
                     info.width as usize,
                     info.height as usize,

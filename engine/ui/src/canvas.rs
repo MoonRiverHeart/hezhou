@@ -114,6 +114,14 @@ impl Canvas {
             font_size * 1.2
         }
     }
+    
+    pub fn get_font_height(&self, font_size: f32) -> f32 {
+        if let Some(atlas) = self.get_font_atlas() {
+            atlas.get_font_height(self.font_index, font_size)
+        } else {
+            font_size
+        }
+    }
 
     pub fn draw_rect(&mut self, bounds: Rect, style: &Style) {
         let final_alpha = style.background_color.a * style.opacity * self.opacity;

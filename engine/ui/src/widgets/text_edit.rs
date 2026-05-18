@@ -483,7 +483,7 @@ impl Widget for TextEdit {
             };
             
             canvas.draw_rect(
-                Rect::new(cursor_x, cursor_y - max_bearing_y, 2.0, font_size),
+                Rect::new(cursor_x, cursor_y - max_bearing_y, 2.0, canvas.get_font_height(font_size)),
                 &Style::new().with_background(Color::white()),
             );
         } else {
