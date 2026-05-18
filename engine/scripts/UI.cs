@@ -69,6 +69,12 @@ namespace Hezhou
         public delegate void TextEditDeleteCharDelegate(IntPtr handle, ulong widgetId);
         
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate int TextEditGetTextLenDelegate(IntPtr handle, ulong widgetId);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void TextEditGetTextDelegate(IntPtr handle, ulong widgetId, IntPtr buffer, int bufferSize);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public delegate void RegisterResizeDelegate(IntPtr callbackPtr);
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
@@ -106,6 +112,8 @@ namespace Hezhou
             public IntPtr ui_text_edit_set_text;
             public IntPtr ui_text_edit_insert_char;
             public IntPtr ui_text_edit_delete_char;
+            public IntPtr ui_text_edit_get_text_len;
+            public IntPtr ui_text_edit_get_text;
             public IntPtr widget_tree_ptr;
         }
 
@@ -258,6 +266,29 @@ public static void RegisterResizeCallback(ResizeCallbackDelegate callback)
             }
             var func = Marshal.GetDelegateForFunctionPointer<TextEditSetTextDelegate>(_ffi.ui_text_edit_set_text);
             func(_widgetTree, widgetId, text);
+        }
+        
+        public static string TextEditGetText(ulong widgetId)
+        {
+            if (_ffi.ui_text_edit_get_text_len == IntPtr.Zero || _ffi.ui_text_edit_get_text == IntPtr.Zero)
+            {
+                Console.WriteLine("[C#] ERROR: TextEditGetText函数指针为空");
+                return "";
+            }
+            
+            var getLenFunc = Marshal.GetDelegateForFunctionPointer<TextEditGetTextLenDelegate>(_ffi.ui_text_edit_get_text_len);
+            int len = getLenFunc(_widgetTree, widgetId);
+            
+            if (len == 0) return "";
+            
+            IntPtr buffer = Marshal.AllocHGlobal(len + 1);
+            var getTextFunc = Marshal.GetDelegateForFunctionPointer<TextEditGetTextDelegate>(_ffi.ui_text_edit_get_text);
+            getTextFunc(_widgetTree, widgetId, buffer, len + 1);
+            
+            string result = Marshal.PtrToStringAnsi(buffer);
+            Marshal.FreeHGlobal(buffer);
+            
+            return result ?? "";
         }
 
         public static ulong GetRootId()

@@ -991,3 +991,59 @@ pub extern "C" fn ui_text_edit_delete_char(
         }
     }
 }
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_text_edit_get_text_len(
+    handle: WidgetTreeHandle,
+    widget_id: u64,
+) -> usize {
+    if handle.is_null() {
+        return 0;
+    }
+    unsafe {
+        let arc = &*(handle as *const Arc<Mutex<WidgetTree>>);
+        let tree = arc.lock();
+        let id = WidgetId::from_raw(widget_id);
+        if let Some(widget) = tree.get_widget(id) {
+            if widget.widget_type() == "TextEdit" {
+                use crate::widgets::TextEdit;
+                if let Some(text_edit) = widget.as_any().downcast_ref::<TextEdit>() {
+                    return text_edit.get_text().len();
+                }
+            }
+        }
+        0
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_text_edit_get_text(
+    handle: WidgetTreeHandle,
+    widget_id: u64,
+    buffer: *mut std::ffi::c_char,
+    buffer_size: usize,
+) {
+    if handle.is_null() || buffer.is_null() || buffer_size == 0 {
+        return;
+    }
+    unsafe {
+        let arc = &*(handle as *const Arc<Mutex<WidgetTree>>);
+        let tree = arc.lock();
+        let id = WidgetId::from_raw(widget_id);
+        if let Some(widget) = tree.get_widget(id) {
+            if widget.widget_type() == "TextEdit" {
+                use crate::widgets::TextEdit;
+                if let Some(text_edit) = widget.as_any().downcast_ref::<TextEdit>() {
+                    let text = text_edit.get_text();
+                    let copy_len = text.len().min(buffer_size - 1);
+                    std::ptr::copy_nonoverlapping(
+                        text.as_ptr(),
+                        buffer as *mut u8,
+                        copy_len,
+                    );
+                    *buffer.add(copy_len) = 0;  // null terminator
+                }
+            }
+        }
+    }
+}

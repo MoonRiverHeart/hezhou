@@ -269,6 +269,56 @@ namespace Hezhou
         private static void OnHotReloadClick(ulong widgetId)
         {
             Console.WriteLine("[Editor] Hot Reload triggered!");
+            
+            if (_scriptTextEditId == 0)
+            {
+                Console.WriteLine("[Editor] ERROR: TextEdit not created");
+                return;
+            }
+            
+            // 获取脚本内容
+            string scriptContent = UI.TextEditGetText(_scriptTextEditId);
+            Console.WriteLine($"[Editor] Script content length: {scriptContent.Length}");
+            
+            // 保存到临时文件
+            try
+            {
+                string tempPath = "scripts/tmp/NewScript.cs";
+                System.IO.Directory.CreateDirectory("scripts/tmp");
+                System.IO.File.WriteAllText(tempPath, scriptContent);
+                Console.WriteLine($"[Editor] Script saved to {tempPath}");
+                
+                // 编译
+                var compileProcess = new System.Diagnostics.Process();
+                compileProcess.StartInfo.FileName = "mcs";
+                compileProcess.StartInfo.Arguments = $"-target:library -out:scripts/tmp/NewScript.dll {tempPath}";
+                compileProcess.StartInfo.UseShellExecute = false;
+                compileProcess.StartInfo.RedirectStandardOutput = true;
+                compileProcess.StartInfo.RedirectStandardError = true;
+                compileProcess.StartInfo.CreateNoWindow = true;
+                
+                compileProcess.Start();
+                string output = compileProcess.StandardOutput.ReadToEnd();
+                string error = compileProcess.StandardError.ReadToEnd();
+                compileProcess.WaitForExit();
+                
+                if (compileProcess.ExitCode == 0)
+                {
+                    Console.WriteLine("[Editor] ✓ Compilation successful!");
+                    Console.WriteLine($"[Editor] Output DLL: scripts/tmp/NewScript.dll");
+                    if (!string.IsNullOrEmpty(output))
+                        Console.WriteLine($"[Editor] Compiler output:\n{output}");
+                }
+                else
+                {
+                    Console.WriteLine("[Editor] ✗ Compilation failed!");
+                    Console.WriteLine($"[Editor] Error:\n{error}");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[Editor] ERROR: {ex.Message}");
+            }
         }
         
         private static void OnOpenClick(ulong widgetId)
