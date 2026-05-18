@@ -30,6 +30,9 @@ pub struct FontAtlas {
     atlas_width: u32,
     atlas_height: u32,
     character_cache: HashMap<CharacterKey, CharacterInfo>,
+    current_x: u32,
+    current_y: u32,
+    row_height: u32,
 }
 
 impl FontAtlas {
@@ -41,6 +44,9 @@ impl FontAtlas {
             atlas_width: 2048,
             atlas_height: 2048,
             character_cache: HashMap::new(),
+            current_x: 0,
+            current_y: 0,
+            row_height: 0,
         }
     }
     
@@ -101,9 +107,114 @@ impl FontAtlas {
         
         for size in sizes {
             for c in chars.chars() {
-                self.rasterize_char(font_index, c, *size);
+                self.rasterize_char_direct(font_index, c, *size);
             }
         }
+    }
+    
+    fn rasterize_char_direct(&mut self, font_index: usize, character: char, font_size: f32) {
+        if character == ' ' || character == '\t' || character == '\n' || character == '\r' {
+            let key = CharacterKey {
+                font_index,
+                character,
+                font_size: font_size as u32,
+            };
+            
+            if !self.character_cache.contains_key(&key) {
+                let space_width = font_size * 0.25;
+                let info = CharacterInfo {
+                    uv_x: 0.97,
+                    uv_y: 0.0,
+                    uv_w: 0.0,
+                    uv_h: 0.0,
+                    width: 0.0,
+                    height: 0.0,
+                    advance_x: space_width,
+                    bearing_x: 0.0,
+                    bearing_y: 0.0,
+                };
+                self.character_cache.insert(key, info);
+            }
+            return;
+        }
+        
+        let key = CharacterKey {
+            font_index,
+            character,
+            font_size: font_size as u32,
+        };
+        
+        if self.character_cache.contains_key(&key) {
+            return;
+        }
+        
+        let (metrics, bitmap) = self.fonts[font_index].rasterize(character, font_size);
+        
+        let char_width = metrics.width as u32;
+        let char_height = metrics.height as u32;
+        
+        if char_width == 0 || char_height == 0 || bitmap.is_empty() {
+            let info = CharacterInfo {
+                uv_x: 0.97,
+                uv_y: 0.0,
+                uv_w: 0.0,
+                uv_h: 0.0,
+                width: 0.0,
+                height: 0.0,
+                advance_x: metrics.advance_width,
+                bearing_x: metrics.bounds.xmin,
+                bearing_y: metrics.bounds.height + metrics.bounds.ymin,
+            };
+            self.character_cache.insert(key, info);
+            return;
+        }
+        
+        if self.current_x + char_width > self.atlas_width {
+            self.current_x = 0;
+            self.current_y += self.row_height;
+            self.row_height = 0;
+        }
+        
+        if self.current_y + char_height > self.atlas_height {
+            return;
+        }
+        
+        for y in 0..char_height {
+            for x in 0..char_width {
+                let atlas_x = self.current_x + x;
+                let atlas_y = self.current_y + y;
+                let src_idx = y as usize * char_width as usize + x as usize;
+                let dst_idx = atlas_y as usize * self.atlas_width as usize * 4 + atlas_x as usize * 4;
+                
+                if src_idx < bitmap.len() && dst_idx + 3 < self.atlas_texture.len() {
+                    let val = bitmap[src_idx];
+                    self.atlas_texture[dst_idx] = 255;
+                    self.atlas_texture[dst_idx + 1] = 255;
+                    self.atlas_texture[dst_idx + 2] = 255;
+                    self.atlas_texture[dst_idx + 3] = val;
+                }
+            }
+        }
+        
+        let bearing_x = metrics.bounds.xmin;
+        let bearing_y = metrics.bounds.height + metrics.bounds.ymin;
+        
+        let info = CharacterInfo {
+            uv_x: self.current_x as f32 / self.atlas_width as f32,
+            uv_y: self.current_y as f32 / self.atlas_height as f32,
+            uv_w: char_width as f32 / self.atlas_width as f32,
+            uv_h: char_height as f32 / self.atlas_height as f32,
+            width: char_width as f32,
+            height: char_height as f32,
+            advance_x: metrics.advance_width,
+            bearing_x,
+            bearing_y,
+        };
+        
+        self.character_cache.insert(key, info);
+        
+        self.current_x += char_width + 1;
+        self.row_height = self.row_height.max(char_height);
     }
     
     fn rasterize_char(&mut self, font_index: usize, character: char, font_size: f32) {
@@ -165,58 +276,52 @@ impl FontAtlas {
             return;
         }
         
-        static mut CURRENT_X: u32 = 0;
-        static mut CURRENT_Y: u32 = 0;
-        static mut ROW_HEIGHT: u32 = 0;
+        if self.current_x + char_width > self.atlas_width {
+            self.current_x = 0;
+            self.current_y += self.row_height;
+            self.row_height = 0;
+        }
         
-        unsafe {
-            if CURRENT_X + char_width > self.atlas_width {
-                CURRENT_X = 0;
-                CURRENT_Y += ROW_HEIGHT;
-                ROW_HEIGHT = 0;
-            }
-            
-            if CURRENT_Y + char_height > self.atlas_height {
-                return;
-            }
-            
-            for y in 0..char_height {
-                for x in 0..char_width {
-                    let atlas_x = CURRENT_X + x;
-                    let atlas_y = CURRENT_Y + y;
-                    let src_idx = y as usize * char_width as usize + x as usize;
-                    let dst_idx = atlas_y as usize * self.atlas_width as usize * 4 + atlas_x as usize * 4;
-                    
-                    if src_idx < bitmap.len() && dst_idx + 3 < self.atlas_texture.len() {
-                        let val = bitmap[src_idx];
-                        self.atlas_texture[dst_idx] = 255;
-                        self.atlas_texture[dst_idx + 1] = 255;
-                        self.atlas_texture[dst_idx + 2] = 255;
-                        self.atlas_texture[dst_idx + 3] = val;
-                    }
+        if self.current_y + char_height > self.atlas_height {
+            return;
+        }
+        
+        for y in 0..char_height {
+            for x in 0..char_width {
+                let atlas_x = self.current_x + x;
+                let atlas_y = self.current_y + y;
+                let src_idx = y as usize * char_width as usize + x as usize;
+                let dst_idx = atlas_y as usize * self.atlas_width as usize * 4 + atlas_x as usize * 4;
+                
+                if src_idx < bitmap.len() && dst_idx + 3 < self.atlas_texture.len() {
+                    let val = bitmap[src_idx];
+                    self.atlas_texture[dst_idx] = 255;
+                    self.atlas_texture[dst_idx + 1] = 255;
+                    self.atlas_texture[dst_idx + 2] = 255;
+                    self.atlas_texture[dst_idx + 3] = val;
                 }
             }
-            
-            let bearing_x = metrics.bounds.xmin / supersample_scale;
-            let bearing_y = (metrics.bounds.height + metrics.bounds.ymin) / supersample_scale;
-            
-            let info = CharacterInfo {
-                uv_x: CURRENT_X as f32 / self.atlas_width as f32,
-                uv_y: CURRENT_Y as f32 / self.atlas_height as f32,
-                uv_w: char_width as f32 / self.atlas_width as f32,
-                uv_h: char_height as f32 / self.atlas_height as f32,
-                width: char_width as f32 / supersample_scale,
-                height: char_height as f32 / supersample_scale,
-                advance_x: metrics.advance_width / supersample_scale,
-                bearing_x,
-                bearing_y,
-            };
-            
-            self.character_cache.insert(key, info);
-            
-            CURRENT_X += char_width + 1;
-            ROW_HEIGHT = ROW_HEIGHT.max(char_height);
         }
+        
+        let bearing_x = metrics.bounds.xmin / supersample_scale;
+        let bearing_y = (metrics.bounds.height + metrics.bounds.ymin) / supersample_scale;
+        
+        let info = CharacterInfo {
+            uv_x: self.current_x as f32 / self.atlas_width as f32,
+            uv_y: self.current_y as f32 / self.atlas_height as f32,
+            uv_w: char_width as f32 / self.atlas_width as f32,
+            uv_h: char_height as f32 / self.atlas_height as f32,
+            width: char_width as f32 / supersample_scale,
+            height: char_height as f32 / supersample_scale,
+            advance_x: metrics.advance_width / supersample_scale,
+            bearing_x,
+            bearing_y,
+        };
+        
+        self.character_cache.insert(key, info);
+        
+        self.current_x += char_width + 1;
+        self.row_height = self.row_height.max(char_height);
     }
     
     pub fn get_char_info(&self, font_index: usize, character: char, font_size: f32) -> Option<&CharacterInfo> {
