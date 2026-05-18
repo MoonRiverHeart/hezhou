@@ -283,15 +283,15 @@ namespace Hezhou
             // 保存到临时文件
             try
             {
-                string tempPath = "scripts/tmp/NewScript.cs";
-                System.IO.Directory.CreateDirectory("scripts/tmp");
+                string tempPath = "scripts/bin/Mono/NewScript.cs";
+                System.IO.Directory.CreateDirectory("scripts/bin/Mono");
                 System.IO.File.WriteAllText(tempPath, scriptContent);
                 Console.WriteLine($"[Editor] Script saved to {tempPath}");
                 
-                // 编译
+                // 编译（覆盖EditorScript.dll）
                 var compileProcess = new System.Diagnostics.Process();
                 compileProcess.StartInfo.FileName = "mcs";
-                compileProcess.StartInfo.Arguments = $"-target:library -out:scripts/tmp/NewScript.dll {tempPath}";
+                compileProcess.StartInfo.Arguments = $"-target:library -out:scripts/bin/Mono/EditorScript.dll {tempPath} scripts/UI.cs scripts/DFX.cs";
                 compileProcess.StartInfo.UseShellExecute = false;
                 compileProcess.StartInfo.RedirectStandardOutput = true;
                 compileProcess.StartInfo.RedirectStandardError = true;
@@ -308,6 +308,10 @@ namespace Hezhou
                     Console.WriteLine($"[Editor] Output DLL: scripts/tmp/NewScript.dll");
                     if (!string.IsNullOrEmpty(output))
                         Console.WriteLine($"[Editor] Compiler output:\n{output}");
+                    
+                    // 触发Rust端hot reload
+                    Console.WriteLine("[Editor] Triggering hot reload...");
+                    UI.TriggerHotReload();
                 }
                 else
                 {

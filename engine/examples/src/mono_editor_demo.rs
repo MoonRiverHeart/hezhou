@@ -2,6 +2,15 @@ use hezhou_rhi_vulkan::UIVulkanRenderer;
 use hezhou_scripting::{MonoUIExecutor, ffi_context::{FfiContext, WidgetTreeHandle}};
 use hezhou_ui::ffi as ui_ffi;
 use std::time::Duration;
+use std::sync::atomic::{AtomicBool, Ordering};
+
+static mut EXECUTOR: Option<MonoUIExecutor> = None;
+static HOT_RELOAD_REQUESTED: AtomicBool = AtomicBool::new(false);
+
+#[unsafe(no_mangle)]
+pub extern "C" fn trigger_hot_reload() {
+    HOT_RELOAD_REQUESTED.store(true, Ordering::SeqCst);
+}
 
 fn main() {
     println!("=== Hezhou Game Editor ===\n");
@@ -72,18 +81,51 @@ fn main() {
     let dll_path = "scripts/bin/Mono/EditorScript.dll";
     let executor = MonoUIExecutor::new(dll_path)
         .expect("Failed to load Mono DLL");
+    
+    // 存储到static
+    unsafe {
+        EXECUTOR = Some(executor);
+    }
     println!("    加载成功!\n");
 
     println!("[6] 调用EditorScript.Initialize...");
-    executor.call_static_with_ptr_namespace("Hezhou", "EditorScript", "Initialize", ffi_ptr as usize)
-        .expect("Initialize failed");
+    unsafe {
+        if let Some(ref executor) = EXECUTOR {
+            executor.call_static_with_ptr_namespace("Hezhou", "EditorScript", "Initialize", ffi_ptr as usize)
+                .expect("Initialize failed");
+        }
+    }
     println!("    编辑器UI创建成功!\n");
 
     println!("[7] 开始主循环...");
     println!("    FPS显示在状态栏\n");
+    println!("    Hot Reload: 点击脚本编辑器按钮\n");
 
     loop {
         renderer.process_events();
+        
+        // 检查hot reload请求
+        if HOT_RELOAD_REQUESTED.load(Ordering::SeqCst) {
+            HOT_RELOAD_REQUESTED.store(false, Ordering::SeqCst);
+            println!("\n[HotReload] 触发重载...");
+            
+            unsafe {
+                if let Some(ref mut executor) = EXECUTOR {
+                    match executor.reload() {
+                        Ok(_) => {
+                            println!("[HotReload] Assembly reload成功!");
+                            println!("[HotReload] 调用Initialize...");
+                            executor.call_static_with_ptr_namespace("Hezhou", "EditorScript", "Initialize", ffi_ptr as usize)
+                                .expect("Initialize failed");
+                            println!("[HotReload] UI重新初始化完成!\n");
+                        }
+                        Err(e) => {
+                            println!("[HotReload] Reload失败: {:?}", e);
+                        }
+                    }
+                }
+            }
+        }
 
         match renderer.draw_frame() {
             Ok(running) => {

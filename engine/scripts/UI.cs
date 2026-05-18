@@ -290,6 +290,14 @@ public static void RegisterResizeCallback(ResizeCallbackDelegate callback)
             
             return result ?? "";
         }
+        
+        [DllImport("__Internal", CallingConvention = CallingConvention.Cdecl)]
+        private static extern void trigger_hot_reload();
+        
+        public static void TriggerHotReload()
+        {
+            trigger_hot_reload();
+        }
 
         public static ulong GetRootId()
         {
