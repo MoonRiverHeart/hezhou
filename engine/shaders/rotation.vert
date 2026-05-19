@@ -35,8 +35,8 @@ vec3 positions[8] = vec3[](
 );
 
 // 36 vertices for 6 faces (2 triangles per face)
-// Back/Front/Left/Right: CW winding (normal flipped)
-// Bottom/Top: CCW winding (normal unchanged)
+// Back/Front/Left/Right/Bottom: CW winding (normal flipped)
+// Top: CCW winding (normal unchanged)
 int vertex_indices[36] = int[](
     // Back face (Z-) - red: normal flipped
     0, 2, 1, 0, 3, 2,
@@ -46,8 +46,8 @@ int vertex_indices[36] = int[](
     0, 7, 3, 0, 4, 7,
     // Right face (X+) - yellow: normal flipped
     1, 6, 5, 1, 2, 6,
-    // Bottom face (Y-) - cyan
-    0, 1, 5, 0, 5, 4,
+    // Bottom face (Y-) - cyan: normal flipped
+    0, 5, 1, 0, 4, 5,
     // Top face (Y+) - magenta
     3, 2, 6, 3, 6, 7
 );
