@@ -87,6 +87,7 @@ pub struct UIVulkanRenderer {
     frame_count: u64,
     button_id: u64,
     space_pressed: bool,
+    s_pressed: bool,
     glyph_cache: GlyphCache,
     button_clicked: Arc<AtomicBool>,
     needs_resize: bool,
@@ -572,6 +573,7 @@ impl UIVulkanRenderer {
                 frame_count: 0,
                 button_id: 0,
                 space_pressed: false,
+            s_pressed: false,
                 glyph_cache: GlyphCache::new(),
                 button_clicked: Arc::new(AtomicBool::new(false)),
                 needs_resize: false,
@@ -948,6 +950,14 @@ let font_atlas = ui.get_font_atlas();
     
     pub fn consume_space_press(&mut self) {
         self.space_pressed = false;
+    }
+    
+    pub fn is_s_pressed(&self) -> bool {
+        self.s_pressed || self.window.get_key(Key::S) == Action::Press
+    }
+    
+    pub fn consume_s_press(&mut self) {
+        self.s_pressed = false;
     }
     
     unsafe fn recreate_swapchain(&mut self) -> Result<(), String> {
@@ -1531,6 +1541,9 @@ self.dfx.lock().get_logger().lock().log(
                         if key == Key::Space {
                             self.space_pressed = true;
                         }
+                        if key == Key::S {
+                            self.s_pressed = true;
+                        }
                         if key == Key::Backspace {
                             self.input_handler.lock().on_key_event(&KeyEvent {
                                 action: KeyAction::Press,
@@ -1647,6 +1660,252 @@ self.dfx.lock().get_logger().lock().log(
     
     pub fn get_frame_count(&self) -> u64 {
         self.frame_count
+    }
+    
+    pub fn get_extent(&self) -> (u32, u32) {
+        (self.extent.width, self.extent.height)
+    }
+    
+    pub fn get_glfw_time(&self) -> f64 {
+        self.glfw.get_time()
+    }
+    
+    pub fn capture_screenshot(&mut self, filepath: &str) -> Result<(), String> {
+        unsafe {
+            self.device.device_wait_idle()
+                .map_err(|e| format!("Failed to wait for device idle: {}", e))?;
+            
+            let (image_index, _suboptimal) = self.swapchain_loader.acquire_next_image(
+                self.swapchain,
+                u64::MAX,
+                self.image_available_semaphores[self.current_frame],
+                vk::Fence::null()
+            ).map_err(|e| format!("Failed to acquire image: {}", e))?;
+            
+            let image_index_usize = image_index as usize;
+            let swapchain_image = self.swapchain_images[image_index_usize];
+            
+            let width = self.extent.width;
+            let height = self.extent.height;
+            let buffer_size = (width * height * 4) as usize;
+            
+            let buffer_create_info = vk::BufferCreateInfo {
+                size: buffer_size as u64,
+                usage: vk::BufferUsageFlags::TRANSFER_DST,
+                sharing_mode: vk::SharingMode::EXCLUSIVE,
+                flags: vk::BufferCreateFlags::empty(),
+                queue_family_index_count: 0,
+                p_queue_family_indices: std::ptr::null(),
+                _marker: std::marker::PhantomData,
+                s_type: vk::StructureType::BUFFER_CREATE_INFO,
+                p_next: std::ptr::null(),
+            };
+            
+            let buffer = self.device.create_buffer(&buffer_create_info, None)
+                .map_err(|e| format!("Failed to create buffer: {}", e))?;
+            
+            let memory_requirements = self.device.get_buffer_memory_requirements(buffer);
+            
+            let memory_properties = self.instance.get_physical_device_memory_properties(self.physical_device);
+            let memory_type_index = memory_properties.memory_types.iter().enumerate()
+                .find(|(i, mem_type)| {
+                    (memory_requirements.memory_type_bits & (1 << i)) != 0
+                        && mem_type.property_flags.contains(vk::MemoryPropertyFlags::HOST_VISIBLE | vk::MemoryPropertyFlags::HOST_COHERENT)
+                })
+                .map(|(i, _)| i as u32)
+                .expect("Failed to find suitable memory type");
+            
+            let allocate_info = vk::MemoryAllocateInfo {
+                allocation_size: memory_requirements.size,
+                memory_type_index,
+                p_next: std::ptr::null(),
+                s_type: vk::StructureType::MEMORY_ALLOCATE_INFO,
+                _marker: std::marker::PhantomData,
+            };
+            
+            let buffer_memory = self.device.allocate_memory(&allocate_info, None)
+                .map_err(|e| format!("Failed to allocate buffer memory: {}", e))?;
+            
+            self.device.bind_buffer_memory(buffer, buffer_memory, 0)
+                .map_err(|e| format!("Failed to bind buffer memory: {}", e))?;
+            
+            let command_buffer_allocate_info = vk::CommandBufferAllocateInfo {
+                command_pool: self.command_pool,
+                level: vk::CommandBufferLevel::PRIMARY,
+                command_buffer_count: 1,
+                p_next: std::ptr::null(),
+                s_type: vk::StructureType::COMMAND_BUFFER_ALLOCATE_INFO,
+                _marker: std::marker::PhantomData,
+            };
+            
+            let command_buffers = self.device.allocate_command_buffers(&command_buffer_allocate_info)
+                .map_err(|e| format!("Failed to allocate command buffers: {}", e))?;
+            let command_buffer = command_buffers[0];
+            
+            let begin_info = vk::CommandBufferBeginInfo {
+                flags: vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT,
+                p_inheritance_info: std::ptr::null(),
+                p_next: std::ptr::null(),
+                s_type: vk::StructureType::COMMAND_BUFFER_BEGIN_INFO,
+                _marker: std::marker::PhantomData,
+            };
+            
+            self.device.begin_command_buffer(command_buffer, &begin_info)
+                .map_err(|e| format!("Failed to begin command buffer: {}", e))?;
+            
+            let image_barrier = vk::ImageMemoryBarrier {
+                old_layout: vk::ImageLayout::PRESENT_SRC_KHR,
+                new_layout: vk::ImageLayout::TRANSFER_SRC_OPTIMAL,
+                src_queue_family_index: vk::QUEUE_FAMILY_IGNORED,
+                dst_queue_family_index: vk::QUEUE_FAMILY_IGNORED,
+                image: swapchain_image,
+                subresource_range: vk::ImageSubresourceRange {
+                    aspect_mask: vk::ImageAspectFlags::COLOR,
+                    base_mip_level: 0,
+                    level_count: 1,
+                    base_array_layer: 0,
+                    layer_count: 1,
+                },
+                src_access_mask: vk::AccessFlags::MEMORY_READ,
+                dst_access_mask: vk::AccessFlags::TRANSFER_READ,
+                p_next: std::ptr::null(),
+                s_type: vk::StructureType::IMAGE_MEMORY_BARRIER,
+                _marker: std::marker::PhantomData,
+            };
+            
+            self.device.cmd_pipeline_barrier(
+                command_buffer,
+                vk::PipelineStageFlags::BOTTOM_OF_PIPE,
+                vk::PipelineStageFlags::TRANSFER,
+                vk::DependencyFlags::empty(),
+                &[],
+                &[],
+                &[image_barrier]
+            );
+            
+            let buffer_image_copy = vk::BufferImageCopy {
+                buffer_offset: 0,
+                buffer_row_length: 0,
+                buffer_image_height: 0,
+                image_subresource: vk::ImageSubresourceLayers {
+                    aspect_mask: vk::ImageAspectFlags::COLOR,
+                    mip_level: 0,
+                    base_array_layer: 0,
+                    layer_count: 1,
+                },
+                image_offset: vk::Offset3D { x: 0, y: 0, z: 0 },
+                image_extent: vk::Extent3D { width, height, depth: 1 },
+            };
+            
+            self.device.cmd_copy_image_to_buffer(
+                command_buffer,
+                swapchain_image,
+                vk::ImageLayout::TRANSFER_SRC_OPTIMAL,
+                buffer,
+                &[buffer_image_copy]
+            );
+            
+            let image_barrier2 = vk::ImageMemoryBarrier {
+                old_layout: vk::ImageLayout::TRANSFER_SRC_OPTIMAL,
+                new_layout: vk::ImageLayout::PRESENT_SRC_KHR,
+                src_queue_family_index: vk::QUEUE_FAMILY_IGNORED,
+                dst_queue_family_index: vk::QUEUE_FAMILY_IGNORED,
+                image: swapchain_image,
+                subresource_range: vk::ImageSubresourceRange {
+                    aspect_mask: vk::ImageAspectFlags::COLOR,
+                    base_mip_level: 0,
+                    level_count: 1,
+                    base_array_layer: 0,
+                    layer_count: 1,
+                },
+                src_access_mask: vk::AccessFlags::TRANSFER_READ,
+                dst_access_mask: vk::AccessFlags::MEMORY_READ,
+                p_next: std::ptr::null(),
+                s_type: vk::StructureType::IMAGE_MEMORY_BARRIER,
+                _marker: std::marker::PhantomData,
+            };
+            
+            self.device.cmd_pipeline_barrier(
+                command_buffer,
+                vk::PipelineStageFlags::TRANSFER,
+                vk::PipelineStageFlags::BOTTOM_OF_PIPE,
+                vk::DependencyFlags::empty(),
+                &[],
+                &[],
+                &[image_barrier2]
+            );
+            
+            self.device.end_command_buffer(command_buffer)
+                .map_err(|e| format!("Failed to end command buffer: {}", e))?;
+            
+            let submit_info = vk::SubmitInfo {
+                wait_semaphore_count: 0,
+                p_wait_semaphores: std::ptr::null(),
+                p_wait_dst_stage_mask: std::ptr::null(),
+                command_buffer_count: 1,
+                p_command_buffers: &command_buffer,
+                signal_semaphore_count: 0,
+                p_signal_semaphores: std::ptr::null(),
+                p_next: std::ptr::null(),
+                s_type: vk::StructureType::SUBMIT_INFO,
+                _marker: std::marker::PhantomData,
+            };
+            
+            let fence = self.device.create_fence(&vk::FenceCreateInfo::default(), None)
+                .map_err(|e| format!("Failed to create fence: {}", e))?;
+            
+            self.device.queue_submit(self.queue, &[submit_info], fence)
+                .map_err(|e| format!("Failed to submit queue: {}", e))?;
+            
+            self.device.wait_for_fences(&[fence], true, u64::MAX)
+                .map_err(|e| format!("Failed to wait for fence: {}", e))?;
+            
+            self.device.destroy_fence(fence, None);
+            
+            let data_ptr = self.device.map_memory(buffer_memory, 0, buffer_size as u64, vk::MemoryMapFlags::empty())
+                .map_err(|e| format!("Failed to map memory: {}", e))?;
+            
+            let data_slice = std::slice::from_raw_parts(data_ptr as *const u8, buffer_size);
+            
+            let mut pixels: Vec<u8> = data_slice.to_vec();
+            
+            for y in 0..height {
+                for x in 0..width {
+                    let idx = (y * width + x) as usize * 4;
+                    let r = pixels[idx];
+                    let g = pixels[idx + 1];
+                    let b = pixels[idx + 2];
+                    let a = pixels[idx + 3];
+                    pixels[idx] = b;
+                    pixels[idx + 1] = g;
+                    pixels[idx + 2] = r;
+                    pixels[idx + 3] = a;
+                }
+            }
+            
+            self.device.unmap_memory(buffer_memory);
+            
+            let img_buffer: image::ImageBuffer<image::Rgba<u8>, Vec<u8>> = 
+                image::ImageBuffer::from_raw(width, height, pixels)
+                    .expect("Failed to create image buffer");
+            
+            img_buffer.save(filepath)
+                .map_err(|e| format!("Failed to save image: {}", e))?;
+            
+            self.device.free_command_buffers(self.command_pool, &command_buffers);
+            self.device.destroy_buffer(buffer, None);
+            self.device.free_memory(buffer_memory, None);
+            
+            self.dfx.lock().get_logger().lock().log(
+                LogLevel::Info,
+                "Screenshot",
+                &format!("Screenshot saved to {}", filepath),
+                file!(),
+                line!()
+            );
+            
+            Ok(())
+        }
     }
     
     pub fn cleanup(&mut self) {

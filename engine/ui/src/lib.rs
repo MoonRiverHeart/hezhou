@@ -46,6 +46,7 @@ pub struct UISystem {
     animation_engine: Arc<parking_lot::Mutex<AnimationEngine>>,
     font_atlas: FontAtlas,
     dfx: Arc<parking_lot::Mutex<DfxSystem>>,
+    status_widget_id: Option<WidgetId>,
 }
 
 impl UISystem {
@@ -60,6 +61,7 @@ impl UISystem {
             animation_engine: Arc::new(parking_lot::Mutex::new(AnimationEngine::new(Arc::clone(&dfx)))),
             font_atlas,
             dfx,
+            status_widget_id: None,
         }
     }
     
@@ -111,6 +113,14 @@ impl UISystem {
     
     pub fn get_animation_engine(&self) -> Arc<parking_lot::Mutex<AnimationEngine>> {
         Arc::clone(&self.animation_engine)
+    }
+    
+    pub fn set_status_widget_id(&mut self, id: WidgetId) {
+        self.status_widget_id = Some(id);
+    }
+    
+    pub fn get_status_widget_id(&self) -> Option<WidgetId> {
+        self.status_widget_id
     }
 }
 

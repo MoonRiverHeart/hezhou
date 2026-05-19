@@ -24,5 +24,6 @@ bytemuck = "1.14"
 glfw = { version = "0.62", default-features = false, features = ["src-build", "vulkan", "raw-window-handle-v0-6", "native-handles"] }
 libloading = "0.8"
 parking_lot = "0.12"
+image = "0.25"
 
 [dev-dependencies]

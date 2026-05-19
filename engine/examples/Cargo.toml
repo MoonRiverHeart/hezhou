@@ -22,6 +22,7 @@ parking_lot = "0.12"
 bytemuck = "1.14"
 chrono = "0.4"
 serde_json = "1.0"
+image = "0.25"
 
 [[bin]]
 name = "engine_demo"
@@ -85,3 +86,7 @@ required-features = ["mono"]
 [[bin]]
 name = "trace_viewer_demo"
 path = "src/trace_viewer_demo.rs"
+
+[[bin]]
+name = "screenshot_demo"
+path = "src/screenshot_demo.rs"
