@@ -489,6 +489,10 @@ private static void ShowDropdownMenu(float x, float y, string[] items, UI.Widget
             {
                 _previewPanel = new Panel(rootId, previewX, mainY, previewWidth, mainHeight + BOTTOM_PANEL_HEIGHT, 0.08f, 0.08f, 0.08f, 0.3f);
                 UI.CreateLabel(_previewPanel.Id, 10f, 10f, previewWidth - 20f, 25f, "游戏预览");
+                
+                // 创建预览窗组件
+                _previewWindowId = UI.CreatePreviewWindow(_previewPanel.Id, 10f, 40f, previewWidth - 20f, mainHeight - 20f, 1);
+                Log.Info("Editor", "PreviewWindow创建完成 (ShowMainLayout)");
             }
             
             if (_assetPanel == null)
