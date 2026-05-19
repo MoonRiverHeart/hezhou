@@ -6,12 +6,12 @@ layout(push_constant) uniform PushConstants {
     float height;
 } pc;
 
-// Perspective projection matrix
+// Perspective projection matrix (Vulkan: flip Y axis)
 mat4 perspective(float fov, float aspect, float near, float far) {
     float f = 1.0 / tan(fov * 0.5);
     return mat4(
         f / aspect, 0.0, 0.0, 0.0,
-        0.0, f, 0.0, 0.0,
+        0.0, -f, 0.0, 0.0,  // -f to flip Y for Vulkan
         0.0, 0.0, (far + near) / (near - far), -1.0,
         0.0, 0.0, (2.0 * far * near) / (near - far), 0.0
     );
@@ -32,17 +32,17 @@ vec3 positions[8] = vec3[](
 // 36 vertices for 6 faces (2 triangles per face)
 // All faces use COUNTER_CLOCKWISE winding (looking from outside)
 int vertex_indices[36] = int[](
-    // Back face (Z-) - red (looking from Z- toward Z+)
+    // Back face (Z-) - red
     0, 1, 2, 0, 2, 3,
-    // Front face (Z+) - green (looking from Z+ toward Z-)
-    4, 6, 5, 4, 7, 6,
-    // Left face (X-) - blue (looking from X- toward X+)
-    0, 7, 4, 0, 3, 7,
-    // Right face (X+) - yellow (looking from X+ toward X-)
+    // Front face (Z+) - green
+    4, 7, 6, 4, 6, 5,
+    // Left face (X-) - blue
+    0, 3, 7, 0, 7, 4,
+    // Right face (X+) - yellow
     1, 5, 6, 1, 6, 2,
-    // Bottom face (Y-) - cyan (looking from Y- toward Y+)
-    0, 5, 1, 0, 4, 5,
-    // Top face (Y+) - magenta (looking from Y+ toward Y-)
+    // Bottom face (Y-) - cyan
+    0, 1, 5, 0, 5, 4,
+    // Top face (Y+) - magenta
     3, 2, 6, 3, 6, 7
 );
 
