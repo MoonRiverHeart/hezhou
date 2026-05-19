@@ -2,7 +2,7 @@ use hezhou_rhi_vulkan::UIVulkanRenderer;
 use hezhou_scripting::{MonoUIExecutor, ffi_context::{FfiContext, WidgetTreeHandle}};
 use hezhou_ui::ffi as ui_ffi;
 use hezhou_dfx::*;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use std::sync::atomic::{AtomicBool, Ordering};
 
 static mut EXECUTOR: Option<MonoUIExecutor> = None;
@@ -14,6 +14,15 @@ pub extern "C" fn trigger_hot_reload() {
 }
 
 fn main() {
+    let args: Vec<String> = std::env::args().collect();
+    let screenshot_mode = args.iter().any(|a| a == "--screenshot");
+    let screenshot_delay = if screenshot_mode { 
+        args.iter().position(|a| a == "--delay")
+            .and_then(|i| args.get(i + 1))
+            .and_then(|s| s.parse::<f32>().ok())
+            .unwrap_or(3.0)
+    } else { 0.0 };
+    
     let dfx = init_dfx();
     dfx.lock().get_logger().lock().set_level(LogLevel::Info);
     dfx.lock().get_trace_analyzer().lock().enable();
@@ -26,6 +35,9 @@ fn main() {
     
     dfx_info!("Demo", "=== Hezhou Game Editor ===");
     dfx_info!("Demo", "Log file: {}", log_path);
+    if screenshot_mode {
+        dfx_info!("Demo", "Screenshot mode: delay={}s", screenshot_delay);
+    }
     
     dfx_trace_begin!("Startup", "editor");
     dfx_info!("Demo", "[1] 创建编辑器窗口 (1280x720)...");
@@ -125,15 +137,43 @@ fn main() {
     dfx_trace_end!("Startup", "editor");
     dfx_info!("Demo", "编辑器UI创建成功!");
 
+    let screenshot_path = if screenshot_mode {
+        args.iter().position(|a| a == "--output")
+            .and_then(|i| args.get(i + 1))
+            .cloned()
+            .unwrap_or_else(|| format!("screenshots/mono_editor_demo.png"))
+    } else { String::new() };
+    
+    if screenshot_mode {
+        std::fs::create_dir_all("screenshots").ok();
+    }
+    
     dfx_info!("Demo", "[7] 开始主循环...");
     dfx_info!("Demo", "Trace will be saved to traces/trace_latest.json on exit");
 
     let mut frame_count = 0u64;
+    let start_time = Instant::now();
+    let mut screenshot_taken = false;
+    
     loop {
         frame_count += 1;
         dfx_trace_begin!("Frame", "render");
         
         renderer.process_events();
+        
+        if screenshot_mode && !screenshot_taken {
+            let elapsed = start_time.elapsed().as_secs_f32();
+            if elapsed >= screenshot_delay {
+                dfx_info!("Screenshot", "Taking screenshot after {:.1}s...", elapsed);
+                if let Err(e) = renderer.capture_screenshot(&screenshot_path) {
+                    dfx_error!("Screenshot", "Failed: {}", e);
+                } else {
+                    dfx_info!("Screenshot", "Saved: {}", screenshot_path);
+                }
+                screenshot_taken = true;
+                break;
+            }
+        }
         
         if HOT_RELOAD_REQUESTED.load(Ordering::SeqCst) {
             HOT_RELOAD_REQUESTED.store(false, Ordering::SeqCst);

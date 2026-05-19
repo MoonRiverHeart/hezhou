@@ -30,6 +30,8 @@ Vulkan原生渲染三角形，展示底层Vulkan API的使用。
 - 缓冲区管理
 
 #### `ui_vulkan_demo`
+![ui_vulkan_demo](docs/ui_vulkan_demo.png)
+
 UI系统与Vulkan渲染集成演示，展示：
 - UI布局系统
 - 文本渲染
@@ -106,6 +108,8 @@ cargo run --bin mono_ui_thunk_demo --features mono
 ```
 
 #### `mono_editor_demo`
+![mono_editor_demo](docs/mono_editor_demo.png)
+
 **游戏编辑器演示**，完整编辑器UI：
 - **窗口尺寸**：1280x720
 - **布局结构**：
@@ -141,6 +145,8 @@ cargo run --bin rotation_demo --features native-aot
 ### 性能分析工具
 
 #### `trace_viewer_demo`
+![trace_viewer_demo](docs/trace_viewer_demo.png)
+
 **Trace泳道图查看器**，用于分析性能：
 - 加载 `traces/trace_latest.json` 文件
 - 显示Frame和DrawFrame的泳道图
@@ -156,6 +162,8 @@ cargo run --bin trace_viewer_demo --release
 ### 开发工具
 
 #### `screenshot_demo`
+![screenshot_demo](docs/screenshot_demo.png)
+
 **截图工具**，用于UI调试和问题记录：
 - 按 **S键** 截取当前窗口画面
 - 截图自动保存到 `screenshots/screenshot_YYYYMMDD_HHMMSS.png`

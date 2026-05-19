@@ -4,8 +4,23 @@ use hezhou_ui::ffi::WidgetTreeHandle;
 use hezhou_dfx::*;
 use chrono::Local;
 use std::ffi::CString;
+use std::time::{Duration, Instant};
 
 fn main() {
+    let args: Vec<String> = std::env::args().collect();
+    let screenshot_mode = args.iter().any(|a| a == "--screenshot");
+    let screenshot_delay = if screenshot_mode { 
+        args.iter().position(|a| a == "--delay")
+            .and_then(|i| args.get(i + 1))
+            .and_then(|s| s.parse::<f32>().ok())
+            .unwrap_or(2.0)
+    } else { 0.0 };
+    let screenshot_path = if screenshot_mode {
+        args.iter().position(|a| a == "--output")
+            .and_then(|i| args.get(i + 1))
+            .cloned()
+            .unwrap_or_else(|| "screenshots/screenshot_demo.png".to_string())
+    } else { String::new() };
     let dfx = init_dfx();
     dfx.lock().get_logger().lock().set_level(LogLevel::Info);
     
@@ -77,30 +92,54 @@ fn main() {
     
     dfx_info!("Screenshot", "UI created!");
     dfx_info!("Screenshot", "[3] Starting main loop...");
-    dfx_info!("Screenshot", "Press S key to take screenshot");
     
+    if screenshot_mode {
+        std::fs::create_dir_all("screenshots").ok();
+        dfx_info!("Screenshot", "[Screenshot mode] delay={}s, output={}", screenshot_delay, screenshot_path);
+    } else {
+        dfx_info!("Screenshot", "Press S key to take screenshot");
+    }
+
     let mut screenshot_count = 0u32;
+    let start_time = Instant::now();
+    let mut auto_screenshot_taken = false;
     
     loop {
         renderer.process_events();
         
-        let should_screenshot = renderer.is_s_pressed();
+        if screenshot_mode && !auto_screenshot_taken {
+            let elapsed = start_time.elapsed().as_secs_f32();
+            if elapsed >= screenshot_delay {
+                dfx_info!("Screenshot", "Taking auto screenshot...");
+                if let Err(e) = renderer.capture_screenshot(&screenshot_path) {
+                    dfx_error!("Screenshot", "Failed: {}", e);
+                } else {
+                    dfx_info!("Screenshot", "Saved: {}", screenshot_path);
+                }
+                auto_screenshot_taken = true;
+                break;
+            }
+        }
         
-        if should_screenshot {
-            renderer.consume_s_press();
+        if !screenshot_mode {
+            let should_screenshot = renderer.is_s_pressed();
             
-            screenshot_count += 1;
-            let timestamp = Local::now().format("%Y%m%d_%H%M%S").to_string();
-            let filename = format!("screenshots/screenshot_{}.png", timestamp);
-            
-            dfx_info!("Screenshot", "Taking screenshot #{}...", screenshot_count);
-            
-            if let Err(e) = renderer.capture_screenshot(&filename) {
-                dfx_error!("Screenshot", "Failed to capture: {}", e);
-            } else {
-                dfx_info!("Screenshot", "Screenshot saved: {}", filename);
-                let new_text = CString::new(format!("Saved: {}", filename)).unwrap();
-                ui_ffi::ui_widget_set_text(handle, status_id, new_text.as_ptr());
+            if should_screenshot {
+                renderer.consume_s_press();
+                
+                screenshot_count += 1;
+                let timestamp = Local::now().format("%Y%m%d_%H%M%S").to_string();
+                let filename = format!("screenshots/screenshot_{}.png", timestamp);
+                
+                dfx_info!("Screenshot", "Taking screenshot #{}...", screenshot_count);
+                
+                if let Err(e) = renderer.capture_screenshot(&filename) {
+                    dfx_error!("Screenshot", "Failed to capture: {}", e);
+                } else {
+                    dfx_info!("Screenshot", "Screenshot saved: {}", filename);
+                    let new_text = CString::new(format!("Saved: {}", filename)).unwrap();
+                    ui_ffi::ui_widget_set_text(handle, status_id, new_text.as_ptr());
+                }
             }
         }
         

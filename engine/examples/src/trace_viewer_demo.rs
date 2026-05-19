@@ -3,8 +3,23 @@ use hezhou_dfx::*;
 use hezhou_ui::ffi as ui_ffi;
 use std::ffi::CString;
 use std::fs;
+use std::time::{Duration, Instant};
 
 fn main() {
+    let args: Vec<String> = std::env::args().collect();
+    let screenshot_mode = args.iter().any(|a| a == "--screenshot");
+    let screenshot_delay = if screenshot_mode { 
+        args.iter().position(|a| a == "--delay")
+            .and_then(|i| args.get(i + 1))
+            .and_then(|s| s.parse::<f32>().ok())
+            .unwrap_or(1.0)
+    } else { 0.0 };
+    let screenshot_path = if screenshot_mode {
+        args.iter().position(|a| a == "--output")
+            .and_then(|i| args.get(i + 1))
+            .cloned()
+            .unwrap_or_else(|| "screenshots/trace_viewer_demo.png".to_string())
+    } else { String::new() };
     let dfx = init_dfx();
     dfx.lock().get_logger().lock().set_level(LogLevel::Info);
     
@@ -40,26 +55,49 @@ fn main() {
     dfx_info!("TraceViewer", "Building UI...");
     build_trace_ui(handle, root_id, &trace, &stats);
     
-    dfx_info!("TraceViewer", "Starting main loop...");
-    dfx_info!("TraceViewer", "Press S to screenshot the swimlane visualization");
+    if screenshot_mode {
+        std::fs::create_dir_all("screenshots").ok();
+        dfx_info!("TraceViewer", "[Screenshot mode] delay={}s, output={}", screenshot_delay, screenshot_path);
+    } else {
+        dfx_info!("TraceViewer", "Starting main loop...");
+        dfx_info!("TraceViewer", "Press S to screenshot the swimlane visualization");
+        std::fs::create_dir_all("screenshots").ok();
+    }
     
-    std::fs::create_dir_all("screenshots").ok();
-    
+    let start_time = Instant::now();
+    let mut screenshot_taken = false;
+
     loop {
         renderer.process_events();
         
-        let should_screenshot = renderer.is_s_pressed();
-        if should_screenshot {
-            renderer.consume_s_press();
-            
-            let timestamp = chrono::Local::now().format("%Y%m%d_%H%M%S").to_string();
-            let filename = format!("screenshots/trace_viewer_{}.png", timestamp);
-            
-            dfx_info!("TraceViewer", "Taking screenshot...");
-            if let Err(e) = renderer.capture_screenshot(&filename) {
-                dfx_error!("TraceViewer", "Screenshot failed: {}", e);
-            } else {
-                dfx_info!("TraceViewer", "Screenshot saved: {}", filename);
+        if screenshot_mode && !screenshot_taken {
+            let elapsed = start_time.elapsed().as_secs_f32();
+            if elapsed >= screenshot_delay {
+                dfx_info!("TraceViewer", "Taking screenshot...");
+                if let Err(e) = renderer.capture_screenshot(&screenshot_path) {
+                    dfx_error!("TraceViewer", "Screenshot failed: {}", e);
+                } else {
+                    dfx_info!("TraceViewer", "Screenshot saved: {}", screenshot_path);
+                }
+                screenshot_taken = true;
+                break;
+            }
+        }
+        
+        if !screenshot_mode {
+            let should_screenshot = renderer.is_s_pressed();
+            if should_screenshot {
+                renderer.consume_s_press();
+                
+                let timestamp = chrono::Local::now().format("%Y%m%d_%H%M%S").to_string();
+                let filename = format!("screenshots/trace_viewer_{}.png", timestamp);
+                
+                dfx_info!("TraceViewer", "Taking screenshot...");
+                if let Err(e) = renderer.capture_screenshot(&filename) {
+                    dfx_error!("TraceViewer", "Screenshot failed: {}", e);
+                } else {
+                    dfx_info!("TraceViewer", "Screenshot saved: {}", filename);
+                }
             }
         }
         
@@ -75,7 +113,7 @@ fn main() {
             }
         }
         
-        std::thread::sleep(std::time::Duration::from_millis(16));
+        std::thread::sleep(Duration::from_millis(16));
     }
     
     dfx_info!("TraceViewer", "Cleanup...");

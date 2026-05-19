@@ -2,9 +2,30 @@ use hezhou_rhi_vulkan::UIVulkanRenderer;
 use hezhou_scripting::MonoUIExecutor;
 use hezhou_ui::{Button, Widget, WidgetId};
 use std::path::Path;
+use std::time::{Duration, Instant};
 
 fn main() {
+    let args: Vec<String> = std::env::args().collect();
+    let screenshot_mode = args.iter().any(|a| a == "--screenshot");
+    let screenshot_delay = if screenshot_mode { 
+        args.iter().position(|a| a == "--delay")
+            .and_then(|i| args.get(i + 1))
+            .and_then(|s| s.parse::<f32>().ok())
+            .unwrap_or(2.0)
+    } else { 0.0 };
+    let screenshot_path = if screenshot_mode {
+        args.iter().position(|a| a == "--output")
+            .and_then(|i| args.get(i + 1))
+            .cloned()
+            .unwrap_or_else(|| "screenshots/mono_ui_demo.png".to_string())
+    } else { String::new() };
+
     println!("=== Mono UI + C# Click Callback Demo ===\n");
+
+    if screenshot_mode {
+        std::fs::create_dir_all("screenshots").ok();
+        println!("[Screenshot mode] delay={}s, output={}\n", screenshot_delay, screenshot_path);
+    }
 
     println!("[架构说明]");
     println!("  - Vulkan渲染Button控件，初始文字'button'");
@@ -76,10 +97,25 @@ fn main() {
     println!("    - Button文字将变为'hello'");
     println!("    - 按 ESC 或关闭窗口退出\n");
 
-    let max_frames = 10000u64;
+    let start_time = Instant::now();
+    let mut screenshot_taken = false;
 
     loop {
         renderer.process_events();
+        
+        if screenshot_mode && !screenshot_taken {
+            let elapsed = start_time.elapsed().as_secs_f32();
+            if elapsed >= screenshot_delay {
+                println!("    Taking screenshot...");
+                if let Err(e) = renderer.capture_screenshot(&screenshot_path) {
+                    println!("    ERROR: {}", e);
+                } else {
+                    println!("    Saved: {}", screenshot_path);
+                }
+                screenshot_taken = true;
+                break;
+            }
+        }
 
         if renderer.is_space_pressed() {
             renderer.consume_space_press();
@@ -104,7 +140,7 @@ fn main() {
 
         match renderer.draw_frame() {
             Ok(running) => {
-                if !running || renderer.get_frame_count() >= max_frames {
+                if !running {
                     break;
                 }
             }
@@ -114,7 +150,7 @@ fn main() {
             }
         }
 
-        std::thread::sleep(std::time::Duration::from_millis(16));
+        std::thread::sleep(Duration::from_millis(16));
     }
 
     println!("\n[6] 清理资源...");
