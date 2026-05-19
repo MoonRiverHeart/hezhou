@@ -108,7 +108,13 @@ pub struct UIVulkanRenderer {
     offscreen_framebuffer: vk::Framebuffer,
     offscreen_extent: vk::Extent2D,
     
-    // Preview texture descriptor (for UI to sample offscreen image)
+    // FXAA output (offscreen image after FXAA processing)
+    offscreen_fxaa_image: vk::Image,
+    offscreen_fxaa_image_memory: vk::DeviceMemory,
+    offscreen_fxaa_image_view: vk::ImageView,
+    offscreen_fxaa_framebuffer: vk::Framebuffer,
+    
+    // Preview texture descriptor (for UI to sample FXAA output)
     preview_descriptor_set: vk::DescriptorSet,
     
     // FXAA post-processing
@@ -576,6 +582,36 @@ impl UIVulkanRenderer {
                 ..Default::default()
             }, None).map_err(|e| format!("Failed to create offscreen framebuffer: {}", e))?;
             
+            // FXAA output image (same size/format as game offscreen)
+            let (offscreen_fxaa_image, offscreen_fxaa_image_memory) = Self::create_offscreen_image(
+                &instance, &device, physical_device, offscreen_extent, offscreen_format
+            )?;
+            
+            let offscreen_fxaa_image_view = device.create_image_view(&vk::ImageViewCreateInfo {
+                image: offscreen_fxaa_image,
+                view_type: vk::ImageViewType::TYPE_2D,
+                format: offscreen_format,
+                subresource_range: vk::ImageSubresourceRange {
+                    aspect_mask: vk::ImageAspectFlags::COLOR,
+                    base_mip_level: 0,
+                    level_count: 1,
+                    base_array_layer: 0,
+                    layer_count: 1,
+                },
+                ..Default::default()
+            }, None).map_err(|e| format!("Failed to create FXAA offscreen image view: {}", e))?;
+            
+            // FXAA framebuffer (uses same game_render_pass)
+            let offscreen_fxaa_framebuffer = device.create_framebuffer(&vk::FramebufferCreateInfo {
+                render_pass: game_render_pass,
+                attachment_count: 1,
+                p_attachments: &offscreen_fxaa_image_view,
+                width: offscreen_extent.width,
+                height: offscreen_extent.height,
+                layers: 1,
+                ..Default::default()
+            }, None).map_err(|e| format!("Failed to create FXAA framebuffer: {}", e))?;
+            
             // Game pipeline (simple triangle shader, reuse rotation.vert/frag)
             let game_vert_code = include_bytes!("../../shaders/rotation.vert.spv");
             let game_frag_code = include_bytes!("../../shaders/rotation.frag.spv");
@@ -737,13 +773,176 @@ impl UIVulkanRenderer {
             
             logger.lock().log(LogLevel::Info, "Vulkan", "Game preview resources created", file!(), line!());
             
-            // FXAA resources (placeholder for now)
-            let fxaa_pipeline = vk::Pipeline::null();
-            let fxaa_pipeline_layout = vk::PipelineLayout::null();
-            let fxaa_descriptor_set_layout = vk::DescriptorSetLayout::null();
-            let fxaa_descriptor_pool = vk::DescriptorPool::null();
-            let fxaa_descriptor_set = vk::DescriptorSet::null();
-            let fxaa_sampler = preview_sampler; // reuse preview sampler
+            // FXAA pipeline setup
+            let fxaa_vert_code = include_bytes!("../../shaders/fxaa.vert.spv");
+            let fxaa_frag_code = include_bytes!("../../shaders/fxaa.frag.spv");
+            
+            let fxaa_vert_shader = Self::create_shader_module(&device, fxaa_vert_code)?;
+            let fxaa_frag_shader = Self::create_shader_module(&device, fxaa_frag_code)?;
+            
+            let fxaa_descriptor_set_layout = device.create_descriptor_set_layout(&vk::DescriptorSetLayoutCreateInfo {
+                binding_count: 1,
+                p_bindings: &vk::DescriptorSetLayoutBinding {
+                    binding: 0,
+                    descriptor_type: vk::DescriptorType::COMBINED_IMAGE_SAMPLER,
+                    descriptor_count: 1,
+                    stage_flags: vk::ShaderStageFlags::FRAGMENT,
+                    p_immutable_samplers: std::ptr::null(),
+                    ..Default::default()
+                },
+                ..Default::default()
+            }, None).map_err(|e| format!("Failed to create FXAA descriptor set layout: {}", e))?;
+            
+            let fxaa_pipeline_layout = device.create_pipeline_layout(&vk::PipelineLayoutCreateInfo {
+                set_layout_count: 1,
+                p_set_layouts: &fxaa_descriptor_set_layout,
+                push_constant_range_count: 1,
+                p_push_constant_ranges: &vk::PushConstantRange {
+                    stage_flags: vk::ShaderStageFlags::FRAGMENT,
+                    offset: 0,
+                    size: 8, // vec2 resolution (2 * 4 bytes)
+                },
+                ..Default::default()
+            }, None).map_err(|e| format!("Failed to create FXAA pipeline layout: {}", e))?;
+            
+            let fxaa_pipeline = device.create_graphics_pipelines(vk::PipelineCache::null(), &[
+                vk::GraphicsPipelineCreateInfo {
+                    stage_count: 2,
+                    p_stages: &[
+                        vk::PipelineShaderStageCreateInfo {
+                            stage: vk::ShaderStageFlags::VERTEX,
+                            module: fxaa_vert_shader,
+                            p_name: b"main\0".as_ptr() as *const i8,
+                            ..Default::default()
+                        },
+                        vk::PipelineShaderStageCreateInfo {
+                            stage: vk::ShaderStageFlags::FRAGMENT,
+                            module: fxaa_frag_shader,
+                            p_name: b"main\0".as_ptr() as *const i8,
+                            ..Default::default()
+                        },
+                    ] as *const _,
+                    p_vertex_input_state: &vk::PipelineVertexInputStateCreateInfo {
+                        ..Default::default()
+                    },
+                    p_input_assembly_state: &vk::PipelineInputAssemblyStateCreateInfo {
+                        topology: vk::PrimitiveTopology::TRIANGLE_LIST,
+                        primitive_restart_enable: vk::FALSE,
+                        ..Default::default()
+                    },
+                    p_viewport_state: &vk::PipelineViewportStateCreateInfo {
+                        viewport_count: 1,
+                        p_viewports: &vk::Viewport {
+                            x: 0.0,
+                            y: 0.0,
+                            width: offscreen_extent.width as f32,
+                            height: offscreen_extent.height as f32,
+                            min_depth: 0.0,
+                            max_depth: 1.0,
+                        },
+                        scissor_count: 1,
+                        p_scissors: &vk::Rect2D {
+                            offset: vk::Offset2D { x: 0, y: 0 },
+                            extent: offscreen_extent,
+                        },
+                        ..Default::default()
+                    },
+                    p_rasterization_state: &vk::PipelineRasterizationStateCreateInfo {
+                        polygon_mode: vk::PolygonMode::FILL,
+                        cull_mode: vk::CullModeFlags::NONE,
+                        front_face: vk::FrontFace::CLOCKWISE,
+                        line_width: 1.0,
+                        ..Default::default()
+                    },
+                    p_multisample_state: &vk::PipelineMultisampleStateCreateInfo {
+                        rasterization_samples: vk::SampleCountFlags::TYPE_1,
+                        ..Default::default()
+                    },
+                    p_color_blend_state: &vk::PipelineColorBlendStateCreateInfo {
+                        logic_op_enable: vk::FALSE,
+                        attachment_count: 1,
+                        p_attachments: &vk::PipelineColorBlendAttachmentState {
+                            blend_enable: vk::FALSE,
+                            src_color_blend_factor: vk::BlendFactor::ONE,
+                            dst_color_blend_factor: vk::BlendFactor::ZERO,
+                            color_blend_op: vk::BlendOp::ADD,
+                            src_alpha_blend_factor: vk::BlendFactor::ONE,
+                            dst_alpha_blend_factor: vk::BlendFactor::ZERO,
+                            alpha_blend_op: vk::BlendOp::ADD,
+                            color_write_mask: vk::ColorComponentFlags::R | vk::ColorComponentFlags::G | vk::ColorComponentFlags::B | vk::ColorComponentFlags::A,
+                            ..Default::default()
+                        },
+                        ..Default::default()
+                    },
+                    layout: fxaa_pipeline_layout,
+                    render_pass: game_render_pass,
+                    subpass: 0,
+                    ..Default::default()
+                }
+            ], None).map_err(|(_, e)| format!("Failed to create FXAA pipeline: {}", e))?[0];
+            
+            device.destroy_shader_module(fxaa_vert_shader, None);
+            device.destroy_shader_module(fxaa_frag_shader, None);
+            
+            // FXAA descriptor set
+            let fxaa_descriptor_pool = device.create_descriptor_pool(&vk::DescriptorPoolCreateInfo {
+                max_sets: 1,
+                pool_size_count: 1,
+                p_pool_sizes: &vk::DescriptorPoolSize {
+                    ty: vk::DescriptorType::COMBINED_IMAGE_SAMPLER,
+                    descriptor_count: 1,
+                },
+                ..Default::default()
+            }, None).map_err(|e| format!("Failed to create FXAA descriptor pool: {}", e))?;
+            
+            let fxaa_descriptor_set = device.allocate_descriptor_sets(&vk::DescriptorSetAllocateInfo {
+                descriptor_pool: fxaa_descriptor_pool,
+                descriptor_set_count: 1,
+                p_set_layouts: &fxaa_descriptor_set_layout,
+                ..Default::default()
+            }).map_err(|e| format!("Failed to allocate FXAA descriptor set: {}", e))?[0];
+            
+            // Update FXAA descriptor set to sample from offscreen image (game output)
+            device.update_descriptor_sets(
+                &[vk::WriteDescriptorSet {
+                    dst_set: fxaa_descriptor_set,
+                    dst_binding: 0,
+                    dst_array_element: 0,
+                    descriptor_count: 1,
+                    descriptor_type: vk::DescriptorType::COMBINED_IMAGE_SAMPLER,
+                    p_image_info: &vk::DescriptorImageInfo {
+                        sampler: preview_sampler,
+                        image_view: offscreen_image_view,
+                        image_layout: vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
+                    },
+                    ..Default::default()
+                }],
+                &[]
+            );
+            
+            let fxaa_sampler = preview_sampler; // reuse
+            
+            logger.lock().log(LogLevel::Info, "Vulkan", "FXAA pipeline created", file!(), line!());
+            
+            // Update preview descriptor set to point to FXAA output (offscreen_fxaa)
+            device.update_descriptor_sets(
+                &[vk::WriteDescriptorSet {
+                    dst_set: preview_descriptor_set,
+                    dst_binding: 0,
+                    dst_array_element: 0,
+                    descriptor_count: 1,
+                    descriptor_type: vk::DescriptorType::COMBINED_IMAGE_SAMPLER,
+                    p_image_info: &vk::DescriptorImageInfo {
+                        sampler: preview_sampler,
+                        image_view: offscreen_fxaa_image_view,
+                        image_layout: vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
+                    },
+                    ..Default::default()
+                }],
+                &[]
+            );
+            
+            logger.lock().log(LogLevel::Info, "Vulkan", "Preview descriptor set updated for FXAA output", file!(), line!());
             
             let command_buffers = device.allocate_command_buffers(&vk::CommandBufferAllocateInfo {
                 command_pool,
@@ -844,6 +1043,11 @@ impl UIVulkanRenderer {
                 offscreen_image_view,
                 offscreen_framebuffer,
                 offscreen_extent,
+                
+                offscreen_fxaa_image,
+                offscreen_fxaa_image_memory,
+                offscreen_fxaa_image_view,
+                offscreen_fxaa_framebuffer,
                 
                 preview_descriptor_set,
                 
@@ -1602,6 +1806,133 @@ let font_atlas = ui.get_font_atlas();
                 &[],
                 &[],
                 &[game_barrier_end]
+            );
+            
+            // === FXAA Pass: Apply FXAA to offscreen image ===
+            // Transition offscreen_fxaa to COLOR_ATTACHMENT_OPTIMAL
+            let fxaa_barrier_begin = vk::ImageMemoryBarrier {
+                old_layout: vk::ImageLayout::UNDEFINED,
+                new_layout: vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL,
+                src_queue_family_index: vk::QUEUE_FAMILY_IGNORED,
+                dst_queue_family_index: vk::QUEUE_FAMILY_IGNORED,
+                image: self.offscreen_fxaa_image,
+                subresource_range: vk::ImageSubresourceRange {
+                    aspect_mask: vk::ImageAspectFlags::COLOR,
+                    base_mip_level: 0,
+                    level_count: 1,
+                    base_array_layer: 0,
+                    layer_count: 1,
+                },
+                src_access_mask: vk::AccessFlags::empty(),
+                dst_access_mask: vk::AccessFlags::COLOR_ATTACHMENT_WRITE,
+                ..Default::default()
+            };
+            self.device.cmd_pipeline_barrier(
+                self.command_buffers[image_index_usize],
+                vk::PipelineStageFlags::TOP_OF_PIPE,
+                vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT,
+                vk::DependencyFlags::empty(),
+                &[],
+                &[],
+                &[fxaa_barrier_begin]
+            );
+            
+            // Begin FXAA render pass
+            self.device.cmd_begin_render_pass(
+                self.command_buffers[image_index_usize],
+                &vk::RenderPassBeginInfo {
+                    render_pass: self.game_render_pass,
+                    framebuffer: self.offscreen_fxaa_framebuffer,
+                    render_area: vk::Rect2D {
+                        offset: vk::Offset2D { x: 0, y: 0 },
+                        extent: self.offscreen_extent,
+                    },
+                    clear_value_count: 1,
+                    p_clear_values: &vk::ClearValue {
+                        color: vk::ClearColorValue {
+                            float32: [0.0, 0.0, 0.0, 1.0],
+                        },
+                    },
+                    _marker: std::marker::PhantomData,
+                    p_next: std::ptr::null(),
+                    s_type: vk::StructureType::RENDER_PASS_BEGIN_INFO,
+                },
+                vk::SubpassContents::INLINE
+            );
+            
+            // Bind FXAA pipeline and descriptor set
+            self.device.cmd_bind_pipeline(
+                self.command_buffers[image_index_usize],
+                vk::PipelineBindPoint::GRAPHICS,
+                self.fxaa_pipeline
+            );
+            self.device.cmd_bind_descriptor_sets(
+                self.command_buffers[image_index_usize],
+                vk::PipelineBindPoint::GRAPHICS,
+                self.fxaa_pipeline_layout,
+                0,
+                &[self.fxaa_descriptor_set],
+                &[]
+            );
+            
+            // Set viewport and scissor for FXAA pass
+            let fxaa_viewport = vk::Viewport {
+                x: 0.0,
+                y: 0.0,
+                width: self.offscreen_extent.width as f32,
+                height: self.offscreen_extent.height as f32,
+                min_depth: 0.0,
+                max_depth: 1.0,
+            };
+            let fxaa_scissor = vk::Rect2D {
+                offset: vk::Offset2D { x: 0, y: 0 },
+                extent: self.offscreen_extent,
+            };
+            self.device.cmd_set_viewport(self.command_buffers[image_index_usize], 0, &[fxaa_viewport]);
+            self.device.cmd_set_scissor(self.command_buffers[image_index_usize], 0, &[fxaa_scissor]);
+            
+            // Push resolution constant (vec2: width, height)
+            let resolution_data = [self.offscreen_extent.width as f32, self.offscreen_extent.height as f32];
+            self.device.cmd_push_constants(
+                self.command_buffers[image_index_usize],
+                self.fxaa_pipeline_layout,
+                vk::ShaderStageFlags::FRAGMENT,
+                0,
+                bytemuck::cast_slice(&resolution_data)
+            );
+            
+            // Draw fullscreen quad (FXAA shader uses gl_VertexIndex for vertices)
+            self.device.cmd_draw(self.command_buffers[image_index_usize], 6, 1, 0, 0);
+            
+            // End FXAA render pass
+            self.device.cmd_end_render_pass(self.command_buffers[image_index_usize]);
+            
+            // Transition offscreen_fxaa to SHADER_READ_ONLY_OPTIMAL
+            let fxaa_barrier_end = vk::ImageMemoryBarrier {
+                old_layout: vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL,
+                new_layout: vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
+                src_queue_family_index: vk::QUEUE_FAMILY_IGNORED,
+                dst_queue_family_index: vk::QUEUE_FAMILY_IGNORED,
+                image: self.offscreen_fxaa_image,
+                subresource_range: vk::ImageSubresourceRange {
+                    aspect_mask: vk::ImageAspectFlags::COLOR,
+                    base_mip_level: 0,
+                    level_count: 1,
+                    base_array_layer: 0,
+                    layer_count: 1,
+                },
+                src_access_mask: vk::AccessFlags::COLOR_ATTACHMENT_WRITE,
+                dst_access_mask: vk::AccessFlags::SHADER_READ,
+                ..Default::default()
+            };
+            self.device.cmd_pipeline_barrier(
+                self.command_buffers[image_index_usize],
+                vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT,
+                vk::PipelineStageFlags::FRAGMENT_SHADER,
+                vk::DependencyFlags::empty(),
+                &[],
+                &[],
+                &[fxaa_barrier_end]
             );
             
             // === UI Pass: Render UI to swapchain ===
