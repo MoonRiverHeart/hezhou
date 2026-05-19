@@ -127,11 +127,11 @@ namespace Hezhou
             bool selected = UI.IsPreviewWindowSelected(_previewWindowId);
             if (!selected) return;
             
-            const uint KEY_ESC = 256;
-            const uint KEY_LEFT = 263;
-            const uint KEY_RIGHT = 262;
-            const uint KEY_UP = 265;
-            const uint KEY_DOWN = 264;
+            const uint KEY_ESC = 39;
+            const uint KEY_LEFT = 45;
+            const uint KEY_RIGHT = 46;
+            const uint KEY_UP = 47;
+            const uint KEY_DOWN = 48;
             
             if (keycode == KEY_ESC)
             {
