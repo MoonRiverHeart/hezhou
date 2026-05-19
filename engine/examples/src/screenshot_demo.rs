@@ -154,6 +154,11 @@ fn main() {
     }
     
     dfx_info!("Screenshot", "Cleanup...");
-    renderer.cleanup();
+    
+    if screenshot_mode {
+        dfx_info!("Screenshot", "Screenshot mode - skipping cleanup");
+    } else {
+        renderer.cleanup();
+    }
     dfx_info!("Screenshot", "=== Screenshot Tool Closed ===");
 }

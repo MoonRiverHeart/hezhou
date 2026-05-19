@@ -154,8 +154,12 @@ fn main() {
     }
 
     println!("\n[6] 清理资源...");
-
-    renderer.cleanup();
+    
+    if screenshot_mode {
+        println!("    Screenshot mode - skipping cleanup");
+    } else {
+        renderer.cleanup();
+    }
 
     println!("\n=== Demo Complete ===");
 }

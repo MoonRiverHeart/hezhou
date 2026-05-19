@@ -164,14 +164,27 @@ fn main() {
         if screenshot_mode && !screenshot_taken {
             let elapsed = start_time.elapsed().as_secs_f32();
             if elapsed >= screenshot_delay {
-                dfx_info!("Screenshot", "Taking screenshot after {:.1}s...", elapsed);
-                if let Err(e) = renderer.capture_screenshot(&screenshot_path) {
-                    dfx_error!("Screenshot", "Failed: {}", e);
-                } else {
-                    dfx_info!("Screenshot", "Saved: {}", screenshot_path);
+                dfx_trace_begin!("DrawFrame", "render");
+                match renderer.draw_frame() {
+                    Ok(_) => {
+                        dfx_trace_end!("DrawFrame", "render");
+                        dfx_trace_end!("Frame", "render");
+                        dfx_info!("Screenshot", "Taking screenshot after {:.1}s...", elapsed);
+                        if let Err(e) = renderer.capture_screenshot(&screenshot_path) {
+                            dfx_error!("Screenshot", "Failed: {}", e);
+                        } else {
+                            dfx_info!("Screenshot", "Saved: {}", screenshot_path);
+                        }
+                        screenshot_taken = true;
+                        break;
+                    }
+                    Err(e) => {
+                        dfx_trace_end!("DrawFrame", "render");
+                        dfx_trace_end!("Frame", "render");
+                        dfx_error!("Demo", "Draw error: {}", e);
+                        break;
+                    }
                 }
-                screenshot_taken = true;
-                break;
             }
         }
         
@@ -233,15 +246,20 @@ fn main() {
     }
 
     dfx_info!("Demo", "[8] 清理资源...");
-    std::fs::create_dir_all("traces").ok();
-    let trace_path = format!("traces/trace_{}.json", chrono::Local::now().format("%Y%m%d_%H%M%S"));
-    if let Err(e) = dfx.lock().get_trace_analyzer().lock().save_to_file(&trace_path) {
-        dfx_error!("Demo", "Failed to save trace: {}", e);
-    } else {
-        dfx_info!("Demo", "Trace saved to {}", trace_path);
-    }
     
-    renderer.cleanup();
+    if screenshot_mode {
+        dfx_info!("Demo", "Screenshot mode - skipping cleanup");
+    } else {
+        std::fs::create_dir_all("traces").ok();
+        let trace_path = format!("traces/trace_{}.json", chrono::Local::now().format("%Y%m%d_%H%M%S"));
+        if let Err(e) = dfx.lock().get_trace_analyzer().lock().save_to_file(&trace_path) {
+            dfx_error!("Demo", "Failed to save trace: {}", e);
+        } else {
+            dfx_info!("Demo", "Trace saved to {}", trace_path);
+        }
+        
+        renderer.cleanup();
+    }
     dfx_info!("Demo", "=== Editor Closed ===");
 }
 

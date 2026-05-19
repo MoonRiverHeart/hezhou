@@ -137,7 +137,12 @@ fn main() {
     }
 
     dfx_info!("Demo", "[8] 清理资源...");
-    renderer.cleanup();
+    
+    if screenshot_mode {
+        dfx_info!("Demo", "Screenshot mode - skipping cleanup");
+    } else {
+        renderer.cleanup();
+    }
     dfx_info!("Demo", "=== Demo Complete ===");
 }
 

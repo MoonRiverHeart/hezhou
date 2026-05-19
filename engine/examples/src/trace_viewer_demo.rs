@@ -117,7 +117,12 @@ fn main() {
     }
     
     dfx_info!("TraceViewer", "Cleanup...");
-    renderer.cleanup();
+    
+    if screenshot_mode {
+        dfx_info!("TraceViewer", "Screenshot mode - skipping cleanup");
+    } else {
+        renderer.cleanup();
+    }
     dfx_info!("TraceViewer", "=== Trace Viewer Closed ===");
 }
 
