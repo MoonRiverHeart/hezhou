@@ -474,13 +474,13 @@ impl UIVulkanRenderer {
                     scissor_count: 1,
                     ..Default::default()
                 },
-                p_rasterization_state: &vk::PipelineRasterizationStateCreateInfo {
-                    polygon_mode: vk::PolygonMode::FILL,
-                    cull_mode: vk::CullModeFlags::NONE,
-                    front_face: vk::FrontFace::COUNTER_CLOCKWISE,
-                    line_width: 1.0,
-                    ..Default::default()
-                },
+p_rasterization_state: &vk::PipelineRasterizationStateCreateInfo {
+                        polygon_mode: vk::PolygonMode::FILL,
+                        cull_mode: vk::CullModeFlags::BACK,
+                        front_face: vk::FrontFace::COUNTER_CLOCKWISE,
+                        line_width: 1.0,
+                        ..Default::default()
+                    },
                 p_multisample_state: &vk::PipelineMultisampleStateCreateInfo {
                     rasterization_samples: vk::SampleCountFlags::TYPE_1,
                     ..Default::default()
