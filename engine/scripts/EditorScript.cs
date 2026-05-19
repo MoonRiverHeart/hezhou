@@ -154,14 +154,10 @@ private static float _cameraYaw = 0f;
             
             if (!selected) return;
             
-            if (keycode == KEY_LEFT)
-                _keyLeftPressed = pressed;
-            if (keycode == KEY_RIGHT)
-                _keyRightPressed = pressed;
-            if (keycode == KEY_UP)
-                _keyUpPressed = pressed;
-            if (keycode == KEY_DOWN)
-                _keyDownPressed = pressed;
+            if (keycode == KEY_LEFT) _keyLeftPressed = pressed;
+            if (keycode == KEY_RIGHT) _keyRightPressed = pressed;
+            if (keycode == KEY_UP) _keyUpPressed = pressed;
+            if (keycode == KEY_DOWN) _keyDownPressed = pressed;
         }
 
         private static void CreateEditorLayout()
@@ -315,6 +311,7 @@ private static float _cameraYaw = 0f;
                     _fpsLabel.Text = $"FPS: {((int)(1000f / deltaTime))}";
                     
                     bool selected = UI.IsPreviewWindowSelected(_previewWindowId);
+                    
                     if (selected != _previewSelected)
                     {
                         _previewSelected = selected;
@@ -332,7 +329,7 @@ private static float _cameraYaw = 0f;
                     // Pass camera params to shader when preview is selected
                     if (_previewSelected)
                     {
-                        float speed = 0.5f * (deltaTime / 1000f);  // deltaTime is milliseconds
+                        float speed = 2f * (deltaTime / 1000f);  // 2 units/sec
                         if (_keyLeftPressed) _cameraX -= speed;
                         if (_keyRightPressed) _cameraX += speed;
                         if (_keyUpPressed) _cameraZ = Math.Max(0.5f, _cameraZ - speed);
