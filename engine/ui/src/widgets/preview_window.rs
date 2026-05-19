@@ -1,5 +1,4 @@
-use crate::{Widget, WidgetId, Layout, Style, Color, Canvas, Rect, Event, EventResult, DrawCommand, WidgetState, EventType, EventData};
-use hezhou_dfx::*;
+use crate::{Widget, WidgetId, Layout, Style, Color, Canvas, Rect, Event, EventResult, DrawCommand, WidgetState, EventType};
 
 pub struct PreviewWindow {
     id: WidgetId,
@@ -108,7 +107,6 @@ impl Widget for PreviewWindow {
         canvas.draw_image(bounds, self.texture_id, uv);
         
         if self.selected {
-            dfx_info!("PreviewWindow", "Drawing border: width={}, height={}, selected={}", self.layout.width, self.layout.height, self.selected);
             let border_style = Style::new()
                 .with_background(Color::transparent())
                 .with_border(Color::new(0.2, 0.6, 1.0, 1.0), 3.0, 0.0);
@@ -117,19 +115,7 @@ impl Widget for PreviewWindow {
     }
     
     fn on_event(&mut self, event: &Event) -> EventResult {
-        dfx_info!("PreviewWindow", "on_event: type={}, target={}, self_id={}", 
-            match event.event_type {
-                EventType::TouchBegin => "TouchBegin",
-                EventType::TouchEnd => "TouchEnd",
-                EventType::KeyDown => "KeyDown",
-                _ => "Other",
-            },
-            event.target.id,
-            self.id.id
-        );
-        
         if event.target.id == self.id.id && event.event_type == EventType::TouchBegin {
-            dfx_info!("PreviewWindow", "Setting selected=true");
             self.selected = true;
             return EventResult::Handled;
         }

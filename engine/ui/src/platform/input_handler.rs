@@ -162,14 +162,6 @@ impl UIInputHandler {
     }
 
     pub fn on_key_event(&mut self, key: &KeyEvent, timestamp: u64) {
-        dfx_info!("UIInputHandler", "Key event: keycode={} (Left={}, Right={}, Up={}, Down={}), action={}", 
-                 key.keycode as u32, KeyCode::Left as u32, KeyCode::Right as u32, KeyCode::Up as u32, KeyCode::Down as u32,
-                 match key.action {
-                     KeyAction::Press => "Press",
-                     KeyAction::Release => "Release",
-                     KeyAction::Repeat => "Repeat",
-                 });
-        
         // 追踪 Shift 和 Ctrl 键状态
         if key.keycode == KeyCode::Shift {
             match key.action {
