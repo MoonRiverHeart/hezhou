@@ -182,6 +182,17 @@ namespace Hezhou
                 UI.SetWidgetLayout(_assetPanel.Id, 0, bottomY, LEFT_PANEL_WIDTH, BOTTOM_PANEL_HEIGHT);
             if (_previewPanel != null)
                 UI.SetWidgetLayout(_previewPanel.Id, previewX, mainY, previewWidth, mainHeight + BOTTOM_PANEL_HEIGHT);
+            
+            // Update PreviewWindow size and Game Pass extent
+            if (_previewWindowId != 0 && _previewPanel != null && !_scriptEditorVisible)
+            {
+                float previewWindowWidth = previewWidth - 20f;
+                float previewWindowHeight = mainHeight - 20f;
+                UI.SetWidgetLayout(_previewWindowId, 10f, 40f, previewWindowWidth, previewWindowHeight);
+                UI.SetGamePreviewExtent((uint)previewWindowWidth, (uint)previewWindowHeight);
+                Log.Info("Editor", $"PreviewWindow resize: {previewWindowWidth}x{previewWindowHeight}");
+            }
+            
             if (_propertiesPanel != null)
                 UI.SetWidgetLayout(_propertiesPanel.Id, _screenWidth - RIGHT_PANEL_WIDTH, mainY, RIGHT_PANEL_WIDTH, mainHeight + BOTTOM_PANEL_HEIGHT);
             if (_statusBar != null)
