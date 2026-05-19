@@ -2133,16 +2133,46 @@ let font_atlas = self.ui_system.lock().get_font_atlas();
                 tree_guard.generate_render_data(font_atlas)
             };
             
-            let mut vertices: Vec<f32> = Vec::new();
-            let mut preview_vertices: Vec<f32> = Vec::new();
-            let mut vertices: Vec<f32> = Vec::new();
+            struct RenderBatch {
+                vertices: Vec<f32>,
+                clip_x: f32,
+                clip_y: f32,
+                clip_w: f32,
+                clip_h: f32,
+            }
+            
+            let mut batches: Vec<RenderBatch> = Vec::new();
+            let mut current_vertices: Vec<f32> = Vec::new();
+            let mut current_clip: Option<(f32, f32, f32, f32)> = None;
+            
             let mut preview_vertices: Vec<f32> = Vec::new();
             let mut preview_border_vertices: Vec<f32> = Vec::new();
             let mut is_preview_window_context = false;
             
+            fn flush_batch(batches: &mut Vec<RenderBatch>, vertices: &mut Vec<f32>, clip: Option<(f32, f32, f32, f32)>) {
+                if !vertices.is_empty() {
+                    batches.push(RenderBatch {
+                        vertices: vertices.clone(),
+                        clip_x: clip.map(|c| c.0).unwrap_or(0.0),
+                        clip_y: clip.map(|c| c.1).unwrap_or(0.0),
+                        clip_w: clip.map(|c| c.2).unwrap_or(1e6),
+                        clip_h: clip.map(|c| c.3).unwrap_or(1e6),
+                    });
+                    vertices.clear();
+                }
+            }
+            
             // 渲染UI控件
             for cmd in render_data.iter().flat_map(|data| &data.draw_commands) {
                 match cmd {
+                    DrawCommand::ClipRect { rect } => {
+                        flush_batch(&mut batches, &mut current_vertices, current_clip);
+                        current_clip = Some((rect.x, rect.y, rect.width, rect.height));
+                    }
+                    DrawCommand::ClearClip => {
+                        flush_batch(&mut batches, &mut current_vertices, current_clip);
+                        current_clip = None;
+                    }
                     DrawCommand::Rect { bounds, width, height, fill_color, stroke_color, stroke_width, .. } => {
                         let x = bounds.x;
                         let y = bounds.y;
@@ -2155,13 +2185,13 @@ let font_atlas = self.ui_system.lock().get_font_atlas();
                         
                         // 如果fill_color是透明且是preview window context，跳过填充
                         if !is_preview_window_context || a > 0.0 {
-                            vertices.extend_from_slice(&[
-                                x, y, r, g, b, a, 0.0, 0.0,
-                                x + w, y, r, g, b, a, 0.0, 0.0,
-                                x, y + h, r, g, b, a, 0.0, 0.0,
-                                x + w, y, r, g, b, a, 0.0, 0.0,
-                                x + w, y + h, r, g, b, a, 0.0, 0.0,
-                                x, y + h, r, g, b, a, 0.0, 0.0,
+                            current_vertices.extend_from_slice(&[
+                                x.round(), y.round(), r, g, b, a, 0.0, 0.0,
+                                (x + w).round(), y.round(), r, g, b, a, 0.0, 0.0,
+                                x.round(), (y + h).round(), r, g, b, a, 0.0, 0.0,
+                                (x + w).round(), y.round(), r, g, b, a, 0.0, 0.0,
+                                (x + w).round(), (y + h).round(), r, g, b, a, 0.0, 0.0,
+                                x.round(), (y + h).round(), r, g, b, a, 0.0, 0.0,
                             ]);
                         }
                         
@@ -2176,47 +2206,53 @@ let font_atlas = self.ui_system.lock().get_font_atlas();
                                 let target_vertices = if is_preview_window_context {
                                     &mut preview_border_vertices
                                 } else {
-                                    &mut vertices
+                                    &mut current_vertices
                                 };
+                                
+                                let xr = x.round();
+                                let yr = y.round();
+                                let wr = w.round();
+                                let hr = h.round();
+                                let swr = sw.round();
                                 
                                 // Top line
                                 target_vertices.extend_from_slice(&[
-                                    x, y, sr, sg, sb, sa, 0.0, 0.0,
-                                    x + w, y, sr, sg, sb, sa, 0.0, 0.0,
-                                    x, y + sw, sr, sg, sb, sa, 0.0, 0.0,
-                                    x + w, y, sr, sg, sb, sa, 0.0, 0.0,
-                                    x + w, y + sw, sr, sg, sb, sa, 0.0, 0.0,
-                                    x, y + sw, sr, sg, sb, sa, 0.0, 0.0,
+                                    xr, yr, sr, sg, sb, sa, 0.0, 0.0,
+                                    xr + wr, yr, sr, sg, sb, sa, 0.0, 0.0,
+                                    xr, yr + swr, sr, sg, sb, sa, 0.0, 0.0,
+                                    xr + wr, yr, sr, sg, sb, sa, 0.0, 0.0,
+                                    xr + wr, yr + swr, sr, sg, sb, sa, 0.0, 0.0,
+                                    xr, yr + swr, sr, sg, sb, sa, 0.0, 0.0,
                                 ]);
                                 
                                 // Bottom line
                                 target_vertices.extend_from_slice(&[
-                                    x, y + h - sw, sr, sg, sb, sa, 0.0, 0.0,
-                                    x + w, y + h - sw, sr, sg, sb, sa, 0.0, 0.0,
-                                    x, y + h, sr, sg, sb, sa, 0.0, 0.0,
-                                    x + w, y + h - sw, sr, sg, sb, sa, 0.0, 0.0,
-                                    x + w, y + h, sr, sg, sb, sa, 0.0, 0.0,
-                                    x, y + h, sr, sg, sb, sa, 0.0, 0.0,
+                                    xr, yr + hr - swr, sr, sg, sb, sa, 0.0, 0.0,
+                                    xr + wr, yr + hr - swr, sr, sg, sb, sa, 0.0, 0.0,
+                                    xr, yr + hr, sr, sg, sb, sa, 0.0, 0.0,
+                                    xr + wr, yr + hr - swr, sr, sg, sb, sa, 0.0, 0.0,
+                                    xr + wr, yr + hr, sr, sg, sb, sa, 0.0, 0.0,
+                                    xr, yr + hr, sr, sg, sb, sa, 0.0, 0.0,
                                 ]);
                                 
                                 // Left line
                                 target_vertices.extend_from_slice(&[
-                                    x, y + sw, sr, sg, sb, sa, 0.0, 0.0,
-                                    x + sw, y + sw, sr, sg, sb, sa, 0.0, 0.0,
-                                    x, y + h - sw, sr, sg, sb, sa, 0.0, 0.0,
-                                    x + sw, y + sw, sr, sg, sb, sa, 0.0, 0.0,
-                                    x + sw, y + h - sw, sr, sg, sb, sa, 0.0, 0.0,
-                                    x, y + h - sw, sr, sg, sb, sa, 0.0, 0.0,
+                                    xr, yr + swr, sr, sg, sb, sa, 0.0, 0.0,
+                                    xr + swr, yr + swr, sr, sg, sb, sa, 0.0, 0.0,
+                                    xr, yr + hr - swr, sr, sg, sb, sa, 0.0, 0.0,
+                                    xr + swr, yr + swr, sr, sg, sb, sa, 0.0, 0.0,
+                                    xr + swr, yr + hr - swr, sr, sg, sb, sa, 0.0, 0.0,
+                                    xr, yr + hr - swr, sr, sg, sb, sa, 0.0, 0.0,
                                 ]);
                                 
                                 // Right line
                                 target_vertices.extend_from_slice(&[
-                                    x + w - sw, y + sw, sr, sg, sb, sa, 0.0, 0.0,
-                                    x + w, y + sw, sr, sg, sb, sa, 0.0, 0.0,
-                                    x + w - sw, y + h - sw, sr, sg, sb, sa, 0.0, 0.0,
-                                    x + w, y + sw, sr, sg, sb, sa, 0.0, 0.0,
-                                    x + w, y + h - sw, sr, sg, sb, sa, 0.0, 0.0,
-                                    x + w - sw, y + h - sw, sr, sg, sb, sa, 0.0, 0.0,
+                                    xr + wr - swr, yr + swr, sr, sg, sb, sa, 0.0, 0.0,
+                                    xr + wr, yr + swr, sr, sg, sb, sa, 0.0, 0.0,
+                                    xr + wr - swr, yr + hr - swr, sr, sg, sb, sa, 0.0, 0.0,
+                                    xr + wr, yr + swr, sr, sg, sb, sa, 0.0, 0.0,
+                                    xr + wr, yr + hr - swr, sr, sg, sb, sa, 0.0, 0.0,
+                                    xr + wr - swr, yr + hr - swr, sr, sg, sb, sa, 0.0, 0.0,
                                 ]);
                                 
                                 // Reset context after border
@@ -2226,111 +2262,129 @@ let font_atlas = self.ui_system.lock().get_font_atlas();
                             }
                         }
                     }
-DrawCommand::Text { bounds, width, height, font_color, text, font_size, alignment, .. } => {
-                            let text_str = if text.is_empty() {
-                                ""
-                            } else {
-                                std::str::from_utf8(text).unwrap_or("")
-                            };
+                    DrawCommand::Text { bounds, width, height, font_color, text, font_size, alignment, .. } => {
+                        flush_batch(&mut batches, &mut current_vertices, current_clip);
+                        
+                        let text_str = if text.is_empty() {
+                            ""
+                        } else {
+                            std::str::from_utf8(text).unwrap_or("")
+                        };
+                        
+                        let ui_lock = self.ui_system.lock();
+                        let font_atlas = ui_lock.get_font_atlas();
+                        
+                        let glyphs = if alignment.horizontal == hezhou_ui::HorizontalAlignment::Left {
+                            let vertical_center = alignment.vertical == hezhou_ui::VerticalAlignment::Center;
+                            font_atlas.layout_text_left(
+                                0,
+                                text_str,
+                                *font_size,
+                                bounds.x.round(),
+                                bounds.y.round(),
+                                *height,
+                                vertical_center,
+                            )
+                        } else {
+                            font_atlas.layout_text_centered(
+                                0,
+                                text_str,
+                                *font_size,
+                                bounds.x.round(),
+                                bounds.y.round(),
+                                *width,
+                                *height,
+                            )
+                        };
+                        
+                        for (gx, gy, gw, gh, uv_x, uv_y, uv_w, uv_h) in glyphs {
+                            let w = gw as f32;
+                            let h = gh as f32;
                             
-                            let ui_lock = self.ui_system.lock();
-                            let font_atlas = ui_lock.get_font_atlas();
-                            
-                            let glyphs = if alignment.horizontal == hezhou_ui::HorizontalAlignment::Left {
-                                let vertical_center = alignment.vertical == hezhou_ui::VerticalAlignment::Center;
-                                font_atlas.layout_text_left(
-                                    0,
-                                    text_str,
-                                    *font_size,
-                                    bounds.x,
-                                    bounds.y,
-                                    *height,
-                                    vertical_center,
-                                )
-                            } else {
-                                font_atlas.layout_text_centered(
-                                    0,
-                                    text_str,
-                                    *font_size,
-                                    bounds.x,
-                                    bounds.y,
-                                    *width,
-                                    *height,
-                                )
-                            };
-                            
-                            for (gx, gy, gw, gh, uv_x, uv_y, uv_w, uv_h) in glyphs {
-                                let w = gw as f32;
-                                let h = gh as f32;
-                                
-                                if w == 0.0 || h == 0.0 {
-                                    continue;
-                                }
-                                
-                                let x = gx;
-                                let y = gy;
-                                let u0 = uv_x;
-                                let v0 = uv_y;
-                                let u1 = uv_x + uv_w;
-                                let v1 = uv_y + uv_h;
-                                let r = font_color.r;
-                                let g = font_color.g;
-                                let b = font_color.b;
-                                let a = font_color.a;
-                                
-                                vertices.extend_from_slice(&[
-                                    x, y, r, g, b, a, u0, v0,
-                                    x + w, y, r, g, b, a, u1, v0,
-                                    x, y + h, r, g, b, a, u0, v1,
-                                    x + w, y, r, g, b, a, u1, v0,
-                                    x + w, y + h, r, g, b, a, u1, v1,
-                                    x, y + h, r, g, b, a, u0, v1,
-                                ]);
+                            if w == 0.0 || h == 0.0 {
+                                continue;
                             }
-                        }
-                        DrawCommand::Line { .. } => {}
-                        DrawCommand::Image { bounds, width, height, texture_id, uv } => {
-                            // Separate preview texture quads from regular UI
-                            let x = bounds.x;
-                            let y = bounds.y;
-                            let w = *width;
-                            let h = *height;
-                            let u0 = uv.x;
-                            let v0 = uv.y;
-                            let u1 = uv.x + uv.width;
-                            let v1 = uv.y + uv.height;
                             
-                            let r = 1.0;
-                            let g = 1.0;
-                            let b = 1.0;
-                            let a = 1.0;
+                            let x = gx.round();
+                            let y = gy.round();
+                            let u0 = uv_x;
+                            let v0 = uv_y;
+                            let u1 = uv_x + uv_w;
+                            let v1 = uv_y + uv_h;
+                            let r = font_color.r;
+                            let g = font_color.g;
+                            let b = font_color.b;
+                            let a = font_color.a;
                             
-                            let quad_vertices = [
+                            current_vertices.extend_from_slice(&[
                                 x, y, r, g, b, a, u0, v0,
-                                x + w, y, r, g, b, a, u1, v0,
-                                x, y + h, r, g, b, a, u0, v1,
-                                x + w, y, r, g, b, a, u1, v0,
-                                x + w, y + h, r, g, b, a, u1, v1,
-                                x, y + h, r, g, b, a, u0, v1,
-                            ];
-                            
-                            // texture_id == 1 means preview texture
-                            if *texture_id == 1 {
-                                preview_vertices.extend_from_slice(&quad_vertices);
-                                is_preview_window_context = true;
-                            } else {
-                                vertices.extend_from_slice(&quad_vertices);
-                            }
+                                x + w.round(), y, r, g, b, a, u1, v0,
+                                x, y + h.round(), r, g, b, a, u0, v1,
+                                x + w.round(), y, r, g, b, a, u1, v0,
+                                x + w.round(), y + h.round(), r, g, b, a, u1, v1,
+                                x, y + h.round(), r, g, b, a, u0, v1,
+                            ]);
                         }
-                        DrawCommand::Shadow { .. } => {}
-                    DrawCommand::ClipRect { .. } => {}
-                    DrawCommand::ClearClip => {}
+                        
+                        flush_batch(&mut batches, &mut current_vertices, current_clip);
+                    }
+                    DrawCommand::Line { .. } => {}
+                    DrawCommand::Image { bounds, width, height, texture_id, uv } => {
+                        flush_batch(&mut batches, &mut current_vertices, current_clip);
+                        
+                        let x = bounds.x.round();
+                        let y = bounds.y.round();
+                        let w = width.round();
+                        let h = height.round();
+                        let u0 = uv.x;
+                        let v0 = uv.y;
+                        let u1 = uv.x + uv.width;
+                        let v1 = uv.y + uv.height;
+                        
+                        let r = 1.0;
+                        let g = 1.0;
+                        let b = 1.0;
+                        let a = 1.0;
+                        
+                        let quad_vertices = [
+                            x, y, r, g, b, a, u0, v0,
+                            x + w, y, r, g, b, a, u1, v0,
+                            x, y + h, r, g, b, a, u0, v1,
+                            x + w, y, r, g, b, a, u1, v0,
+                            x + w, y + h, r, g, b, a, u1, v1,
+                            x, y + h, r, g, b, a, u0, v1,
+                        ];
+                        
+                        if *texture_id == 1 {
+                            preview_vertices.extend_from_slice(&quad_vertices);
+                            is_preview_window_context = true;
+                        } else {
+                            current_vertices.extend_from_slice(&quad_vertices);
+                        }
+                        
+                        flush_batch(&mut batches, &mut current_vertices, current_clip);
+                    }
+                    DrawCommand::Shadow { .. } => {}
                     DrawCommand::SetTransform { .. } => {}
                     DrawCommand::ResetTransform => {}
                 }
             }
             
-            let vertex_data: &[u8] = bytemuck::cast_slice(&vertices);
+            flush_batch(&mut batches, &mut current_vertices, current_clip);
+            
+            let mut all_vertices: Vec<f32> = Vec::new();
+            let mut batch_ranges: Vec<(usize, usize, f32, f32, f32, f32)> = Vec::new();
+            let mut current_offset = 0;
+            
+            for batch in &batches {
+                let start = current_offset;
+                let end = current_offset + batch.vertices.len();
+                batch_ranges.push((start, end, batch.clip_x, batch.clip_y, batch.clip_w, batch.clip_h));
+                all_vertices.extend_from_slice(&batch.vertices);
+                current_offset = end;
+            }
+            
+            let vertex_data: &[u8] = bytemuck::cast_slice(&all_vertices);
             
             let vertex_ptr = self.device.map_memory(
                 self.vertex_buffer_memory,
@@ -2349,17 +2403,43 @@ DrawCommand::Text { bounds, width, height, font_color, text, font_size, alignmen
                 &[0]
             );
             
-            self.device.cmd_draw(
-                self.command_buffers[image_index_usize],
-                (vertices.len() / 8) as u32,
-                1,
-                0,
-                0
-            );
+            for (start, end, clip_x, clip_y, clip_w, clip_h) in &batch_ranges {
+                if *clip_w < 1e5 {
+                    let scissor = vk::Rect2D {
+                        offset: vk::Offset2D { 
+                            x: clip_x.round() as i32, 
+                            y: clip_y.round() as i32 
+                        },
+                        extent: vk::Extent2D { 
+                            width: clip_w.round() as u32, 
+                            height: clip_h.round() as u32 
+                        },
+                    };
+                    self.device.cmd_set_scissor(self.command_buffers[image_index_usize], 0, &[scissor]);
+                } else {
+                    let scissor = vk::Rect2D {
+                        offset: vk::Offset2D { x: 0, y: 0 },
+                        extent: self.extent,
+                    };
+                    self.device.cmd_set_scissor(self.command_buffers[image_index_usize], 0, &[scissor]);
+                }
+                
+                let vertex_count = ((end - start) / 8) as u32;
+                let first_vertex = (start / 8) as u32;
+                
+                if vertex_count > 0 {
+                    self.device.cmd_draw(
+                        self.command_buffers[image_index_usize],
+                        vertex_count,
+                        1,
+                        first_vertex,
+                        0
+                    );
+                }
+            }
             
             // Render preview texture quads (if any)
             if !preview_vertices.is_empty() {
-                // Upload preview vertices after UI vertices
                 let preview_offset = vertex_data.len() as u64;
                 let preview_data: &[u8] = bytemuck::cast_slice(&preview_vertices);
                 let preview_ptr = self.device.map_memory(
@@ -2454,7 +2534,7 @@ DrawCommand::Text { bounds, width, height, font_color, text, font_size, alignmen
             }
             
             if self.frame_count == 0 {
-                self.dfx.lock().get_logger().lock().log(LogLevel::Trace, "Render", &format!("Frame {}: {} vertices + {} preview vertices", self.frame_count, vertices.len() / 8, preview_vertices.len() / 8), file!(), line!());
+                self.dfx.lock().get_logger().lock().log(LogLevel::Trace, "Render", &format!("Frame {}: {} vertices + {} preview vertices", self.frame_count, all_vertices.len() / 8, preview_vertices.len() / 8), file!(), line!());
             }
             
             self.device.cmd_end_render_pass(self.command_buffers[image_index_usize]);

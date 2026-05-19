@@ -4,6 +4,7 @@ use crate::layout::*;
 use crate::style::*;
 use crate::types::*;
 use crate::widget::*;
+use crate::text_layout::TextLayoutPresenter;
 use hezhou_dfx::*;
 use hezhou_platform::KeyCode;
 use parking_lot::Mutex;
@@ -29,26 +30,18 @@ pub struct TextEdit {
     selection_start: usize,
     selection_end: usize,
     focused: bool,
-    char_layouts: Vec<CharLayout>,
+    presenter: TextLayoutPresenter,
     layout_dirty: bool,
-    cached_line_height: f32,
-    cached_max_bearing_y: f32,
+    scroll_offset_x: f32,
     scroll_offset_y: f32,
+    total_content_width: f32,
     total_content_height: f32,
-    scrollbar_dragging: bool,
-    scrollbar_drag_start_y: f32,
-    scrollbar_drag_start_offset: f32,
-}
-
-#[derive(Clone, Copy, Debug)]
-struct CharLayout {
-    x: f32,
-    y: f32,
-    width: f32,
-    height: f32,
-    grapheme_index: usize,      // grapheme cluster索引
-    grapheme_start_byte: usize, // 该grapheme在String中的起始字节
-    grapheme_end_byte: usize,   // 该grapheme结束字节（exclusive）
+    v_scrollbar_dragging: bool,
+    v_scrollbar_drag_start_y: f32,
+    v_scrollbar_drag_start_offset: f32,
+    h_scrollbar_dragging: bool,
+    h_scrollbar_drag_start_x: f32,
+    h_scrollbar_drag_start_offset: f32,
 }
 
 impl TextEdit {
@@ -71,15 +64,18 @@ impl TextEdit {
             selection_start: 0,
             selection_end: 0,
             focused: false,
-            char_layouts: Vec::new(),
+            presenter: TextLayoutPresenter::new(),
             layout_dirty: true,
-            cached_line_height: 0.0,
-            cached_max_bearing_y: 0.0,
+            scroll_offset_x: 0.0,
             scroll_offset_y: 0.0,
+            total_content_width: 0.0,
             total_content_height: 0.0,
-            scrollbar_dragging: false,
-            scrollbar_drag_start_y: 0.0,
-            scrollbar_drag_start_offset: 0.0,
+            v_scrollbar_dragging: false,
+            v_scrollbar_drag_start_y: 0.0,
+            v_scrollbar_drag_start_offset: 0.0,
+            h_scrollbar_dragging: false,
+            h_scrollbar_drag_start_x: 0.0,
+            h_scrollbar_drag_start_offset: 0.0,
         }
     }
     
@@ -92,17 +88,17 @@ impl TextEdit {
 
     pub fn set_text(&mut self, text: &str) {
         self.text = text.to_string();
+        self.presenter.set_text(text, self.text_style.font_size);
         let num_graphemes = self.text.graphemes(true).count();
         self.cursor_grapheme_index = num_graphemes;
         self.cursor_byte_index = self.text.len();
-        self.char_layouts.clear();
         self.layout_dirty = true;
         self.flags.dirty_render = true;
     }
     
     pub fn set_font_size(&mut self, size: f32) {
         self.text_style.font_size = size;
-        self.char_layouts.clear();
+        self.presenter.set_text(&self.text, size);
         self.layout_dirty = true;
         self.flags.dirty_render = true;
     }
@@ -136,7 +132,7 @@ impl TextEdit {
         self.text.insert(self.cursor_byte_index, c);
         self.cursor_byte_index += c.len_utf8();
         self.cursor_grapheme_index = self.byte_index_to_grapheme_index(self.cursor_byte_index);
-        self.char_layouts.clear();
+        self.presenter.set_text(&self.text, self.text_style.font_size);
         self.layout_dirty = true;
         self.flags.dirty_render = true;
     }
@@ -145,14 +141,13 @@ impl TextEdit {
         self.text.insert_str(self.cursor_byte_index, grapheme);
         self.cursor_byte_index += grapheme.len();
         self.cursor_grapheme_index += 1;
-        self.char_layouts.clear();
+        self.presenter.set_text(&self.text, self.text_style.font_size);
         self.layout_dirty = true;
         self.flags.dirty_render = true;
     }
     
     pub fn delete_char(&mut self) {
         if self.cursor_grapheme_index > 0 {
-            // 找到前一个grapheme的起始和结束位置
             let prev_grapheme = self.text.grapheme_indices(true)
                 .nth(self.cursor_grapheme_index - 1);
             
@@ -161,7 +156,7 @@ impl TextEdit {
                 self.text.drain(start_byte..end_byte);
                 self.cursor_byte_index = start_byte;
                 self.cursor_grapheme_index -= 1;
-                self.char_layouts.clear();
+                self.presenter.set_text(&self.text, self.text_style.font_size);
                 self.layout_dirty = true;
                 self.flags.dirty_render = true;
             }
@@ -190,61 +185,23 @@ impl TextEdit {
     }
     
     fn move_cursor_up(&mut self) {
-        if let Some(current_layout) = self.find_char_layout_at_cursor() {
-            let current_x = current_layout.x;
-            let current_y = current_layout.y;
-            
-            let prev_line_y = self.char_layouts.iter()
-                .filter(|l| l.y < current_y)
-                .map(|l| l.y)
-                .max_by(|a, b| a.partial_cmp(b).unwrap());
-            
-            if let Some(prev_y) = prev_line_y {
-                let best = self.char_layouts.iter()
-                    .filter(|l| l.y == prev_y)
-                    .min_by(|a, b| {
-                        let dist_a = (a.x - current_x).abs();
-                        let dist_b = (b.x - current_x).abs();
-                        dist_a.partial_cmp(&dist_b).unwrap()
-                    });
-                
-                if let Some(layout) = best {
-                    self.cursor_grapheme_index = layout.grapheme_index;
-                    self.cursor_byte_index = layout.grapheme_start_byte;
-                    self.flags.dirty_render = true;
-                    dfx_info!("TextEdit", "Move up: grapheme_index={}", self.cursor_grapheme_index);
-                }
-            }
-        }
+        let (cursor_x, cursor_y) = self.presenter.grapheme_to_pixel(self.cursor_grapheme_index);
+        let target_y = cursor_y - self.presenter.get_model().get_line_height();
+        
+        let new_grapheme = self.presenter.pixel_to_grapheme(cursor_x, target_y);
+        self.cursor_grapheme_index = new_grapheme;
+        self.cursor_byte_index = self.grapheme_index_to_byte_index(new_grapheme);
+        self.flags.dirty_render = true;
     }
     
     fn move_cursor_down(&mut self) {
-        if let Some(current_layout) = self.find_char_layout_at_cursor() {
-            let current_x = current_layout.x;
-            let current_y = current_layout.y;
-            
-            let next_line_y = self.char_layouts.iter()
-                .filter(|l| l.y > current_y)
-                .map(|l| l.y)
-                .min_by(|a, b| a.partial_cmp(b).unwrap());
-            
-            if let Some(next_y) = next_line_y {
-                let best = self.char_layouts.iter()
-                    .filter(|l| l.y == next_y)
-                    .min_by(|a, b| {
-                        let dist_a = (a.x - current_x).abs();
-                        let dist_b = (b.x - current_x).abs();
-                        dist_a.partial_cmp(&dist_b).unwrap()
-                    });
-                
-                if let Some(layout) = best {
-                    self.cursor_grapheme_index = layout.grapheme_index;
-                    self.cursor_byte_index = layout.grapheme_start_byte;
-                    self.flags.dirty_render = true;
-                    dfx_info!("TextEdit", "Move down: grapheme_index={}", self.cursor_grapheme_index);
-                }
-            }
-        }
+        let (cursor_x, cursor_y) = self.presenter.grapheme_to_pixel(self.cursor_grapheme_index);
+        let target_y = cursor_y + self.presenter.get_model().get_line_height();
+        
+        let new_grapheme = self.presenter.pixel_to_grapheme(cursor_x, target_y);
+        self.cursor_grapheme_index = new_grapheme;
+        self.cursor_byte_index = self.grapheme_index_to_byte_index(new_grapheme);
+        self.flags.dirty_render = true;
     }
     
     fn move_cursor_to_line_start(&mut self) {
@@ -275,76 +232,13 @@ impl TextEdit {
         dfx_info!("TextEdit", "Move to line end: grapheme_index={}", self.cursor_grapheme_index);
     }
     
-    fn find_char_layout_at_cursor(&self) -> Option<&CharLayout> {
-        self.char_layouts.iter()
-            .find(|l| l.grapheme_index == self.cursor_grapheme_index)
-    }
-    
     pub fn set_focused(&mut self, focused: bool) {
         self.focused = focused;
         self.flags.dirty_render = true;
     }
     
     fn find_cursor_position_at(&self, click_x: f32, click_y: f32) -> usize {
-        dfx_info!("Click", "Finding cursor position at ({}, {})", click_x, click_y);
-        
-        let num_graphemes = self.text.graphemes(true).count();
-        
-        if !self.char_layouts.is_empty() {
-            dfx_info!("Click", "Using precise char_layouts ({} graphemes)", self.char_layouts.len());
-            
-            let max_bearing_y = self.cached_max_bearing_y;
-            let font_size = self.text_style.font_size;
-            
-            let mut best_grapheme_idx = 0;
-            let mut best_byte_idx = 0;
-            let mut best_distance = f32::MAX;
-            
-            let mut closest_line_y = 0.0;
-            let mut min_y_distance = f32::MAX;
-            
-            for layout in &self.char_layouts {
-                let cursor_draw_y = layout.y - max_bearing_y;
-                let cursor_draw_y_end = cursor_draw_y + font_size;
-                let line_center_y = (cursor_draw_y + cursor_draw_y_end) / 2.0;
-                let y_distance = (click_y - line_center_y).abs();
-                
-                if y_distance < min_y_distance {
-                    min_y_distance = y_distance;
-                    closest_line_y = layout.y;
-                }
-            }
-            
-            dfx_info!("Click", "Closest baseline_y: {}", closest_line_y);
-            
-            for layout in &self.char_layouts {
-                if layout.y == closest_line_y {
-                    let grapheme_center_x = layout.x + layout.width / 2.0;
-                    
-                    let x_distance = (click_x - grapheme_center_x).abs();
-                    
-                    if x_distance < best_distance {
-                        best_distance = x_distance;
-                        if click_x < grapheme_center_x {
-                            best_grapheme_idx = layout.grapheme_index;
-                            best_byte_idx = layout.grapheme_start_byte;
-                        } else {
-                            best_grapheme_idx = layout.grapheme_index + 1;
-                            best_byte_idx = layout.grapheme_end_byte;
-                        }
-                    }
-                }
-            }
-            
-            // 确保不超过文本长度
-            best_grapheme_idx = best_grapheme_idx.min(num_graphemes);
-            
-            dfx_info!("Click", "Final grapheme_index={}, byte_index={}", best_grapheme_idx, best_byte_idx);
-            return best_grapheme_idx;
-        }
-        
-        dfx_info!("Click", "No char_layouts, returning 0");
-        0
+        self.presenter.pixel_to_grapheme(click_x, click_y)
     }
 }
 
@@ -425,41 +319,48 @@ impl Widget for TextEdit {
         let text_margin_x = 10.0;
         let text_start_x = line_number_width + text_margin_x;
         let scrollbar_width = 12.0;
+        let scrollbar_height = 12.0;
         let text_area_width = width - line_number_width - scrollbar_width - 2.0 * text_margin_x;
+        let text_area_height = height - scrollbar_height;
         
         canvas.draw_rect(Rect::new(0.0, 0.0, width, height), &self.style);
         
         let line_number_style = Style::new()
             .with_background(Color::new(0.12, 0.12, 0.12, 1.0));
-        canvas.draw_rect(Rect::new(0.0, 0.0, line_number_width, height), &line_number_style);
+        canvas.draw_rect(Rect::new(0.0, 0.0, line_number_width, text_area_height), &line_number_style);
         
-        let num_lines = self.text.lines().count().max(1);
-        let max_bearing_y = if self.cached_max_bearing_y > 0.0 {
-            self.cached_max_bearing_y
-        } else {
-            canvas.get_max_bearing_y(&self.text, font_size)
-        };
-        let line_height = if self.cached_line_height > 0.0 {
-            self.cached_line_height
-        } else {
-            canvas.get_line_height(font_size)
-        };
+        if let Some(font_atlas) = canvas.get_font_atlas() {
+            if self.layout_dirty {
+                self.presenter.set_scroll_offset_y(self.scroll_offset_y);
+                self.presenter.set_scroll_offset_x(self.scroll_offset_x);
+                self.presenter.set_container(text_start_x, 10.0);
+                self.presenter.set_clip_rect(Rect::new(text_start_x, 0.0, text_area_width, text_area_height));
+                self.presenter.update_layout(font_atlas, 0, None);
+                self.layout_dirty = false;
+            }
+            
+            self.total_content_height = self.presenter.get_total_height();
+            self.total_content_width = self.presenter.get_total_width();
+        }
         
-        self.total_content_height = 10.0 + max_bearing_y + num_lines as f32 * line_height;
+        let line_height = self.presenter.get_model().get_line_height();
+        let max_bearing_y = self.presenter.get_model().get_max_bearing_y();
         
-        let max_scroll = (self.total_content_height - height).max(0.0);
-        self.scroll_offset_y = self.scroll_offset_y.min(max_scroll).max(0.0);
+        let max_scroll_y = (self.total_content_height - text_area_height).max(0.0);
+        let max_scroll_x = (self.total_content_width - text_area_width).max(0.0);
+        self.scroll_offset_y = self.scroll_offset_y.min(max_scroll_y).max(0.0);
+        self.scroll_offset_x = self.scroll_offset_x.min(max_scroll_x).max(0.0);
         
         let line_number_text_style = TextStyle::new()
             .with_size(font_size)
             .with_color(Color::new(0.5, 0.5, 0.5, 1.0));
         
-        for line_num in 1..=num_lines {
-            let line_y = 10.0 + max_bearing_y + (line_num - 1) as f32 * line_height - self.scroll_offset_y;
-            if line_y - max_bearing_y >= 0.0 && line_y - max_bearing_y < height {
-                let line_num_str = line_num.to_string();
+        for (line_idx, line) in self.presenter.get_model().get_lines().iter().enumerate() {
+            let line_y = line.baseline_y - max_bearing_y - self.scroll_offset_y;
+            if line_y >= 0.0 && line_y < text_area_height {
+                let line_num_str = (line_idx + 1).to_string();
                 canvas.draw_text(
-                    Rect::new(5.0, line_y - max_bearing_y, line_number_width - 10.0, font_size),
+                    Rect::new(5.0, line_y, line_number_width - 10.0, font_size),
                     &line_num_str,
                     &line_number_text_style,
                 );
@@ -472,164 +373,105 @@ impl Widget for TextEdit {
         self.selection_end = self.selection_end.min(num_graphemes);
         self.cursor_grapheme_index = self.cursor_grapheme_index.min(num_graphemes);
         
-        if self.selection_start != self.selection_end && !self.char_layouts.is_empty() {
+        if self.selection_start != self.selection_end {
             let start = self.selection_start.min(self.selection_end);
             let end = self.selection_start.max(self.selection_end);
             
-            let mut lines: Vec<(f32, f32, f32)> = Vec::new();
-            
-            for layout in &self.char_layouts {
-                if layout.grapheme_index >= start && layout.grapheme_index < end {
-                    let y = layout.y - self.scroll_offset_y;
-                    
-                    if let Some(last_line) = lines.last_mut() {
-                        if last_line.0 == y {
-                            last_line.2 = layout.x + layout.width.max(1.0);
+            for line in self.presenter.get_model().get_lines() {
+                if line.end_grapheme >= start && line.start_grapheme < end {
+                    let line_y = line.baseline_y - max_bearing_y - self.scroll_offset_y;
+                    if line_y >= 0.0 && line_y < text_area_height {
+                        let start_x = if line.start_grapheme >= start {
+                            line.x_start - self.scroll_offset_x
                         } else {
-                            lines.push((y, layout.x, layout.x + layout.width.max(1.0)));
+                            let (x, _) = self.presenter.grapheme_to_pixel(start);
+                            x
+                        };
+                        let end_x = if line.end_grapheme <= end {
+                            line.x_end - self.scroll_offset_x
+                        } else {
+                            let (x, _) = self.presenter.grapheme_to_pixel(end);
+                            x
+                        };
+                        
+                        if start_x < text_start_x + text_area_width && end_x > text_start_x {
+                            canvas.draw_rect(
+                                Rect::new(start_x.max(text_start_x), line_y, (end_x - start_x).min(text_area_width), line_height),
+                                &Style::new().with_background(Color::new(0.3, 0.5, 0.8, 0.3)),
+                            );
                         }
-                    } else {
-                        lines.push((y, layout.x, layout.x + layout.width.max(1.0)));
                     }
-                }
-            }
-            
-            for (y, start_x, end_x) in &lines {
-                let highlight_y = y - max_bearing_y;
-                if highlight_y >= 0.0 && highlight_y < height {
-                    canvas.draw_rect(
-                        Rect::new(*start_x, highlight_y, *end_x - *start_x, font_size),
-                        &Style::new().with_background(Color::new(0.3, 0.5, 0.8, 0.3)),
-                    );
                 }
             }
         }
         
         if !self.text.is_empty() {
             let text_start_y = 10.0 - self.scroll_offset_y;
+            let text_draw_x = text_start_x - self.scroll_offset_x;
+            canvas.set_clip_rect(Rect::new(text_start_x, 0.0, text_area_width, text_area_height));
             canvas.draw_text(
-                Rect::new(text_start_x, text_start_y, text_area_width, self.total_content_height),
+                Rect::new(text_draw_x, text_start_y, self.total_content_width, self.total_content_height),
                 &self.text,
                 &self.text_style,
             );
+            canvas.clear_clip();
         }
         
-        if self.total_content_height > height {
-            let scrollbar_x = width - scrollbar_width;
+        // Vertical scrollbar
+        if self.total_content_height > text_area_height {
+            let v_scrollbar_x = width - scrollbar_width;
             let scrollbar_bg_style = Style::new()
                 .with_background(Color::new(0.08, 0.08, 0.08, 1.0));
-            canvas.draw_rect(Rect::new(scrollbar_x, 0.0, scrollbar_width, height), &scrollbar_bg_style);
+            canvas.draw_rect(Rect::new(v_scrollbar_x, 0.0, scrollbar_width, text_area_height), &scrollbar_bg_style);
             
-            let scrollbar_ratio = height / self.total_content_height;
-            let scrollbar_height = (height * scrollbar_ratio).max(30.0);
-            let scrollbar_y = (self.scroll_offset_y / max_scroll) * (height - scrollbar_height);
+            let scrollbar_ratio = text_area_height / self.total_content_height;
+            let v_scrollbar_h = (text_area_height * scrollbar_ratio).max(30.0);
+            let v_scrollbar_y = (self.scroll_offset_y / max_scroll_y) * (text_area_height - v_scrollbar_h);
             
             let scrollbar_style = Style::new()
                 .with_background(Color::new(0.3, 0.3, 0.3, 1.0))
                 .with_border(Color::new(0.4, 0.4, 0.4, 1.0), 1.0, 3.0);
             canvas.draw_rect(
-                Rect::new(scrollbar_x + 1.0, scrollbar_y, scrollbar_width - 2.0, scrollbar_height),
+                Rect::new(v_scrollbar_x + 1.0, v_scrollbar_y, scrollbar_width - 2.0, v_scrollbar_h),
                 &scrollbar_style,
             );
         }
         
+        // Horizontal scrollbar
+        if self.total_content_width > text_area_width {
+            let h_scrollbar_y = text_area_height;
+            let scrollbar_bg_style = Style::new()
+                .with_background(Color::new(0.08, 0.08, 0.08, 1.0));
+            canvas.draw_rect(Rect::new(line_number_width, h_scrollbar_y, width - line_number_width - scrollbar_width, scrollbar_height), &scrollbar_bg_style);
+            
+            let scrollbar_ratio = text_area_width / self.total_content_width;
+            let h_scrollbar_w = (text_area_width * scrollbar_ratio).max(30.0);
+            let h_scrollbar_x = line_number_width + (self.scroll_offset_x / max_scroll_x) * (text_area_width - h_scrollbar_w);
+            
+            let scrollbar_style = Style::new()
+                .with_background(Color::new(0.3, 0.3, 0.3, 1.0))
+                .with_border(Color::new(0.4, 0.4, 0.4, 1.0), 1.0, 3.0);
+            canvas.draw_rect(
+                Rect::new(h_scrollbar_x, h_scrollbar_y + 1.0, h_scrollbar_w, scrollbar_height - 2.0),
+                &scrollbar_style,
+            );
+        }
+        
+        // Cursor
         if self.focused && self.cursor_visible {
-            let text_start_y = 10.0 - self.scroll_offset_y;
+            let (cursor_x, cursor_y) = self.presenter.grapheme_to_pixel(self.cursor_grapheme_index);
+            let draw_y = cursor_y - max_bearing_y;
             
-            if self.layout_dirty || self.char_layouts.is_empty() {
-                let wrap_width = Some(text_area_width);
-                
-                let char_positions = canvas.layout_text_for_cursor_with_wrap(
-                    &self.text,
-                    font_size,
-                    text_start_x,
-                    10.0,
-                    wrap_width,
-                );
-                
-                let max_bearing_y = canvas.get_max_bearing_y(&self.text, font_size);
-                
-                self.char_layouts = char_positions.iter().map(|(x, baseline_y, width, grapheme_idx, start_byte, end_byte)| {
-                    CharLayout {
-                        x: *x,
-                        y: *baseline_y,
-                        width: *width,
-                        height: font_size,
-                        grapheme_index: *grapheme_idx,
-                        grapheme_start_byte: *start_byte,
-                        grapheme_end_byte: *end_byte,
-                    }
-                }).collect();
-                
-                self.cached_max_bearing_y = max_bearing_y;
-                self.cached_line_height = canvas.get_line_height(font_size);
-                self.layout_dirty = false;
-            }
-            
-            let max_bearing_y = self.cached_max_bearing_y;
-            
-            let (cursor_x, cursor_y) = if self.cursor_grapheme_index == 0 {
-                (text_start_x, text_start_y + max_bearing_y)
-            } else {
-                let mut found_x = text_start_x;
-                let mut found_y = text_start_y + max_bearing_y;
-                
-                for layout in &self.char_layouts {
-                    if layout.grapheme_index < self.cursor_grapheme_index {
-                        found_x = layout.x + layout.width;
-                        found_y = layout.y - self.scroll_offset_y;
-                    } else {
-                        break;
-                    }
-                }
-                
-                (found_x, found_y)
-            };
-            
-            if cursor_y - max_bearing_y >= 0.0 && cursor_y - max_bearing_y < height {
+            if draw_y >= 0.0 && draw_y < text_area_height && cursor_x >= text_start_x && cursor_x < text_start_x + text_area_width {
                 canvas.draw_rect(
-                    Rect::new(cursor_x, cursor_y - max_bearing_y, 2.0, canvas.get_font_height(font_size)),
+                    Rect::new(cursor_x, draw_y, 2.0, max_bearing_y + 4.0),
                     &Style::new().with_background(Color::white()),
                 );
-            }
-        } else {
-            if self.layout_dirty && canvas.get_font_atlas().is_some() && !self.text.is_empty() {
-                let text_start_y = 10.0;
-                let wrap_width = Some(text_area_width);
-                
-                let char_positions = canvas.layout_text_for_cursor_with_wrap(
-                    &self.text,
-                    font_size,
-                    text_start_x,
-                    text_start_y,
-                    wrap_width,
-                );
-                
-                let max_bearing_y = canvas.get_max_bearing_y(&self.text, font_size);
-                
-                self.char_layouts = char_positions.iter().map(|(x, baseline_y, width, grapheme_idx, start_byte, end_byte)| {
-                    CharLayout {
-                        x: *x,
-                        y: *baseline_y,
-                        width: *width,
-                        height: font_size,
-                        grapheme_index: *grapheme_idx,
-                        grapheme_start_byte: *start_byte,
-                        grapheme_end_byte: *end_byte,
-                    }
-                }).collect();
-                
-                self.cached_max_bearing_y = max_bearing_y;
-                self.cached_line_height = canvas.get_line_height(font_size);
-                self.layout_dirty = false;
             }
         }
     }
 
     fn measure(&self, font_atlas: &crate::font_atlas::FontAtlas) -> (f32, f32) {
-        // 注意：虽然签名是 &self，但 widget_tree 通过 as_mut() 调用
-        // 这里不更新 char_layouts（需要 &mut self）
-        
         let (text_width, text_height) =
             font_atlas.measure_text(0, &self.text, self.text_style.font_size);
 
@@ -652,10 +494,20 @@ impl Widget for TextEdit {
         match event.event_type {
             EventType::MouseWheel => {
                 if let EventData::Wheel(wheel_data) = &event.data {
-                    let max_scroll = (self.total_content_height - self.layout.height).max(0.0);
+                    let text_area_height = self.layout.height - 12.0;
+                    let text_area_width = self.layout.width - 50.0 - 12.0 - 20.0;
+                    
+                    let max_scroll_y = (self.total_content_height - text_area_height).max(0.0);
+                    let max_scroll_x = (self.total_content_width - text_area_width).max(0.0);
+                    
                     self.scroll_offset_y = (self.scroll_offset_y + wheel_data.delta_y * 30.0)
-                        .min(max_scroll)
+                        .min(max_scroll_y)
                         .max(0.0);
+                    self.scroll_offset_x = (self.scroll_offset_x + wheel_data.delta_x * 30.0)
+                        .min(max_scroll_x)
+                        .max(0.0);
+                    
+                    self.layout_dirty = true;
                     self.flags.dirty_render = true;
                     return EventResult::Handled;
                 }
@@ -663,38 +515,58 @@ impl Widget for TextEdit {
             EventType::TouchBegin => {
                 let width = self.layout.width;
                 let height = self.layout.height;
+                let line_number_width = 50.0;
                 let scrollbar_width = 12.0;
-                let scrollbar_x = width - scrollbar_width;
+                let scrollbar_height = 12.0;
+                let text_area_height = height - scrollbar_height;
+                let v_scrollbar_x = width - scrollbar_width;
+                let h_scrollbar_y = text_area_height;
                 
                 if let EventData::Touch(touch_data) = &event.data {
                     let click_x = touch_data.x;
                     let click_y = touch_data.y;
                     
-                    if self.total_content_height > height && click_x >= scrollbar_x {
-                        let max_scroll = (self.total_content_height - height).max(0.0);
-                        let scrollbar_ratio = height / self.total_content_height;
-                        let scrollbar_height = (height * scrollbar_ratio).max(30.0);
-                        let scrollbar_y = (self.scroll_offset_y / max_scroll) * (height - scrollbar_height);
+                    // Vertical scrollbar
+                    if self.total_content_height > text_area_height && click_x >= v_scrollbar_x && click_y < h_scrollbar_y {
+                        let max_scroll_y = (self.total_content_height - text_area_height).max(0.0);
+                        let scrollbar_ratio = text_area_height / self.total_content_height;
+                        let v_scrollbar_h = (text_area_height * scrollbar_ratio).max(30.0);
+                        let v_scrollbar_y = (self.scroll_offset_y / max_scroll_y) * (text_area_height - v_scrollbar_h);
                         
-                        if click_y >= scrollbar_y && click_y <= scrollbar_y + scrollbar_height {
-                            self.scrollbar_dragging = true;
-                            self.scrollbar_drag_start_y = click_y;
-                            self.scrollbar_drag_start_offset = self.scroll_offset_y;
+                        if click_y >= v_scrollbar_y && click_y <= v_scrollbar_y + v_scrollbar_h {
+                            self.v_scrollbar_dragging = true;
+                            self.v_scrollbar_drag_start_y = click_y;
+                            self.v_scrollbar_drag_start_offset = self.scroll_offset_y;
+                            self.flags.dirty_render = true;
+                            return EventResult::Handled;
+                        }
+                    }
+                    
+                    // Horizontal scrollbar
+                    if self.total_content_width > width - line_number_width - scrollbar_width - 20.0 && click_y >= h_scrollbar_y && click_x >= line_number_width {
+                        let text_area_width = width - line_number_width - scrollbar_width - 20.0;
+                        let max_scroll_x = (self.total_content_width - text_area_width).max(0.0);
+                        let scrollbar_ratio = text_area_width / self.total_content_width;
+                        let h_scrollbar_w = (text_area_width * scrollbar_ratio).max(30.0);
+                        let h_scrollbar_x = line_number_width + (self.scroll_offset_x / max_scroll_x) * (text_area_width - h_scrollbar_w);
+                        
+                        if click_x >= h_scrollbar_x && click_x <= h_scrollbar_x + h_scrollbar_w {
+                            self.h_scrollbar_dragging = true;
+                            self.h_scrollbar_drag_start_x = click_x;
+                            self.h_scrollbar_drag_start_offset = self.scroll_offset_x;
                             self.flags.dirty_render = true;
                             return EventResult::Handled;
                         }
                     }
                 }
                 
-                dfx_info!("TextEdit", "TouchBegin received");
                 self.focused = true;
                 self.cursor_visible = true;
                 
                 if let EventData::Touch(touch_data) = &event.data {
                     let click_x = touch_data.x;
-                    let click_y = touch_data.y + self.scroll_offset_y;
+                    let click_y = touch_data.y;
                     let shift_pressed = touch_data.modifiers & 1 != 0;
-                    dfx_info!("Click", "Click at ({}, {}), shift={}", click_x, click_y, shift_pressed);
                     
                     let num_graphemes = self.text.graphemes(true).count();
                     let new_grapheme_idx = self.find_cursor_position_at(click_x, click_y).min(num_graphemes);
@@ -723,19 +595,42 @@ impl Widget for TextEdit {
                 return EventResult::Handled;
             }
             EventType::TouchMove => {
-                if self.scrollbar_dragging {
+                let width = self.layout.width;
+                let height = self.layout.height;
+                let text_area_height = height - 12.0;
+                let text_area_width = width - 50.0 - 12.0 - 20.0;
+                
+                if self.v_scrollbar_dragging {
                     if let EventData::Touch(touch_data) = &event.data {
-                        let height = self.layout.height;
-                        let drag_delta_y = touch_data.y - self.scrollbar_drag_start_y;
-                        let max_scroll = (self.total_content_height - height).max(0.0);
-                        let scrollbar_ratio = height / self.total_content_height;
-                        let scrollbar_height = (height * scrollbar_ratio).max(30.0);
-                        let scrollable_track = height - scrollbar_height;
+                        let max_scroll_y = (self.total_content_height - text_area_height).max(0.0);
+                        let scrollbar_ratio = text_area_height / self.total_content_height;
+                        let v_scrollbar_h = (text_area_height * scrollbar_ratio).max(30.0);
+                        let scrollable_track = text_area_height - v_scrollbar_h;
                         
-                        let scroll_delta = (drag_delta_y / scrollable_track) * max_scroll;
-                        self.scroll_offset_y = (self.scrollbar_drag_start_offset + scroll_delta)
-                            .min(max_scroll)
+                        let drag_delta_y = touch_data.y - self.v_scrollbar_drag_start_y;
+                        let scroll_delta = (drag_delta_y / scrollable_track) * max_scroll_y;
+                        self.scroll_offset_y = (self.v_scrollbar_drag_start_offset + scroll_delta)
+                            .min(max_scroll_y)
                             .max(0.0);
+                        self.layout_dirty = true;
+                        self.flags.dirty_render = true;
+                        return EventResult::Handled;
+                    }
+                }
+                
+                if self.h_scrollbar_dragging {
+                    if let EventData::Touch(touch_data) = &event.data {
+                        let max_scroll_x = (self.total_content_width - text_area_width).max(0.0);
+                        let scrollbar_ratio = text_area_width / self.total_content_width;
+                        let h_scrollbar_w = (text_area_width * scrollbar_ratio).max(30.0);
+                        let scrollable_track = text_area_width - h_scrollbar_w;
+                        
+                        let drag_delta_x = touch_data.x - self.h_scrollbar_drag_start_x;
+                        let scroll_delta = (drag_delta_x / scrollable_track) * max_scroll_x;
+                        self.scroll_offset_x = (self.h_scrollbar_drag_start_offset + scroll_delta)
+                            .min(max_scroll_x)
+                            .max(0.0);
+                        self.layout_dirty = true;
                         self.flags.dirty_render = true;
                         return EventResult::Handled;
                     }
@@ -744,7 +639,7 @@ impl Widget for TextEdit {
                 if self.focused {
                     if let EventData::Touch(touch_data) = &event.data {
                         let click_x = touch_data.x;
-                        let click_y = touch_data.y + self.scroll_offset_y;
+                        let click_y = touch_data.y;
                         
                         let num_graphemes = self.text.graphemes(true).count();
                         let new_grapheme_idx = self.find_cursor_position_at(click_x, click_y).min(num_graphemes);
@@ -754,15 +649,20 @@ impl Widget for TextEdit {
                         self.cursor_grapheme_index = new_grapheme_idx;
                         self.cursor_byte_index = new_byte_idx;
                         
-                        dfx_info!("Drag", "Selection: {} to {}", self.selection_start, self.selection_end);
                         self.flags.dirty_render = true;
                         return EventResult::Handled;
                     }
                 }
             }
             EventType::TouchEnd => {
-                if self.scrollbar_dragging {
-                    self.scrollbar_dragging = false;
+                if self.v_scrollbar_dragging {
+                    self.v_scrollbar_dragging = false;
+                    self.flags.dirty_render = true;
+                    return EventResult::Handled;
+                }
+                
+                if self.h_scrollbar_dragging {
+                    self.h_scrollbar_dragging = false;
                     self.flags.dirty_render = true;
                     return EventResult::Handled;
                 }
@@ -857,7 +757,7 @@ impl Widget for TextEdit {
                                     *backup = text_to_cut.clone();
                                 }
                                 
-                                self.char_layouts.clear();
+                                self.presenter.set_text(&self.text, self.text_style.font_size);
                                 self.layout_dirty = true;
                                 self.flags.dirty_render = true;
                                 return EventResult::Handled;
