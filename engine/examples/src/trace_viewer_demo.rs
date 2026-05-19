@@ -7,6 +7,15 @@ use std::time::{Duration, Instant};
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
+    
+    let trace_file = args.iter().position(|a| a == "--file")
+        .and_then(|i| args.get(i + 1))
+        .cloned()
+        .unwrap_or_else(|| {
+            list_available_traces();
+            "traces/trace_latest.json".to_string()
+        });
+    
     let screenshot_mode = args.iter().any(|a| a == "--screenshot");
     let screenshot_delay = if screenshot_mode { 
         args.iter().position(|a| a == "--delay")
@@ -18,8 +27,9 @@ fn main() {
         args.iter().position(|a| a == "--output")
             .and_then(|i| args.get(i + 1))
             .cloned()
-            .unwrap_or_else(|| "screenshots/trace_viewer_demo.png".to_string())
+            .unwrap_or_else(|| "screenshots/trace_viewer.png".to_string())
     } else { String::new() };
+    
     let dfx = init_dfx();
     dfx.lock().get_logger().lock().set_level(LogLevel::Info);
     
@@ -27,12 +37,13 @@ fn main() {
     let _ = dfx.lock().get_logger().lock().enable_file_output(&log_path);
     
     dfx_info!("TraceViewer", "=== Trace Viewer ===");
+    dfx_info!("TraceViewer", "Loading: {}", trace_file);
     
-    dfx_info!("TraceViewer", "Loading trace file...");
-    let trace_data = load_trace_file("traces/trace_latest.json");
+    let trace_data = load_trace_file(&trace_file);
     
     if trace_data.is_none() {
-        dfx_error!("TraceViewer", "No trace file found. Run mono_editor_demo first to generate trace.");
+        dfx_error!("TraceViewer", "No trace file found: {}", trace_file);
+        dfx_info!("TraceViewer", "Run mono_editor_demo first to generate trace.");
         std::process::exit(1);
     }
     
@@ -406,4 +417,39 @@ fn get_category_color(category: &str) -> (f32, f32, f32) {
         "script" => (0.8, 0.6, 0.2),
         _ => (0.5, 0.5, 0.5),
     }
+}
+
+fn list_available_traces() {
+    println!("\n=== Available Trace Files ===");
+    
+    if let Ok(entries) = fs::read_dir("traces") {
+        let mut files: Vec<_> = entries
+            .filter_map(|e| e.ok())
+            .filter(|e| e.path().extension().map(|ext| ext == "json").unwrap_or(false))
+            .collect();
+        
+        files.sort_by(|a, b| {
+            b.metadata().and_then(|m| m.modified())
+                .unwrap_or(std::time::SystemTime::UNIX_EPOCH)
+                .cmp(&a.metadata().and_then(|m| m.modified())
+                    .unwrap_or(std::time::SystemTime::UNIX_EPOCH))
+        });
+        
+        if files.is_empty() {
+            println!("  No trace files found in traces/");
+            println!("  Run mono_editor_demo first to generate traces.");
+        } else {
+            println!("  Usage: trace_viewer_demo --file <path>");
+            println!("\n  Recent files:");
+            for (i, file) in files.iter().take(10).enumerate() {
+                let path_str = file.path().to_string_lossy().to_string();
+                let size = file.metadata().map(|m| m.len()).unwrap_or(0);
+                println!("    [{}] {} ({:.1} KB)", i + 1, path_str, size as f32 / 1024.0);
+            }
+            println!("\n  Default: traces/trace_latest.json");
+        }
+    } else {
+        println!("  traces/ directory not found");
+    }
+    println!();
 }
