@@ -1754,7 +1754,7 @@ let font_atlas = ui.get_font_atlas();
                 0,
                 bytemuck::cast_slice(&push_constant_data)
             );
-            self.device.cmd_draw(self.command_buffers[image_index_usize], 3, 1, 0, 0);
+            self.device.cmd_draw(self.command_buffers[image_index_usize], 36, 1, 0, 0); // 36 vertices for cube
             
             // End game render pass
             self.device.cmd_end_render_pass(self.command_buffers[image_index_usize]);
