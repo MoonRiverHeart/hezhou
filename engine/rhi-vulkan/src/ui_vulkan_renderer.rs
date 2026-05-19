@@ -1666,7 +1666,7 @@ let font_atlas = ui.get_font_atlas();
                 .map_err(|e| format!("Failed to begin command buffer: {}", e))?;
             
             // === Game Pass: Render triangle to offscreen ===
-            self.triangle_angle += 90.0 * 0.016;
+            self.triangle_angle += 90.0 * delta_time / 1000.0; // 90度/秒, delta_time is milliseconds
             if self.triangle_angle > 360.0 {
                 self.triangle_angle -= 360.0;
             }
@@ -1999,36 +1999,7 @@ let font_atlas = self.ui_system.lock().get_font_atlas();
             
             let mut vertices: Vec<f32> = Vec::new();
             
-            // 添加旋转三角形（在预览区域中心，作为背景）
-            let preview_x = 250.0f32;
-            let preview_y = 40.0f32;
-            let preview_w = self.extent.width as f32 - 500.0;
-            let preview_h = self.extent.height as f32 - 70.0;
-            
-            let center_x = preview_x + preview_w / 2.0;
-            let center_y = preview_y + preview_h / 2.0;
-            let radius = 80.0;
-            
-            self.triangle_angle += 90.0 * 0.016; // 90度/秒
-            if self.triangle_angle > 360.0 {
-                self.triangle_angle -= 360.0;
-            }
-            
-            let angle_rad = self.triangle_angle.to_radians();
-            
-            let p0 = (center_x + radius * angle_rad.cos(), center_y - radius * angle_rad.sin());
-            let p1 = (center_x + radius * (angle_rad + 2.094).cos(), center_y - radius * (angle_rad + 2.094).sin());
-            let p2 = (center_x + radius * (angle_rad + 4.189).cos(), center_y - radius * (angle_rad + 4.189).sin());
-            
-            let (r, g, b, a) = (1.0, 0.5, 0.8, 1.0);
-            
-            vertices.extend_from_slice(&[
-                p0.0, p0.1, r, g, b, a, 0.0, 0.0,
-                p1.0, p1.1, r, g, b, a, 0.0, 0.0,
-                p2.0, p2.1, r, g, b, a, 0.0, 0.0,
-            ]);
-            
-            // 渲染UI（在三角形之上）
+            // 渲染UI控件
             for cmd in render_data.iter().flat_map(|data| &data.draw_commands) {
                 match cmd {
 DrawCommand::Rect { bounds, width, height, fill_color, .. } => {
@@ -2178,11 +2149,14 @@ DrawCommand::Text { bounds, width, height, font_color, text, font_size, alignmen
             );
             
             // === Render preview texture in preview area ===
-            // Preview area: x=250, y=40, width=(1280-500)=780, height=(720-70)=650
+            // Preview area: same as UI _previewPanel bounds
+            // x = LEFT_PANEL_WIDTH = 250, y = TOOLBAR_HEIGHT = 40
+            // width = screenWidth - LEFT - RIGHT = 1280 - 250 - 250 = 780
+            // height = screenHeight - TOOLBAR - STATUS_BAR = 720 - 40 - 40 = 640
             let preview_x = 250.0f32;
             let preview_y = 40.0f32;
             let preview_w = self.extent.width as f32 - 500.0;
-            let preview_h = self.extent.height as f32 - 70.0;
+            let preview_h = self.extent.height as f32 - 80.0; // 40(toolbar) + 40(status)
             
             // Create preview quad vertices (texture_id = 1 for offscreen)
             let preview_vertices: [f32; 48] = [
@@ -2217,6 +2191,13 @@ DrawCommand::Text { bounds, width, height, font_color, text, font_size, alignmen
                 &[self.preview_descriptor_set],
                 &[]
             );
+            
+            // Set scissor to limit preview rendering area (prevent overlap with other UI)
+            let preview_scissor = vk::Rect2D {
+                offset: vk::Offset2D { x: preview_x as i32, y: preview_y as i32 },
+                extent: vk::Extent2D { width: preview_w as u32, height: preview_h as u32 },
+            };
+            self.device.cmd_set_scissor(self.command_buffers[image_index_usize], 0, &[preview_scissor]);
             
             // Draw preview quad
             self.device.cmd_bind_vertex_buffers(

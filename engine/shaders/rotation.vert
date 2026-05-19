@@ -5,9 +5,9 @@ layout(push_constant) uniform PushConstants {
 } pc;
 
 vec2 positions[3] = vec2[](
-    vec2(0.0, -0.5),
-    vec2(-0.5, 0.5),
-    vec2(0.5, 0.5)
+    vec2(0.0, -0.667),   // 顶部 (向下偏移使重心在origin)
+    vec2(-0.5, 0.333),   // 左下
+    vec2(0.5, 0.333)     // 右下
 );
 
 vec3 colors[3] = vec3[](
