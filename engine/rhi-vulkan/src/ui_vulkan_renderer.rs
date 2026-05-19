@@ -97,6 +97,24 @@ pub struct UIVulkanRenderer {
     triangle_angle: f32,
     last_frame_time: f64,
     content_scale: f32,
+    
+    // Game preview rendering (offscreen + FXAA)
+    game_render_pass: vk::RenderPass,
+    game_pipeline: vk::Pipeline,
+    game_pipeline_layout: vk::PipelineLayout,
+    offscreen_image: vk::Image,
+    offscreen_image_memory: vk::DeviceMemory,
+    offscreen_image_view: vk::ImageView,
+    offscreen_framebuffer: vk::Framebuffer,
+    offscreen_extent: vk::Extent2D,
+    
+    // FXAA post-processing
+    fxaa_pipeline: vk::Pipeline,
+    fxaa_pipeline_layout: vk::PipelineLayout,
+    fxaa_descriptor_set_layout: vk::DescriptorSetLayout,
+    fxaa_descriptor_pool: vk::DescriptorPool,
+    fxaa_descriptor_set: vk::DescriptorSet,
+    fxaa_sampler: vk::Sampler,
 }
 
 impl UIVulkanRenderer {
@@ -493,6 +511,195 @@ impl UIVulkanRenderer {
                 ..Default::default()
             }, None).map_err(|e| format!("Failed to create command pool: {}", e))?;
             
+            // === Game Preview Rendering Setup ===
+            logger.lock().log(LogLevel::Info, "Vulkan", "Creating game preview resources...", file!(), line!());
+            
+            // Offscreen image for game preview (use fixed size 512x512)
+            let offscreen_extent = vk::Extent2D { width: 512, height: 512 };
+            let offscreen_format = vk::Format::R8G8B8A8_UNORM;
+            
+            let (offscreen_image, offscreen_image_memory) = Self::create_offscreen_image(
+                &instance, &device, physical_device, offscreen_extent, offscreen_format
+            )?;
+            
+            let offscreen_image_view = device.create_image_view(&vk::ImageViewCreateInfo {
+                image: offscreen_image,
+                view_type: vk::ImageViewType::TYPE_2D,
+                format: offscreen_format,
+                subresource_range: vk::ImageSubresourceRange {
+                    aspect_mask: vk::ImageAspectFlags::COLOR,
+                    base_mip_level: 0,
+                    level_count: 1,
+                    base_array_layer: 0,
+                    layer_count: 1,
+                },
+                ..Default::default()
+            }, None).map_err(|e| format!("Failed to create offscreen image view: {}", e))?;
+            
+            // Game render pass (render to offscreen)
+            let game_render_pass = device.create_render_pass(&vk::RenderPassCreateInfo {
+                attachment_count: 1,
+                p_attachments: &vk::AttachmentDescription {
+                    format: offscreen_format,
+                    samples: vk::SampleCountFlags::TYPE_1,
+                    load_op: vk::AttachmentLoadOp::CLEAR,
+                    store_op: vk::AttachmentStoreOp::STORE,
+                    stencil_load_op: vk::AttachmentLoadOp::DONT_CARE,
+                    stencil_store_op: vk::AttachmentStoreOp::DONT_CARE,
+                    initial_layout: vk::ImageLayout::UNDEFINED,
+                    final_layout: vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
+                    ..Default::default()
+                },
+                subpass_count: 1,
+                p_subpasses: &vk::SubpassDescription {
+                    pipeline_bind_point: vk::PipelineBindPoint::GRAPHICS,
+                    color_attachment_count: 1,
+                    p_color_attachments: &vk::AttachmentReference {
+                        attachment: 0,
+                        layout: vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL,
+                    },
+                    ..Default::default()
+                },
+                ..Default::default()
+            }, None).map_err(|e| format!("Failed to create game render pass: {}", e))?;
+            
+            let offscreen_framebuffer = device.create_framebuffer(&vk::FramebufferCreateInfo {
+                render_pass: game_render_pass,
+                attachment_count: 1,
+                p_attachments: &offscreen_image_view,
+                width: offscreen_extent.width,
+                height: offscreen_extent.height,
+                layers: 1,
+                ..Default::default()
+            }, None).map_err(|e| format!("Failed to create offscreen framebuffer: {}", e))?;
+            
+            // Game pipeline (simple triangle shader, reuse rotation.vert/frag)
+            let game_vert_code = include_bytes!("../../shaders/rotation.vert.spv");
+            let game_frag_code = include_bytes!("../../shaders/rotation.frag.spv");
+            
+            let game_vert_shader = Self::create_shader_module(&device, game_vert_code)?;
+            let game_frag_shader = Self::create_shader_module(&device, game_frag_code)?;
+            
+            let game_pipeline_layout = device.create_pipeline_layout(&vk::PipelineLayoutCreateInfo {
+                push_constant_range_count: 1,
+                p_push_constant_ranges: &vk::PushConstantRange {
+                    stage_flags: vk::ShaderStageFlags::VERTEX,
+                    offset: 0,
+                    size: 4,
+                },
+                ..Default::default()
+            }, None).map_err(|e| format!("Failed to create game pipeline layout: {}", e))?;
+            
+            let game_pipeline = device.create_graphics_pipelines(vk::PipelineCache::null(), &[
+                vk::GraphicsPipelineCreateInfo {
+                    stage_count: 2,
+                    p_stages: &[
+                        vk::PipelineShaderStageCreateInfo {
+                            stage: vk::ShaderStageFlags::VERTEX,
+                            module: game_vert_shader,
+                            p_name: b"main\0".as_ptr() as *const i8,
+                            ..Default::default()
+                        },
+                        vk::PipelineShaderStageCreateInfo {
+                            stage: vk::ShaderStageFlags::FRAGMENT,
+                            module: game_frag_shader,
+                            p_name: b"main\0".as_ptr() as *const i8,
+                            ..Default::default()
+                        },
+                    ] as *const _,
+                    p_vertex_input_state: &vk::PipelineVertexInputStateCreateInfo {
+                        vertex_binding_description_count: 1,
+                        p_vertex_binding_descriptions: &vk::VertexInputBindingDescription {
+                            binding: 0,
+                            stride: 24,
+                            input_rate: vk::VertexInputRate::VERTEX,
+                        },
+                        vertex_attribute_description_count: 2,
+                        p_vertex_attribute_descriptions: &[
+                            vk::VertexInputAttributeDescription {
+                                location: 0,
+                                binding: 0,
+                                format: vk::Format::R32G32_SFLOAT,
+                                offset: 0,
+                            },
+                            vk::VertexInputAttributeDescription {
+                                location: 1,
+                                binding: 0,
+                                format: vk::Format::R32G32B32A32_SFLOAT,
+                                offset: 8,
+                            },
+                        ] as *const _,
+                        ..Default::default()
+                    },
+                    p_input_assembly_state: &vk::PipelineInputAssemblyStateCreateInfo {
+                        topology: vk::PrimitiveTopology::TRIANGLE_LIST,
+                        primitive_restart_enable: vk::FALSE,
+                        ..Default::default()
+                    },
+                    p_viewport_state: &vk::PipelineViewportStateCreateInfo {
+                        viewport_count: 1,
+                        p_viewports: &vk::Viewport {
+                            x: 0.0,
+                            y: 0.0,
+                            width: offscreen_extent.width as f32,
+                            height: offscreen_extent.height as f32,
+                            min_depth: 0.0,
+                            max_depth: 1.0,
+                        },
+                        scissor_count: 1,
+                        p_scissors: &vk::Rect2D {
+                            offset: vk::Offset2D { x: 0, y: 0 },
+                            extent: offscreen_extent,
+                        },
+                        ..Default::default()
+                    },
+                    p_rasterization_state: &vk::PipelineRasterizationStateCreateInfo {
+                        polygon_mode: vk::PolygonMode::FILL,
+                        cull_mode: vk::CullModeFlags::NONE,
+                        front_face: vk::FrontFace::CLOCKWISE,
+                        line_width: 1.0,
+                        ..Default::default()
+                    },
+                    p_multisample_state: &vk::PipelineMultisampleStateCreateInfo {
+                        rasterization_samples: vk::SampleCountFlags::TYPE_1,
+                        ..Default::default()
+                    },
+                    p_color_blend_state: &vk::PipelineColorBlendStateCreateInfo {
+                        logic_op_enable: vk::FALSE,
+                        attachment_count: 1,
+                        p_attachments: &vk::PipelineColorBlendAttachmentState {
+                            blend_enable: vk::FALSE,
+                            src_color_blend_factor: vk::BlendFactor::ONE,
+                            dst_color_blend_factor: vk::BlendFactor::ZERO,
+                            color_blend_op: vk::BlendOp::ADD,
+                            src_alpha_blend_factor: vk::BlendFactor::ONE,
+                            dst_alpha_blend_factor: vk::BlendFactor::ZERO,
+                            alpha_blend_op: vk::BlendOp::ADD,
+                            color_write_mask: vk::ColorComponentFlags::R | vk::ColorComponentFlags::G | vk::ColorComponentFlags::B | vk::ColorComponentFlags::A,
+                            ..Default::default()
+                        },
+                        ..Default::default()
+                    },
+                    layout: game_pipeline_layout,
+                    render_pass: game_render_pass,
+                    subpass: 0,
+                    ..Default::default()
+                }
+            ], None).map_err(|(_, e)| format!("Failed to create game pipeline: {}", e))?[0];
+            
+            device.destroy_shader_module(game_vert_shader, None);
+            device.destroy_shader_module(game_frag_shader, None);
+            
+            logger.lock().log(LogLevel::Info, "Vulkan", "Game preview resources created", file!(), line!());
+            
+            // FXAA resources (placeholder for now)
+            let fxaa_pipeline = vk::Pipeline::null();
+            let fxaa_pipeline_layout = vk::PipelineLayout::null();
+            let fxaa_descriptor_set_layout = vk::DescriptorSetLayout::null();
+            let fxaa_descriptor_pool = vk::DescriptorPool::null();
+            let fxaa_descriptor_set = vk::DescriptorSet::null();
+            let fxaa_sampler = vk::Sampler::null();
+            
             let command_buffers = device.allocate_command_buffers(&vk::CommandBufferAllocateInfo {
                 command_pool,
                 level: vk::CommandBufferLevel::PRIMARY,
@@ -583,7 +790,70 @@ impl UIVulkanRenderer {
                 triangle_angle: 0.0,
                 last_frame_time: 0.0,
                 content_scale,
+                
+                game_render_pass,
+                game_pipeline,
+                game_pipeline_layout,
+                offscreen_image,
+                offscreen_image_memory,
+                offscreen_image_view,
+                offscreen_framebuffer,
+                offscreen_extent,
+                
+                fxaa_pipeline,
+                fxaa_pipeline_layout,
+                fxaa_descriptor_set_layout,
+                fxaa_descriptor_pool,
+                fxaa_descriptor_set,
+                fxaa_sampler,
             })
+        }
+    }
+    
+    fn create_offscreen_image(
+        instance: &ash::Instance,
+        device: &ash::Device,
+        physical_device: vk::PhysicalDevice,
+        extent: vk::Extent2D,
+        format: vk::Format,
+    ) -> Result<(vk::Image, vk::DeviceMemory), String> {
+        unsafe {
+            let image = device.create_image(&vk::ImageCreateInfo {
+                image_type: vk::ImageType::TYPE_2D,
+                format,
+                extent: vk::Extent3D {
+                    width: extent.width,
+                    height: extent.height,
+                    depth: 1,
+                },
+                mip_levels: 1,
+                array_layers: 1,
+                samples: vk::SampleCountFlags::TYPE_1,
+                tiling: vk::ImageTiling::OPTIMAL,
+                usage: vk::ImageUsageFlags::COLOR_ATTACHMENT | vk::ImageUsageFlags::SAMPLED,
+                sharing_mode: vk::SharingMode::EXCLUSIVE,
+                ..Default::default()
+            }, None).map_err(|e| format!("Failed to create offscreen image: {}", e))?;
+            
+            let mem_requirements = device.get_image_memory_requirements(image);
+            let mem_properties = instance.get_physical_device_memory_properties(physical_device);
+            
+            let memory_type_index = Self::find_memory_type(
+                mem_requirements.memory_type_bits,
+                vk::MemoryPropertyFlags::DEVICE_LOCAL,
+                &mem_properties
+            );
+            
+            let memory = device.allocate_memory(&vk::MemoryAllocateInfo {
+                allocation_size: mem_requirements.size,
+                memory_type_index,
+                ..Default::default()
+            }, None).map_err(|e| format!("Failed to allocate offscreen memory: {}", e))?;
+            
+            device.bind_image_memory(image, memory, 0)
+                .map_err(|e| format!("Failed to bind offscreen memory: {}", e))?;
+            
+            Ok((image, memory))
         }
     }
     
@@ -1165,6 +1435,129 @@ let font_atlas = ui.get_font_atlas();
             self.device.begin_command_buffer(self.command_buffers[image_index_usize], &vk::CommandBufferBeginInfo::default())
                 .map_err(|e| format!("Failed to begin command buffer: {}", e))?;
             
+            // === Game Pass: Render triangle to offscreen ===
+            self.triangle_angle += 90.0 * 0.016;
+            if self.triangle_angle > 360.0 {
+                self.triangle_angle -= 360.0;
+            }
+            
+            // Transition offscreen image to COLOR_ATTACHMENT_OPTIMAL
+            let game_barrier_begin = vk::ImageMemoryBarrier {
+                old_layout: vk::ImageLayout::UNDEFINED,
+                new_layout: vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL,
+                src_queue_family_index: vk::QUEUE_FAMILY_IGNORED,
+                dst_queue_family_index: vk::QUEUE_FAMILY_IGNORED,
+                image: self.offscreen_image,
+                subresource_range: vk::ImageSubresourceRange {
+                    aspect_mask: vk::ImageAspectFlags::COLOR,
+                    base_mip_level: 0,
+                    level_count: 1,
+                    base_array_layer: 0,
+                    layer_count: 1,
+                },
+                src_access_mask: vk::AccessFlags::empty(),
+                dst_access_mask: vk::AccessFlags::COLOR_ATTACHMENT_WRITE,
+                ..Default::default()
+            };
+            self.device.cmd_pipeline_barrier(
+                self.command_buffers[image_index_usize],
+                vk::PipelineStageFlags::TOP_OF_PIPE,
+                vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT,
+                vk::DependencyFlags::empty(),
+                &[],
+                &[],
+                &[game_barrier_begin]
+            );
+            
+            // Begin game render pass
+            self.device.cmd_begin_render_pass(
+                self.command_buffers[image_index_usize],
+                &vk::RenderPassBeginInfo {
+                    render_pass: self.game_render_pass,
+                    framebuffer: self.offscreen_framebuffer,
+                    render_area: vk::Rect2D {
+                        offset: vk::Offset2D { x: 0, y: 0 },
+                        extent: self.offscreen_extent,
+                    },
+                    clear_value_count: 1,
+                    p_clear_values: &vk::ClearValue {
+                        color: vk::ClearColorValue {
+                            float32: [0.05, 0.05, 0.1, 1.0],
+                        },
+                    },
+                    _marker: std::marker::PhantomData,
+                    p_next: std::ptr::null(),
+                    s_type: vk::StructureType::RENDER_PASS_BEGIN_INFO,
+                },
+                vk::SubpassContents::INLINE
+            );
+            
+            // Bind game pipeline
+            self.device.cmd_bind_pipeline(
+                self.command_buffers[image_index_usize],
+                vk::PipelineBindPoint::GRAPHICS,
+                self.game_pipeline
+            );
+            
+            // Set viewport and scissor for game pass
+            let game_viewport = vk::Viewport {
+                x: 0.0,
+                y: 0.0,
+                width: self.offscreen_extent.width as f32,
+                height: self.offscreen_extent.height as f32,
+                min_depth: 0.0,
+                max_depth: 1.0,
+            };
+            let game_scissor = vk::Rect2D {
+                offset: vk::Offset2D { x: 0, y: 0 },
+                extent: self.offscreen_extent,
+            };
+            self.device.cmd_set_viewport(self.command_buffers[image_index_usize], 0, &[game_viewport]);
+            self.device.cmd_set_scissor(self.command_buffers[image_index_usize], 0, &[game_scissor]);
+            
+            // Draw triangle (rotation shader uses built-in vertex positions, no vertex buffer needed)
+            let push_constant_data = [self.triangle_angle.to_radians()];
+            self.device.cmd_push_constants(
+                self.command_buffers[image_index_usize],
+                self.game_pipeline_layout,
+                vk::ShaderStageFlags::VERTEX,
+                0,
+                bytemuck::cast_slice(&push_constant_data)
+            );
+            self.device.cmd_draw(self.command_buffers[image_index_usize], 3, 1, 0, 0);
+            
+            // End game render pass
+            self.device.cmd_end_render_pass(self.command_buffers[image_index_usize]);
+            
+            // Transition offscreen image to SHADER_READ_ONLY_OPTIMAL
+            let game_barrier_end = vk::ImageMemoryBarrier {
+                old_layout: vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL,
+                new_layout: vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
+                src_queue_family_index: vk::QUEUE_FAMILY_IGNORED,
+                dst_queue_family_index: vk::QUEUE_FAMILY_IGNORED,
+                image: self.offscreen_image,
+                subresource_range: vk::ImageSubresourceRange {
+                    aspect_mask: vk::ImageAspectFlags::COLOR,
+                    base_mip_level: 0,
+                    level_count: 1,
+                    base_array_layer: 0,
+                    layer_count: 1,
+                },
+                src_access_mask: vk::AccessFlags::COLOR_ATTACHMENT_WRITE,
+                dst_access_mask: vk::AccessFlags::SHADER_READ,
+                ..Default::default()
+            };
+            self.device.cmd_pipeline_barrier(
+                self.command_buffers[image_index_usize],
+                vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT,
+                vk::PipelineStageFlags::FRAGMENT_SHADER,
+                vk::DependencyFlags::empty(),
+                &[],
+                &[],
+                &[game_barrier_end]
+            );
+            
+            // === UI Pass: Render UI to swapchain ===
             self.device.cmd_begin_render_pass(
                 self.command_buffers[image_index_usize],
                 &vk::RenderPassBeginInfo {
