@@ -81,30 +81,28 @@ void main() {
         pos.x * sinA + pos.z * cosA
     );
     
-    // Camera view: yaw (Y rotation) + pitch (X rotation)
+    // View transform: translate to camera space then rotate
+    vec3 translated_pos = model_pos - vec3(pc.cameraX, pc.cameraY, pc.cameraZ);
+    
+    // Camera rotation: pitch (X axis) then yaw (Y axis)
     float yaw = pc.cameraYaw;
     float pitch = pc.cameraPitch;
     
-    // First: pitch (rotate around X axis)
     float cosP = cos(pitch);
     float sinP = sin(pitch);
     vec3 pitched_pos = vec3(
-        model_pos.x,
-        model_pos.y * cosP - model_pos.z * sinP,
-        model_pos.y * sinP + model_pos.z * cosP
+        translated_pos.x,
+        translated_pos.y * cosP - translated_pos.z * sinP,
+        translated_pos.y * sinP + translated_pos.z * cosP
     );
     
-    // Second: yaw (rotate around Y axis)
     float cosY = cos(yaw);
     float sinY = sin(yaw);
-    vec3 yawed_pos = vec3(
+    vec3 view_pos = vec3(
         pitched_pos.x * cosY + pitched_pos.z * sinY,
         pitched_pos.y,
         -pitched_pos.x * sinY + pitched_pos.z * cosY
     );
-    
-    // View transform: translate by camera position
-    vec3 view_pos = yawed_pos - vec3(pc.cameraX, pc.cameraY, pc.cameraZ);
     
     // Perspective projection (dynamic aspect ratio)
     float aspect = pc.width / pc.height;
