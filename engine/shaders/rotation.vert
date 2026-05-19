@@ -4,6 +4,18 @@ layout(push_constant) uniform PushConstants {
     float rotation;
 } pc;
 
+// Perspective projection matrix
+// FOV=60°, aspect=1.0, near=0.1, far=100.0
+mat4 perspective(float fov, float aspect, float near, float far) {
+    float f = 1.0 / tan(fov * 0.5);
+    return mat4(
+        f / aspect, 0.0, 0.0, 0.0,
+        0.0, f, 0.0, 0.0,
+        0.0, 0.0, (far + near) / (near - far), -1.0,
+        0.0, 0.0, (2.0 * far * near) / (near - far), 0.0
+    );
+}
+
 // Cube vertices (8 corners)
 vec3 positions[8] = vec3[](
     vec3(-0.5, -0.5, -0.5),  // 0: back-bottom-left
@@ -17,26 +29,19 @@ vec3 positions[8] = vec3[](
 );
 
 // 36 vertices for 6 faces (2 triangles per face)
-// Face indices: 0=back, 1=front, 2=left, 3=right, 4=bottom, 5=top
 int vertex_indices[36] = int[](
     // Back face (Z-) - red
-    0, 2, 1,
-    0, 3, 2,
+    0, 2, 1, 0, 3, 2,
     // Front face (Z+) - green
-    4, 5, 6,
-    4, 6, 7,
+    4, 5, 6, 4, 6, 7,
     // Left face (X-) - blue
-    0, 4, 7,
-    0, 7, 3,
+    0, 4, 7, 0, 7, 3,
     // Right face (X+) - yellow
-    1, 6, 5,
-    1, 2, 6,
+    1, 6, 5, 1, 2, 6,
     // Bottom face (Y-) - cyan
-    0, 1, 5,
-    0, 5, 4,
+    0, 1, 5, 0, 5, 4,
     // Top face (Y+) - magenta
-    3, 7, 6,
-    3, 6, 2
+    3, 7, 6, 3, 6, 2
 );
 
 // Face colors
@@ -53,32 +58,37 @@ layout(location = 0) out vec3 fragColor;
 
 void main() {
     int vertex_idx = vertex_indices[gl_VertexIndex];
-    int face_idx = gl_VertexIndex / 6;  // Each face has 6 vertices
+    int face_idx = gl_VertexIndex / 6;
     
     vec3 pos = positions[vertex_idx];
     
-    // Rotate around Y axis
+    // Model transform: rotate around Y then tilt around X
     float angle = pc.rotation;
     float cosA = cos(angle);
     float sinA = sin(angle);
     
-    vec3 rotated = vec3(
+    vec3 rotated_y = vec3(
         pos.x * cosA - pos.z * sinA,
         pos.y,
         pos.x * sinA + pos.z * cosA
     );
     
-    // Slight rotation around X axis for better view
-    float tilt = 0.3;
+    float tilt = 0.5;
     float cosT = cos(tilt);
     float sinT = sin(tilt);
     
-    vec3 final_pos = vec3(
-        rotated.x,
-        rotated.y * cosT - rotated.z * sinT,
-        rotated.y * sinT + rotated.z * cosT
+    vec3 model_pos = vec3(
+        rotated_y.x,
+        rotated_y.y * cosT - rotated_y.z * sinT,
+        rotated_y.y * sinT + rotated_y.z * cosT
     );
     
-    gl_Position = vec4(final_pos, 1.0);
+    // View transform: push cube back so it's visible (z = -3)
+    vec3 view_pos = model_pos + vec3(0.0, 0.0, -3.0);
+    
+    // Perspective projection
+    mat4 proj = perspective(1.0472, 1.0, 0.1, 100.0); // 60° FOV
+    gl_Position = proj * vec4(view_pos, 1.0);
+    
     fragColor = face_colors[face_idx];
 }
