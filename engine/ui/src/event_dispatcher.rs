@@ -1,10 +1,9 @@
 use crate::event::*;
 use crate::gesture::*;
 use crate::gesture_recognizer::*;
-use crate::thunk_manager::*;
 use crate::types::*;
 use crate::widget_tree::*;
-use hezhou_dfx::DfxSystem;
+use hezhou_dfx::{DfxSystem, dfx_debug};
 use parking_lot::Mutex;
 use std::sync::Arc;
 
@@ -197,7 +196,7 @@ impl EventDispatcher {
                     let relative_x = window_x - abs_layout.x;
                     let relative_y = window_y - abs_layout.y;
                     
-                    println!("[Dispatch] Widget {}: window ({}, {}) -> relative ({}, {})", 
+                    dfx_debug!("Dispatch", "Widget {}: window ({}, {}) -> relative ({}, {})", 
                              widget_id.id, window_x, window_y, relative_x, relative_y);
                     
                     let mut converted = event.clone();

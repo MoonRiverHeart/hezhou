@@ -1,7 +1,7 @@
 use crate::event::*;
 use crate::gesture::*;
 use crate::types::*;
-use hezhou_dfx::*;
+use hezhou_dfx::{DfxSystem, dfx_debug};
 use parking_lot::Mutex;
 use std::sync::Arc;
 
@@ -56,7 +56,7 @@ impl GestureRecognizer {
 
             self.active_gestures.push(gesture);
 
-            println!("[GestureRecognizer] TouchBegin: target={}", event.target.id);
+            dfx_debug!("Gesture", "TouchBegin: target={}", event.target.id);
         }
         None
     }
@@ -111,8 +111,7 @@ impl GestureRecognizer {
                                     GestureType::Tap
                                 };
 
-                                println!(
-                                    "[GestureRecognizer] {} recognized: target={}",
+                                dfx_debug!("Gesture", "{} recognized: target={}",
                                     match gesture_type {
                                         GestureType::Tap => "Tap",
                                         GestureType::DoubleTap => "DoubleTap",

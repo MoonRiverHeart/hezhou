@@ -12,6 +12,8 @@ pub use event::*;
 pub use traits::*;
 pub use window::*;
 
+use hezhou_dfx::*;
+
 #[cfg(feature = "glfw")]
 pub use glfw_backend::GLFWPlatform;
 
@@ -131,7 +133,7 @@ pub extern "C" fn platform_init_glfw(manager: *mut PlatformManager) -> i32 {
         match (*manager).create_glfw_platform() {
             Ok(_) => 0,
             Err(e) => {
-                eprintln!("GLFW init failed: {}", e);
+                dfx_error!("Platform", "GLFW init failed: {}", e);
                 -1
             }
         }
@@ -149,7 +151,7 @@ pub extern "C" fn platform_init_harmony(manager: *mut PlatformManager) -> i32 {
         match (*manager).create_harmony_platform() {
             Ok(_) => 0,
             Err(e) => {
-                eprintln!("Harmony init failed: {}", e);
+                dfx_error!("Platform", "Harmony init failed: {}", e);
                 -1
             }
         }

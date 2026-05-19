@@ -1,6 +1,6 @@
 use crate::animation::*;
 use crate::types::*;
-use hezhou_dfx::*;
+use hezhou_dfx::{DfxSystem, dfx_debug, dfx_trace};
 use parking_lot::Mutex;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -36,17 +36,14 @@ impl AnimationEngine {
                 self.running_animations.push(id);
             }
 
-            println!(
-                "[AnimationEngine] Animation started: id={}, duration={}s",
-                id.id, anim.duration
-            );
+            dfx_debug!("Animation", "Animation started: id={}, duration={}s", id.id, anim.duration);
         }
     }
 
     pub fn pause_animation(&mut self, id: AnimationId) {
         if let Some(anim) = self.animations.get_mut(&id) {
             anim.paused = true;
-            println!("[AnimationEngine] Animation paused: id={}", id.id);
+            dfx_debug!("Animation", "Animation paused: id={}", id.id);
         }
     }
 
@@ -57,7 +54,7 @@ impl AnimationEngine {
 
             self.running_animations
                 .retain(|running_id| *running_id != id);
-            println!("[AnimationEngine] Animation cancelled: id={}", id.id);
+            dfx_debug!("Animation", "Animation cancelled: id={}", id.id);
         }
     }
 
@@ -73,12 +70,7 @@ impl AnimationEngine {
 
             let current_value = anim.current_value();
 
-            println!(
-                "[AnimationEngine] Animation {} updated: progress={}, value={}",
-                id.id,
-                anim.elapsed_time / anim.duration,
-                current_value
-            );
+            dfx_trace!("Animation", "Animation {} updated: progress={}, value={}", id.id, anim.elapsed_time / anim.duration, current_value);
 
             if anim.is_complete() {
                 if anim.repeat_count > 1 {
@@ -92,7 +84,7 @@ impl AnimationEngine {
                     }
                 } else {
                     anim.running = false;
-                    println!("[AnimationEngine] Animation completed: id={}", id.id);
+                    dfx_debug!("Animation", "Animation completed: id={}", id.id);
                 }
             }
         }
