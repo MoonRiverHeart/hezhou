@@ -2498,6 +2498,15 @@ self.dfx.lock().get_logger().lock().log(
                         Action::Repeat => KeyAction::Repeat,
                     };
                     
+                    // Escape键
+                    if key == Key::Escape {
+                        self.input_handler.lock().on_key_event(&KeyEvent {
+                            action: key_action,
+                            keycode: KeyCode::Escape,
+                            modifiers: KeyModifiers::default(),
+                        }, self.frame_count);
+                    }
+                    
                     if key == Key::Backspace {
                         self.input_handler.lock().on_key_event(&KeyEvent {
                             action: key_action,
@@ -2576,8 +2585,6 @@ self.dfx.lock().get_logger().lock().log(
                             }, self.frame_count);
                         }
                     }
-                    
-                    dfx_info!("GLFW", "Key: {:?} action={:?} mods={:?}", key, action, mods);
                 }
                 WindowEvent::Char(codepoint) => {
                     if codepoint >= ' ' {
