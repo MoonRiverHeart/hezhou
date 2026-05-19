@@ -4,6 +4,7 @@ use crate::layout::*;
 use crate::style::*;
 use crate::types::*;
 use crate::widget::*;
+use hezhou_dfx::*;
 use hezhou_platform::KeyCode;
 use parking_lot::Mutex;
 use std::sync::LazyLock;
@@ -172,7 +173,7 @@ impl TextEdit {
             self.cursor_grapheme_index -= 1;
             self.cursor_byte_index = self.grapheme_index_to_byte_index(self.cursor_grapheme_index);
             self.flags.dirty_render = true;
-            println!("[TextEdit] Move left: grapheme_index={}, byte_index={}", 
+            dfx_info!("TextEdit", "Move left: grapheme_index={}, byte_index={}", 
                      self.cursor_grapheme_index, self.cursor_byte_index);
         }
     }
@@ -183,7 +184,7 @@ impl TextEdit {
             self.cursor_grapheme_index += 1;
             self.cursor_byte_index = self.grapheme_index_to_byte_index(self.cursor_grapheme_index);
             self.flags.dirty_render = true;
-            println!("[TextEdit] Move right: grapheme_index={}, byte_index={}", 
+            dfx_info!("TextEdit", "Move right: grapheme_index={}, byte_index={}", 
                      self.cursor_grapheme_index, self.cursor_byte_index);
         }
     }
@@ -211,7 +212,7 @@ impl TextEdit {
                     self.cursor_grapheme_index = layout.grapheme_index;
                     self.cursor_byte_index = layout.grapheme_start_byte;
                     self.flags.dirty_render = true;
-                    println!("[TextEdit] Move up: grapheme_index={}", self.cursor_grapheme_index);
+                    dfx_info!("TextEdit", "Move up: grapheme_index={}", self.cursor_grapheme_index);
                 }
             }
         }
@@ -240,7 +241,7 @@ impl TextEdit {
                     self.cursor_grapheme_index = layout.grapheme_index;
                     self.cursor_byte_index = layout.grapheme_start_byte;
                     self.flags.dirty_render = true;
-                    println!("[TextEdit] Move down: grapheme_index={}", self.cursor_grapheme_index);
+                    dfx_info!("TextEdit", "Move down: grapheme_index={}", self.cursor_grapheme_index);
                 }
             }
         }
@@ -257,7 +258,7 @@ impl TextEdit {
         self.cursor_byte_index = line_start_byte;
         self.cursor_grapheme_index = self.byte_index_to_grapheme_index(line_start_byte);
         self.flags.dirty_render = true;
-        println!("[TextEdit] Move to line start: grapheme_index={}", self.cursor_grapheme_index);
+        dfx_info!("TextEdit", "Move to line start: grapheme_index={}", self.cursor_grapheme_index);
     }
     
     fn move_cursor_to_line_end(&mut self) {
@@ -271,7 +272,7 @@ impl TextEdit {
         self.cursor_byte_index = line_end_byte;
         self.cursor_grapheme_index = self.byte_index_to_grapheme_index(line_end_byte);
         self.flags.dirty_render = true;
-        println!("[TextEdit] Move to line end: grapheme_index={}", self.cursor_grapheme_index);
+        dfx_info!("TextEdit", "Move to line end: grapheme_index={}", self.cursor_grapheme_index);
     }
     
     fn find_char_layout_at_cursor(&self) -> Option<&CharLayout> {
@@ -285,12 +286,12 @@ impl TextEdit {
     }
     
     fn find_cursor_position_at(&self, click_x: f32, click_y: f32) -> usize {
-        println!("[Click] Finding cursor position at ({}, {})", click_x, click_y);
+        dfx_info!("Click", "Finding cursor position at ({}, {})", click_x, click_y);
         
         let num_graphemes = self.text.graphemes(true).count();
         
         if !self.char_layouts.is_empty() {
-            println!("[Click] Using precise char_layouts ({} graphemes)", self.char_layouts.len());
+            dfx_info!("Click", "Using precise char_layouts ({} graphemes)", self.char_layouts.len());
             
             let max_bearing_y = self.cached_max_bearing_y;
             let font_size = self.text_style.font_size;
@@ -314,7 +315,7 @@ impl TextEdit {
                 }
             }
             
-            println!("[Click] Closest baseline_y: {}", closest_line_y);
+            dfx_info!("Click", "Closest baseline_y: {}", closest_line_y);
             
             for layout in &self.char_layouts {
                 if layout.y == closest_line_y {
@@ -338,11 +339,11 @@ impl TextEdit {
             // 确保不超过文本长度
             best_grapheme_idx = best_grapheme_idx.min(num_graphemes);
             
-            println!("[Click] Final grapheme_index={}, byte_index={}", best_grapheme_idx, best_byte_idx);
+            dfx_info!("Click", "Final grapheme_index={}, byte_index={}", best_grapheme_idx, best_byte_idx);
             return best_grapheme_idx;
         }
         
-        println!("[Click] No char_layouts, returning 0");
+        dfx_info!("Click", "No char_layouts, returning 0");
         0
     }
 }
@@ -685,7 +686,7 @@ impl Widget for TextEdit {
                     }
                 }
                 
-                println!("[TextEdit] TouchBegin received");
+                dfx_info!("TextEdit", "TouchBegin received");
                 self.focused = true;
                 self.cursor_visible = true;
                 
@@ -693,7 +694,7 @@ impl Widget for TextEdit {
                     let click_x = touch_data.x;
                     let click_y = touch_data.y + self.scroll_offset_y;
                     let shift_pressed = touch_data.modifiers & 1 != 0;
-                    println!("[Click] Click at ({}, {}), shift={}", click_x, click_y, shift_pressed);
+                    dfx_info!("Click", "Click at ({}, {}), shift={}", click_x, click_y, shift_pressed);
                     
                     let num_graphemes = self.text.graphemes(true).count();
                     let new_grapheme_idx = self.find_cursor_position_at(click_x, click_y).min(num_graphemes);
@@ -706,7 +707,7 @@ impl Widget for TextEdit {
                         } else {
                             self.selection_end = new_grapheme_idx;
                         }
-                        println!("[TextEdit] Selection: {} to {}", self.selection_start, self.selection_end);
+                        dfx_info!("TextEdit", "Selection: {} to {}", self.selection_start, self.selection_end);
                     } else {
                         self.selection_start = new_grapheme_idx;
                         self.selection_end = new_grapheme_idx;
@@ -714,7 +715,7 @@ impl Widget for TextEdit {
                         self.cursor_byte_index = new_byte_idx;
                     }
                     
-                    println!("[Click] cursor_grapheme_index={}, cursor_byte_index={}", 
+                    dfx_info!("Click", "cursor_grapheme_index={}, cursor_byte_index={}", 
                              self.cursor_grapheme_index, self.cursor_byte_index);
                 }
                 
@@ -753,7 +754,7 @@ impl Widget for TextEdit {
                         self.cursor_grapheme_index = new_grapheme_idx;
                         self.cursor_byte_index = new_byte_idx;
                         
-                        println!("[Drag] Selection: {} to {}", self.selection_start, self.selection_end);
+                        dfx_info!("Drag", "Selection: {} to {}", self.selection_start, self.selection_end);
                         self.flags.dirty_render = true;
                         return EventResult::Handled;
                     }
@@ -767,14 +768,14 @@ impl Widget for TextEdit {
                 }
                 
                 if self.focused {
-                    println!("[TextEdit] TouchEnd, finalizing selection");
+                    dfx_info!("TextEdit", "TouchEnd, finalizing selection");
                 }
             }
             EventType::KeyDown => {
-                println!("[TextEdit] KeyDown received, focused={}", self.focused);
+                dfx_info!("TextEdit", "KeyDown received, focused={}", self.focused);
                 if self.focused {
                     if let EventData::Key(key_data) = &event.data {
-                        println!("[TextEdit] keycode={}, unicode={}, modifiers={}", 
+                        dfx_info!("TextEdit", "keycode={}, unicode={}, modifiers={}", 
                                  key_data.keycode, key_data.unicode_char, key_data.modifiers);
                         
                         let ctrl_pressed = key_data.modifiers & 2 != 0;
@@ -793,30 +794,30 @@ impl Widget for TextEdit {
                                 
                                 if let Ok(mut clipboard) = Clipboard::new() {
                                     if let Err(e) = clipboard.set_text(&text_to_copy) {
-                                        println!("[TextEdit] Clipboard set error: {:?}", e);
+                                        dfx_error!("TextEdit", "Clipboard set error: {:?}", e);
                                         let mut backup = CLIPBOARD_BACKUP.lock();
                                         *backup = text_to_copy.clone();
                                     } else {
-                                        println!("[TextEdit] Ctrl+C: copied {} chars to system clipboard", text_to_copy.len());
+                                        dfx_info!("TextEdit", "Ctrl+C: copied {} chars to system clipboard", text_to_copy.len());
                                     }
                                 } else {
                                     let mut backup = CLIPBOARD_BACKUP.lock();
                                     *backup = text_to_copy.clone();
-                                    println!("[TextEdit] Ctrl+C: copied {} chars to backup (no system clipboard)", text_to_copy.len());
+                                    dfx_info!("TextEdit", "Ctrl+C: copied {} chars to backup (no system clipboard)", text_to_copy.len());
                                 }
                                 return EventResult::Handled;
                             }
                             if key_data.keycode == KeyCode::V as u32 {
                                 let text_to_paste = if let Ok(mut clipboard) = Clipboard::new() {
                                     clipboard.get_text().unwrap_or_else(|e| {
-                                        println!("[TextEdit] Clipboard get error: {:?}", e);
+                                        dfx_error!("TextEdit", "Clipboard get error: {:?}", e);
                                         CLIPBOARD_BACKUP.lock().clone()
                                     })
                                 } else {
                                     CLIPBOARD_BACKUP.lock().clone()
                                 };
                                 
-                                println!("[TextEdit] Ctrl+V: pasting {} chars", text_to_paste.len());
+                                dfx_info!("TextEdit", "Ctrl+V: pasting {} chars", text_to_paste.len());
                                 for grapheme in text_to_paste.graphemes(true) {
                                     self.insert_grapheme(grapheme);
                                 }
@@ -845,11 +846,11 @@ impl Widget for TextEdit {
                                 
                                 if let Ok(mut clipboard) = Clipboard::new() {
                                     if let Err(e) = clipboard.set_text(&text_to_cut) {
-                                        println!("[TextEdit] Clipboard set error: {:?}", e);
+                                        dfx_error!("TextEdit", "Clipboard set error: {:?}", e);
                                         let mut backup = CLIPBOARD_BACKUP.lock();
                                         *backup = text_to_cut.clone();
                                     } else {
-                                        println!("[TextEdit] Ctrl+X: cut {} chars to system clipboard", text_to_cut.len());
+                                        dfx_info!("TextEdit", "Ctrl+X: cut {} chars to system clipboard", text_to_cut.len());
                                     }
                                 } else {
                                     let mut backup = CLIPBOARD_BACKUP.lock();
@@ -867,7 +868,7 @@ impl Widget for TextEdit {
                         if key_data.unicode_char > 0 {
                             let c = char::from_u32(key_data.unicode_char);
                             if let Some(c) = c {
-                                println!("[TextEdit] Inserting char: '{}' (unicode={})", c, key_data.unicode_char);
+                                dfx_info!("TextEdit", "Inserting char: '{}' (unicode={})", c, key_data.unicode_char);
                                 self.insert_char(c);
                                 return EventResult::Handled;
                             }
@@ -875,32 +876,32 @@ impl Widget for TextEdit {
                         
                         // Backspace删除（删除前一个grapheme）
                         if key_data.keycode == KeyCode::Backspace as u32 {
-                            println!("[TextEdit] Backspace, deleting grapheme");
+                            dfx_info!("TextEdit", "Backspace, deleting grapheme");
                             self.delete_char();
                             return EventResult::Handled;
                         }
                         
                         // 方向键导航
-                        println!("[TextEdit] Checking arrow keys: keycode={}, Left={}, Right={}, Up={}, Down={}", 
+                        dfx_info!("TextEdit", "Checking arrow keys: keycode={}, Left={}, Right={}, Up={}, Down={}", 
                                  key_data.keycode, KeyCode::Left as u32, KeyCode::Right as u32, KeyCode::Up as u32, KeyCode::Down as u32);
                         
                         if key_data.keycode == KeyCode::Left as u32 {
-                            println!("[TextEdit] ArrowLeft detected!");
+                            dfx_info!("TextEdit", "ArrowLeft detected!");
                             self.move_cursor_left();
                             return EventResult::Handled;
                         }
                         if key_data.keycode == KeyCode::Right as u32 {
-                            println!("[TextEdit] ArrowRight detected!");
+                            dfx_info!("TextEdit", "ArrowRight detected!");
                             self.move_cursor_right();
                             return EventResult::Handled;
                         }
                         if key_data.keycode == KeyCode::Up as u32 {
-                            println!("[TextEdit] ArrowUp detected!");
+                            dfx_info!("TextEdit", "ArrowUp detected!");
                             self.move_cursor_up();
                             return EventResult::Handled;
                         }
                         if key_data.keycode == KeyCode::Down as u32 {
-                            println!("[TextEdit] ArrowDown detected!");
+                            dfx_info!("TextEdit", "ArrowDown detected!");
                             self.move_cursor_down();
                             return EventResult::Handled;
                         }
@@ -915,7 +916,7 @@ impl Widget for TextEdit {
                             return EventResult::Handled;
                         }
                         
-                        println!("[TextEdit] KeyDown ignored: keycode={}, unicode={}, ctrl={}", 
+                        dfx_info!("TextEdit", "KeyDown ignored: keycode={}, unicode={}, ctrl={}", 
                             key_data.keycode, key_data.unicode_char, ctrl_pressed);
                     }
                 }

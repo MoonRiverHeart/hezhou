@@ -8,6 +8,7 @@ name = "hezhou_platform"
 path = "src/lib.rs"
 
 [dependencies]
+hezhou-dfx = { path = "../dfx" }
 hezhou-scripting = { path = "../scripting" }
 parking_lot = "0.12"
 

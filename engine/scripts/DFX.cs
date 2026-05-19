@@ -13,6 +13,76 @@ namespace Hezhou
         Fatal = 5
     }
 
+    public static class Log
+    {
+        private static IntPtr _dfxHandle = IntPtr.Zero;
+
+        public static void Init(IntPtr dfxHandle)
+        {
+            _dfxHandle = dfxHandle;
+        }
+
+        public static void Trace(string module, string message)
+        {
+            if (_dfxHandle != IntPtr.Zero)
+                NativeMethods.dfx_log(_dfxHandle, (byte)LogLevel.Trace, module, message, "", 0);
+            else
+                Console.WriteLine($"[TRACE][{module}] {message}");
+        }
+
+        public static void Debug(string module, string message)
+        {
+            if (_dfxHandle != IntPtr.Zero)
+                NativeMethods.dfx_log(_dfxHandle, (byte)LogLevel.Debug, module, message, "", 0);
+            else
+                Console.WriteLine($"[DEBUG][{module}] {message}");
+        }
+
+        public static void Info(string module, string message)
+        {
+            if (_dfxHandle != IntPtr.Zero)
+                NativeMethods.dfx_log(_dfxHandle, (byte)LogLevel.Info, module, message, "", 0);
+            else
+                Console.WriteLine($"[INFO][{module}] {message}");
+        }
+
+        public static void Warn(string module, string message)
+        {
+            if (_dfxHandle != IntPtr.Zero)
+                NativeMethods.dfx_log(_dfxHandle, (byte)LogLevel.Warn, module, message, "", 0);
+            else
+                Console.WriteLine($"[WARN][{module}] {message}");
+        }
+
+        public static void Error(string module, string message)
+        {
+            if (_dfxHandle != IntPtr.Zero)
+                NativeMethods.dfx_log(_dfxHandle, (byte)LogLevel.Error, module, message, "", 0);
+            else
+                Console.WriteLine($"[ERROR][{module}] {message}");
+        }
+
+        public static void Fatal(string module, string message)
+        {
+            if (_dfxHandle != IntPtr.Zero)
+                NativeMethods.dfx_log(_dfxHandle, (byte)LogLevel.Fatal, module, message, "", 0);
+            else
+                Console.WriteLine($"[FATAL][{module}] {message}");
+        }
+
+        public static void TraceBegin(string name, string category = "ui")
+        {
+            if (_dfxHandle != IntPtr.Zero)
+                NativeMethods.dfx_trace_begin(_dfxHandle, name, category);
+        }
+
+        public static void TraceEnd(string name, string category = "ui")
+        {
+            if (_dfxHandle != IntPtr.Zero)
+                NativeMethods.dfx_trace_end(_dfxHandle, name, category);
+        }
+    }
+
     public class DFX : IDisposable
     {
         private IntPtr _handle;
@@ -27,6 +97,7 @@ namespace Hezhou
         private DFX(IntPtr handle)
         {
             _handle = handle;
+            Log.Init(handle);
         }
 
         public void EnableAll()
@@ -37,6 +108,11 @@ namespace Hezhou
         public void SetLogLevel(LogLevel level)
         {
             NativeMethods.dfx_set_log_level(_handle, (byte)level);
+        }
+
+        public void EnableFileOutput(string path)
+        {
+            NativeMethods.dfx_enable_file_output(_handle, path);
         }
 
         public void Log(string message, LogLevel level = LogLevel.Info, string module = "UIScript")
@@ -119,6 +195,9 @@ namespace Hezhou
 
             [DllImport("hezhou_scripting", CallingConvention = CallingConvention.Cdecl)]
             public static extern void dfx_clear_log_buffer(IntPtr system);
+
+            [DllImport("hezhou_scripting", CallingConvention = CallingConvention.Cdecl)]
+            public static extern int dfx_enable_file_output(IntPtr system, string path);
         }
     }
 }

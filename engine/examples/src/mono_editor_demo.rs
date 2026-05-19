@@ -1,6 +1,7 @@
 use hezhou_rhi_vulkan::UIVulkanRenderer;
 use hezhou_scripting::{MonoUIExecutor, ffi_context::{FfiContext, WidgetTreeHandle}};
 use hezhou_ui::ffi as ui_ffi;
+use hezhou_dfx::*;
 use std::time::Duration;
 use std::sync::atomic::{AtomicBool, Ordering};
 
@@ -13,34 +14,41 @@ pub extern "C" fn trigger_hot_reload() {
 }
 
 fn main() {
-    println!("=== Hezhou Game Editor ===\n");
+    let dfx = init_dfx();
+    dfx.lock().get_logger().lock().set_level(LogLevel::Info);
     
-    println!("[布局说明]");
-    println!("  - 顶部: 工具栏 (40px)");
-    println!("  - 左侧: 项目结构 (250px)");
-    println!("  - 左下: 资产管理 (200px)");
-    println!("  - 中间: 游戏预览区域");
-    println!("  - 右侧: 属性面板 (250px)");
-    println!("  - 底部: 状态栏 (30px)\n");
+    let log_path = format!("logs/hezhou_{}.log", chrono::Local::now().format("%Y-%m-%d"));
+    std::fs::create_dir_all("logs").ok();
+    if let Err(e) = dfx.lock().get_logger().lock().enable_file_output(&log_path) {
+        dfx_error!("Demo", "Failed to enable file output: {}", e);
+    }
     
-    println!("[1] 创建编辑器窗口 (1280x720)...");
+    dfx_info!("Demo", "=== Hezhou Game Editor ===");
+    dfx_info!("Demo", "Log file: {}", log_path);
+    dfx_info!("Demo", "[1] 创建编辑器窗口 (1280x720)...");
+    
     let mut renderer = UIVulkanRenderer::new(1280, 720, "Hezhou Game Editor")
         .expect("Failed to create renderer");
-    println!("    窗口创建成功!\n");
+    dfx_info!("Demo", "窗口创建成功!");
 
-    println!("[2] 设置UI Root Panel...");
+    dfx_info!("Demo", "[2] 设置UI Root Panel...");
     renderer.setup_ui_for_script();
     ui_ffi::ui_set_screen_size(1280.0, 720.0);
     let content_scale = renderer.get_content_scale();
     ui_ffi::ui_set_content_scale(content_scale);
-    println!("    Content scale: {} (DPI: {})", content_scale, content_scale * 96.0);
-    println!("    Root Panel设置完成!\n");
+    dfx_info!("Demo", "Content scale: {} (DPI: {})", content_scale, content_scale * 96.0);
 
-    println!("[3] 编译C#编辑器脚本...");
+    dfx_info!("Demo", "[3] 编译C#编辑器脚本...");
     compile_editor_script();
 
-    println!("[4] 设置FFI Context...");
+    dfx_info!("Demo", "[4] 设置FFI Context...");
     let widget_tree_handle: WidgetTreeHandle = renderer.get_widget_tree_handle() as WidgetTreeHandle;
+    
+    let dfx_for_csharp = hezhou_dfx::dfx_create();
+    hezhou_dfx::dfx_set_log_level(dfx_for_csharp, 2);
+    
+    let log_path_c = std::ffi::CString::new(log_path.clone()).unwrap();
+    hezhou_dfx::dfx_enable_file_output(dfx_for_csharp, log_path_c.as_ptr());
     
     let ffi_ctx = FfiContext {
         ui_get_primary_button_id: ui_ffi::ui_get_primary_button_id,
@@ -78,59 +86,54 @@ fn main() {
         ui_text_edit_get_text: unsafe { std::mem::transmute(ui_ffi::ui_text_edit_get_text as *const std::ffi::c_void) },
         ui_trigger_hot_reload: trigger_hot_reload,
         widget_tree_ptr: widget_tree_handle,
+        dfx_handle: dfx_for_csharp as *mut std::ffi::c_void,
     };
     hezhou_scripting::ffi_context::set_ffi_context(ffi_ctx);
     let ffi_ptr = hezhou_scripting::ffi_context::get_ffi_context_ptr();
-    println!("    FfiContext已设置, ptr={:?}\n", ffi_ptr);
+    dfx_info!("Demo", "FfiContext已设置, ptr={:?}", ffi_ptr);
 
-    println!("[5] 加载Mono DLL...");
+    dfx_info!("Demo", "[5] 加载Mono DLL...");
     let dll_path = "scripts/bin/Mono/EditorScript.dll";
     let executor = MonoUIExecutor::new(dll_path)
         .expect("Failed to load Mono DLL");
     
-    // 存储到static
     unsafe {
         EXECUTOR = Some(executor);
     }
-    println!("    加载成功!\n");
+    dfx_info!("Demo", "加载成功!");
 
-    println!("[6] 调用EditorScript.Initialize...");
+    dfx_info!("Demo", "[6] 调用EditorScript.Initialize...");
     unsafe {
         if let Some(ref executor) = EXECUTOR {
             executor.call_static_with_ptr_namespace("Hezhou", "EditorScript", "Initialize", ffi_ptr as usize)
                 .expect("Initialize failed");
         }
     }
-    println!("    编辑器UI创建成功!\n");
+    dfx_info!("Demo", "编辑器UI创建成功!");
 
-    println!("[7] 开始主循环...");
-    println!("    FPS显示在状态栏\n");
-    println!("    Hot Reload: 点击脚本编辑器按钮\n");
+    dfx_info!("Demo", "[7] 开始主循环...");
 
     loop {
         renderer.process_events();
         
-        // 检查hot reload请求
         if HOT_RELOAD_REQUESTED.load(Ordering::SeqCst) {
             HOT_RELOAD_REQUESTED.store(false, Ordering::SeqCst);
-            println!("\n[HotReload] 触发重载...");
+            dfx_info!("HotReload", "触发重载...");
             
             unsafe {
                 if let Some(ref mut executor) = EXECUTOR {
-                    // 先清理widget tree
-                    println!("[HotReload] 清理旧的UI...");
+                    dfx_info!("HotReload", "清理旧的UI...");
                     ui_ffi::ui_clear_widget_tree(widget_tree_handle as ui_ffi::WidgetTreeHandle);
                     
                     match executor.reload() {
                         Ok(_) => {
-                            println!("[HotReload] Assembly reload成功!");
-                            println!("[HotReload] 调用Initialize...");
+                            dfx_info!("HotReload", "Assembly reload成功!");
                             executor.call_static_with_ptr_namespace("Hezhou", "EditorScript", "Initialize", ffi_ptr as usize)
                                 .expect("Initialize failed");
-                            println!("[HotReload] UI重新初始化完成!\n");
+                            dfx_info!("HotReload", "UI重新初始化完成!");
                         }
                         Err(e) => {
-                            println!("[HotReload] Reload失败: {:?}", e);
+                            dfx_error!("HotReload", "Reload失败: {:?}", e);
                         }
                     }
                 }
@@ -144,7 +147,7 @@ fn main() {
                 }
             }
             Err(e) => {
-                println!("ERROR: {}", e);
+                dfx_error!("Demo", "{}", e);
                 break;
             }
         }
@@ -152,10 +155,9 @@ fn main() {
         std::thread::sleep(Duration::from_millis(16));
     }
 
-    println!("\n[8] 清理资源...");
+    dfx_info!("Demo", "[8] 清理资源...");
     renderer.cleanup();
-
-    println!("\n=== Editor Closed ===");
+    dfx_info!("Demo", "=== Editor Closed ===");
 }
 
 fn compile_editor_script() {
@@ -174,13 +176,13 @@ fn compile_editor_script() {
     match result {
         Ok(output) => {
             if output.status.success() {
-                println!("    EditorScript.dll编译成功");
+                dfx_info!("Demo", "EditorScript.dll编译成功");
             } else {
-                println!("    编译失败: {}", String::from_utf8_lossy(&output.stderr));
+                dfx_error!("Demo", "编译失败: {}", String::from_utf8_lossy(&output.stderr));
             }
         }
         Err(e) => {
-            println!("    mcs not found: {:?}", e);
+            dfx_error!("Demo", "mcs not found: {:?}", e);
         }
     }
 }

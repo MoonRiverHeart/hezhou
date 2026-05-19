@@ -16,23 +16,23 @@ public static class TestScript
     
     public static void Initialize(IntPtr ffiContextPtr)
     {
-        Console.WriteLine("[C#] TestScript Initialize开始");
+        Log.Info("C#", "TestScript Initialize开始");
         
         try {
             UI.InitFromContext(ffiContextPtr);
             
             UI.GetScreenSize(out _screenWidth, out _screenHeight);
-            Console.WriteLine($"[C#] 屏幕大小: {_screenWidth}x{_screenHeight}");
+            Log.Info("C#", $"屏幕大小: {_screenWidth}x{_screenHeight}");
             
             CreateUI();
             
             _resizeCallback = OnResize;
             UI.RegisterResizeCallback(_resizeCallback);
             
-            Console.WriteLine("[C#] UI创建完成（使用VStack布局）");
+            Log.Info("C#", "UI创建完成（使用VStack布局）");
         } catch (Exception e) {
-            Console.WriteLine("[C#] ERROR: " + e.Message);
-            Console.WriteLine("[C#] StackTrace: " + e.StackTrace);
+            Log.Error("C#", e.Message);
+            Log.Error("C#", "StackTrace: " + e.StackTrace);
         }
     }
     
@@ -57,7 +57,7 @@ public static class TestScript
     
     private static void OnResize(float width, float height)
     {
-        Console.WriteLine($"[C#] Resize: {width}x{height}");
+        Log.Info("C#", $"Resize: {width}x{height}");
         _screenWidth = width;
         _screenHeight = height;
         
@@ -68,13 +68,13 @@ public static class TestScript
     
     private static void OnButton1Click(ulong widgetId)
     {
-        Console.WriteLine("[C#] Button 1 clicked!");
+        Log.Info("C#", "Button 1 clicked!");
         _button1.Text = "hello";
     }
     
     private static void OnButton2Click(ulong widgetId)
     {
-        Console.WriteLine("[C#] Button 2 clicked!");
+        Log.Info("C#", "Button 2 clicked!");
         _button2.Text = "hello";
     }
 }

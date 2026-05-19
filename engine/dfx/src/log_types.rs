@@ -52,4 +52,6 @@ pub struct LogEntry {
     pub line: u32,
 }
 
+unsafe impl Send for LogEntry {}
+
 pub type LogCallback = extern "C" fn(&LogEntry);

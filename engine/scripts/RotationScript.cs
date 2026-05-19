@@ -1,4 +1,5 @@
 using System;
+using Hezhou;
 
 #if NATIVEAOT
 using System.Runtime.InteropServices;
@@ -9,9 +10,7 @@ namespace HezhouScripts
 {
     public class RotationController
     {
-        // ===== 修改这里的值来改变旋转速度 =====
         private const float DefaultRotationSpeed = 9.0f;
-        // ====================================
         
         private static RotationController _instance;
         private float _rotationSpeed;
@@ -58,20 +57,20 @@ namespace HezhouScripts
         public static void SetRotationSpeed(float speed)
         {
             GetInstance()._rotationSpeed = speed;
-            Console.WriteLine($"[C#] SetRotationSpeed: {speed}°/s");
+            Log.Info("C#", $"SetRotationSpeed: {speed}°/s");
         }
         
         public static void ResetRotation()
         {
             GetInstance()._currentAngle = 0.0f;
-            Console.WriteLine($"[C#] ResetRotation: angle=0°");
+            Log.Info("C#", "ResetRotation: angle=0°");
         }
         
         public static void ResetAll()
         {
             _instance = null;
             GetInstance();
-            Console.WriteLine($"[C#] ResetAll complete, speed={GetInstance()._rotationSpeed}°/s");
+            Log.Info("C#", $"ResetAll complete, speed={GetInstance()._rotationSpeed}°/s");
         }
         
         public static float GetCurrentAngle()
@@ -107,7 +106,7 @@ namespace HezhouScripts
         [UnmanagedCallersOnly(EntryPoint = "csharp_initialize", CallConvs = new[] { typeof(CallConvCdecl) })]
         public static void ExportInitialize()
         {
-            Console.WriteLine($"[C# NativeAOT] Initialized, rotation_speed = {GetInstance()._rotationSpeed}°/s");
+            Log.Info("C# NativeAOT", $"Initialized, rotation_speed = {GetInstance()._rotationSpeed}°/s");
         }
 #endif
     }

@@ -1,5 +1,6 @@
 using System;
 using System.Runtime.InteropServices;
+using Hezhou;
 
 public class ButtonClickTest
 {
@@ -12,39 +13,39 @@ public class ButtonClickTest
     
     public static void Initialize(IntPtr handle, ulong id)
     {
-        Console.WriteLine("[C#] Initialize called");
-        Console.WriteLine("[C#] WidgetTreeHandle: " + handle);
-        Console.WriteLine("[C#] ButtonId: " + id);
+        Log.Info("C#", "Initialize called");
+        Log.Info("C#", $"WidgetTreeHandle: {handle}");
+        Log.Info("C#", $"ButtonId: {id}");
         
         widgetTreeHandle = handle;
         buttonId = id;
         
-        Console.WriteLine("[C#] Initialize complete");
+        Log.Info("C#", "Initialize complete");
     }
     
     public static void OnButtonClick(ulong widgetId)
     {
-        Console.WriteLine("[C#] ========== BUTTON CLICKED! ==========");
-        Console.WriteLine("[C#] WidgetId: " + widgetId);
-        Console.WriteLine("[C#] ButtonId: " + buttonId);
-        Console.WriteLine("[C#] WidgetTreeHandle: " + widgetTreeHandle);
+        Log.Info("C#", "========== BUTTON CLICKED! ==========");
+        Log.Info("C#", $"WidgetId: {widgetId}");
+        Log.Info("C#", $"ButtonId: {buttonId}");
+        Log.Info("C#", $"WidgetTreeHandle: {widgetTreeHandle}");
         
         if (widgetTreeHandle != IntPtr.Zero)
         {
-            Console.WriteLine("[C#] Calling ui_widget_set_text...");
+            Log.Info("C#", "Calling ui_widget_set_text...");
             ui_widget_set_text(widgetTreeHandle, buttonId, "hello");
-            Console.WriteLine("[C#] ui_widget_set_text called successfully");
+            Log.Info("C#", "ui_widget_set_text called successfully");
         }
         else
         {
-            Console.WriteLine("[C#] ERROR: WidgetTreeHandle is null!");
+            Log.Error("C#", "WidgetTreeHandle is null!");
         }
         
-        Console.WriteLine("[C#] =====================================");
+        Log.Info("C#", "=====================================");
     }
     
     public static void Cleanup()
     {
-        Console.WriteLine("[C#] Cleanup called");
+        Log.Info("C#", "Cleanup called");
     }
 }

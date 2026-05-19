@@ -1,5 +1,6 @@
 using System;
 using HezhouUI;
+using Hezhou;
 
 #if MONO
 namespace HezhouScripts
@@ -14,19 +15,19 @@ namespace HezhouScripts
         
         public static void Initialize()
         {
-            Console.WriteLine("[C# Mono] Initialize UI System");
+            Log.Info("C# Mono", "Initialize UI System");
             
             _uiSystem = new UISystem();
             _frameCount = 0;
             
             _rootId = _uiSystem.CreateRootPanel(0, 0, 800, 600);
-            Console.WriteLine($"[C# Mono] Root panel created: id={_rootId}");
+            Log.Info("C# Mono", $"Root panel created: id={_rootId}");
             
             _buttonId = _uiSystem.AddButton(_rootId, 50, 50, 200, 40, "Click Me");
-            Console.WriteLine($"[C# Mono] Button created: id={_buttonId}");
+            Log.Info("C# Mono", $"Button created: id={_buttonId}");
             
             _labelId = _uiSystem.AddLabel(_rootId, 50, 100, 200, 30, "Hello Mono UI!");
-            Console.WriteLine($"[C# Mono] Label created: id={_labelId}");
+            Log.Info("C# Mono", $"Label created: id={_labelId}");
             
             _uiSystem.SetWidgetBackgroundColor(_buttonId, 0.2f, 0.6f, 1.0f, 1.0f);
             _uiSystem.SetWidgetBackgroundColor(_labelId, 0.0f, 0.0f, 0.0f, 0.0f);
@@ -38,7 +39,7 @@ namespace HezhouScripts
             
             if (_frameCount % 60 == 0)
             {
-                Console.WriteLine($"[C# Mono] Frame {_frameCount}, deltaTime={deltaTime}");
+                Log.Debug("C# Mono", $"Frame {_frameCount}, deltaTime={deltaTime}");
             }
             
             _uiSystem.Update(deltaTime);
@@ -48,14 +49,14 @@ namespace HezhouScripts
         {
             ulong timestamp = _frameCount;
             _uiSystem.DispatchTouchBegin(x, y, pointerId, timestamp);
-            Console.WriteLine($"[C# Mono] TouchBegin: x={x}, y={y}, pointer={pointerId}");
+            Log.Debug("C# Mono", $"TouchBegin: x={x}, y={y}, pointer={pointerId}");
         }
         
         public static void OnTouchEnd(float x, float y, uint pointerId)
         {
             ulong timestamp = _frameCount;
             _uiSystem.DispatchTouchEnd(x, y, pointerId, timestamp);
-            Console.WriteLine($"[C# Mono] TouchEnd: x={x}, y={y}, pointer={pointerId}");
+            Log.Debug("C# Mono", $"TouchEnd: x={x}, y={y}, pointer={pointerId}");
         }
         
         public static void OnKeyDown(KeyCode keycode, KeyModifiers modifiers)
@@ -63,7 +64,7 @@ namespace HezhouScripts
             ulong timestamp = _frameCount;
             uint flags = modifiers.ToFlags();
             _uiSystem.DispatchKeyDown((uint)keycode, flags, timestamp);
-            Console.WriteLine($"[C# Mono] KeyDown: keycode={keycode}, modifiers={flags}");
+            Log.Debug("C# Mono", $"KeyDown: keycode={keycode}, modifiers={flags}");
         }
         
         public static void OnKeyUp(KeyCode keycode, KeyModifiers modifiers)
@@ -71,12 +72,12 @@ namespace HezhouScripts
             ulong timestamp = _frameCount;
             uint flags = modifiers.ToFlags();
             _uiSystem.DispatchKeyUp((uint)keycode, flags, timestamp);
-            Console.WriteLine($"[C# Mono] KeyUp: keycode={keycode}, modifiers={flags}");
+            Log.Debug("C# Mono", $"KeyUp: keycode={keycode}, modifiers={flags}");
         }
         
         public static void Cleanup()
         {
-            Console.WriteLine("[C# Mono] Cleanup UI System");
+            Log.Info("C# Mono", "Cleanup UI System");
             _uiSystem?.Dispose();
             _uiSystem = null;
         }
@@ -101,7 +102,7 @@ namespace HezhouScripts
         [UnmanagedCallersOnly(EntryPoint = "csharp_ui_initialize", CallConvs = new[] { typeof(CallConvCdecl) })]
         public static void Initialize()
         {
-            Console.WriteLine("[C# NativeAOT] Initialize UI System");
+            Log.Info("C# NativeAOT", "Initialize UI System");
             
             _uiSystem = new UISystem();
             _frameCount = 0;

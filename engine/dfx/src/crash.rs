@@ -13,6 +13,8 @@ pub struct StackFrame {
     pub line: u32,
 }
 
+unsafe impl Send for StackFrame {}
+
 #[repr(C)]
 #[derive(Clone, Copy)]
 pub struct CrashReport {
@@ -22,6 +24,8 @@ pub struct CrashReport {
     pub frames: *mut StackFrame,
     pub frame_count: u32,
 }
+
+unsafe impl Send for CrashReport {}
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -40,6 +44,8 @@ pub struct CrashHandler {
     crash_file: Option<std::path::PathBuf>,
     enabled: bool,
 }
+
+unsafe impl Send for CrashHandler {}
 
 impl CrashHandler {
     pub fn new() -> Self {

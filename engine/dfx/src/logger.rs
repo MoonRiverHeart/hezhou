@@ -40,8 +40,12 @@ impl Logger {
     }
 
     pub fn enable_file_output(&mut self, path: &str) -> Result<(), String> {
-        let file =
-            std::fs::File::create(path).map_err(|e| format!("Failed to create log file: {}", e))?;
+        use std::io::Write;
+        let file = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(path)
+            .map_err(|e| format!("Failed to create log file: {}", e))?;
         self.output_file = Some(file);
         Ok(())
     }
@@ -136,6 +140,7 @@ impl Logger {
     }
 
     fn write_file(&self, file: &std::fs::File, entry: &LogEntry) {
+        use std::io::Write;
         let time = Local::now().format("%Y-%m-%d %H:%M:%S%.3f");
         let module = unsafe {
             std::ffi::CStr::from_ptr(entry.module)
@@ -147,21 +152,24 @@ impl Logger {
                 .to_str()
                 .unwrap_or("")
         };
-        let file_name = unsafe { std::ffi::CStr::from_ptr(entry.file).to_str().unwrap_or("") };
 
         let line = format!(
-            "[{}][{}][T:{}][{}][{}:{}] {}\n",
+            "[{}][{}][T:{}][{}] {}\n",
             time,
             entry.level.as_str(),
             entry.thread_id,
             module,
-            file_name,
-            entry.line,
             message
         );
 
-        let mut file = file.try_clone().unwrap();
-        file.write_all(line.as_bytes()).unwrap();
+        if let Ok(mut cloned_file) = file.try_clone() {
+            if let Err(e) = cloned_file.write_all(line.as_bytes()) {
+                eprintln!("Log file write error: {}", e);
+            }
+            if let Err(e) = cloned_file.flush() {
+                eprintln!("Log file flush error: {}", e);
+            }
+        }
     }
 
     fn get_thread_id() -> u64 {

@@ -178,3 +178,52 @@ cargo run --bin rotation_demo --features native-aot
 - GLFW backend: Parse `glfw::Modifiers` to set `KeyModifiers.shift/ctrl/alt`
 - UIInputHandler: Track Shift/Ctrl state via separate KeyEvents
 - TouchData modifiers: bit 0 = Shift, bit 1 = Ctrl, bit 2 = Alt
+
+## DFX Logging System
+
+### Usage
+
+**Rust:**
+```rust
+use hezhou_dfx::*;
+
+fn main() {
+    let dfx = init_dfx();
+    dfx.lock().get_logger().lock().set_level(LogLevel::Info);
+    
+    // Enable file output
+    let log_path = format!("logs/hezhou_{}.log", chrono::Local::now().format("%Y-%m-%d"));
+    std::fs::create_dir_all("logs").ok();
+    dfx.lock().get_logger().lock().enable_file_output(&log_path).ok();
+    
+    dfx_info!("Module", "Message");
+    dfx_error!("Module", "Error: {}", error);
+}
+
+// Trace points
+dfx_trace_begin!("FunctionName", "category");
+dfx_trace_end!("FunctionName", "category");
+```
+
+**C#:**
+```csharp
+// When dfx_handle is null, falls back to Console.WriteLine
+Log.Info("Module", "Message");
+Log.Error("Module", "Error message");
+```
+
+### Log Levels
+- Trace (0): Detailed debugging
+- Debug (1): Debug information
+- Info (2): General information (default)
+- Warn (3): Warning messages
+- Error (4): Error messages
+- Fatal (5): Critical errors
+
+### Output Format
+- Console: `[2026-05-19 09:35:16.928][INFO][Demo] Message`
+- File: `[2026-05-19 09:35:16.928][INFO][T:8076][Demo] Message`
+
+### Run Location
+- Run from `engine/` directory for correct log file path
+- Log files: `engine/logs/hezhou_YYYY-MM-DD.log`

@@ -127,13 +127,20 @@ namespace Hezhou
             public IntPtr ui_text_edit_get_text;
             public IntPtr ui_trigger_hot_reload;
             public IntPtr widget_tree_ptr;
+            public IntPtr dfx_handle;
         }
 
         public static void InitFromContext(IntPtr contextPtr)
         {
             _ffi = Marshal.PtrToStructure<FfiContext>(contextPtr);
             _widgetTree = _ffi.widget_tree_ptr;
-            Console.WriteLine("[C#] FfiContext初始化成功");
+            
+            if (_ffi.dfx_handle != IntPtr.Zero)
+            {
+                Log.Init(_ffi.dfx_handle);
+            }
+            
+            Log.Info("C#", "FfiContext初始化成功");
         }
 
         public static void GetScreenSize(out float width, out float height)
@@ -162,7 +169,7 @@ namespace Hezhou
         {
             if (_ffi.ui_set_content_scale == IntPtr.Zero)
             {
-                Console.WriteLine("[C#] ERROR: SetContentScale函数指针为空");
+                Log.Error("C#", "SetContentScale函数指针为空");
                 return;
             }
             var func = Marshal.GetDelegateForFunctionPointer<SetContentScaleDelegate>(_ffi.ui_set_content_scale);
@@ -175,7 +182,7 @@ public static void RegisterResizeCallback(ResizeCallbackDelegate callback)
             
             if (_ffi.ui_register_resize_thunk_ptr == IntPtr.Zero)
             {
-                Console.WriteLine("[C#] ERROR: RegisterResizeThunkPtr函数指针为空");
+                Log.Error("C#", "RegisterResizeThunkPtr函数指针为空");
                 return;
             }
             var func = Marshal.GetDelegateForFunctionPointer<RegisterResizeDelegate>(_ffi.ui_register_resize_thunk_ptr);
@@ -188,7 +195,7 @@ public static void RegisterResizeCallback(ResizeCallbackDelegate callback)
             
             if (_ffi.ui_register_global_click_thunk_ptr == IntPtr.Zero)
             {
-                Console.WriteLine("[C#] ERROR: RegisterGlobalClickThunkPtr函数指针为空");
+                Log.Error("C#", "RegisterGlobalClickThunkPtr函数指针为空");
                 return;
             }
             var func = Marshal.GetDelegateForFunctionPointer<RegisterGlobalClickDelegate>(_ffi.ui_register_global_click_thunk_ptr);
@@ -199,7 +206,7 @@ public static void RegisterResizeCallback(ResizeCallbackDelegate callback)
         {
             if (_ffi.ui_create_vstack == IntPtr.Zero)
             {
-                Console.WriteLine("[C#] ERROR: CreateVStack函数指针为空");
+                Log.Error("C#", "CreateVStack函数指针为空");
                 return 0;
             }
             var func = Marshal.GetDelegateForFunctionPointer<CreateVStackDelegate>(_ffi.ui_create_vstack);
@@ -210,7 +217,7 @@ public static void RegisterResizeCallback(ResizeCallbackDelegate callback)
         {
             if (_ffi.ui_create_vstack_in_parent == IntPtr.Zero)
             {
-                Console.WriteLine("[C#] ERROR: CreateVStackInParent函数指针为空");
+                Log.Error("C#", "CreateVStackInParent函数指针为空");
                 return 0;
             }
             var func = Marshal.GetDelegateForFunctionPointer<CreateVStackInParentDelegate>(_ffi.ui_create_vstack_in_parent);
@@ -221,7 +228,7 @@ public static void RegisterResizeCallback(ResizeCallbackDelegate callback)
         {
             if (_ffi.ui_create_hstack == IntPtr.Zero)
             {
-                Console.WriteLine("[C#] ERROR: CreateHStack函数指针为空");
+                Log.Error("C#", "CreateHStack函数指针为空");
                 return 0;
             }
             var func = Marshal.GetDelegateForFunctionPointer<CreateHStackDelegate>(_ffi.ui_create_hstack);
@@ -232,7 +239,7 @@ public static void RegisterResizeCallback(ResizeCallbackDelegate callback)
         {
             if (_ffi.ui_create_hstack_in_parent == IntPtr.Zero)
             {
-                Console.WriteLine("[C#] ERROR: CreateHStackInParent函数指针为空");
+                Log.Error("C#", "CreateHStackInParent函数指针为空");
                 return 0;
             }
             var func = Marshal.GetDelegateForFunctionPointer<CreateHStackInParentDelegate>(_ffi.ui_create_hstack_in_parent);
@@ -243,7 +250,7 @@ public static void RegisterResizeCallback(ResizeCallbackDelegate callback)
         {
             if (_ffi.ui_create_button_in_parent == IntPtr.Zero)
             {
-                Console.WriteLine("[C#] ERROR: CreateButtonInParent函数指针为空");
+                Log.Error("C#", "CreateButtonInParent函数指针为空");
                 return 0;
             }
             var func = Marshal.GetDelegateForFunctionPointer<CreateButtonInParentDelegate>(_ffi.ui_create_button_in_parent);
@@ -254,7 +261,7 @@ public static void RegisterResizeCallback(ResizeCallbackDelegate callback)
         {
             if (_ffi.ui_create_label_in_parent == IntPtr.Zero)
             {
-                Console.WriteLine("[C#] ERROR: CreateLabelInParent函数指针为空");
+                Log.Error("C#", "CreateLabelInParent函数指针为空");
                 return 0;
             }
             var func = Marshal.GetDelegateForFunctionPointer<CreateLabelInParentDelegate>(_ffi.ui_create_label_in_parent);
@@ -272,7 +279,7 @@ public static void RegisterResizeCallback(ResizeCallbackDelegate callback)
         {
             if (_ffi.ui_create_panel_in_parent == IntPtr.Zero)
             {
-                Console.WriteLine("[C#] ERROR: CreatePanelInParent函数指针为空");
+                Log.Error("C#", "CreatePanelInParent函数指针为空");
                 return 0;
             }
             var func = Marshal.GetDelegateForFunctionPointer<CreatePanelInParentDelegate>(_ffi.ui_create_panel_in_parent);
@@ -283,7 +290,7 @@ public static void RegisterResizeCallback(ResizeCallbackDelegate callback)
         {
             if (_ffi.ui_create_text_edit_in_parent == IntPtr.Zero)
             {
-                Console.WriteLine("[C#] ERROR: CreateTextEditInParent函数指针为空");
+                Log.Error("C#", "CreateTextEditInParent函数指针为空");
                 return 0;
             }
             var func = Marshal.GetDelegateForFunctionPointer<CreateTextEditInParentDelegate>(_ffi.ui_create_text_edit_in_parent);
@@ -294,7 +301,7 @@ public static void RegisterResizeCallback(ResizeCallbackDelegate callback)
         {
             if (_ffi.ui_text_edit_set_text == IntPtr.Zero)
             {
-                Console.WriteLine("[C#] ERROR: TextEditSetText函数指针为空");
+                Log.Error("C#", "TextEditSetText函数指针为空");
                 return;
             }
             var func = Marshal.GetDelegateForFunctionPointer<TextEditSetTextDelegate>(_ffi.ui_text_edit_set_text);
@@ -305,7 +312,7 @@ public static void RegisterResizeCallback(ResizeCallbackDelegate callback)
         {
             if (_ffi.ui_text_edit_get_text_len == IntPtr.Zero || _ffi.ui_text_edit_get_text == IntPtr.Zero)
             {
-                Console.WriteLine("[C#] ERROR: TextEditGetText函数指针为空");
+                Log.Error("C#", "TextEditGetText函数指针为空");
                 return "";
             }
             
@@ -328,7 +335,7 @@ public static void RegisterResizeCallback(ResizeCallbackDelegate callback)
         {
             if (_ffi.ui_trigger_hot_reload == IntPtr.Zero)
             {
-                Console.WriteLine("[C#] ERROR: TriggerHotReload函数指针为空");
+                Log.Error("C#", "TriggerHotReload函数指针为空");
                 return;
             }
             var func = Marshal.GetDelegateForFunctionPointer<TriggerHotReloadDelegate>(_ffi.ui_trigger_hot_reload);
@@ -342,7 +349,7 @@ public static void RegisterResizeCallback(ResizeCallbackDelegate callback)
         {
             if (_widgetTree == IntPtr.Zero)
             {
-                Console.WriteLine("[C#] ERROR: widget_tree_ptr为空");
+                Log.Error("C#", "widget_tree_ptr为空");
                 return;
             }
             // Use the ui_clear_widget_tree function via FFI
@@ -353,7 +360,7 @@ public static void RegisterResizeCallback(ResizeCallbackDelegate callback)
         {
             if (_ffi.ui_get_root_id == IntPtr.Zero)
             {
-                Console.WriteLine("[C#] ERROR: GetRootId函数指针为空");
+                Log.Error("C#", "GetRootId函数指针为空");
                 return 0;
             }
             var func = Marshal.GetDelegateForFunctionPointer<GetRootIdDelegate>(_ffi.ui_get_root_id);
@@ -364,7 +371,7 @@ public static void RegisterResizeCallback(ResizeCallbackDelegate callback)
         {
             if (_ffi.ui_set_widget_layout == IntPtr.Zero)
             {
-                Console.WriteLine("[C#] ERROR: SetWidgetLayout函数指针为空");
+                Log.Error("C#", "SetWidgetLayout函数指针为空");
                 return;
             }
             var func = Marshal.GetDelegateForFunctionPointer<SetWidgetLayoutDelegate>(_ffi.ui_set_widget_layout);
@@ -375,7 +382,7 @@ public static void RegisterResizeCallback(ResizeCallbackDelegate callback)
         {
             if (_ffi.ui_remove_widget == IntPtr.Zero)
             {
-                Console.WriteLine("[C#] ERROR: RemoveWidget函数指针为空");
+                Log.Error("C#", "RemoveWidget函数指针为空");
                 return;
             }
             var func = Marshal.GetDelegateForFunctionPointer<RemoveWidgetDelegate>(_ffi.ui_remove_widget);
@@ -386,7 +393,7 @@ public static void RegisterResizeCallback(ResizeCallbackDelegate callback)
         {
             if (_ffi.ui_widget_set_text == IntPtr.Zero)
             {
-                Console.WriteLine("[C#] ERROR: SetText函数指针为空");
+                Log.Error("C#", "SetText函数指针为空");
                 return;
             }
             var func = Marshal.GetDelegateForFunctionPointer<SetTextDelegate>(_ffi.ui_widget_set_text);
@@ -397,7 +404,7 @@ public static void RegisterResizeCallback(ResizeCallbackDelegate callback)
         {
             if (_ffi.ui_button_set_on_click_thunk_ptr == IntPtr.Zero)
             {
-                Console.WriteLine("[C#] ERROR: SetOnClick函数指针为空");
+                Log.Error("C#", "SetOnClick函数指针为空");
                 return;
             }
             IntPtr callbackPtr = Marshal.GetFunctionPointerForDelegate(callback);
@@ -429,7 +436,7 @@ public static void RegisterResizeCallback(ResizeCallbackDelegate callback)
             
             if (_ffi.ui_register_update_thunk_ptr == IntPtr.Zero)
             {
-                Console.WriteLine("[C#] ERROR: RegisterUpdateThunkPtr函数指针为空");
+                Log.Error("C#", "RegisterUpdateThunkPtr函数指针为空");
                 return;
             }
             
@@ -445,7 +452,7 @@ public static void RegisterResizeCallback(ResizeCallbackDelegate callback)
         public VStack(ulong parentId, float spacing = 8f)
         {
             Id = UI.CreateVStack(parentId, spacing);
-            Console.WriteLine($"[C#] VStack创建成功: id={Id}, parent={parentId}");
+            Log.Info("C#", $"VStack创建成功: id={Id}, parent={parentId}");
         }
         
         public ulong AddButton(float width, float height, string text)
@@ -471,7 +478,7 @@ public static void RegisterResizeCallback(ResizeCallbackDelegate callback)
         public HStack(ulong parentId, float spacing = 8f)
         {
             Id = UI.CreateHStack(parentId, spacing);
-            Console.WriteLine($"[C#] HStack创建成功: id={Id}, parent={parentId}");
+            Log.Info("C#", $"HStack创建成功: id={Id}, parent={parentId}");
         }
         
         public Button AddButton(float width, float height, string text)
@@ -500,7 +507,7 @@ public static void RegisterResizeCallback(ResizeCallbackDelegate callback)
         {
             _text = text;
             Id = UI.CreateButton(parentId, width, height, text);
-            Console.WriteLine($"[C#] Button创建成功: id={Id}, text=\"{text}\"");
+            Log.Info("C#", $"Button创建成功: id={Id}, text=\"{text}\"");
         }
         
         public string Text
@@ -525,7 +532,7 @@ public static void RegisterResizeCallback(ResizeCallbackDelegate callback)
         {
             _text = text;
             Id = UI.CreateLabel(parentId, width, height, text);
-            Console.WriteLine($"[C#] Label创建成功: id={Id}, text=\"{text}\"");
+            Log.Info("C#", $"Label创建成功: id={Id}, text=\"{text}\"");
         }
         
         public string Text
@@ -542,7 +549,7 @@ public static void RegisterResizeCallback(ResizeCallbackDelegate callback)
         public Panel(ulong parentId, float x, float y, float width, float height, float r = 0.2f, float g = 0.2f, float b = 0.2f, float a = 1.0f)
         {
             Id = UI.CreatePanel(parentId, x, y, width, height, r, g, b, a);
-            Console.WriteLine($"[Editor] Panel创建成功: id={Id}");
+            Log.Info("Editor", $"Panel创建成功: id={Id}");
         }
         
         public ulong AddButton(float width, float height, string text)

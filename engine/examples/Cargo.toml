@@ -20,6 +20,8 @@ glfw = "0.62"
 ash = "0.38"
 parking_lot = "0.12"
 bytemuck = "1.14"
+chrono = "0.4"
+serde_json = "1.0"
 
 [[bin]]
 name = "engine_demo"
@@ -79,3 +81,7 @@ required-features = ["mono"]
 name = "mono_editor_demo"
 path = "src/mono_editor_demo.rs"
 required-features = ["mono"]
+
+[[bin]]
+name = "trace_viewer_demo"
+path = "src/trace_viewer_demo.rs"

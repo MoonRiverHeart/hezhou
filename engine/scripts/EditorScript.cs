@@ -48,13 +48,13 @@ namespace Hezhou
 
         public static void Initialize(IntPtr contextPtr)
         {
-            Console.WriteLine("[Editor] 编辑器初始化开始");
+            Log.Info("Editor", "编辑器初始化开始");
             
             UI.InitFromContext(contextPtr);
             UI.GetScreenSize(out _screenWidth, out _screenHeight);
             _contentScale = UI.GetContentScale();
             
-            Console.WriteLine($"[Editor] 屏幕尺寸: {_screenWidth}x{_screenHeight}, DPI缩放: {_contentScale}");
+            Log.Info("Editor", $"屏幕尺寸: {_screenWidth}x{_screenHeight}, DPI缩放: {_contentScale}");
             
             _updateCallback = Update;
             UI.RegisterUpdateCallback(_updateCallback);
@@ -64,7 +64,7 @@ namespace Hezhou
             UI.RegisterResizeCallback(OnResize);
             UI.RegisterGlobalClickCallback(OnGlobalClick);
             
-            Console.WriteLine("[Editor] 编辑器初始化完成");
+            Log.Info("Editor", "编辑器初始化完成");
         }
 
         private static void CreateEditorLayout()
@@ -79,7 +79,7 @@ namespace Hezhou
             float previewX = LEFT_PANEL_WIDTH;
 
             ulong rootId = UI.GetRootId();
-            Console.WriteLine($"[Editor] RootId={rootId}");
+            Log.Info("Editor", $"RootId={rootId}");
 
             _toolbar = new Panel(rootId, 0, toolbarY, _screenWidth, TOOLBAR_HEIGHT, 0.15f, 0.15f, 0.15f, 1.0f);
             _toolbarButtons = new HStack(_toolbar.Id, 10f);
@@ -101,7 +101,7 @@ namespace Hezhou
             UI.SetWidgetLayout(_toggleEditorBtn.Id, _screenWidth - 120f, 5f, 100f, 30f);
             _toggleEditorBtn.SetOnClick(OnToggleEditorClick);
             
-            Console.WriteLine("[Editor] 工具栏创建完成");
+            Log.Info("Editor", "工具栏创建完成");
 
             _projectPanel = new Panel(rootId, 0, mainY, LEFT_PANEL_WIDTH, mainHeight, 0.2f, 0.2f, 0.2f, 1.0f);
             UI.CreateLabel(_projectPanel.Id, 10f, 10f, LEFT_PANEL_WIDTH - 20f, 25f, "项目结构");
@@ -110,7 +110,7 @@ namespace Hezhou
             _projectTree.AddLabel(LEFT_PANEL_WIDTH - 40f, 20f, "├─ Assets");
             _projectTree.AddLabel(LEFT_PANEL_WIDTH - 40f, 20f, "├─ Scenes");
             _projectTree.AddLabel(LEFT_PANEL_WIDTH - 40f, 20f, "└─ Scripts");
-            Console.WriteLine("[Editor] 项目结构面板创建完成");
+            Log.Info("Editor", "项目结构面板创建完成");
 
             _assetPanel = new Panel(rootId, 0, bottomY, LEFT_PANEL_WIDTH, BOTTOM_PANEL_HEIGHT, 0.2f, 0.2f, 0.2f, 1.0f);
             UI.CreateLabel(_assetPanel.Id, 10f, 10f, LEFT_PANEL_WIDTH - 20f, 25f, "资产管理");
@@ -119,11 +119,11 @@ namespace Hezhou
             _assetList.AddLabel(LEFT_PANEL_WIDTH - 40f, 20f, "Textures: 0");
             _assetList.AddLabel(LEFT_PANEL_WIDTH - 40f, 20f, "Models: 0");
             _assetList.AddLabel(LEFT_PANEL_WIDTH - 40f, 20f, "Scripts: 1");
-            Console.WriteLine("[Editor] 资产管理面板创建完成");
+            Log.Info("Editor", "资产管理面板创建完成");
 
             _previewPanel = new Panel(rootId, previewX, mainY, previewWidth, mainHeight + BOTTOM_PANEL_HEIGHT, 0.08f, 0.08f, 0.08f, 0.3f);
             UI.CreateLabel(_previewPanel.Id, 10f, 10f, previewWidth - 20f, 25f, "游戏预览");
-            Console.WriteLine("[Editor] 游戏预览面板创建完成");
+            Log.Info("Editor", "游戏预览面板创建完成");
 
             _propertiesPanel = new Panel(rootId, _screenWidth - RIGHT_PANEL_WIDTH, mainY, RIGHT_PANEL_WIDTH, mainHeight + BOTTOM_PANEL_HEIGHT, 0.2f, 0.2f, 0.2f, 1.0f);
             UI.CreateLabel(_propertiesPanel.Id, 10f, 10f, RIGHT_PANEL_WIDTH - 20f, 25f, "属性编辑");
@@ -132,7 +132,7 @@ namespace Hezhou
             _propsList.AddLabel(RIGHT_PANEL_WIDTH - 40f, 20f, "选中: 无");
             _propsList.AddLabel(RIGHT_PANEL_WIDTH - 40f, 20f, "位置: (0, 0)");
             _propsList.AddLabel(RIGHT_PANEL_WIDTH - 40f, 20f, "大小: (0, 0)");
-            Console.WriteLine("[Editor] 属性面板创建完成");
+            Log.Info("Editor", "属性面板创建完成");
 
             _statusBar = new Panel(rootId, 0, statusY, _screenWidth, STATUS_BAR_HEIGHT, 0.12f, 0.12f, 0.12f, 1.0f);
             _statusItems = new HStack(_statusBar.Id, 20f);
@@ -140,14 +140,14 @@ namespace Hezhou
             _fpsLabel = new Label(_statusItems.Id, 120f, 25f, "FPS: 0");
             _statusItems.AddLabel(150f, 20f, "状态: 就绪");
             _statusItems.AddLabel(150f, 20f, "项目: 未命名");
-            Console.WriteLine("[Editor] 状态栏创建完成");
+            Log.Info("Editor", "状态栏创建完成");
         }
 
         private static void OnResize(float width, float height)
         {
             _screenWidth = width;
             _screenHeight = height;
-            Console.WriteLine($"[Editor] 窗口resize: {width}x{height}");
+            Log.Info("Editor", $"窗口resize: {width}x{height}");
             
             UpdateLayout();
         }
@@ -187,7 +187,7 @@ namespace Hezhou
                     UI.SetWidgetLayout(_scriptTextEditId, 10f, 50f, editorWidth - 20f, editorHeight - 50f);
             }
             
-            Console.WriteLine("[Editor] 布局更新完成");
+            Log.Info("Editor", "布局更新完成");
         }
 
         public static void Update(float deltaTime)
@@ -200,7 +200,7 @@ namespace Hezhou
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"[Editor] Update error: {ex.Message}");
+                    Log.Error("Editor", $"Update error: {ex.Message}");
                 }
             }
         }
@@ -210,7 +210,7 @@ namespace Hezhou
         
         private static void OnNewClick(ulong widgetId)
         {
-            Console.WriteLine($"[Editor] 点击\"新建\"按钮, id={widgetId}");
+            Log.Info("Editor", $"点击\"新建\"按钮, id={widgetId}");
             ShowDropdownMenu(10, 45, 
                 new string[] { "新建场景", "新建脚本", "新建材质", "新建文件夹" },
                 new UI.WidgetCallbackDelegate[] { null, OnNewScriptClick, null, null });
@@ -218,7 +218,7 @@ namespace Hezhou
         
         private static void OnNewScriptClick(ulong widgetId)
         {
-            Console.WriteLine("[Editor] 创建新脚本...");
+            Log.Info("Editor", "创建新脚本...");
             HideDropdownMenu();
             ShowScriptEditor();
         }
@@ -227,24 +227,24 @@ namespace Hezhou
         {
             if (_scriptEditorVisible) return;
             
-            Console.WriteLine("[Editor] ShowScriptEditor开始...");
+            Log.Info("Editor", "ShowScriptEditor开始...");
             
             // 移除preview相关panel，保留左侧目录树
             if (_previewPanel != null)
             {
-                Console.WriteLine("[Editor] 移除previewPanel...");
+                Log.Info("Editor", "移除previewPanel...");
                 UI.RemoveWidget(_previewPanel.Id);
                 _previewPanel = null;
             }
             if (_assetPanel != null)
             {
-                Console.WriteLine("[Editor] 移除assetPanel...");
+                Log.Info("Editor", "移除assetPanel...");
                 UI.RemoveWidget(_assetPanel.Id);
                 _assetPanel = null;
             }
             if (_propertiesPanel != null)
             {
-                Console.WriteLine("[Editor] 移除propertiesPanel...");
+                Log.Info("Editor", "移除propertiesPanel...");
                 UI.RemoveWidget(_propertiesPanel.Id);
                 _propertiesPanel = null;
             }
@@ -260,7 +260,7 @@ namespace Hezhou
             
             // 刷新目录树显示实际文件系统
             RefreshDirectoryTree();
-            Console.WriteLine("[Editor] 左侧目录树已刷新");
+            Log.Info("Editor", "左侧目录树已刷新");
             
             // 右侧编辑区
             _scriptEditorPanel = new Panel(rootId, editorX, editorY, editorWidth, editorHeight, 0.12f, 0.12f, 0.14f, 1.0f);
@@ -277,22 +277,22 @@ namespace Hezhou
             UI.TextEditSetText(_scriptTextEditId, "// NewScript.cs\nusing System;\nusing Hezhou;\n\npublic class NewScript\n{\n    public void Start()\n    {\n        Console.WriteLine(\"NewScript started!\");\n    }\n    \n    public void Update(float deltaTime)\n    {\n        // Update logic here\n    }\n}");
             
             _scriptEditorVisible = true;
-            Console.WriteLine("[Editor] Script Editor显示成功");
+            Log.Info("Editor", "Script Editor显示成功");
         }
         
         private static void OnHotReloadClick(ulong widgetId)
         {
-            Console.WriteLine("[Editor] Hot Reload triggered!");
+            Log.Info("Editor", "Hot Reload triggered!");
             
             if (_scriptTextEditId == 0)
             {
-                Console.WriteLine("[Editor] ERROR: TextEdit not created");
+                Log.Error("Editor", "TextEdit not created");
                 return;
             }
             
             // 获取脚本内容
             string scriptContent = UI.TextEditGetText(_scriptTextEditId);
-            Console.WriteLine($"[Editor] Script content length: {scriptContent.Length}");
+            Log.Info("Editor", $"Script content length: {scriptContent.Length}");
             
             // 保存到临时文件
             try
@@ -300,7 +300,7 @@ namespace Hezhou
                 string tempPath = "scripts/bin/Mono/NewScript.cs";
                 System.IO.Directory.CreateDirectory("scripts/bin/Mono");
                 System.IO.File.WriteAllText(tempPath, scriptContent);
-                Console.WriteLine($"[Editor] Script saved to {tempPath}");
+                Log.Info("Editor", $"Script saved to {tempPath}");
                 
                 // 编译（覆盖EditorScript.dll）
                 var compileProcess = new System.Diagnostics.Process();
@@ -318,49 +318,49 @@ namespace Hezhou
                 
                 if (compileProcess.ExitCode == 0)
                 {
-                    Console.WriteLine("[Editor] ✓ Compilation successful!");
-                    Console.WriteLine($"[Editor] Output DLL: scripts/tmp/NewScript.dll");
+                    Log.Info("Editor", "✓ Compilation successful!");
+                    Log.Info("Editor", "Output DLL: scripts/tmp/NewScript.dll");
                     if (!string.IsNullOrEmpty(output))
-                        Console.WriteLine($"[Editor] Compiler output:\n{output}");
+                        Log.Info("Editor", $"Compiler output:\n{output}");
                     
                     // 触发Rust端hot reload
-                    Console.WriteLine("[Editor] Triggering hot reload...");
+                    Log.Info("Editor", "Triggering hot reload...");
                     UI.TriggerHotReload();
                 }
                 else
                 {
-                    Console.WriteLine("[Editor] ✗ Compilation failed!");
-                    Console.WriteLine($"[Editor] Error:\n{error}");
+                    Log.Error("Editor", "✗ Compilation failed!");
+                    Log.Error("Editor", $"Error:\n{error}");
                 }
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[Editor] ERROR: {ex.Message}");
+                Log.Error("Editor", ex.Message);
             }
         }
         
         private static void OnOpenClick(ulong widgetId)
         {
-            Console.WriteLine($"[Editor] 点击\"打开\"按钮, id={widgetId}");
+            Log.Info("Editor", $"点击\"打开\"按钮, id={widgetId}");
             ShowDropdownMenu(100, 45, new string[] { "打开场景", "打开项目", "打开资源" });
         }
         
         private static void OnSaveClick(ulong widgetId)
         {
-            Console.WriteLine($"[Editor] 点击\"保存\"按钮, id={widgetId}");
+            Log.Info("Editor", $"点击\"保存\"按钮, id={widgetId}");
             ShowDropdownMenu(190, 45, new string[] { "保存场景", "保存全部", "另存为..." });
         }
         
         private static void OnRunClick(ulong widgetId)
         {
-            Console.WriteLine($"[Editor] 点击\"运行\"按钮, id={widgetId}");
+            Log.Info("Editor", $"点击\"运行\"按钮, id={widgetId}");
             HideDropdownMenu();
-            Console.WriteLine("[Editor] 开始运行游戏...");
+            Log.Info("Editor", "开始运行游戏...");
         }
         
         private static void OnGlobalClick(float x, float y)
         {
-            Console.WriteLine($"[Editor] GlobalClick at ({x}, {y})");
+            Log.Info("Editor", $"GlobalClick at ({x}, {y})");
             HideDropdownMenu();
         }
         
@@ -376,15 +376,15 @@ private static void ShowDropdownMenu(float x, float y, string[] items, UI.Widget
             for (int i = 0; i < items.Length; i++)
             {
                 ulong btnId = _menuItems.AddButton(140, 30f, items[i]);
-                Console.WriteLine($"[Editor] 菜单项{i}: '{items[i]}', btnId={btnId}");
+                Log.Info("Editor", $"菜单项{i}: '{items[i]}', btnId={btnId}");
                 if (i < callbacks.Length && callbacks[i] != null)
                 {
-                    Console.WriteLine($"[Editor] 注册回调: btnId={btnId}");
+                    Log.Info("Editor", $"注册回调: btnId={btnId}");
                     UI.SetOnClick(btnId, callbacks[i]);
                 }
             }
             
-            Console.WriteLine($"[Editor] 显示下拉菜单: {items.Length}项");
+            Log.Info("Editor", $"显示下拉菜单: {items.Length}项");
         }
         
         private static void ShowDropdownMenu(float x, float y, string[] items)
@@ -399,7 +399,7 @@ private static void ShowDropdownMenu(float x, float y, string[] items, UI.Widget
                 UI.RemoveWidget(_dropdownMenu.Id);
                 _dropdownMenu = null;
                 _menuItems = null;
-                Console.WriteLine("[Editor] 隐藏下拉菜单");
+                Log.Info("Editor", "隐藏下拉菜单");
             }
         }
         
@@ -409,7 +409,7 @@ private static void ShowDropdownMenu(float x, float y, string[] items, UI.Widget
         {
             if (_isTransitioning) return;  // 正在切换中，忽略点击
             
-            Console.WriteLine($"[Editor] 点击\"编辑器\"切换按钮, id={widgetId}");
+            Log.Info("Editor", $"点击\"编辑器\"切换按钮, id={widgetId}");
             _isTransitioning = true;
             
             HideDropdownMenu();
@@ -449,12 +449,12 @@ private static void ShowDropdownMenu(float x, float y, string[] items, UI.Widget
                 _toggleEditorBtn.Text = "编辑器";
             }
             
-            Console.WriteLine("[Editor] 脚本编辑器隐藏");
+            Log.Info("Editor", "脚本编辑器隐藏");
         }
         
         private static void ShowMainLayout()
         {
-            Console.WriteLine("[Editor] 显示主界面...");
+            Log.Info("Editor", "显示主界面...");
             
             ulong rootId = UI.GetRootId();
             float mainY = TOOLBAR_HEIGHT;
@@ -507,12 +507,12 @@ private static void ShowDropdownMenu(float x, float y, string[] items, UI.Widget
                 _toggleEditorBtn.Text = "编辑器";
             }
             
-            Console.WriteLine("[Editor] 主界面显示完成");
+            Log.Info("Editor", "主界面显示完成");
         }
         
         private static void HideMainLayout()
         {
-            Console.WriteLine("[Editor] 隐藏主界面...");
+            Log.Info("Editor", "隐藏主界面...");
             
             if (_previewPanel != null)
             {
@@ -551,19 +551,19 @@ private static void ShowDropdownMenu(float x, float y, string[] items, UI.Widget
                 _toggleEditorBtn.Text = "预览";
             }
             
-            Console.WriteLine("[Editor] 主界面隐藏完成");
+            Log.Info("Editor", "主界面隐藏完成");
         }
         
         private static void OpenInExplorer(ulong widgetId)
         {
-            Console.WriteLine("[Editor] 打开文件管理器...");
+            Log.Info("Editor", "打开文件管理器...");
             try
             {
                 Process.Start("explorer.exe", _currentDirectory);
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[Editor] ERROR: {ex.Message}");
+                Log.Error("Editor", ex.Message);
             }
         }
         
@@ -601,10 +601,10 @@ private static void ShowDropdownMenu(float x, float y, string[] items, UI.Widget
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[Editor] ERROR reading directory: {ex.Message}");
+                Log.Error("Editor", $"reading directory: {ex.Message}");
             }
             
-            Console.WriteLine("[Editor] 目录树刷新完成");
+            Log.Info("Editor", "目录树刷新完成");
         }
         
         private static void AddDirectoryItems(VStack stack, string path, int depth)
@@ -636,7 +636,7 @@ private static void ShowDropdownMenu(float x, float y, string[] items, UI.Widget
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[Editor] ERROR: {ex.Message}");
+                Log.Error("Editor", ex.Message);
             }
         }
         
@@ -646,7 +646,7 @@ private static void ShowDropdownMenu(float x, float y, string[] items, UI.Widget
             if (parent != null)
             {
                 _currentDirectory = parent.FullName;
-                Console.WriteLine($"[Editor] 返回上级目录: {_currentDirectory}");
+                Log.Info("Editor", $"返回上级目录: {_currentDirectory}");
                 RefreshDirectoryTree();
             }
         }
@@ -657,7 +657,7 @@ private static void ShowDropdownMenu(float x, float y, string[] items, UI.Widget
             {
                 _currentDirectory = path;
                 RefreshDirectoryTree();
-                Console.WriteLine($"[Editor] 进入目录: {path}");
+                Log.Info("Editor", $"进入目录: {path}");
             }
         }
         
@@ -665,7 +665,7 @@ private static void ShowDropdownMenu(float x, float y, string[] items, UI.Widget
         {
             if (_fileItemPaths.TryGetValue(widgetId, out string path))
             {
-                Console.WriteLine($"[Editor] 点击文件: {path}");
+                Log.Info("Editor", $"点击文件: {path}");
                 LoadFileToEditor(path);
             }
         }
@@ -677,12 +677,12 @@ private static void ShowDropdownMenu(float x, float y, string[] items, UI.Widget
                 string content = File.ReadAllText(filePath);
                 string fileName = Path.GetFileName(filePath);
                 
-                Console.WriteLine($"[Editor] 读取文件: {fileName} ({content.Length} chars)");
+                Log.Info("Editor", $"读取文件: {fileName} ({content.Length} chars)");
                 
                 // 确保编辑器已显示
                 if (!_scriptEditorVisible)
                 {
-                    Console.WriteLine("[Editor] 编辑器未显示，先显示编辑器...");
+                    Log.Info("Editor", "编辑器未显示，先显示编辑器...");
                     
                     // 先创建编辑器（不刷新目录树）
                     ulong rootId = UI.GetRootId();
@@ -722,7 +722,7 @@ private static void ShowDropdownMenu(float x, float y, string[] items, UI.Widget
                     UI.SetWidgetLayout(_scriptTextEditId, 10f, 50f, editorWidth - 20f, editorHeight - 50f);
                     
                     _scriptEditorVisible = true;
-                    Console.WriteLine("[Editor] 编辑器面板创建完成");
+                    Log.Info("Editor", "编辑器面板创建完成");
                     
                     // 刷新目录树（保持点击回调有效）
                     RefreshDirectoryTree();
@@ -731,9 +731,9 @@ private static void ShowDropdownMenu(float x, float y, string[] items, UI.Widget
                 // 设置文本内容
                 if (_scriptTextEditId != 0)
                 {
-                    Console.WriteLine($"[Editor] 设置TextEdit内容，id={_scriptTextEditId}");
+                    Log.Info("Editor", $"设置TextEdit内容，id={_scriptTextEditId}");
                     UI.TextEditSetText(_scriptTextEditId, content);
-                    Console.WriteLine($"[Editor] ✓ 文件已加载: {fileName}");
+                    Log.Info("Editor", $"✓ 文件已加载: {fileName}");
                     
                     if (_scriptEditorLabel != null)
                     {
@@ -742,12 +742,12 @@ private static void ShowDropdownMenu(float x, float y, string[] items, UI.Widget
                 }
                 else
                 {
-                    Console.WriteLine("[Editor] ERROR: TextEdit id为0");
+                    Log.Error("Editor", "TextEdit id为0");
                 }
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[Editor] ERROR loading file: {ex.Message}\n{ex.StackTrace}");
+                Log.Error("Editor", $"loading file: {ex.Message}\n{ex.StackTrace}");
             }
         }
     }

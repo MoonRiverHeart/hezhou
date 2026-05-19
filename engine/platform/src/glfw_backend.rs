@@ -1,6 +1,7 @@
 use crate::event::*;
 use crate::traits::*;
 use crate::window::*;
+use hezhou_dfx::*;
 use glfw::Context;
 use parking_lot::Mutex;
 use std::sync::Arc;
@@ -85,7 +86,7 @@ impl Platform for GLFWPlatform {
         let (scale_x, scale_y) = window.get_content_scale();
         self.content_scale_x = scale_x;
         self.content_scale_y = scale_y;
-        println!("[GLFW] Content scale: x={}, y={} (DPI: {})", scale_x, scale_y, scale_x * 96.0);
+        dfx_info!("GLFW", "Content scale: x={}, y={} (DPI: {})", scale_x, scale_y, scale_x * 96.0);
 
         let handle = WindowHandle::new(
             NativeWindowType::GLFW,
@@ -246,7 +247,7 @@ impl GLFWPlatform {
                     alt: mods.contains(glfw::Modifiers::Alt),
                 };
                 
-                println!("[GLFW] Key event: glfw_key={}, keycode={}, action={}, modifiers(shift={},ctrl={},alt={})", 
+                dfx_info!("GLFW", "Key event: glfw_key={}, keycode={}, action={}, modifiers(shift={},ctrl={},alt={})", 
                          match key {
                              glfw::Key::Left => "Left",
                              glfw::Key::Right => "Right",

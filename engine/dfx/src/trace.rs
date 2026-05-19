@@ -14,6 +14,8 @@ pub struct TracePoint {
     pub thread_id: u64,
 }
 
+unsafe impl Send for TracePoint {}
+
 #[repr(C)]
 #[derive(Clone, Copy)]
 pub struct CounterPoint {
@@ -22,6 +24,8 @@ pub struct CounterPoint {
     pub value: i64,
     pub timestamp: u64,
 }
+
+unsafe impl Send for CounterPoint {}
 
 pub struct TraceAnalyzer {
     points: Arc<Mutex<Vec<TracePoint>>>,

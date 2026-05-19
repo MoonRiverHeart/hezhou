@@ -75,6 +75,7 @@ pub struct FfiContext {
     pub ui_text_edit_get_text: TextEditGetTextFn,
     pub ui_trigger_hot_reload: TriggerHotReloadFn,
     pub widget_tree_ptr: WidgetTreeHandle,
+    pub dfx_handle: *mut c_void,
 }
 
 static mut FFI_CONTEXT: Option<Box<FfiContext>> = None;

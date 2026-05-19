@@ -1,5 +1,6 @@
 use crate::*;
 use crate::thunk_manager::*;
+use hezhou_dfx::*;
 use parking_lot::Mutex;
 use std::ffi::{c_char, CStr};
 use std::sync::Arc;
@@ -786,7 +787,7 @@ pub extern "C" fn ui_create_button_in_parent(
         
         let content_scale = crate::thunk_manager::ui_get_content_scale();
         let font_size = 16.0 * content_scale;
-        println!("[FFI] CreateButton: content_scale={}, font_size={}", content_scale, font_size);
+        dfx_info!("FFI", "CreateButton: content_scale={}, font_size={}", content_scale, font_size);
         button.set_font_size(font_size);
         
         let id = button.id();
@@ -822,7 +823,7 @@ pub extern "C" fn ui_create_label_in_parent(
         
         let content_scale = crate::thunk_manager::ui_get_content_scale();
         let font_size = 16.0 * content_scale;
-        println!("[FFI] CreateLabel: content_scale={}, font_size={}", content_scale, font_size);
+        dfx_info!("FFI", "CreateLabel: content_scale={}, font_size={}", content_scale, font_size);
         label.set_font_size(font_size);
         
         let id = label.id();
@@ -948,7 +949,7 @@ pub extern "C" fn ui_create_text_edit_in_parent(
         
         let content_scale = crate::thunk_manager::ui_get_content_scale();
         let font_size = 16.0 * content_scale;
-        println!("[FFI] CreateTextEdit: content_scale={}, font_size={}", content_scale, font_size);
+        dfx_info!("FFI", "CreateTextEdit: content_scale={}, font_size={}", content_scale, font_size);
         text_edit.set_font_size(font_size);
         
         let id = text_edit.id();
@@ -969,27 +970,27 @@ pub extern "C" fn ui_text_edit_set_text(
     text: *const std::ffi::c_char,
 ) {
     if handle.is_null() || text.is_null() {
-        println!("[FFI] ui_text_edit_set_text: handle or text is null");
+        dfx_info!("FFI", "ui_text_edit_set_text: handle or text is null");
         return;
     }
     unsafe {
         let arc = &*(handle as *const Arc<Mutex<WidgetTree>>);
         let mut tree = arc.lock();
         let id = WidgetId::from_raw(widget_id);
-        println!("[FFI] ui_text_edit_set_text: widget_id={}, looking for widget", widget_id);
+        dfx_info!("FFI", "ui_text_edit_set_text: widget_id={}, looking for widget", widget_id);
         if let Some(widget) = tree.get_widget_mut(id) {
-            println!("[FFI] Found widget, type={}", widget.widget_type());
+            dfx_info!("FFI", "Found widget, type={}", widget.widget_type());
             if widget.widget_type() == "TextEdit" {
                 use crate::widgets::TextEdit;
                 if let Some(text_edit) = widget.as_any_mut().downcast_mut::<TextEdit>() {
                     let text_str = std::ffi::CStr::from_ptr(text).to_string_lossy();
-                    println!("[FFI] Setting text: {} chars, font_size={}", text_str.len(), text_edit.get_text_style().font_size);
+                    dfx_info!("FFI", "Setting text: {} chars, font_size={}", text_str.len(), text_edit.get_text_style().font_size);
                     text_edit.set_text(&text_str);
-                    println!("[FFI] ✓ Text set successfully");
+                    dfx_info!("FFI", "✓ Text set successfully");
                 }
             }
         } else {
-            println!("[FFI] Widget not found for id={}", widget_id);
+            dfx_info!("FFI", "Widget not found for id={}", widget_id);
         }
     }
 }

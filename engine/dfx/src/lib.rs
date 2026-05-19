@@ -12,6 +12,132 @@ pub use trace::*;
 
 use parking_lot::Mutex;
 use std::sync::Arc;
+use std::sync::OnceLock;
+
+static GLOBAL_DFX: OnceLock<Arc<Mutex<DfxSystem>>> = OnceLock::new();
+
+pub fn init_dfx() -> Arc<Mutex<DfxSystem>> {
+    let dfx = Arc::new(Mutex::new(DfxSystem::new()));
+    let _ = GLOBAL_DFX.set(dfx.clone());
+    dfx
+}
+
+pub fn get_dfx() -> Option<Arc<Mutex<DfxSystem>>> {
+    GLOBAL_DFX.get().cloned()
+}
+
+#[macro_export]
+macro_rules! dfx_trace {
+    ($module:expr, $message:expr) => {
+        if let Some(dfx) = $crate::get_dfx() {
+            dfx.lock().get_logger().lock().trace($module, $message, file!(), line!());
+        }
+    };
+    ($module:expr, $message:expr, $($arg:tt)*) => {
+        if let Some(dfx) = $crate::get_dfx() {
+            dfx.lock().get_logger().lock().trace($module, &format!($message, $($arg)*), file!(), line!());
+        }
+    };
+}
+
+#[macro_export]
+macro_rules! dfx_debug {
+    ($module:expr, $message:expr) => {
+        if let Some(dfx) = $crate::get_dfx() {
+            dfx.lock().get_logger().lock().debug($module, $message, file!(), line!());
+        }
+    };
+    ($module:expr, $message:expr, $($arg:tt)*) => {
+        if let Some(dfx) = $crate::get_dfx() {
+            dfx.lock().get_logger().lock().debug($module, &format!($message, $($arg)*), file!(), line!());
+        }
+    };
+}
+
+#[macro_export]
+macro_rules! dfx_info {
+    ($module:expr, $message:expr) => {
+        if let Some(dfx) = $crate::get_dfx() {
+            dfx.lock().get_logger().lock().info($module, $message, file!(), line!());
+        }
+    };
+    ($module:expr, $message:expr, $($arg:tt)*) => {
+        if let Some(dfx) = $crate::get_dfx() {
+            dfx.lock().get_logger().lock().info($module, &format!($message, $($arg)*), file!(), line!());
+        }
+    };
+}
+
+#[macro_export]
+macro_rules! dfx_warn {
+    ($module:expr, $message:expr) => {
+        if let Some(dfx) = $crate::get_dfx() {
+            dfx.lock().get_logger().lock().warn($module, $message, file!(), line!());
+        }
+    };
+    ($module:expr, $message:expr, $($arg:tt)*) => {
+        if let Some(dfx) = $crate::get_dfx() {
+            dfx.lock().get_logger().lock().warn($module, &format!($message, $($arg)*), file!(), line!());
+        }
+    };
+}
+
+#[macro_export]
+macro_rules! dfx_error {
+    ($module:expr, $message:expr) => {
+        if let Some(dfx) = $crate::get_dfx() {
+            dfx.lock().get_logger().lock().error($module, $message, file!(), line!());
+        }
+    };
+    ($module:expr, $message:expr, $($arg:tt)*) => {
+        if let Some(dfx) = $crate::get_dfx() {
+            dfx.lock().get_logger().lock().error($module, &format!($message, $($arg)*), file!(), line!());
+        }
+    };
+}
+
+#[macro_export]
+macro_rules! dfx_fatal {
+    ($module:expr, $message:expr) => {
+        if let Some(dfx) = $crate::get_dfx() {
+            dfx.lock().get_logger().lock().fatal($module, $message, file!(), line!());
+        }
+    };
+    ($module:expr, $message:expr, $($arg:tt)*) => {
+        if let Some(dfx) = $crate::get_dfx() {
+            dfx.lock().get_logger().lock().fatal($module, &format!($message, $($arg)*), file!(), line!());
+        }
+    };
+}
+
+#[macro_export]
+macro_rules! dfx_trace_begin {
+    ($name:expr, $category:expr) => {
+        if let Some(dfx) = $crate::get_dfx() {
+            dfx.lock().get_trace_analyzer().lock().begin_point($name, $category);
+        }
+    };
+}
+
+#[macro_export]
+macro_rules! dfx_trace_end {
+    ($name:expr, $category:expr) => {
+        if let Some(dfx) = $crate::get_dfx() {
+            dfx.lock().get_trace_analyzer().lock().end_point($name, $category);
+        }
+    };
+}
+
+#[macro_export]
+macro_rules! dfx_scoped_trace {
+    ($name:expr, $category:expr) => {
+        $crate::ScopedTrace::new(
+            $crate::get_dfx().unwrap().lock().get_trace_analyzer(),
+            $name,
+            $category
+        )
+    };
+}
 
 pub struct DfxSystem {
     logger: Arc<Mutex<Logger>>,
@@ -19,6 +145,8 @@ pub struct DfxSystem {
     trace_analyzer: Arc<Mutex<TraceAnalyzer>>,
     perf_monitor: Arc<Mutex<PerformanceMonitor>>,
 }
+
+unsafe impl Send for DfxSystem {}
 
 impl DfxSystem {
     pub fn new() -> Self {
@@ -355,6 +483,28 @@ pub extern "C" fn dfx_clear_perf(system: *mut DfxSystem) {
     if !system.is_null() {
         unsafe {
             (*system).perf_monitor.lock().clear();
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn dfx_enable_file_output(system: *mut DfxSystem, path: *const std::os::raw::c_char) -> i32 {
+    if system.is_null() || path.is_null() {
+        return -1;
+    }
+
+    unsafe {
+        let path_str = std::ffi::CStr::from_ptr(path).to_str().unwrap_or("");
+        
+        if let Some(parent) = std::path::Path::new(path_str).parent() {
+            if !parent.as_os_str().is_empty() {
+                let _ = std::fs::create_dir_all(parent);
+            }
+        }
+
+        match (*system).logger.lock().enable_file_output(path_str) {
+            Ok(_) => 0,
+            Err(_) => -1,
         }
     }
 }
