@@ -108,6 +108,9 @@ pub struct UIVulkanRenderer {
     offscreen_framebuffer: vk::Framebuffer,
     offscreen_extent: vk::Extent2D,
     
+    // Preview texture descriptor (for UI to sample offscreen image)
+    preview_descriptor_set: vk::DescriptorSet,
+    
     // FXAA post-processing
     fxaa_pipeline: vk::Pipeline,
     fxaa_pipeline_layout: vk::PipelineLayout,
@@ -330,11 +333,11 @@ impl UIVulkanRenderer {
             }, None).map_err(|e| format!("Failed to create descriptor set layout: {}", e))?;
             
             let descriptor_pool = device.create_descriptor_pool(&vk::DescriptorPoolCreateInfo {
-                max_sets: 1,
+                max_sets: 2,
                 pool_size_count: 1,
                 p_pool_sizes: &vk::DescriptorPoolSize {
                     ty: vk::DescriptorType::COMBINED_IMAGE_SAMPLER,
-                    descriptor_count: 1,
+                    descriptor_count: 2,
                 },
                 ..Default::default()
             }, None).map_err(|e| format!("Failed to create descriptor pool: {}", e))?;
@@ -690,6 +693,48 @@ impl UIVulkanRenderer {
             device.destroy_shader_module(game_vert_shader, None);
             device.destroy_shader_module(game_frag_shader, None);
             
+            // Preview texture sampler (for UI to sample offscreen image)
+            let preview_sampler = device.create_sampler(&vk::SamplerCreateInfo {
+                mag_filter: vk::Filter::LINEAR,
+                min_filter: vk::Filter::LINEAR,
+                address_mode_u: vk::SamplerAddressMode::CLAMP_TO_EDGE,
+                address_mode_v: vk::SamplerAddressMode::CLAMP_TO_EDGE,
+                address_mode_w: vk::SamplerAddressMode::CLAMP_TO_EDGE,
+                mip_lod_bias: 0.0,
+                max_anisotropy: 1.0,
+                compare_op: vk::CompareOp::NEVER,
+                min_lod: 0.0,
+                max_lod: 0.0,
+                border_color: vk::BorderColor::FLOAT_TRANSPARENT_BLACK,
+                unnormalized_coordinates: 0,
+                ..Default::default()
+            }, None).map_err(|e| format!("Failed to create preview sampler: {}", e))?;
+            
+            // Preview descriptor set (for UI to display offscreen texture)
+            let preview_descriptor_set = device.allocate_descriptor_sets(&vk::DescriptorSetAllocateInfo {
+                descriptor_pool,
+                descriptor_set_count: 1,
+                p_set_layouts: &descriptor_set_layout,
+                ..Default::default()
+            }).map_err(|e| format!("Failed to allocate preview descriptor set: {}", e))?[0];
+            
+            device.update_descriptor_sets(
+                &[vk::WriteDescriptorSet {
+                    dst_set: preview_descriptor_set,
+                    dst_binding: 0,
+                    dst_array_element: 0,
+                    descriptor_count: 1,
+                    descriptor_type: vk::DescriptorType::COMBINED_IMAGE_SAMPLER,
+                    p_image_info: &vk::DescriptorImageInfo {
+                        sampler: preview_sampler,
+                        image_view: offscreen_image_view,
+                        image_layout: vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
+                    },
+                    ..Default::default()
+                }],
+                &[]
+            );
+            
             logger.lock().log(LogLevel::Info, "Vulkan", "Game preview resources created", file!(), line!());
             
             // FXAA resources (placeholder for now)
@@ -698,7 +743,7 @@ impl UIVulkanRenderer {
             let fxaa_descriptor_set_layout = vk::DescriptorSetLayout::null();
             let fxaa_descriptor_pool = vk::DescriptorPool::null();
             let fxaa_descriptor_set = vk::DescriptorSet::null();
-            let fxaa_sampler = vk::Sampler::null();
+            let fxaa_sampler = preview_sampler; // reuse preview sampler
             
             let command_buffers = device.allocate_command_buffers(&vk::CommandBufferAllocateInfo {
                 command_pool,
@@ -799,6 +844,8 @@ impl UIVulkanRenderer {
                 offscreen_image_view,
                 offscreen_framebuffer,
                 offscreen_extent,
+                
+                preview_descriptor_set,
                 
                 fxaa_pipeline,
                 fxaa_pipeline_layout,
@@ -1756,7 +1803,35 @@ DrawCommand::Text { bounds, width, height, font_color, text, font_size, alignmen
                             }
                         }
                         DrawCommand::Line { .. } => {}
-                        DrawCommand::Image { .. } => {}
+                        DrawCommand::Image { bounds, width, height, texture_id, uv } => {
+                            // Render image texture quad
+                            let x = bounds.x;
+                            let y = bounds.y;
+                            let w = *width;
+                            let h = *height;
+                            let u0 = uv.x;
+                            let v0 = uv.y;
+                            let u1 = uv.x + uv.width;
+                            let v1 = uv.y + uv.height;
+                            
+                            // White color (1.0, 1.0, 1.0, 1.0) to display texture without color modulation
+                            let r = 1.0;
+                            let g = 1.0;
+                            let b = 1.0;
+                            let a = 1.0;
+                            
+                            vertices.extend_from_slice(&[
+                                x, y, r, g, b, a, u0, v0,
+                                x + w, y, r, g, b, a, u1, v0,
+                                x, y + h, r, g, b, a, u0, v1,
+                                x + w, y, r, g, b, a, u1, v0,
+                                x + w, y + h, r, g, b, a, u1, v1,
+                                x, y + h, r, g, b, a, u0, v1,
+                            ]);
+                            
+                            // Track texture_id for later descriptor set switching
+                            // texture_id == 1 means preview texture, 0 means font texture
+                        }
                         DrawCommand::Shadow { .. } => {}
                     DrawCommand::ClipRect { .. } => {}
                     DrawCommand::ClearClip => {}
@@ -1792,8 +1867,74 @@ DrawCommand::Text { bounds, width, height, font_color, text, font_size, alignmen
                 0
             );
             
+            // === Render preview texture in preview area ===
+            // Preview area: x=250, y=40, width=(1280-500)=780, height=(720-70)=650
+            let preview_x = 250.0f32;
+            let preview_y = 40.0f32;
+            let preview_w = self.extent.width as f32 - 500.0;
+            let preview_h = self.extent.height as f32 - 70.0;
+            
+            // Create preview quad vertices (texture_id = 1 for offscreen)
+            let preview_vertices: [f32; 48] = [
+                // Triangle 1
+                preview_x, preview_y, 1.0, 1.0, 1.0, 1.0, 0.0, 0.0,
+                preview_x + preview_w, preview_y, 1.0, 1.0, 1.0, 1.0, 1.0, 0.0,
+                preview_x, preview_y + preview_h, 1.0, 1.0, 1.0, 1.0, 0.0, 1.0,
+                // Triangle 2
+                preview_x + preview_w, preview_y, 1.0, 1.0, 1.0, 1.0, 1.0, 0.0,
+                preview_x + preview_w, preview_y + preview_h, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
+                preview_x, preview_y + preview_h, 1.0, 1.0, 1.0, 1.0, 0.0, 1.0,
+            ];
+            
+            // Upload preview vertices (offset after UI vertices)
+            let preview_offset = vertex_data.len() as u64;
+            let preview_data: &[u8] = bytemuck::cast_slice(&preview_vertices);
+            let preview_ptr = self.device.map_memory(
+                self.vertex_buffer_memory,
+                preview_offset,
+                preview_data.len() as vk::DeviceSize,
+                vk::MemoryMapFlags::empty()
+            ).map_err(|e| format!("Failed to map preview memory: {}", e))?;
+            std::ptr::copy_nonoverlapping(preview_data.as_ptr(), preview_ptr as *mut u8, preview_data.len());
+            self.device.unmap_memory(self.vertex_buffer_memory);
+            
+            // Bind preview descriptor set (offscreen texture)
+            self.device.cmd_bind_descriptor_sets(
+                self.command_buffers[image_index_usize],
+                vk::PipelineBindPoint::GRAPHICS,
+                self.pipeline_layout,
+                0,
+                &[self.preview_descriptor_set],
+                &[]
+            );
+            
+            // Draw preview quad
+            self.device.cmd_bind_vertex_buffers(
+                self.command_buffers[image_index_usize],
+                0,
+                &[self.vertex_buffer],
+                &[preview_offset]
+            );
+            self.device.cmd_draw(
+                self.command_buffers[image_index_usize],
+                6, // 6 vertices for quad
+                1,
+                0,
+                0
+            );
+            
+            // Restore font descriptor set for future frames
+            self.device.cmd_bind_descriptor_sets(
+                self.command_buffers[image_index_usize],
+                vk::PipelineBindPoint::GRAPHICS,
+                self.pipeline_layout,
+                0,
+                &[self.descriptor_set],
+                &[]
+            );
+            
             if self.frame_count == 0 {
-                self.dfx.lock().get_logger().lock().log(LogLevel::Trace, "Render", &format!("Frame {}: {} vertices", self.frame_count, vertices.len() / 8), file!(), line!());
+                self.dfx.lock().get_logger().lock().log(LogLevel::Trace, "Render", &format!("Frame {}: {} vertices + 6 preview vertices", self.frame_count, vertices.len() / 8), file!(), line!());
             }
             
             self.device.cmd_end_render_pass(self.command_buffers[image_index_usize]);
