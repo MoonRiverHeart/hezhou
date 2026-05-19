@@ -259,6 +259,24 @@ fn main() {
     ui_ffi::ui_clear_widget_tree(widget_tree_handle as ui_ffi::WidgetTreeHandle);
     dfx_info!("Demo", "UI widgets清理完成");
     
+    dfx_info!("Demo", "保存trace...");
+    std::fs::create_dir_all("traces").ok();
+    let trace_path = format!("traces/trace_{}.json", chrono::Local::now().format("%Y%m%d_%H%M%S"));
+    {
+        let dfx_guard = dfx.lock();
+        let trace_analyzer_arc = dfx_guard.get_trace_analyzer();
+        let trace_analyzer = trace_analyzer_arc.lock();
+        let result = trace_analyzer.save_to_file(&trace_path);
+        // 先释放锁再输出日志
+        drop(trace_analyzer);
+        drop(dfx_guard);
+        match result {
+            Ok(_) => dfx_info!("Demo", "Trace saved to {}", trace_path),
+            Err(e) => dfx_error!("Demo", "Failed to save trace: {}", e),
+        }
+    }
+    dfx_info!("Demo", "Trace保存完成");
+    
     dfx_info!("Demo", "=== Editor Closed ===");
     std::process::exit(0);
 }

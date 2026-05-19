@@ -1,13 +1,12 @@
 use parking_lot::Mutex;
 use std::collections::HashMap;
-use std::ffi::CString;
 use std::sync::Arc;
 
 #[repr(C)]
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 pub struct TracePoint {
-    pub name: *const std::os::raw::c_char,
-    pub category: *const std::os::raw::c_char,
+    pub name: String,
+    pub category: String,
     pub start_time: u64,
     pub end_time: u64,
     pub duration_ns: u64,
@@ -17,10 +16,10 @@ pub struct TracePoint {
 unsafe impl Send for TracePoint {}
 
 #[repr(C)]
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 pub struct CounterPoint {
-    pub name: *const std::os::raw::c_char,
-    pub category: *const std::os::raw::c_char,
+    pub name: String,
+    pub category: String,
     pub value: i64,
     pub timestamp: u64,
 }
@@ -80,12 +79,9 @@ impl TraceAnalyzer {
             let duration_ns = end_time - start_time;
             let thread_id = Self::get_thread_id();
 
-            let name_c = CString::new(name).unwrap().into_raw();
-            let category_c = CString::new(category).unwrap().into_raw();
-
             let point = TracePoint {
-                name: name_c,
-                category: category_c,
+                name: name.to_string(),
+                category: category.to_string(),
                 start_time,
                 end_time,
                 duration_ns,
@@ -109,15 +105,12 @@ impl TraceAnalyzer {
 
         let timestamp = Self::get_timestamp_ns();
 
-        let name_c = CString::new(name).unwrap().into_raw();
-        let category_c = CString::new(category).unwrap().into_raw();
-
         let counter = CounterPoint {
-            name: name_c,
-            category: category_c,
-            value,
-            timestamp,
-        };
+                name: name.to_string(),
+                category: category.to_string(),
+                value,
+                timestamp,
+            };
 
         self.counters
             .lock()
@@ -198,16 +191,9 @@ impl TraceAnalyzer {
                 json.push(',');
             }
 
-            let name = unsafe { std::ffi::CStr::from_ptr(point.name).to_str().unwrap_or("") };
-            let cat = unsafe {
-                std::ffi::CStr::from_ptr(point.category)
-                    .to_str()
-                    .unwrap_or("")
-            };
-
             json.push_str(&format!(
                 "{{\"name\":\"{}\",\"cat\":\"{}\",\"ph\":\"X\",\"ts\":{},\"dur\":{},\"tid\":{}}}",
-                name, cat, point.start_time, point.duration_ns, point.thread_id
+                point.name, point.category, point.start_time, point.duration_ns, point.thread_id
             ));
         }
 
@@ -215,20 +201,9 @@ impl TraceAnalyzer {
             for counter in counter_values.iter() {
                 json.push(',');
 
-                let name = unsafe {
-                    std::ffi::CStr::from_ptr(counter.name)
-                        .to_str()
-                        .unwrap_or("")
-                };
-                let cat = unsafe {
-                    std::ffi::CStr::from_ptr(counter.category)
-                        .to_str()
-                        .unwrap_or("")
-                };
-
                 json.push_str(&format!(
                     "{{\"name\":\"{}\",\"cat\":\"{}\",\"ph\":\"C\",\"ts\":{},\"value\":{}}}",
-                    name, cat, counter.timestamp, counter.value
+                    counter.name, counter.category, counter.timestamp, counter.value
                 ));
             }
         }
