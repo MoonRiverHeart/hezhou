@@ -661,11 +661,11 @@ p_rasterization_state: &vk::PipelineRasterizationStateCreateInfo {
                 ..Default::default()
             }, None).map_err(|e| format!("Failed to create FXAA offscreen image view: {}", e))?;
             
-            // FXAA framebuffer (uses same game_render_pass)
+            // FXAA framebuffer (uses same game_render_pass with 2 attachments)
             let offscreen_fxaa_framebuffer = device.create_framebuffer(&vk::FramebufferCreateInfo {
                 render_pass: game_render_pass,
-                attachment_count: 1,
-                p_attachments: &offscreen_fxaa_image_view,
+                attachment_count: 2,
+                p_attachments: &[offscreen_fxaa_image_view, depth_image_view] as *const _,
                 width: offscreen_extent.width,
                 height: offscreen_extent.height,
                 layers: 1,
@@ -3067,10 +3067,29 @@ self.dfx.lock().get_logger().lock().log(
                 ..Default::default()
             }, None).map_err(|e| format!("Failed to create offscreen image view: {}", e))?;
             
+            // Create new depth image
+            let (depth_image, depth_image_memory) = Self::create_depth_image(
+                &self.instance, &self.device, self.physical_device, new_extent
+            )?;
+            
+            let depth_image_view = self.device.create_image_view(&vk::ImageViewCreateInfo {
+                image: depth_image,
+                view_type: vk::ImageViewType::TYPE_2D,
+                format: vk::Format::D32_SFLOAT,
+                subresource_range: vk::ImageSubresourceRange {
+                    aspect_mask: vk::ImageAspectFlags::DEPTH,
+                    base_mip_level: 0,
+                    level_count: 1,
+                    base_array_layer: 0,
+                    layer_count: 1,
+                },
+                ..Default::default()
+            }, None).map_err(|e| format!("Failed to create depth image view: {}", e))?;
+            
             let offscreen_framebuffer = self.device.create_framebuffer(&vk::FramebufferCreateInfo {
                 render_pass: self.game_render_pass,
-                attachment_count: 1,
-                p_attachments: &offscreen_image_view,
+                attachment_count: 2,
+                p_attachments: &[offscreen_image_view, depth_image_view] as *const _,
                 width: new_extent.width,
                 height: new_extent.height,
                 layers: 1,
@@ -3098,8 +3117,8 @@ self.dfx.lock().get_logger().lock().log(
             
             let offscreen_fxaa_framebuffer = self.device.create_framebuffer(&vk::FramebufferCreateInfo {
                 render_pass: self.game_render_pass,
-                attachment_count: 1,
-                p_attachments: &offscreen_fxaa_image_view,
+                attachment_count: 2,
+                p_attachments: &[offscreen_fxaa_image_view, depth_image_view] as *const _,
                 width: new_extent.width,
                 height: new_extent.height,
                 layers: 1,
@@ -3148,6 +3167,10 @@ self.dfx.lock().get_logger().lock().log(
             self.offscreen_image_view = offscreen_image_view;
             self.offscreen_framebuffer = offscreen_framebuffer;
             self.offscreen_extent = new_extent;
+            
+            self.depth_image = depth_image;
+            self.depth_image_memory = depth_image_memory;
+            self.depth_image_view = depth_image_view;
             
             self.offscreen_fxaa_image = offscreen_fxaa_image;
             self.offscreen_fxaa_image_memory = offscreen_fxaa_image_memory;
