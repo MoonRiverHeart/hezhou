@@ -148,7 +148,7 @@ impl FontAtlas {
             return;
         }
         
-        let supersample_scale = 2.0;
+        let supersample_scale = 4.0;
         let raster_size = font_size * supersample_scale;
         let (metrics, bitmap) = self.fonts[font_index].rasterize(character, raster_size);
         
@@ -255,7 +255,7 @@ impl FontAtlas {
             return;
         }
         
-        let supersample_scale = 2.0;
+        let supersample_scale = 4.0;
         let raster_size = font_size * supersample_scale;
         let (metrics, bitmap) = self.fonts[font_index].rasterize(character, raster_size);
         
