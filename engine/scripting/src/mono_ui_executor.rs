@@ -102,4 +102,8 @@ impl MonoUIExecutor {
         self.assembly_name = new_name;
         Ok(())
     }
+
+    pub fn shutdown(&mut self) {
+        self.manager.shutdown();
+    }
 }

@@ -247,6 +247,14 @@ fn main() {
 
     dfx_info!("Demo", "[8] 清理资源...");
     
+    unsafe {
+        if let Some(ref mut executor) = EXECUTOR {
+            dfx_info!("Demo", "清理Mono executor...");
+            executor.shutdown();
+        }
+        EXECUTOR = None;
+    }
+    
     if screenshot_mode {
         dfx_info!("Demo", "Screenshot mode - skipping cleanup");
     } else {

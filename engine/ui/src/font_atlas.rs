@@ -40,9 +40,9 @@ impl FontAtlas {
         Self {
             fonts: Vec::new(),
             font_data: Vec::new(),
-            atlas_texture: vec![0u8; 2048 * 2048 * 4],
-            atlas_width: 2048,
-            atlas_height: 2048,
+            atlas_texture: vec![0u8; 4096 * 4096 * 4],
+            atlas_width: 4096,
+            atlas_height: 4096,
             character_cache: HashMap::new(),
             current_x: 0,
             current_y: 0,
@@ -148,7 +148,7 @@ impl FontAtlas {
             return;
         }
         
-        let supersample_scale = 3.0;
+        let supersample_scale = 4.0;
         let raster_size = font_size * supersample_scale;
         let (metrics, bitmap) = self.fonts[font_index].rasterize(character, raster_size);
         
@@ -255,7 +255,7 @@ impl FontAtlas {
             return;
         }
         
-        let supersample_scale = 3.0;
+        let supersample_scale = 4.0;
         let raster_size = font_size * supersample_scale;
         let (metrics, bitmap) = self.fonts[font_index].rasterize(character, raster_size);
         
