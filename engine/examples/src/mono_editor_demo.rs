@@ -7,10 +7,24 @@ use std::sync::atomic::{AtomicBool, Ordering};
 
 static mut EXECUTOR: Option<MonoUIExecutor> = None;
 static HOT_RELOAD_REQUESTED: AtomicBool = AtomicBool::new(false);
+static mut RENDERER: Option<*mut UIVulkanRenderer> = None;
 
 #[unsafe(no_mangle)]
 pub extern "C" fn trigger_hot_reload() {
     HOT_RELOAD_REQUESTED.store(true, Ordering::SeqCst);
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn set_game_preview_extent(width: u32, height: u32) {
+    unsafe {
+        if let Some(renderer_ptr) = RENDERER {
+            if let Err(e) = (*renderer_ptr).set_game_preview_extent(width, height) {
+                dfx_error!("Demo", "Failed to set game preview extent: {}", e);
+            } else {
+                dfx_info!("Demo", "Game preview extent set to {}x{}", width, height);
+            }
+        }
+    }
 }
 
 fn main() {
@@ -45,6 +59,7 @@ fn main() {
     dfx_trace_begin!("Window", "create");
     let mut renderer = UIVulkanRenderer::new(1280, 720, "Hezhou Game Editor")
         .expect("Failed to create renderer");
+    unsafe { RENDERER = Some(&mut renderer as *mut UIVulkanRenderer); }
     dfx_trace_end!("Window", "create");
     dfx_info!("Demo", "窗口创建成功!");
 
@@ -108,6 +123,7 @@ fn main() {
         ui_text_edit_get_text_len: unsafe { std::mem::transmute(ui_ffi::ui_text_edit_get_text_len as *const std::ffi::c_void) },
         ui_text_edit_get_text: unsafe { std::mem::transmute(ui_ffi::ui_text_edit_get_text as *const std::ffi::c_void) },
         ui_trigger_hot_reload: trigger_hot_reload,
+        ui_set_game_preview_extent: set_game_preview_extent,
         widget_tree_ptr: widget_tree_handle,
         dfx_handle: dfx_for_csharp as *mut std::ffi::c_void,
     };

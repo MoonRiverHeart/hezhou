@@ -107,6 +107,7 @@ pub struct UIVulkanRenderer {
     offscreen_image_view: vk::ImageView,
     offscreen_framebuffer: vk::Framebuffer,
     offscreen_extent: vk::Extent2D,
+    offscreen_format: vk::Format,
     
     // FXAA output (offscreen image after FXAA processing)
     offscreen_fxaa_image: vk::Image,
@@ -116,6 +117,7 @@ pub struct UIVulkanRenderer {
     
     // Preview texture descriptor (for UI to sample FXAA output)
     preview_descriptor_set: vk::DescriptorSet,
+    preview_sampler: vk::Sampler,
     
     // FXAA post-processing
     fxaa_pipeline: vk::Pipeline,
@@ -1022,6 +1024,7 @@ impl UIVulkanRenderer {
                 offscreen_image_view,
                 offscreen_framebuffer,
                 offscreen_extent,
+                offscreen_format,
                 
                 offscreen_fxaa_image,
                 offscreen_fxaa_image_memory,
@@ -1029,6 +1032,7 @@ impl UIVulkanRenderer {
                 offscreen_fxaa_framebuffer,
                 
                 preview_descriptor_set,
+                preview_sampler,
                 
                 fxaa_pipeline,
                 fxaa_pipeline_layout,
@@ -2752,9 +2756,192 @@ self.dfx.lock().get_logger().lock().log(
         }
     }
     
+    pub fn set_game_preview_extent(&mut self, width: u32, height: u32) -> Result<(), String> {
+        let new_extent = vk::Extent2D { width, height };
+        
+        if new_extent.width == 0 || new_extent.height == 0 {
+            return Err("Invalid preview extent".to_string());
+        }
+        
+        if new_extent.width == self.offscreen_extent.width && new_extent.height == self.offscreen_extent.height {
+            self.dfx.lock().get_logger().lock().log(
+                LogLevel::Info,
+                "Vulkan",
+                &format!("Preview extent unchanged: {}x{}", width, height),
+                file!(),
+                line!()
+            );
+            return Ok(());
+        }
+        
+        self.dfx.lock().get_logger().lock().log(
+            LogLevel::Info,
+            "Vulkan",
+            &format!("Recreating game preview resources: {}x{} -> {}x{}", 
+                self.offscreen_extent.width, self.offscreen_extent.height, width, height),
+            file!(),
+            line!()
+        );
+        
+        unsafe {
+            self.device.device_wait_idle()
+                .map_err(|e| format!("Failed to wait for device idle: {}", e))?;
+            
+            // Destroy old offscreen resources
+            self.device.destroy_framebuffer(self.offscreen_framebuffer, None);
+            self.device.destroy_image_view(self.offscreen_image_view, None);
+            self.device.destroy_image(self.offscreen_image, None);
+            self.device.free_memory(self.offscreen_image_memory, None);
+            
+            self.device.destroy_framebuffer(self.offscreen_fxaa_framebuffer, None);
+            self.device.destroy_image_view(self.offscreen_fxaa_image_view, None);
+            self.device.destroy_image(self.offscreen_fxaa_image, None);
+            self.device.free_memory(self.offscreen_fxaa_image_memory, None);
+            
+            // Create new offscreen image (game output)
+            let (offscreen_image, offscreen_image_memory) = Self::create_offscreen_image(
+                &self.instance, &self.device, self.physical_device, new_extent, self.offscreen_format
+            )?;
+            
+            let offscreen_image_view = self.device.create_image_view(&vk::ImageViewCreateInfo {
+                image: offscreen_image,
+                view_type: vk::ImageViewType::TYPE_2D,
+                format: self.offscreen_format,
+                subresource_range: vk::ImageSubresourceRange {
+                    aspect_mask: vk::ImageAspectFlags::COLOR,
+                    base_mip_level: 0,
+                    level_count: 1,
+                    base_array_layer: 0,
+                    layer_count: 1,
+                },
+                ..Default::default()
+            }, None).map_err(|e| format!("Failed to create offscreen image view: {}", e))?;
+            
+            let offscreen_framebuffer = self.device.create_framebuffer(&vk::FramebufferCreateInfo {
+                render_pass: self.game_render_pass,
+                attachment_count: 1,
+                p_attachments: &offscreen_image_view,
+                width: new_extent.width,
+                height: new_extent.height,
+                layers: 1,
+                ..Default::default()
+            }, None).map_err(|e| format!("Failed to create offscreen framebuffer: {}", e))?;
+            
+            // Create new FXAA output image
+            let (offscreen_fxaa_image, offscreen_fxaa_image_memory) = Self::create_offscreen_image(
+                &self.instance, &self.device, self.physical_device, new_extent, self.offscreen_format
+            )?;
+            
+            let offscreen_fxaa_image_view = self.device.create_image_view(&vk::ImageViewCreateInfo {
+                image: offscreen_fxaa_image,
+                view_type: vk::ImageViewType::TYPE_2D,
+                format: self.offscreen_format,
+                subresource_range: vk::ImageSubresourceRange {
+                    aspect_mask: vk::ImageAspectFlags::COLOR,
+                    base_mip_level: 0,
+                    level_count: 1,
+                    base_array_layer: 0,
+                    layer_count: 1,
+                },
+                ..Default::default()
+            }, None).map_err(|e| format!("Failed to create FXAA image view: {}", e))?;
+            
+            let offscreen_fxaa_framebuffer = self.device.create_framebuffer(&vk::FramebufferCreateInfo {
+                render_pass: self.game_render_pass,
+                attachment_count: 1,
+                p_attachments: &offscreen_fxaa_image_view,
+                width: new_extent.width,
+                height: new_extent.height,
+                layers: 1,
+                ..Default::default()
+            }, None).map_err(|e| format!("Failed to create FXAA framebuffer: {}", e))?;
+            
+            // Update FXAA descriptor set to sample from new offscreen image
+            self.device.update_descriptor_sets(
+                &[vk::WriteDescriptorSet {
+                    dst_set: self.fxaa_descriptor_set,
+                    dst_binding: 0,
+                    dst_array_element: 0,
+                    descriptor_count: 1,
+                    descriptor_type: vk::DescriptorType::COMBINED_IMAGE_SAMPLER,
+                    p_image_info: &vk::DescriptorImageInfo {
+                        sampler: self.fxaa_sampler,
+                        image_view: offscreen_image_view,
+                        image_layout: vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
+                    },
+                    ..Default::default()
+                }],
+                &[]
+            );
+            
+            // Update preview descriptor set to point to new offscreen image
+            self.device.update_descriptor_sets(
+                &[vk::WriteDescriptorSet {
+                    dst_set: self.preview_descriptor_set,
+                    dst_binding: 0,
+                    dst_array_element: 0,
+                    descriptor_count: 1,
+                    descriptor_type: vk::DescriptorType::COMBINED_IMAGE_SAMPLER,
+                    p_image_info: &vk::DescriptorImageInfo {
+                        sampler: self.preview_sampler,
+                        image_view: offscreen_image_view,
+                        image_layout: vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
+                    },
+                    ..Default::default()
+                }],
+                &[]
+            );
+            
+            // Update struct fields
+            self.offscreen_image = offscreen_image;
+            self.offscreen_image_memory = offscreen_image_memory;
+            self.offscreen_image_view = offscreen_image_view;
+            self.offscreen_framebuffer = offscreen_framebuffer;
+            self.offscreen_extent = new_extent;
+            
+            self.offscreen_fxaa_image = offscreen_fxaa_image;
+            self.offscreen_fxaa_image_memory = offscreen_fxaa_image_memory;
+            self.offscreen_fxaa_image_view = offscreen_fxaa_image_view;
+            self.offscreen_fxaa_framebuffer = offscreen_fxaa_framebuffer;
+            
+            self.dfx.lock().get_logger().lock().log(
+                LogLevel::Info,
+                "Vulkan",
+                &format!("Game preview resources recreated: {}x{}", width, height),
+                file!(),
+                line!()
+            );
+            
+            Ok(())
+        }
+    }
+    
     pub fn cleanup(&mut self) {
         unsafe {
             self.device.device_wait_idle().expect("Failed to wait for device idle");
+            
+            // Cleanup game preview resources
+            self.device.destroy_framebuffer(self.offscreen_framebuffer, None);
+            self.device.destroy_image_view(self.offscreen_image_view, None);
+            self.device.destroy_image(self.offscreen_image, None);
+            self.device.free_memory(self.offscreen_image_memory, None);
+            
+            self.device.destroy_framebuffer(self.offscreen_fxaa_framebuffer, None);
+            self.device.destroy_image_view(self.offscreen_fxaa_image_view, None);
+            self.device.destroy_image(self.offscreen_fxaa_image, None);
+            self.device.free_memory(self.offscreen_fxaa_image_memory, None);
+            
+            self.device.destroy_sampler(self.preview_sampler, None);
+            
+            self.device.destroy_pipeline(self.game_pipeline, None);
+            self.device.destroy_pipeline_layout(self.game_pipeline_layout, None);
+            self.device.destroy_render_pass(self.game_render_pass, None);
+            
+            self.device.destroy_pipeline(self.fxaa_pipeline, None);
+            self.device.destroy_pipeline_layout(self.fxaa_pipeline_layout, None);
+            self.device.destroy_descriptor_pool(self.fxaa_descriptor_pool, None);
+            self.device.destroy_descriptor_set_layout(self.fxaa_descriptor_set_layout, None);
+            self.device.destroy_sampler(self.fxaa_sampler, None);
             
             self.device.destroy_buffer(self.vertex_buffer, None);
             self.device.free_memory(self.vertex_buffer_memory, None);

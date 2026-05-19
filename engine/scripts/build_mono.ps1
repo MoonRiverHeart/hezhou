@@ -22,10 +22,17 @@ if (-not (Test-Path $McsPath)) {
 }
 
 $SourceFile = "$ScriptsDir/RotationScript.cs"
+$UiFile = "$ScriptsDir/UI.cs"
 Write-Host "[Info] Compiling: $SourceFile"
+Write-Host "[Info] Including: $UiFile"
 
 if (-not (Test-Path $SourceFile)) {
     Write-Host "[Error] Source file not found: $SourceFile" -ForegroundColor Red
+    exit 1
+}
+
+if (-not (Test-Path $UiFile)) {
+    Write-Host "[Error] UI file not found: $UiFile" -ForegroundColor Red
     exit 1
 }
 
@@ -39,6 +46,7 @@ $Output = & $McsPath `
     -target:library `
     -out:"$OutputDll" `
     $SourceFile `
+    $UiFile `
     -define:MONO `
     2>&1
 

@@ -126,8 +126,13 @@ namespace Hezhou
             UI.CreateLabel(_previewPanel.Id, 10f, 10f, previewWidth - 20f, 25f, "游戏预览");
             
             // 预览窗组件（显示游戏渲染纹理）
-            _previewWindowId = UI.CreatePreviewWindow(_previewPanel.Id, 10f, 40f, previewWidth - 20f, mainHeight - 20f, 1);
-            Log.Info("Editor", "游戏预览面板创建完成");
+            float previewWindowWidth = previewWidth - 20f;
+            float previewWindowHeight = mainHeight - 20f;
+            _previewWindowId = UI.CreatePreviewWindow(_previewPanel.Id, 10f, 40f, previewWindowWidth, previewWindowHeight, 1);
+            
+            // 设置Game Pass渲染尺寸匹配PreviewWindow（避免拉伸变形）
+            UI.SetGamePreviewExtent((uint)previewWindowWidth, (uint)previewWindowHeight);
+            Log.Info("Editor", $"游戏预览面板创建完成: {previewWindowWidth}x{previewWindowHeight}");
 
             _propertiesPanel = new Panel(rootId, _screenWidth - RIGHT_PANEL_WIDTH, mainY, RIGHT_PANEL_WIDTH, mainHeight + BOTTOM_PANEL_HEIGHT, 0.2f, 0.2f, 0.2f, 1.0f);
             UI.CreateLabel(_propertiesPanel.Id, 10f, 10f, RIGHT_PANEL_WIDTH - 20f, 25f, "属性编辑");
@@ -491,8 +496,20 @@ private static void ShowDropdownMenu(float x, float y, string[] items, UI.Widget
                 UI.CreateLabel(_previewPanel.Id, 10f, 10f, previewWidth - 20f, 25f, "游戏预览");
                 
                 // 创建预览窗组件
-                _previewWindowId = UI.CreatePreviewWindow(_previewPanel.Id, 10f, 40f, previewWidth - 20f, mainHeight - 20f, 1);
-                Log.Info("Editor", "PreviewWindow创建完成 (ShowMainLayout)");
+                float previewWindowWidth = previewWidth - 20f;
+                float previewWindowHeight = mainHeight - 20f;
+                _previewWindowId = UI.CreatePreviewWindow(_previewPanel.Id, 10f, 40f, previewWindowWidth, previewWindowHeight, 1);
+                
+                // 设置Game Pass渲染尺寸匹配PreviewWindow
+                UI.SetGamePreviewExtent((uint)previewWindowWidth, (uint)previewWindowHeight);
+                Log.Info("Editor", $"PreviewWindow创建完成 (ShowMainLayout): {previewWindowWidth}x{previewWindowHeight}");
+            }
+            else
+            {
+                // PreviewWindow已存在，更新渲染尺寸
+                float previewWindowWidth = previewWidth - 20f;
+                float previewWindowHeight = mainHeight - 20f;
+                UI.SetGamePreviewExtent((uint)previewWindowWidth, (uint)previewWindowHeight);
             }
             
             if (_assetPanel == null)

@@ -95,6 +95,9 @@ namespace Hezhou
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public delegate void TriggerHotReloadDelegate();
 
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void SetGamePreviewExtentDelegate(uint width, uint height);
+
         [StructLayout(LayoutKind.Sequential)]
         public struct FfiContext
         {
@@ -134,6 +137,7 @@ namespace Hezhou
             public IntPtr ui_text_edit_get_text_len;
             public IntPtr ui_text_edit_get_text;
             public IntPtr ui_trigger_hot_reload;
+            public IntPtr ui_set_game_preview_extent;
             public IntPtr widget_tree_ptr;
             public IntPtr dfx_handle;
         }
@@ -370,6 +374,18 @@ public static void RegisterResizeCallback(ResizeCallbackDelegate callback)
             }
             var func = Marshal.GetDelegateForFunctionPointer<TriggerHotReloadDelegate>(_ffi.ui_trigger_hot_reload);
             func();
+        }
+
+        public static void SetGamePreviewExtent(uint width, uint height)
+        {
+            if (_ffi.ui_set_game_preview_extent == IntPtr.Zero)
+            {
+                Log.Error("C#", "SetGamePreviewExtent函数指针为空");
+                return;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<SetGamePreviewExtentDelegate>(_ffi.ui_set_game_preview_extent);
+            func(width, height);
+            Log.Info("C#", $"Game preview extent set to {width}x{height}");
         }
         
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]

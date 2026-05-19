@@ -39,6 +39,7 @@ pub type TextEditDeleteCharFn = extern "C" fn(WidgetTreeHandle, u64);
 pub type TextEditGetTextLenFn = extern "C" fn(WidgetTreeHandle, u64) -> usize;
 pub type TextEditGetTextFn = extern "C" fn(WidgetTreeHandle, u64, *mut c_char, usize);
 pub type TriggerHotReloadFn = extern "C" fn();
+pub type SetGamePreviewExtentFn = extern "C" fn(u32, u32);
 
 #[repr(C)]
 pub struct FfiContext {
@@ -78,6 +79,7 @@ pub struct FfiContext {
     pub ui_text_edit_get_text_len: TextEditGetTextLenFn,
     pub ui_text_edit_get_text: TextEditGetTextFn,
     pub ui_trigger_hot_reload: TriggerHotReloadFn,
+    pub ui_set_game_preview_extent: SetGamePreviewExtentFn,
     pub widget_tree_ptr: WidgetTreeHandle,
     pub dfx_handle: *mut c_void,
 }

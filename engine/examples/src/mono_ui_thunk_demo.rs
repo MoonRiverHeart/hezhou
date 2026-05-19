@@ -5,6 +5,7 @@ use hezhou_dfx::*;
 use std::time::{Duration, Instant};
 
 pub extern "C" fn trigger_hot_reload() {}
+pub extern "C" fn set_game_preview_extent(_width: u32, _height: u32) {}
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
@@ -83,6 +84,7 @@ fn main() {
         ui_text_edit_get_text_len: unsafe { std::mem::transmute(ui_ffi::ui_text_edit_get_text_len as *const std::ffi::c_void) },
         ui_text_edit_get_text: unsafe { std::mem::transmute(ui_ffi::ui_text_edit_get_text as *const std::ffi::c_void) },
         ui_trigger_hot_reload: trigger_hot_reload,
+        ui_set_game_preview_extent: set_game_preview_extent,
         widget_tree_ptr: widget_tree_handle,
         dfx_handle: std::ptr::null_mut(),
     };
