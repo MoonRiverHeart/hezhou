@@ -15,6 +15,7 @@ namespace Hezhou
         private static Panel _assetPanel;
         private static VStack _assetList;
         private static Panel _previewPanel;
+        private static ulong _previewWindowId;
         private static Panel _propertiesPanel;
         private static VStack _propsList;
         private static Panel _statusBar;
@@ -123,6 +124,9 @@ namespace Hezhou
 
             _previewPanel = new Panel(rootId, previewX, mainY, previewWidth, mainHeight + BOTTOM_PANEL_HEIGHT, 0.08f, 0.08f, 0.08f, 0.3f);
             UI.CreateLabel(_previewPanel.Id, 10f, 10f, previewWidth - 20f, 25f, "游戏预览");
+            
+            // 预览窗组件（显示游戏渲染纹理）
+            _previewWindowId = UI.CreatePreviewWindow(_previewPanel.Id, 10f, 40f, previewWidth - 20f, mainHeight - 20f, 1);
             Log.Info("Editor", "游戏预览面板创建完成");
 
             _propertiesPanel = new Panel(rootId, _screenWidth - RIGHT_PANEL_WIDTH, mainY, RIGHT_PANEL_WIDTH, mainHeight + BOTTOM_PANEL_HEIGHT, 0.2f, 0.2f, 0.2f, 1.0f);

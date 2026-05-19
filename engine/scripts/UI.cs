@@ -36,6 +36,12 @@ namespace Hezhou
         public delegate ulong CreateLabelInParentDelegate(IntPtr handle, ulong parentId, float width, float height, [MarshalAs(UnmanagedType.LPStr)] string text);
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate ulong CreatePreviewWindowDelegate(IntPtr handle, ulong parentId, float x, float y, float width, float height, ulong textureId);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void SetPreviewTextureDelegate(IntPtr handle, ulong widgetId, ulong textureId);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public delegate ulong CreatePanelInParentDelegate(IntPtr handle, ulong parentId, float x, float y, float width, float height, float r, float g, float b, float a);
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
@@ -113,6 +119,8 @@ namespace Hezhou
             public IntPtr ui_create_button_in_parent;
             public IntPtr ui_create_label_in_parent;
             public IntPtr ui_create_panel_in_parent;
+            public IntPtr ui_create_preview_window;
+            public IntPtr ui_set_preview_texture;
             public IntPtr ui_get_root_id;
             public IntPtr ui_set_widget_layout;
             public IntPtr ui_widget_set_position;
@@ -273,6 +281,28 @@ public static void RegisterResizeCallback(ResizeCallbackDelegate callback)
             ulong id = CreateLabel(parentId, width, height, text);
             SetWidgetLayout(id, x, y, width, height);
             return id;
+        }
+
+        public static ulong CreatePreviewWindow(ulong parentId, float x, float y, float width, float height, ulong textureId = 1)
+        {
+            if (_ffi.ui_create_preview_window == IntPtr.Zero)
+            {
+                Log.Error("C#", "CreatePreviewWindow函数指针为空");
+                return 0;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<CreatePreviewWindowDelegate>(_ffi.ui_create_preview_window);
+            return func(_widgetTree, parentId, x, y, width, height, textureId);
+        }
+
+        public static void SetPreviewTexture(ulong widgetId, ulong textureId)
+        {
+            if (_ffi.ui_set_preview_texture == IntPtr.Zero)
+            {
+                Log.Error("C#", "SetPreviewTexture函数指针为空");
+                return;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<SetPreviewTextureDelegate>(_ffi.ui_set_preview_texture);
+            func(_widgetTree, widgetId, textureId);
         }
 
         public static ulong CreatePanel(ulong parentId, float x, float y, float width, float height, float r = 0.2f, float g = 0.2f, float b = 0.2f, float a = 1.0f)

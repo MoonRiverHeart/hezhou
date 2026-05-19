@@ -1998,6 +1998,7 @@ let font_atlas = self.ui_system.lock().get_font_atlas();
             };
             
             let mut vertices: Vec<f32> = Vec::new();
+            let mut preview_vertices: Vec<f32> = Vec::new();
             
             // 渲染UI控件
             for cmd in render_data.iter().flat_map(|data| &data.draw_commands) {
@@ -2085,7 +2086,7 @@ DrawCommand::Text { bounds, width, height, font_color, text, font_size, alignmen
                         }
                         DrawCommand::Line { .. } => {}
                         DrawCommand::Image { bounds, width, height, texture_id, uv } => {
-                            // Render image texture quad
+                            // Separate preview texture quads from regular UI
                             let x = bounds.x;
                             let y = bounds.y;
                             let w = *width;
@@ -2095,23 +2096,26 @@ DrawCommand::Text { bounds, width, height, font_color, text, font_size, alignmen
                             let u1 = uv.x + uv.width;
                             let v1 = uv.y + uv.height;
                             
-                            // White color (1.0, 1.0, 1.0, 1.0) to display texture without color modulation
                             let r = 1.0;
                             let g = 1.0;
                             let b = 1.0;
                             let a = 1.0;
                             
-                            vertices.extend_from_slice(&[
+                            let quad_vertices = [
                                 x, y, r, g, b, a, u0, v0,
                                 x + w, y, r, g, b, a, u1, v0,
                                 x, y + h, r, g, b, a, u0, v1,
                                 x + w, y, r, g, b, a, u1, v0,
                                 x + w, y + h, r, g, b, a, u1, v1,
                                 x, y + h, r, g, b, a, u0, v1,
-                            ]);
+                            ];
                             
-                            // Track texture_id for later descriptor set switching
-                            // texture_id == 1 means preview texture, 0 means font texture
+                            // texture_id == 1 means preview texture
+                            if *texture_id == 1 {
+                                preview_vertices.extend_from_slice(&quad_vertices);
+                            } else {
+                                vertices.extend_from_slice(&quad_vertices);
+                            }
                         }
                         DrawCommand::Shadow { .. } => {}
                     DrawCommand::ClipRect { .. } => {}
@@ -2148,84 +2152,75 @@ DrawCommand::Text { bounds, width, height, font_color, text, font_size, alignmen
                 0
             );
             
-            // === Render preview texture in preview area ===
-            // Preview area: same as UI _previewPanel bounds
-            // x = LEFT_PANEL_WIDTH = 250, y = TOOLBAR_HEIGHT = 40
-            // width = screenWidth - LEFT - RIGHT = 1280 - 250 - 250 = 780
-            // height = screenHeight - TOOLBAR - STATUS_BAR = 720 - 40 - 40 = 640
-            let preview_x = 250.0f32;
-            let preview_y = 40.0f32;
-            let preview_w = self.extent.width as f32 - 500.0;
-            let preview_h = self.extent.height as f32 - 80.0; // 40(toolbar) + 40(status)
-            
-            // Create preview quad vertices (texture_id = 1 for offscreen)
-            let preview_vertices: [f32; 48] = [
-                // Triangle 1
-                preview_x, preview_y, 1.0, 1.0, 1.0, 1.0, 0.0, 0.0,
-                preview_x + preview_w, preview_y, 1.0, 1.0, 1.0, 1.0, 1.0, 0.0,
-                preview_x, preview_y + preview_h, 1.0, 1.0, 1.0, 1.0, 0.0, 1.0,
-                // Triangle 2
-                preview_x + preview_w, preview_y, 1.0, 1.0, 1.0, 1.0, 1.0, 0.0,
-                preview_x + preview_w, preview_y + preview_h, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
-                preview_x, preview_y + preview_h, 1.0, 1.0, 1.0, 1.0, 0.0, 1.0,
-            ];
-            
-            // Upload preview vertices (offset after UI vertices)
-            let preview_offset = vertex_data.len() as u64;
-            let preview_data: &[u8] = bytemuck::cast_slice(&preview_vertices);
-            let preview_ptr = self.device.map_memory(
-                self.vertex_buffer_memory,
-                preview_offset,
-                preview_data.len() as vk::DeviceSize,
-                vk::MemoryMapFlags::empty()
-            ).map_err(|e| format!("Failed to map preview memory: {}", e))?;
-            std::ptr::copy_nonoverlapping(preview_data.as_ptr(), preview_ptr as *mut u8, preview_data.len());
-            self.device.unmap_memory(self.vertex_buffer_memory);
-            
-            // Bind preview descriptor set (offscreen texture)
-            self.device.cmd_bind_descriptor_sets(
-                self.command_buffers[image_index_usize],
-                vk::PipelineBindPoint::GRAPHICS,
-                self.pipeline_layout,
-                0,
-                &[self.preview_descriptor_set],
-                &[]
-            );
-            
-            // Set scissor to limit preview rendering area (prevent overlap with other UI)
-            let preview_scissor = vk::Rect2D {
-                offset: vk::Offset2D { x: preview_x as i32, y: preview_y as i32 },
-                extent: vk::Extent2D { width: preview_w as u32, height: preview_h as u32 },
-            };
-            self.device.cmd_set_scissor(self.command_buffers[image_index_usize], 0, &[preview_scissor]);
-            
-            // Draw preview quad
-            self.device.cmd_bind_vertex_buffers(
-                self.command_buffers[image_index_usize],
-                0,
-                &[self.vertex_buffer],
-                &[preview_offset]
-            );
-            self.device.cmd_draw(
-                self.command_buffers[image_index_usize],
-                6, // 6 vertices for quad
-                1,
-                0,
-                0
-            );
-            
-            // Restore font descriptor set for future frames
-            self.device.cmd_bind_descriptor_sets(
-                self.command_buffers[image_index_usize],
-                vk::PipelineBindPoint::GRAPHICS,
-                self.pipeline_layout,
-                0,
-                &[self.descriptor_set],
-                &[]
-            );
+            // Render preview texture quads (if any)
+            if !preview_vertices.is_empty() {
+                // Upload preview vertices after UI vertices
+                let preview_offset = vertex_data.len() as u64;
+                let preview_data: &[u8] = bytemuck::cast_slice(&preview_vertices);
+                let preview_ptr = self.device.map_memory(
+                    self.vertex_buffer_memory,
+                    preview_offset,
+                    preview_data.len() as vk::DeviceSize,
+                    vk::MemoryMapFlags::empty()
+                ).map_err(|e| format!("Failed to map preview memory: {}", e))?;
+                std::ptr::copy_nonoverlapping(preview_data.as_ptr(), preview_ptr as *mut u8, preview_data.len());
+                self.device.unmap_memory(self.vertex_buffer_memory);
+                
+                // Bind preview descriptor set
+                self.device.cmd_bind_descriptor_sets(
+                    self.command_buffers[image_index_usize],
+                    vk::PipelineBindPoint::GRAPHICS,
+                    self.pipeline_layout,
+                    0,
+                    &[self.preview_descriptor_set],
+                    &[]
+                );
+                
+                // Set push constants for RGB texture mode (enable_msdf = false)
+                let preview_push_constants = [
+                    self.extent.width as f32,
+                    self.extent.height as f32,
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0, // px_range=0, enable_msdf=false
+                ];
+                self.device.cmd_push_constants(
+                    self.command_buffers[image_index_usize],
+                    self.pipeline_layout,
+                    vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT,
+                    0,
+                    bytemuck::cast_slice(&preview_push_constants)
+                );
+                
+                // Draw preview quads
+                self.device.cmd_bind_vertex_buffers(
+                    self.command_buffers[image_index_usize],
+                    0,
+                    &[self.vertex_buffer],
+                    &[preview_offset]
+                );
+                self.device.cmd_draw(
+                    self.command_buffers[image_index_usize],
+                    (preview_vertices.len() / 8) as u32,
+                    1,
+                    0,
+                    0
+                );
+                
+                // Restore font descriptor set
+                self.device.cmd_bind_descriptor_sets(
+                    self.command_buffers[image_index_usize],
+                    vk::PipelineBindPoint::GRAPHICS,
+                    self.pipeline_layout,
+                    0,
+                    &[self.descriptor_set],
+                    &[]
+                );
+            }
             
             if self.frame_count == 0 {
-                self.dfx.lock().get_logger().lock().log(LogLevel::Trace, "Render", &format!("Frame {}: {} vertices + 6 preview vertices", self.frame_count, vertices.len() / 8), file!(), line!());
+                self.dfx.lock().get_logger().lock().log(LogLevel::Trace, "Render", &format!("Frame {}: {} vertices + {} preview vertices", self.frame_count, vertices.len() / 8, preview_vertices.len() / 8), file!(), line!());
             }
             
             self.device.cmd_end_render_pass(self.command_buffers[image_index_usize]);
