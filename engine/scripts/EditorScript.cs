@@ -47,13 +47,13 @@ namespace Hezhou
         private static float _savedCameraY = 0f;
         private static float _savedCameraZ = -3f;
         private static float _savedCameraYaw = 0f;
-        private static float _savedCameraPitch = 0.5f;
+        private static float _savedCameraPitch = 0f;
         
         private static float _cameraX = 0f;
         private static float _cameraY = 0f;
         private static float _cameraZ = -3f;
         private static float _cameraYaw = 0f;
-        private static float _cameraPitch = 0.5f;
+        private static float _cameraPitch = 0f;
         
         private static bool _mouseDragging = false;
         private static float _lastMouseX = 0f;
@@ -339,7 +339,7 @@ namespace Hezhou
                     else
                     {
                         // Reset to default view when not selected
-                        UI.SetCameraParams(0f, 0.5f, 0f, 0f, -3f);
+                        UI.SetCameraParams(0f, 0f, 0f, 0f, -3f);
                     }
                 }
                 catch (Exception ex)

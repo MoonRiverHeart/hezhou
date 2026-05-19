@@ -614,7 +614,7 @@ public static void RegisterResizeCallback(ResizeCallbackDelegate callback)
         public HStack(ulong parentId, float spacing = 8f)
         {
             Id = UI.CreateHStack(parentId, spacing);
-            Log.Info("C#", $"HStack创建成功: id={Id}, parent={parentId}");
+            Log.Info("C#", $"HStack created: id={Id}, parent={parentId}");
         }
         
         public Button AddButton(float width, float height, string text)
@@ -643,7 +643,7 @@ public static void RegisterResizeCallback(ResizeCallbackDelegate callback)
         {
             _text = text;
             Id = UI.CreateButton(parentId, width, height, text);
-            Log.Info("C#", $"Button创建成功: id={Id}, text=\"{text}\"");
+            Log.Info("C#", $"Button created: id={Id}, text=\"{text}\"");
         }
         
         public string Text

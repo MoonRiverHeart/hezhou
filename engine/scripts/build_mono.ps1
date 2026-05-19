@@ -23,8 +23,12 @@ if (-not (Test-Path $McsPath)) {
 
 $SourceFile = "$ScriptsDir/RotationScript.cs"
 $UiFile = "$ScriptsDir/UI.cs"
+$DfxFile = "$ScriptsDir/DFX.cs"
+$EditorFile = "$ScriptsDir/EditorScript.cs"
 Write-Host "[Info] Compiling: $SourceFile"
 Write-Host "[Info] Including: $UiFile"
+Write-Host "[Info] Including: $DfxFile"
+Write-Host "[Info] Including: $EditorFile"
 
 if (-not (Test-Path $SourceFile)) {
     Write-Host "[Error] Source file not found: $SourceFile" -ForegroundColor Red
@@ -33,6 +37,16 @@ if (-not (Test-Path $SourceFile)) {
 
 if (-not (Test-Path $UiFile)) {
     Write-Host "[Error] UI file not found: $UiFile" -ForegroundColor Red
+    exit 1
+}
+
+if (-not (Test-Path $DfxFile)) {
+    Write-Host "[Error] DFX file not found: $DfxFile" -ForegroundColor Red
+    exit 1
+}
+
+if (-not (Test-Path $EditorFile)) {
+    Write-Host "[Error] Editor file not found: $EditorFile" -ForegroundColor Red
     exit 1
 }
 
@@ -47,6 +61,8 @@ $Output = & $McsPath `
     -out:"$OutputDll" `
     $SourceFile `
     $UiFile `
+    $DfxFile `
+    $EditorFile `
     -define:MONO `
     2>&1
 
