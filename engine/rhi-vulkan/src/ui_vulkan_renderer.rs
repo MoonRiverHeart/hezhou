@@ -6,7 +6,7 @@ use std::ffi::CString;
 use std::collections::HashMap;
 use hezhou_ui::{UISystem, UIInputHandler, Panel, Button, Label, TextEdit, Layout, DrawCommand, Widget, Style, Color, TextStyle, ffi::WidgetTreeHandle, ffi::ui_set_primary_button_id};
 use hezhou_platform::{MouseAction, MouseEvent, MouseButton, CharEvent, KeyEvent, KeyAction, KeyCode, KeyModifiers};
-use hezhou_dfx::{DfxSystem, LogLevel};
+use hezhou_dfx::{DfxSystem, LogLevel, dfx_info};
 use parking_lot::Mutex;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -2481,6 +2481,7 @@ self.dfx.lock().get_logger().lock().log(
                     self.input_handler.lock().on_mouse_event(&mouse_event, self.frame_count);
                 }
                 WindowEvent::Key(key, _, action, mods) => {
+                    // Space 和 S 只在 Press 时处理
                     if action == Action::Press {
                         if key == Key::Space {
                             self.space_pressed = true;
@@ -2488,87 +2489,95 @@ self.dfx.lock().get_logger().lock().log(
                         if key == Key::S {
                             self.s_pressed = true;
                         }
-                        if key == Key::Backspace {
-                            self.input_handler.lock().on_key_event(&KeyEvent {
-                                action: KeyAction::Press,
-                                keycode: KeyCode::Backspace,
-                                modifiers: KeyModifiers::default(),
-                            }, self.frame_count);
-                        }
-                        
-                        // 方向键
-                        if key == Key::Left {
-                            self.input_handler.lock().on_key_event(&KeyEvent {
-                                action: KeyAction::Press,
-                                keycode: KeyCode::Left,
-                                modifiers: KeyModifiers::default(),
-                            }, self.frame_count);
-                        }
-                        if key == Key::Right {
-                            self.input_handler.lock().on_key_event(&KeyEvent {
-                                action: KeyAction::Press,
-                                keycode: KeyCode::Right,
-                                modifiers: KeyModifiers::default(),
-                            }, self.frame_count);
-                        }
-                        if key == Key::Up {
-                            self.input_handler.lock().on_key_event(&KeyEvent {
-                                action: KeyAction::Press,
-                                keycode: KeyCode::Up,
-                                modifiers: KeyModifiers::default(),
-                            }, self.frame_count);
-                        }
-                        if key == Key::Down {
-                            self.input_handler.lock().on_key_event(&KeyEvent {
-                                action: KeyAction::Press,
-                                keycode: KeyCode::Down,
-                                modifiers: KeyModifiers::default(),
-                            }, self.frame_count);
-                        }
-                        
-                        // Home/End键
-                        if key == Key::Home {
-                            self.input_handler.lock().on_key_event(&KeyEvent {
-                                action: KeyAction::Press,
-                                keycode: KeyCode::Home,
-                                modifiers: KeyModifiers::default(),
-                            }, self.frame_count);
-                        }
-                        if key == Key::End {
-                            self.input_handler.lock().on_key_event(&KeyEvent {
-                                action: KeyAction::Press,
-                                keycode: KeyCode::End,
-                                modifiers: KeyModifiers::default(),
-                            }, self.frame_count);
-                        }
-                        
-                        // Ctrl+C/V/X 复制粘贴剪切
-                        if mods == glfw::Modifiers::Control {
-                            if key == Key::C {
-                                self.input_handler.lock().on_key_event(&KeyEvent {
-                                    action: KeyAction::Press,
-                                    keycode: KeyCode::C,
-                                    modifiers: KeyModifiers { ctrl: true, shift: false, alt: false },
-                                }, self.frame_count);
-                            }
-                            if key == Key::V {
-                                self.input_handler.lock().on_key_event(&KeyEvent {
-                                    action: KeyAction::Press,
-                                    keycode: KeyCode::V,
-                                    modifiers: KeyModifiers { ctrl: true, shift: false, alt: false },
-                                }, self.frame_count);
-                            }
-                            if key == Key::X {
-                                self.input_handler.lock().on_key_event(&KeyEvent {
-                                    action: KeyAction::Press,
-                                    keycode: KeyCode::X,
-                                    modifiers: KeyModifiers { ctrl: true, shift: false, alt: false },
-                                }, self.frame_count);
-                            }
-                        }
-                        
-                        self.dfx.lock().get_logger().lock().log(LogLevel::Info, "GLFW", &format!("Key pressed: {:?} mods={:?}", key, mods), file!(), line!());
                     }
+                    
+                    // 方向键和其他键需要处理 Press/Release/Repeat
+                    let key_action = match action {
+                        Action::Press => KeyAction::Press,
+                        Action::Release => KeyAction::Release,
+                        Action::Repeat => KeyAction::Repeat,
+                    };
+                    
+                    if key == Key::Backspace {
+                        self.input_handler.lock().on_key_event(&KeyEvent {
+                            action: key_action,
+                            keycode: KeyCode::Backspace,
+                            modifiers: KeyModifiers::default(),
+                        }, self.frame_count);
+                    }
+                    
+                    // 方向键
+                    if key == Key::Left {
+                        self.input_handler.lock().on_key_event(&KeyEvent {
+                            action: key_action,
+                            keycode: KeyCode::Left,
+                            modifiers: KeyModifiers::default(),
+                        }, self.frame_count);
+                    }
+                    if key == Key::Right {
+                        self.input_handler.lock().on_key_event(&KeyEvent {
+                            action: key_action,
+                            keycode: KeyCode::Right,
+                            modifiers: KeyModifiers::default(),
+                        }, self.frame_count);
+                    }
+                    if key == Key::Up {
+                        self.input_handler.lock().on_key_event(&KeyEvent {
+                            action: key_action,
+                            keycode: KeyCode::Up,
+                            modifiers: KeyModifiers::default(),
+                        }, self.frame_count);
+                    }
+                    if key == Key::Down {
+                        self.input_handler.lock().on_key_event(&KeyEvent {
+                            action: key_action,
+                            keycode: KeyCode::Down,
+                            modifiers: KeyModifiers::default(),
+                        }, self.frame_count);
+                    }
+                    
+                    // Home/End键
+                    if key == Key::Home {
+                        self.input_handler.lock().on_key_event(&KeyEvent {
+                            action: key_action,
+                            keycode: KeyCode::Home,
+                            modifiers: KeyModifiers::default(),
+                        }, self.frame_count);
+                    }
+                    if key == Key::End {
+                        self.input_handler.lock().on_key_event(&KeyEvent {
+                            action: key_action,
+                            keycode: KeyCode::End,
+                            modifiers: KeyModifiers::default(),
+                        }, self.frame_count);
+                    }
+                    
+                    // Ctrl+C/V/X 复制粘贴剪切
+                    if mods == glfw::Modifiers::Control {
+                        if key == Key::C {
+                            self.input_handler.lock().on_key_event(&KeyEvent {
+                                action: key_action,
+                                keycode: KeyCode::C,
+                                modifiers: KeyModifiers { ctrl: true, shift: false, alt: false },
+                            }, self.frame_count);
+                        }
+                        if key == Key::V {
+                            self.input_handler.lock().on_key_event(&KeyEvent {
+                                action: key_action,
+                                keycode: KeyCode::V,
+                                modifiers: KeyModifiers { ctrl: true, shift: false, alt: false },
+                            }, self.frame_count);
+                        }
+                        if key == Key::X {
+                            self.input_handler.lock().on_key_event(&KeyEvent {
+                                action: key_action,
+                                keycode: KeyCode::X,
+                                modifiers: KeyModifiers { ctrl: true, shift: false, alt: false },
+                            }, self.frame_count);
+                        }
+                    }
+                    
+                    dfx_info!("GLFW", "Key: {:?} action={:?} mods={:?}", key, action, mods);
                 }
                 WindowEvent::Char(codepoint) => {
                     if codepoint >= ' ' {
