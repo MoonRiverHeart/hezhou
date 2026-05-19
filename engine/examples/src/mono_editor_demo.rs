@@ -249,26 +249,18 @@ fn main() {
     
     unsafe {
         if let Some(ref mut executor) = EXECUTOR {
-            dfx_info!("Demo", "清理Mono executor...");
+            dfx_info!("Demo", "先卸载Mono assembly...");
             executor.shutdown();
         }
         EXECUTOR = None;
     }
     
-    if screenshot_mode {
-        dfx_info!("Demo", "Screenshot mode - skipping cleanup");
-    } else {
-        std::fs::create_dir_all("traces").ok();
-        let trace_path = format!("traces/trace_{}.json", chrono::Local::now().format("%Y%m%d_%H%M%S"));
-        if let Err(e) = dfx.lock().get_trace_analyzer().lock().save_to_file(&trace_path) {
-            dfx_error!("Demo", "Failed to save trace: {}", e);
-        } else {
-            dfx_info!("Demo", "Trace saved to {}", trace_path);
-        }
-        
-        renderer.cleanup();
-    }
+    dfx_info!("Demo", "清理UI widgets...");
+    ui_ffi::ui_clear_widget_tree(widget_tree_handle as ui_ffi::WidgetTreeHandle);
+    dfx_info!("Demo", "UI widgets清理完成");
+    
     dfx_info!("Demo", "=== Editor Closed ===");
+    std::process::exit(0);
 }
 
 fn compile_editor_script() {
