@@ -614,8 +614,8 @@ p_rasterization_state: &vk::PipelineRasterizationStateCreateInfo {
             }, None).map_err(|e| format!("Failed to create game render pass: {}", e))?;
             
             // Create depth image
-            let (depth_image, depth_image_memory) = Self::create_offscreen_image(
-                &instance, &device, physical_device, offscreen_extent, vk::Format::D32_SFLOAT
+            let (depth_image, depth_image_memory) = Self::create_depth_image(
+                &instance, &device, physical_device, offscreen_extent
             ).map_err(|e| format!("Failed to create depth image: {}", e))?;
             
             let depth_image_view = device.create_image_view(&vk::ImageViewCreateInfo {
@@ -1153,6 +1153,52 @@ p_rasterization_state: &vk::PipelineRasterizationStateCreateInfo {
             
             device.bind_image_memory(image, memory, 0)
                 .map_err(|e| format!("Failed to bind offscreen memory: {}", e))?;
+            
+            Ok((image, memory))
+        }
+    }
+    
+    fn create_depth_image(
+        instance: &ash::Instance,
+        device: &ash::Device,
+        physical_device: vk::PhysicalDevice,
+        extent: vk::Extent2D,
+    ) -> Result<(vk::Image, vk::DeviceMemory), String> {
+        unsafe {
+            let image = device.create_image(&vk::ImageCreateInfo {
+                image_type: vk::ImageType::TYPE_2D,
+                format: vk::Format::D32_SFLOAT,
+                extent: vk::Extent3D {
+                    width: extent.width,
+                    height: extent.height,
+                    depth: 1,
+                },
+                mip_levels: 1,
+                array_layers: 1,
+                samples: vk::SampleCountFlags::TYPE_1,
+                tiling: vk::ImageTiling::OPTIMAL,
+                usage: vk::ImageUsageFlags::DEPTH_STENCIL_ATTACHMENT,
+                sharing_mode: vk::SharingMode::EXCLUSIVE,
+                ..Default::default()
+            }, None).map_err(|e| format!("Failed to create depth image: {}", e))?;
+            
+            let mem_requirements = device.get_image_memory_requirements(image);
+            let mem_properties = instance.get_physical_device_memory_properties(physical_device);
+            
+            let memory_type_index = Self::find_memory_type(
+                mem_requirements.memory_type_bits,
+                vk::MemoryPropertyFlags::DEVICE_LOCAL,
+                &mem_properties
+            );
+            
+            let memory = device.allocate_memory(&vk::MemoryAllocateInfo {
+                allocation_size: mem_requirements.size,
+                memory_type_index,
+                ..Default::default()
+            }, None).map_err(|e| format!("Failed to allocate depth memory: {}", e))?;
+            
+            device.bind_image_memory(image, memory, 0)
+                .map_err(|e| format!("Failed to bind depth memory: {}", e))?;
             
             Ok((image, memory))
         }
