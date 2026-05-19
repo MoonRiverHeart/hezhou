@@ -178,9 +178,18 @@ FXAA只处理512x512预览区域，不影响UI文本渲染。
 
 ### Issue 3: Preview Overlap (预览区域覆盖脚本编辑器)
 **原因**: 预览quad在UI pass最后渲染，层级在最上
-**解决**: 
-- 方案A: 在预览区域绘制前设置clip rect
-- 方案B: 预览quad作为UI控件，由布局系统管理层级
+**解决**: 创建PreviewWindow widget作为PreviewPanel的子控件
+**架构**:
+```
+PreviewPanel (Panel widget)
+├── Label "游戏预览"
+└── PreviewWindow (texture_id=1) ← 游戏预览纹理
+```
+**实现**:
+- PreviewWindow widget: `ui/src/widgets/preview_window.rs`
+- FFI接口: `ui_create_preview_window`, `ui_set_preview_texture`
+- EditorScript.cs: `_previewWindowId = UI.CreatePreviewWindow(_previewPanel.Id, ...)`
+- UIVulkanRenderer: 根据texture_id切换descriptor_set
 
 ### Issue 4: Preview Area Size (渲染区域侵占状态栏)
 **原因**: 预览区域尺寸计算错误
