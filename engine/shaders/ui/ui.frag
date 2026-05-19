@@ -19,18 +19,20 @@ void main() {
         out_color = frag_color;
     } else {
         vec4 texture_color = texture(font_texture, frag_uv);
-        float alpha = texture_color.a;
         
         if (pc.enable_msdf) {
+            // MSDF text rendering (alpha only from red channel)
             float dist = texture_color.r;
             float px_range = pc.px_range;
             if (px_range <= 0.0) {
                 px_range = 4.0;
             }
             float d = (dist - 0.5) * px_range;
-            alpha = smoothstep(-1.0, 1.0, d);
+            float alpha = smoothstep(-1.0, 1.0, d);
+            out_color = vec4(frag_color.rgb, frag_color.a * alpha);
+        } else {
+            // RGB texture display (use full RGBA from texture)
+            out_color = vec4(texture_color.rgb * frag_color.rgb, texture_color.a * frag_color.a);
         }
-        
-        out_color = vec4(frag_color.rgb, frag_color.a * alpha);
     }
 }

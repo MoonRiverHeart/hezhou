@@ -647,27 +647,6 @@ impl UIVulkanRenderer {
                         },
                     ] as *const _,
                     p_vertex_input_state: &vk::PipelineVertexInputStateCreateInfo {
-                        vertex_binding_description_count: 1,
-                        p_vertex_binding_descriptions: &vk::VertexInputBindingDescription {
-                            binding: 0,
-                            stride: 24,
-                            input_rate: vk::VertexInputRate::VERTEX,
-                        },
-                        vertex_attribute_description_count: 2,
-                        p_vertex_attribute_descriptions: &[
-                            vk::VertexInputAttributeDescription {
-                                location: 0,
-                                binding: 0,
-                                format: vk::Format::R32G32_SFLOAT,
-                                offset: 0,
-                            },
-                            vk::VertexInputAttributeDescription {
-                                location: 1,
-                                binding: 0,
-                                format: vk::Format::R32G32B32A32_SFLOAT,
-                                offset: 8,
-                            },
-                        ] as *const _,
                         ..Default::default()
                     },
                     p_input_assembly_state: &vk::PipelineInputAssemblyStateCreateInfo {
@@ -934,7 +913,7 @@ impl UIVulkanRenderer {
                     descriptor_type: vk::DescriptorType::COMBINED_IMAGE_SAMPLER,
                     p_image_info: &vk::DescriptorImageInfo {
                         sampler: preview_sampler,
-                        image_view: offscreen_fxaa_image_view,
+                        image_view: offscreen_image_view, // 直接显示game pass输出（调试）
                         image_layout: vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
                     },
                     ..Default::default()
