@@ -153,6 +153,26 @@ cd engine
 cargo run --bin trace_viewer_demo --release
 ```
 
+### 开发工具
+
+#### `screenshot_demo`
+**截图工具**，用于UI调试和问题记录：
+- 按 **S键** 截取当前窗口画面
+- 截图自动保存到 `screenshots/screenshot_YYYYMMDD_HHMMSS.png`
+- 简洁的UI界面：标题、截图按钮、状态显示
+- 实时显示截图保存路径
+
+运行命令：
+```bash
+cd engine
+cargo run --bin screenshot_demo --release
+```
+
+用途：
+- 调试UI布局问题时快速截图记录
+- 捕获渲染问题现场
+- 保存测试结果对比
+
 ## 运行要求
 
 ### Mono JIT版本
