@@ -1049,7 +1049,7 @@ p_rasterization_state: &vk::PipelineRasterizationStateCreateInfo {
                 fxaa_sampler,
                 
                 camera_yaw: 0.0,
-                camera_pitch: 0.5,
+                camera_pitch: 0.0,
                 camera_x: 0.0,
                 camera_y: 0.0,
                 camera_z: -3.0,
