@@ -16,6 +16,7 @@ pub extern "C" fn trigger_hot_reload() {
 fn main() {
     let dfx = init_dfx();
     dfx.lock().get_logger().lock().set_level(LogLevel::Info);
+    dfx.lock().get_trace_analyzer().lock().enable();
     
     let log_path = format!("logs/hezhou_{}.log", chrono::Local::now().format("%Y-%m-%d"));
     std::fs::create_dir_all("logs").ok();
@@ -25,21 +26,29 @@ fn main() {
     
     dfx_info!("Demo", "=== Hezhou Game Editor ===");
     dfx_info!("Demo", "Log file: {}", log_path);
+    
+    dfx_trace_begin!("Startup", "editor");
     dfx_info!("Demo", "[1] 创建编辑器窗口 (1280x720)...");
     
+    dfx_trace_begin!("Window", "create");
     let mut renderer = UIVulkanRenderer::new(1280, 720, "Hezhou Game Editor")
         .expect("Failed to create renderer");
+    dfx_trace_end!("Window", "create");
     dfx_info!("Demo", "窗口创建成功!");
 
     dfx_info!("Demo", "[2] 设置UI Root Panel...");
+    dfx_trace_begin!("UI", "setup");
     renderer.setup_ui_for_script();
     ui_ffi::ui_set_screen_size(1280.0, 720.0);
     let content_scale = renderer.get_content_scale();
     ui_ffi::ui_set_content_scale(content_scale);
+    dfx_trace_end!("UI", "setup");
     dfx_info!("Demo", "Content scale: {} (DPI: {})", content_scale, content_scale * 96.0);
 
     dfx_info!("Demo", "[3] 编译C#编辑器脚本...");
+    dfx_trace_begin!("Script", "compile");
     compile_editor_script();
+    dfx_trace_end!("Script", "compile");
 
     dfx_info!("Demo", "[4] 设置FFI Context...");
     let widget_tree_handle: WidgetTreeHandle = renderer.get_widget_tree_handle() as WidgetTreeHandle;
@@ -93,9 +102,11 @@ fn main() {
     dfx_info!("Demo", "FfiContext已设置, ptr={:?}", ffi_ptr);
 
     dfx_info!("Demo", "[5] 加载Mono DLL...");
+    dfx_trace_begin!("Mono", "load");
     let dll_path = "scripts/bin/Mono/EditorScript.dll";
     let executor = MonoUIExecutor::new(dll_path)
         .expect("Failed to load Mono DLL");
+    dfx_trace_end!("Mono", "load");
     
     unsafe {
         EXECUTOR = Some(executor);
@@ -103,22 +114,31 @@ fn main() {
     dfx_info!("Demo", "加载成功!");
 
     dfx_info!("Demo", "[6] 调用EditorScript.Initialize...");
+    dfx_trace_begin!("Mono", "initialize");
     unsafe {
         if let Some(ref executor) = EXECUTOR {
             executor.call_static_with_ptr_namespace("Hezhou", "EditorScript", "Initialize", ffi_ptr as usize)
                 .expect("Initialize failed");
         }
     }
+    dfx_trace_end!("Mono", "initialize");
+    dfx_trace_end!("Startup", "editor");
     dfx_info!("Demo", "编辑器UI创建成功!");
 
     dfx_info!("Demo", "[7] 开始主循环...");
+    dfx_info!("Demo", "Trace will be saved to traces/trace_latest.json on exit");
 
+    let mut frame_count = 0u64;
     loop {
+        frame_count += 1;
+        dfx_trace_begin!("Frame", "render");
+        
         renderer.process_events();
         
         if HOT_RELOAD_REQUESTED.load(Ordering::SeqCst) {
             HOT_RELOAD_REQUESTED.store(false, Ordering::SeqCst);
             dfx_info!("HotReload", "触发重载...");
+            dfx_trace_begin!("HotReload", "reload");
             
             unsafe {
                 if let Some(ref mut executor) = EXECUTOR {
@@ -138,24 +158,49 @@ fn main() {
                     }
                 }
             }
+            dfx_trace_end!("HotReload", "reload");
         }
 
+        dfx_trace_begin!("DrawFrame", "render");
         match renderer.draw_frame() {
             Ok(running) => {
+                dfx_trace_end!("DrawFrame", "render");
+                
                 if !running {
+                    dfx_trace_end!("Frame", "render");
                     break;
                 }
             }
             Err(e) => {
+                dfx_trace_end!("DrawFrame", "render");
                 dfx_error!("Demo", "{}", e);
                 break;
             }
         }
 
+        dfx_trace_end!("Frame", "render");
+        
+        if frame_count % 300 == 0 {
+            std::fs::create_dir_all("traces").ok();
+            let trace_path = "traces/trace_latest.json";
+            if let Err(e) = dfx.lock().get_trace_analyzer().lock().save_to_file(trace_path) {
+                dfx_error!("Demo", "Failed to save trace: {}", e);
+            }
+            dfx.lock().get_trace_analyzer().lock().clear();
+        }
+        
         std::thread::sleep(Duration::from_millis(16));
     }
 
     dfx_info!("Demo", "[8] 清理资源...");
+    std::fs::create_dir_all("traces").ok();
+    let trace_path = format!("traces/trace_{}.json", chrono::Local::now().format("%Y%m%d_%H%M%S"));
+    if let Err(e) = dfx.lock().get_trace_analyzer().lock().save_to_file(&trace_path) {
+        dfx_error!("Demo", "Failed to save trace: {}", e);
+    } else {
+        dfx_info!("Demo", "Trace saved to {}", trace_path);
+    }
+    
     renderer.cleanup();
     dfx_info!("Demo", "=== Editor Closed ===");
 }
