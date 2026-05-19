@@ -2,10 +2,11 @@
 
 layout(push_constant) uniform PushConstants {
     float rotation;
+    float width;
+    float height;
 } pc;
 
 // Perspective projection matrix
-// FOV=60°, aspect=1.0, near=0.1, far=100.0
 mat4 perspective(float fov, float aspect, float near, float far) {
     float f = 1.0 / tan(fov * 0.5);
     return mat4(
@@ -86,8 +87,9 @@ void main() {
     // View transform: push cube back so it's visible (z = -3)
     vec3 view_pos = model_pos + vec3(0.0, 0.0, -3.0);
     
-    // Perspective projection
-    mat4 proj = perspective(1.0472, 1.0, 0.1, 100.0); // 60° FOV
+    // Perspective projection (dynamic aspect ratio)
+    float aspect = pc.width / pc.height;
+    mat4 proj = perspective(1.0472, aspect, 0.1, 100.0); // 60° FOV
     gl_Position = proj * vec4(view_pos, 1.0);
     
     fragColor = face_colors[face_idx];

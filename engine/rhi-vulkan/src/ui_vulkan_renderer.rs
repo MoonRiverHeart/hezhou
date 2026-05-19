@@ -626,7 +626,7 @@ impl UIVulkanRenderer {
                 p_push_constant_ranges: &vk::PushConstantRange {
                     stage_flags: vk::ShaderStageFlags::VERTEX,
                     offset: 0,
-                    size: 4,
+                    size: 12, // rotation(float) + width(float) + height(float)
                 },
                 ..Default::default()
             }, None).map_err(|e| format!("Failed to create game pipeline layout: {}", e))?;
@@ -1749,8 +1749,12 @@ let font_atlas = ui.get_font_atlas();
             self.device.cmd_set_viewport(self.command_buffers[image_index_usize], 0, &[game_viewport]);
             self.device.cmd_set_scissor(self.command_buffers[image_index_usize], 0, &[game_scissor]);
             
-            // Draw triangle (rotation shader uses built-in vertex positions, no vertex buffer needed)
-            let push_constant_data = [self.triangle_angle.to_radians()];
+            // Push constants: rotation + width + height
+            let push_constant_data = [
+                self.triangle_angle.to_radians(),
+                self.offscreen_extent.width as f32,
+                self.offscreen_extent.height as f32,
+            ];
             self.device.cmd_push_constants(
                 self.command_buffers[image_index_usize],
                 self.game_pipeline_layout,
