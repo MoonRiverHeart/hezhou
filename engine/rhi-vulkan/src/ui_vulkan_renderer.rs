@@ -1675,12 +1675,19 @@ self.dfx.lock().get_logger().lock().log(
             self.device.device_wait_idle()
                 .map_err(|e| format!("Failed to wait for device idle: {}", e))?;
             
+            let fence = self.device.create_fence(&vk::FenceCreateInfo::default(), None)
+                .map_err(|e| format!("Failed to create fence: {}", e))?;
+            
             let (image_index, _suboptimal) = self.swapchain_loader.acquire_next_image(
                 self.swapchain,
                 u64::MAX,
-                self.image_available_semaphores[self.current_frame],
-                vk::Fence::null()
+                vk::Semaphore::null(),
+                fence
             ).map_err(|e| format!("Failed to acquire image: {}", e))?;
+            
+            self.device.wait_for_fences(&[fence], true, u64::MAX)
+                .map_err(|e| format!("Failed to wait for fence: {}", e))?;
+            self.device.destroy_fence(fence, None);
             
             let image_index_usize = image_index as usize;
             let swapchain_image = self.swapchain_images[image_index_usize];
@@ -1895,6 +1902,23 @@ self.dfx.lock().get_logger().lock().log(
             self.device.free_command_buffers(self.command_pool, &command_buffers);
             self.device.destroy_buffer(buffer, None);
             self.device.free_memory(buffer_memory, None);
+            
+            self.device.device_wait_idle()
+                .map_err(|e| format!("Failed to wait for device idle after screenshot: {}", e))?;
+            
+            let present_info = vk::PresentInfoKHR {
+                wait_semaphore_count: 0,
+                p_wait_semaphores: std::ptr::null(),
+                swapchain_count: 1,
+                p_swapchains: &self.swapchain,
+                p_image_indices: &image_index,
+                p_results: std::ptr::null_mut(),
+                p_next: std::ptr::null(),
+                s_type: vk::StructureType::PRESENT_INFO_KHR,
+                _marker: std::marker::PhantomData,
+            };
+            
+            self.swapchain_loader.queue_present(self.queue, &present_info).ok();
             
             self.dfx.lock().get_logger().lock().log(
                 LogLevel::Info,
