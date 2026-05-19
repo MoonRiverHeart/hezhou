@@ -108,6 +108,9 @@ pub struct UIVulkanRenderer {
     offscreen_framebuffer: vk::Framebuffer,
     offscreen_extent: vk::Extent2D,
     offscreen_format: vk::Format,
+    depth_image: vk::Image,
+    depth_image_memory: vk::DeviceMemory,
+    depth_image_view: vk::ImageView,
     
     // FXAA output (offscreen image after FXAA processing)
     offscreen_fxaa_image: vk::Image,
@@ -484,11 +487,21 @@ impl UIVulkanRenderer {
 p_rasterization_state: &vk::PipelineRasterizationStateCreateInfo {
                         polygon_mode: vk::PolygonMode::FILL,
                         cull_mode: vk::CullModeFlags::NONE,
-                        front_face: vk::FrontFace::COUNTER_CLOCKWISE,
+                        front_face: vk::FrontFace::CLOCKWISE,
                         line_width: 1.0,
                         ..Default::default()
                     },
-                p_multisample_state: &vk::PipelineMultisampleStateCreateInfo {
+                    p_depth_stencil_state: &vk::PipelineDepthStencilStateCreateInfo {
+                        depth_test_enable: vk::TRUE,
+                        depth_write_enable: vk::TRUE,
+                        depth_compare_op: vk::CompareOp::LESS,
+                        depth_bounds_test_enable: vk::FALSE,
+                        stencil_test_enable: vk::FALSE,
+                        min_depth_bounds: 0.0,
+                        max_depth_bounds: 1.0,
+                        ..Default::default()
+                    },
+                    p_multisample_state: &vk::PipelineMultisampleStateCreateInfo {
                     rasterization_samples: vk::SampleCountFlags::TYPE_1,
                     ..Default::default()
                 },
@@ -556,18 +569,33 @@ p_rasterization_state: &vk::PipelineRasterizationStateCreateInfo {
             
             // Game render pass (render to offscreen)
             let game_render_pass = device.create_render_pass(&vk::RenderPassCreateInfo {
-                attachment_count: 1,
-                p_attachments: &vk::AttachmentDescription {
-                    format: offscreen_format,
-                    samples: vk::SampleCountFlags::TYPE_1,
-                    load_op: vk::AttachmentLoadOp::CLEAR,
-                    store_op: vk::AttachmentStoreOp::STORE,
-                    stencil_load_op: vk::AttachmentLoadOp::DONT_CARE,
-                    stencil_store_op: vk::AttachmentStoreOp::DONT_CARE,
-                    initial_layout: vk::ImageLayout::UNDEFINED,
-                    final_layout: vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
-                    ..Default::default()
-                },
+                attachment_count: 2,
+                p_attachments: &[
+                    // Color attachment
+                    vk::AttachmentDescription {
+                        format: offscreen_format,
+                        samples: vk::SampleCountFlags::TYPE_1,
+                        load_op: vk::AttachmentLoadOp::CLEAR,
+                        store_op: vk::AttachmentStoreOp::STORE,
+                        stencil_load_op: vk::AttachmentLoadOp::DONT_CARE,
+                        stencil_store_op: vk::AttachmentStoreOp::DONT_CARE,
+                        initial_layout: vk::ImageLayout::UNDEFINED,
+                        final_layout: vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
+                        ..Default::default()
+                    },
+                    // Depth attachment
+                    vk::AttachmentDescription {
+                        format: vk::Format::D32_SFLOAT,
+                        samples: vk::SampleCountFlags::TYPE_1,
+                        load_op: vk::AttachmentLoadOp::CLEAR,
+                        store_op: vk::AttachmentStoreOp::DONT_CARE,
+                        stencil_load_op: vk::AttachmentLoadOp::DONT_CARE,
+                        stencil_store_op: vk::AttachmentStoreOp::DONT_CARE,
+                        initial_layout: vk::ImageLayout::UNDEFINED,
+                        final_layout: vk::ImageLayout::DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+                        ..Default::default()
+                    }
+                ] as *const _,
                 subpass_count: 1,
                 p_subpasses: &vk::SubpassDescription {
                     pipeline_bind_point: vk::PipelineBindPoint::GRAPHICS,
@@ -576,15 +604,38 @@ p_rasterization_state: &vk::PipelineRasterizationStateCreateInfo {
                         attachment: 0,
                         layout: vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL,
                     },
+                    p_depth_stencil_attachment: &vk::AttachmentReference {
+                        attachment: 1,
+                        layout: vk::ImageLayout::DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+                    },
                     ..Default::default()
                 },
                 ..Default::default()
             }, None).map_err(|e| format!("Failed to create game render pass: {}", e))?;
             
+            // Create depth image
+            let (depth_image, depth_image_memory) = Self::create_offscreen_image(
+                &instance, &device, physical_device, offscreen_extent, vk::Format::D32_SFLOAT
+            ).map_err(|e| format!("Failed to create depth image: {}", e))?;
+            
+            let depth_image_view = device.create_image_view(&vk::ImageViewCreateInfo {
+                image: depth_image,
+                view_type: vk::ImageViewType::TYPE_2D,
+                format: vk::Format::D32_SFLOAT,
+                subresource_range: vk::ImageSubresourceRange {
+                    aspect_mask: vk::ImageAspectFlags::DEPTH,
+                    base_mip_level: 0,
+                    level_count: 1,
+                    base_array_layer: 0,
+                    layer_count: 1,
+                },
+                ..Default::default()
+            }, None).map_err(|e| format!("Failed to create depth image view: {}", e))?;
+            
             let offscreen_framebuffer = device.create_framebuffer(&vk::FramebufferCreateInfo {
                 render_pass: game_render_pass,
-                attachment_count: 1,
-                p_attachments: &offscreen_image_view,
+                attachment_count: 2,
+                p_attachments: &[offscreen_image_view, depth_image_view] as *const _,
                 width: offscreen_extent.width,
                 height: offscreen_extent.height,
                 layers: 1,
@@ -1032,6 +1083,9 @@ p_rasterization_state: &vk::PipelineRasterizationStateCreateInfo {
                 offscreen_framebuffer,
                 offscreen_extent,
                 offscreen_format,
+                depth_image,
+                depth_image_memory,
+                depth_image_view,
                 
                 offscreen_fxaa_image,
                 offscreen_fxaa_image_memory,
@@ -1726,12 +1780,17 @@ let font_atlas = ui.get_font_atlas();
                         offset: vk::Offset2D { x: 0, y: 0 },
                         extent: self.offscreen_extent,
                     },
-                    clear_value_count: 1,
-                    p_clear_values: &vk::ClearValue {
+                    clear_value_count: 2,
+                    p_clear_values: &[vk::ClearValue {
                         color: vk::ClearColorValue {
                             float32: [0.05, 0.05, 0.1, 1.0],
                         },
-                    },
+                    }, vk::ClearValue {
+                        depth_stencil: vk::ClearDepthStencilValue {
+                            depth: 1.0,
+                            stencil: 0,
+                        },
+                    }] as *const _,
                     _marker: std::marker::PhantomData,
                     p_next: std::ptr::null(),
                     s_type: vk::StructureType::RENDER_PASS_BEGIN_INFO,
@@ -1852,12 +1911,17 @@ let font_atlas = ui.get_font_atlas();
                         offset: vk::Offset2D { x: 0, y: 0 },
                         extent: self.offscreen_extent,
                     },
-                    clear_value_count: 1,
-                    p_clear_values: &vk::ClearValue {
+                    clear_value_count: 2,
+                    p_clear_values: &[vk::ClearValue {
                         color: vk::ClearColorValue {
                             float32: [0.0, 0.0, 0.0, 1.0],
                         },
-                    },
+                    }, vk::ClearValue {
+                        depth_stencil: vk::ClearDepthStencilValue {
+                            depth: 1.0,
+                            stencil: 0,
+                        },
+                    }] as *const _,
                     _marker: std::marker::PhantomData,
                     p_next: std::ptr::null(),
                     s_type: vk::StructureType::RENDER_PASS_BEGIN_INFO,
@@ -2929,6 +2993,10 @@ self.dfx.lock().get_logger().lock().log(
             self.device.destroy_image(self.offscreen_image, None);
             self.device.free_memory(self.offscreen_image_memory, None);
             
+            self.device.destroy_image_view(self.depth_image_view, None);
+            self.device.destroy_image(self.depth_image, None);
+            self.device.free_memory(self.depth_image_memory, None);
+            
             self.device.destroy_framebuffer(self.offscreen_fxaa_framebuffer, None);
             self.device.destroy_image_view(self.offscreen_fxaa_image_view, None);
             self.device.destroy_image(self.offscreen_fxaa_image, None);
@@ -3069,6 +3137,10 @@ self.dfx.lock().get_logger().lock().log(
             self.device.destroy_image_view(self.offscreen_image_view, None);
             self.device.destroy_image(self.offscreen_image, None);
             self.device.free_memory(self.offscreen_image_memory, None);
+            
+            self.device.destroy_image_view(self.depth_image_view, None);
+            self.device.destroy_image(self.depth_image, None);
+            self.device.free_memory(self.depth_image_memory, None);
             
             self.device.destroy_framebuffer(self.offscreen_fxaa_framebuffer, None);
             self.device.destroy_image_view(self.offscreen_fxaa_image_view, None);
