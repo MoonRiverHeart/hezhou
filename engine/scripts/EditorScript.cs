@@ -48,9 +48,9 @@ namespace Hezhou
 
         public static void Initialize(IntPtr contextPtr)
         {
+            UI.InitFromContext(contextPtr);
             Log.Info("Editor", "编辑器初始化开始");
             
-            UI.InitFromContext(contextPtr);
             UI.GetScreenSize(out _screenWidth, out _screenHeight);
             _contentScale = UI.GetContentScale();
             

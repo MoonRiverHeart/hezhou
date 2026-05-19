@@ -13,6 +13,48 @@ namespace Hezhou
         Fatal = 5
     }
 
+    internal static class DfxNativeMethods
+    {
+        [DllImport("hezhou_dfx", CallingConvention = CallingConvention.Cdecl)]
+        public static extern IntPtr dfx_create();
+
+        [DllImport("hezhou_dfx", CallingConvention = CallingConvention.Cdecl)]
+        public static extern void dfx_destroy(IntPtr system);
+
+        [DllImport("hezhou_dfx", CallingConvention = CallingConvention.Cdecl)]
+        public static extern void dfx_enable_all(IntPtr system);
+
+        [DllImport("hezhou_dfx", CallingConvention = CallingConvention.Cdecl)]
+        public static extern void dfx_set_log_level(IntPtr system, byte level);
+
+        [DllImport("hezhou_dfx", CallingConvention = CallingConvention.Cdecl)]
+        public static extern void dfx_log(
+            IntPtr system,
+            byte level,
+            string module,
+            string message,
+            string file,
+            uint line);
+
+        [DllImport("hezhou_dfx", CallingConvention = CallingConvention.Cdecl)]
+        public static extern void dfx_trace_begin(IntPtr system, string name, string category);
+
+        [DllImport("hezhou_dfx", CallingConvention = CallingConvention.Cdecl)]
+        public static extern void dfx_trace_end(IntPtr system, string name, string category);
+
+        [DllImport("hezhou_dfx", CallingConvention = CallingConvention.Cdecl)]
+        public static extern float dfx_get_fps(IntPtr system);
+
+        [DllImport("hezhou_dfx", CallingConvention = CallingConvention.Cdecl)]
+        public static extern ulong dfx_get_frame_count(IntPtr system);
+
+        [DllImport("hezhou_dfx", CallingConvention = CallingConvention.Cdecl)]
+        public static extern void dfx_clear_log_buffer(IntPtr system);
+
+        [DllImport("hezhou_dfx", CallingConvention = CallingConvention.Cdecl)]
+        public static extern int dfx_enable_file_output(IntPtr system, string path);
+    }
+
     public static class Log
     {
         private static IntPtr _dfxHandle = IntPtr.Zero;
@@ -25,7 +67,7 @@ namespace Hezhou
         public static void Trace(string module, string message)
         {
             if (_dfxHandle != IntPtr.Zero)
-                NativeMethods.dfx_log(_dfxHandle, (byte)LogLevel.Trace, module, message, "", 0);
+                DfxNativeMethods.dfx_log(_dfxHandle, (byte)LogLevel.Trace, module, message, "", 0);
             else
                 Console.WriteLine($"[TRACE][{module}] {message}");
         }
@@ -33,7 +75,7 @@ namespace Hezhou
         public static void Debug(string module, string message)
         {
             if (_dfxHandle != IntPtr.Zero)
-                NativeMethods.dfx_log(_dfxHandle, (byte)LogLevel.Debug, module, message, "", 0);
+                DfxNativeMethods.dfx_log(_dfxHandle, (byte)LogLevel.Debug, module, message, "", 0);
             else
                 Console.WriteLine($"[DEBUG][{module}] {message}");
         }
@@ -41,7 +83,7 @@ namespace Hezhou
         public static void Info(string module, string message)
         {
             if (_dfxHandle != IntPtr.Zero)
-                NativeMethods.dfx_log(_dfxHandle, (byte)LogLevel.Info, module, message, "", 0);
+                DfxNativeMethods.dfx_log(_dfxHandle, (byte)LogLevel.Info, module, message, "", 0);
             else
                 Console.WriteLine($"[INFO][{module}] {message}");
         }
@@ -49,7 +91,7 @@ namespace Hezhou
         public static void Warn(string module, string message)
         {
             if (_dfxHandle != IntPtr.Zero)
-                NativeMethods.dfx_log(_dfxHandle, (byte)LogLevel.Warn, module, message, "", 0);
+                DfxNativeMethods.dfx_log(_dfxHandle, (byte)LogLevel.Warn, module, message, "", 0);
             else
                 Console.WriteLine($"[WARN][{module}] {message}");
         }
@@ -57,7 +99,7 @@ namespace Hezhou
         public static void Error(string module, string message)
         {
             if (_dfxHandle != IntPtr.Zero)
-                NativeMethods.dfx_log(_dfxHandle, (byte)LogLevel.Error, module, message, "", 0);
+                DfxNativeMethods.dfx_log(_dfxHandle, (byte)LogLevel.Error, module, message, "", 0);
             else
                 Console.WriteLine($"[ERROR][{module}] {message}");
         }
@@ -65,7 +107,7 @@ namespace Hezhou
         public static void Fatal(string module, string message)
         {
             if (_dfxHandle != IntPtr.Zero)
-                NativeMethods.dfx_log(_dfxHandle, (byte)LogLevel.Fatal, module, message, "", 0);
+                DfxNativeMethods.dfx_log(_dfxHandle, (byte)LogLevel.Fatal, module, message, "", 0);
             else
                 Console.WriteLine($"[FATAL][{module}] {message}");
         }
@@ -73,13 +115,13 @@ namespace Hezhou
         public static void TraceBegin(string name, string category = "ui")
         {
             if (_dfxHandle != IntPtr.Zero)
-                NativeMethods.dfx_trace_begin(_dfxHandle, name, category);
+                DfxNativeMethods.dfx_trace_begin(_dfxHandle, name, category);
         }
 
         public static void TraceEnd(string name, string category = "ui")
         {
             if (_dfxHandle != IntPtr.Zero)
-                NativeMethods.dfx_trace_end(_dfxHandle, name, category);
+                DfxNativeMethods.dfx_trace_end(_dfxHandle, name, category);
         }
     }
 
@@ -90,7 +132,7 @@ namespace Hezhou
 
         public static DFX Create()
         {
-            var handle = NativeMethods.dfx_create();
+            var handle = DfxNativeMethods.dfx_create();
             return new DFX(handle);
         }
 
@@ -102,47 +144,47 @@ namespace Hezhou
 
         public void EnableAll()
         {
-            NativeMethods.dfx_enable_all(_handle);
+            DfxNativeMethods.dfx_enable_all(_handle);
         }
 
         public void SetLogLevel(LogLevel level)
         {
-            NativeMethods.dfx_set_log_level(_handle, (byte)level);
+            DfxNativeMethods.dfx_set_log_level(_handle, (byte)level);
         }
 
         public void EnableFileOutput(string path)
         {
-            NativeMethods.dfx_enable_file_output(_handle, path);
+            DfxNativeMethods.dfx_enable_file_output(_handle, path);
         }
 
-        public void Log(string message, LogLevel level = LogLevel.Info, string module = "UIScript")
+        public void LogMsg(string message, LogLevel level = LogLevel.Info, string module = "UIScript")
         {
-            NativeMethods.dfx_log(_handle, (byte)level, module, message, "DFX.cs", 0);
+            DfxNativeMethods.dfx_log(_handle, (byte)level, module, message, "DFX.cs", 0);
         }
 
         public void TraceBegin(string name, string category = "ui")
         {
-            NativeMethods.dfx_trace_begin(_handle, name, category);
+            DfxNativeMethods.dfx_trace_begin(_handle, name, category);
         }
 
         public void TraceEnd(string name, string category = "ui")
         {
-            NativeMethods.dfx_trace_end(_handle, name, category);
+            DfxNativeMethods.dfx_trace_end(_handle, name, category);
         }
 
         public float GetFPS()
         {
-            return NativeMethods.dfx_get_fps(_handle);
+            return DfxNativeMethods.dfx_get_fps(_handle);
         }
 
         public ulong GetFrameCount()
         {
-            return NativeMethods.dfx_get_frame_count(_handle);
+            return DfxNativeMethods.dfx_get_frame_count(_handle);
         }
 
         public void ClearLogBuffer()
         {
-            NativeMethods.dfx_clear_log_buffer(_handle);
+            DfxNativeMethods.dfx_clear_log_buffer(_handle);
         }
 
         public void Dispose()
@@ -151,53 +193,11 @@ namespace Hezhou
             {
                 if (_handle != IntPtr.Zero)
                 {
-                    NativeMethods.dfx_destroy(_handle);
+                    DfxNativeMethods.dfx_destroy(_handle);
                     _handle = IntPtr.Zero;
                 }
                 _disposed = true;
             }
-        }
-
-        private static class NativeMethods
-        {
-            [DllImport("hezhou_scripting", CallingConvention = CallingConvention.Cdecl)]
-            public static extern IntPtr dfx_create();
-
-            [DllImport("hezhou_scripting", CallingConvention = CallingConvention.Cdecl)]
-            public static extern void dfx_destroy(IntPtr system);
-
-            [DllImport("hezhou_scripting", CallingConvention = CallingConvention.Cdecl)]
-            public static extern void dfx_enable_all(IntPtr system);
-
-            [DllImport("hezhou_scripting", CallingConvention = CallingConvention.Cdecl)]
-            public static extern void dfx_set_log_level(IntPtr system, byte level);
-
-            [DllImport("hezhou_scripting", CallingConvention = CallingConvention.Cdecl)]
-            public static extern void dfx_log(
-                IntPtr system,
-                byte level,
-                string module,
-                string message,
-                string file,
-                uint line);
-
-            [DllImport("hezhou_scripting", CallingConvention = CallingConvention.Cdecl)]
-            public static extern void dfx_trace_begin(IntPtr system, string name, string category);
-
-            [DllImport("hezhou_scripting", CallingConvention = CallingConvention.Cdecl)]
-            public static extern void dfx_trace_end(IntPtr system, string name, string category);
-
-            [DllImport("hezhou_scripting", CallingConvention = CallingConvention.Cdecl)]
-            public static extern float dfx_get_fps(IntPtr system);
-
-            [DllImport("hezhou_scripting", CallingConvention = CallingConvention.Cdecl)]
-            public static extern ulong dfx_get_frame_count(IntPtr system);
-
-            [DllImport("hezhou_scripting", CallingConvention = CallingConvention.Cdecl)]
-            public static extern void dfx_clear_log_buffer(IntPtr system);
-
-            [DllImport("hezhou_scripting", CallingConvention = CallingConvention.Cdecl)]
-            public static extern int dfx_enable_file_output(IntPtr system, string path);
         }
     }
 }
