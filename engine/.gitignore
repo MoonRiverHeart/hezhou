@@ -1,0 +1,26 @@
+# Build artifacts
+target/
+*.pdb
+
+# Log files
+logs/
+*.log
+
+# Trace files
+traces/
+*.json
+
+# Screenshots
+screenshots/
+*.png
+
+# IDE settings
+.vscode/
+.idea/
+
+# OS files
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
