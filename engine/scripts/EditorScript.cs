@@ -52,12 +52,17 @@ namespace Hezhou
         private static float _cameraX = 0f;
         private static float _cameraY = 0f;
         private static float _cameraZ = 3f;
-        private static float _cameraYaw = 0f;
+private static float _cameraYaw = 0f;
         private static float _cameraPitch = 0f;
         
         private static bool _mouseDragging = false;
         private static float _lastMouseX = 0f;
         private static float _lastMouseY = 0f;
+        
+        private static bool _keyLeftPressed = false;
+        private static bool _keyRightPressed = false;
+        private static bool _keyUpPressed = false;
+        private static bool _keyDownPressed = false;
 
         private const float TOOLBAR_HEIGHT = 40f;
         private const float STATUS_BAR_HEIGHT = 40f;
@@ -122,18 +127,15 @@ namespace Hezhou
 
         private static void OnKey(uint keycode, bool pressed, uint modifiers)
         {
-            if (!pressed) return;
-            
-            bool selected = UI.IsPreviewWindowSelected(_previewWindowId);
-            if (!selected) return;
-            
             const uint KEY_ESC = 39;
             const uint KEY_LEFT = 45;
             const uint KEY_RIGHT = 46;
             const uint KEY_UP = 47;
             const uint KEY_DOWN = 48;
             
-            if (keycode == KEY_ESC)
+            bool selected = UI.IsPreviewWindowSelected(_previewWindowId);
+            
+            if (keycode == KEY_ESC && pressed && selected)
             {
                 UI.SetPreviewWindowSelected(_previewWindowId, false);
                 _cameraX = _savedCameraX;
@@ -141,29 +143,25 @@ namespace Hezhou
                 _cameraZ = _savedCameraZ;
                 _cameraYaw = _savedCameraYaw;
                 _cameraPitch = _savedCameraPitch;
+                _keyLeftPressed = false;
+                _keyRightPressed = false;
+                _keyUpPressed = false;
+                _keyDownPressed = false;
                 Log.Info("Editor", "ESC: 退出预览窗，恢复摄像机");
                 UpdateStatusBar();
+                return;
             }
-            else if (keycode == KEY_LEFT)
-            {
-                _cameraX -= 0.1f;
-                Log.Info("Editor", $"方向键左: cameraX={_cameraX}");
-            }
-            else if (keycode == KEY_RIGHT)
-            {
-                _cameraX += 0.1f;
-                Log.Info("Editor", $"方向键右: cameraX={_cameraX}");
-            }
-            else if (keycode == KEY_UP)
-            {
-                _cameraZ -= 0.1f;
-                Log.Info("Editor", $"方向键上: cameraZ={_cameraZ}");
-            }
-            else if (keycode == KEY_DOWN)
-            {
-                _cameraZ += 0.1f;
-                Log.Info("Editor", $"方向键下: cameraZ={_cameraZ}");
-            }
+            
+            if (!selected) return;
+            
+            if (keycode == KEY_LEFT)
+                _keyLeftPressed = pressed;
+            if (keycode == KEY_RIGHT)
+                _keyRightPressed = pressed;
+            if (keycode == KEY_UP)
+                _keyUpPressed = pressed;
+            if (keycode == KEY_DOWN)
+                _keyDownPressed = pressed;
         }
 
         private static void CreateEditorLayout()
@@ -334,6 +332,12 @@ namespace Hezhou
                     // Pass camera params to shader when preview is selected
                     if (_previewSelected)
                     {
+                        float speed = 5f * deltaTime;
+                        if (_keyLeftPressed) _cameraX -= speed;
+                        if (_keyRightPressed) _cameraX += speed;
+                        if (_keyUpPressed) _cameraZ -= speed;
+                        if (_keyDownPressed) _cameraZ += speed;
+                        
                         UI.SetCameraParams(_cameraYaw, _cameraPitch, _cameraX, _cameraY, _cameraZ);
                     }
                     else
