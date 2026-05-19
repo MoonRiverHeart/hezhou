@@ -37,9 +37,27 @@ fn main() {
     build_trace_ui(handle, root_id, &trace);
     
     dfx_info!("TraceViewer", "Starting main loop...");
+    dfx_info!("TraceViewer", "Press S to screenshot the swimlane visualization");
+    
+    std::fs::create_dir_all("screenshots").ok();
     
     loop {
         renderer.process_events();
+        
+        let should_screenshot = renderer.is_s_pressed();
+        if should_screenshot {
+            renderer.consume_s_press();
+            
+            let timestamp = chrono::Local::now().format("%Y%m%d_%H%M%S").to_string();
+            let filename = format!("screenshots/trace_viewer_{}.png", timestamp);
+            
+            dfx_info!("TraceViewer", "Taking screenshot...");
+            if let Err(e) = renderer.capture_screenshot(&filename) {
+                dfx_error!("TraceViewer", "Screenshot failed: {}", e);
+            } else {
+                dfx_info!("TraceViewer", "Screenshot saved: {}", filename);
+            }
+        }
         
         match renderer.draw_frame() {
             Ok(running) => {
