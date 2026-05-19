@@ -4,6 +4,11 @@ layout(push_constant) uniform PushConstants {
     float rotation;
     float width;
     float height;
+    float cameraYaw;
+    float cameraPitch;
+    float cameraX;
+    float cameraY;
+    float cameraZ;
 } pc;
 
 // Perspective projection matrix (Vulkan: flip Y axis)
@@ -64,29 +69,41 @@ void main() {
     
     vec3 pos = positions[vertex_idx];
     
-    // Model transform: rotate around Y then tilt around X
+    // Model transform: rotate around Y (cube self-rotation)
     float angle = pc.rotation;
     float cosA = cos(angle);
     float sinA = sin(angle);
     
-    vec3 rotated_y = vec3(
+    vec3 model_pos = vec3(
         pos.x * cosA - pos.z * sinA,
         pos.y,
         pos.x * sinA + pos.z * cosA
     );
     
-    float tilt = 0.5;
-    float cosT = cos(tilt);
-    float sinT = sin(tilt);
+    // Camera view: yaw (Y rotation) + pitch (X rotation)
+    float yaw = pc.cameraYaw;
+    float pitch = pc.cameraPitch;
     
-    vec3 model_pos = vec3(
-        rotated_y.x,
-        rotated_y.y * cosT - rotated_y.z * sinT,
-        rotated_y.y * sinT + rotated_y.z * cosT
+    // First: pitch (rotate around X axis)
+    float cosP = cos(pitch);
+    float sinP = sin(pitch);
+    vec3 pitched_pos = vec3(
+        model_pos.x,
+        model_pos.y * cosP - model_pos.z * sinP,
+        model_pos.y * sinP + model_pos.z * cosP
     );
     
-    // View transform: push cube back so it's visible (z = -3)
-    vec3 view_pos = model_pos + vec3(0.0, 0.0, -3.0);
+    // Second: yaw (rotate around Y axis)
+    float cosY = cos(yaw);
+    float sinY = sin(yaw);
+    vec3 yawed_pos = vec3(
+        pitched_pos.x * cosY + pitched_pos.z * sinY,
+        pitched_pos.y,
+        -pitched_pos.x * sinY + pitched_pos.z * cosY
+    );
+    
+    // View transform: translate by camera position
+    vec3 view_pos = yawed_pos - vec3(pc.cameraX, pc.cameraY, pc.cameraZ);
     
     // Perspective projection (dynamic aspect ratio)
     float aspect = pc.width / pc.height;

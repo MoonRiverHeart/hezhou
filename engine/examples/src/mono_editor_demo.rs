@@ -27,6 +27,16 @@ pub extern "C" fn set_game_preview_extent(width: u32, height: u32) {
     }
 }
 
+#[unsafe(no_mangle)]
+pub extern "C" fn set_camera_params(yaw: f32, pitch: f32, x: f32, y: f32, z: f32) {
+    unsafe {
+        if let Some(renderer_ptr) = RENDERER {
+            (*renderer_ptr).set_camera_params(yaw, pitch, x, y, z);
+            dfx_info!("Demo", "Camera params set: yaw={}, pitch={}, pos=({}, {}, {})", yaw, pitch, x, y, z);
+        }
+    }
+}
+
 fn main() {
     let args: Vec<String> = std::env::args().collect();
     let screenshot_mode = args.iter().any(|a| a == "--screenshot");
@@ -94,6 +104,8 @@ fn main() {
         ui_register_update_thunk_ptr: ui_ffi::ui_register_update_thunk_ptr,
         ui_register_resize_thunk_ptr: ui_ffi::ui_register_resize_thunk_ptr,
         ui_register_global_click_thunk_ptr: ui_ffi::ui_register_global_click_thunk_ptr,
+        ui_register_key_thunk_ptr: ui_ffi::ui_register_key_thunk_ptr,
+        ui_register_mouse_move_thunk_ptr: ui_ffi::ui_register_mouse_move_thunk_ptr,
         ui_trigger_resize: ui_ffi::ui_trigger_resize,
         ui_get_screen_size: ui_ffi::ui_get_screen_size,
         ui_set_content_scale: ui_ffi::ui_set_content_scale,
@@ -124,6 +136,9 @@ fn main() {
         ui_text_edit_get_text: unsafe { std::mem::transmute(ui_ffi::ui_text_edit_get_text as *const std::ffi::c_void) },
         ui_trigger_hot_reload: trigger_hot_reload,
         ui_set_game_preview_extent: set_game_preview_extent,
+        ui_set_camera_params: set_camera_params,
+        ui_is_preview_window_selected: unsafe { std::mem::transmute(ui_ffi::ui_is_preview_window_selected as *const std::ffi::c_void) },
+        ui_set_preview_window_selected: unsafe { std::mem::transmute(ui_ffi::ui_set_preview_window_selected as *const std::ffi::c_void) },
         widget_tree_ptr: widget_tree_handle,
         dfx_handle: dfx_for_csharp as *mut std::ffi::c_void,
     };

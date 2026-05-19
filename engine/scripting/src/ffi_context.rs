@@ -9,6 +9,8 @@ pub type SetOnClickThunkPtrFn = extern "C" fn(WidgetTreeHandle, u64, *const c_vo
 pub type RegisterUpdateThunkPtrFn = extern "C" fn(*const c_void);
 pub type RegisterResizeThunkPtrFn = extern "C" fn(*const c_void);
 pub type RegisterGlobalClickThunkPtrFn = extern "C" fn(*const c_void);
+pub type RegisterKeyThunkPtrFn = extern "C" fn(*const c_void);
+pub type RegisterMouseMoveThunkPtrFn = extern "C" fn(*const c_void);
 pub type TriggerResizeFn = extern "C" fn(f32, f32);
 pub type GetScreenSizeFn = extern "C" fn(*mut f32, *mut f32);
 pub type SetContentScaleFn = extern "C" fn(f32);
@@ -40,6 +42,9 @@ pub type TextEditGetTextLenFn = extern "C" fn(WidgetTreeHandle, u64) -> usize;
 pub type TextEditGetTextFn = extern "C" fn(WidgetTreeHandle, u64, *mut c_char, usize);
 pub type TriggerHotReloadFn = extern "C" fn();
 pub type SetGamePreviewExtentFn = extern "C" fn(u32, u32);
+pub type SetCameraParamsFn = extern "C" fn(f32, f32, f32, f32, f32);
+pub type IsPreviewWindowSelectedFn = extern "C" fn(WidgetTreeHandle, u64) -> bool;
+pub type SetPreviewWindowSelectedFn = extern "C" fn(WidgetTreeHandle, u64, bool);
 
 #[repr(C)]
 pub struct FfiContext {
@@ -50,6 +55,8 @@ pub struct FfiContext {
     pub ui_register_update_thunk_ptr: RegisterUpdateThunkPtrFn,
     pub ui_register_resize_thunk_ptr: RegisterResizeThunkPtrFn,
     pub ui_register_global_click_thunk_ptr: RegisterGlobalClickThunkPtrFn,
+    pub ui_register_key_thunk_ptr: RegisterKeyThunkPtrFn,
+    pub ui_register_mouse_move_thunk_ptr: RegisterMouseMoveThunkPtrFn,
     pub ui_trigger_resize: TriggerResizeFn,
     pub ui_get_screen_size: GetScreenSizeFn,
     pub ui_set_content_scale: SetContentScaleFn,
@@ -80,6 +87,9 @@ pub struct FfiContext {
     pub ui_text_edit_get_text: TextEditGetTextFn,
     pub ui_trigger_hot_reload: TriggerHotReloadFn,
     pub ui_set_game_preview_extent: SetGamePreviewExtentFn,
+    pub ui_set_camera_params: SetCameraParamsFn,
+    pub ui_is_preview_window_selected: IsPreviewWindowSelectedFn,
+    pub ui_set_preview_window_selected: SetPreviewWindowSelectedFn,
     pub widget_tree_ptr: WidgetTreeHandle,
     pub dfx_handle: *mut c_void,
 }

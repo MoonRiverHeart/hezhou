@@ -629,6 +629,24 @@ pub extern "C" fn ui_register_global_click_thunk_ptr(callback_ptr: *const std::f
 }
 
 #[unsafe(no_mangle)]
+pub extern "C" fn ui_register_key_thunk_ptr(callback_ptr: *const std::ffi::c_void) {
+    if callback_ptr.is_null() {
+        return;
+    }
+    let callback: crate::thunk_manager::KeyCallback = unsafe { std::mem::transmute(callback_ptr) };
+    crate::thunk_manager::ui_register_key_callback(callback);
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_register_mouse_move_thunk_ptr(callback_ptr: *const std::ffi::c_void) {
+    if callback_ptr.is_null() {
+        return;
+    }
+    let callback: crate::thunk_manager::MouseMoveCallback = unsafe { std::mem::transmute(callback_ptr) };
+    crate::thunk_manager::ui_register_mouse_move_callback(callback);
+}
+
+#[unsafe(no_mangle)]
 pub extern "C" fn ui_trigger_resize(width: f32, height: f32) {
     crate::thunk_manager::trigger_resize_callback(width, height);
 }
@@ -889,6 +907,48 @@ pub extern "C" fn ui_set_preview_texture(
         if let Some(widget) = tree.get_widget_mut(id) {
             if let Some(preview) = widget.as_any_mut().downcast_mut::<crate::widgets::PreviewWindow>() {
                 preview.set_texture_id(texture_id);
+            }
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_is_preview_window_selected(
+    handle: WidgetTreeHandle,
+    widget_id: u64,
+) -> bool {
+    if handle.is_null() {
+        return false;
+    }
+    unsafe {
+        let arc = &*(handle as *const Arc<Mutex<WidgetTree>>);
+        let tree = arc.lock();
+        let id = WidgetId::from_raw(widget_id);
+        if let Some(widget) = tree.get_widget(id) {
+            if let Some(preview) = widget.as_any().downcast_ref::<crate::widgets::PreviewWindow>() {
+                return preview.is_selected();
+            }
+        }
+    }
+    false
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_set_preview_window_selected(
+    handle: WidgetTreeHandle,
+    widget_id: u64,
+    selected: bool,
+) {
+    if handle.is_null() {
+        return;
+    }
+    unsafe {
+        let arc = &*(handle as *const Arc<Mutex<WidgetTree>>);
+        let mut tree = arc.lock();
+        let id = WidgetId::from_raw(widget_id);
+        if let Some(widget) = tree.get_widget_mut(id) {
+            if let Some(preview) = widget.as_any_mut().downcast_mut::<crate::widgets::PreviewWindow>() {
+                preview.set_selected(selected);
             }
         }
     }

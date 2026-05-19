@@ -15,6 +15,12 @@ namespace Hezhou
         public delegate void SetOnClickDelegate(IntPtr handle, ulong widgetId, IntPtr callback);
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void KeyCallbackDelegate(uint keycode, bool pressed, uint modifiers);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void MouseMoveCallbackDelegate(float x, float y, bool dragging);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public delegate void SetTextDelegate(IntPtr handle, ulong widgetId, [MarshalAs(UnmanagedType.LPStr)] string text);
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
@@ -97,6 +103,15 @@ namespace Hezhou
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public delegate void SetGamePreviewExtentDelegate(uint width, uint height);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void SetCameraParamsDelegate(float yaw, float pitch, float x, float y, float z);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate bool IsPreviewWindowSelectedDelegate(IntPtr handle, ulong widgetId);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void SetPreviewWindowSelectedDelegate(IntPtr handle, ulong widgetId, bool selected);
 
         [StructLayout(LayoutKind.Sequential)]
         public struct FfiContext
@@ -108,6 +123,8 @@ namespace Hezhou
             public IntPtr ui_register_update_thunk_ptr;
             public IntPtr ui_register_resize_thunk_ptr;
             public IntPtr ui_register_global_click_thunk_ptr;
+            public IntPtr ui_register_key_thunk_ptr;
+            public IntPtr ui_register_mouse_move_thunk_ptr;
             public IntPtr ui_trigger_resize;
             public IntPtr ui_get_screen_size;
             public IntPtr ui_set_content_scale;
@@ -138,6 +155,9 @@ namespace Hezhou
             public IntPtr ui_text_edit_get_text;
             public IntPtr ui_trigger_hot_reload;
             public IntPtr ui_set_game_preview_extent;
+            public IntPtr ui_set_camera_params;
+            public IntPtr ui_is_preview_window_selected;
+            public IntPtr ui_set_preview_window_selected;
             public IntPtr widget_tree_ptr;
             public IntPtr dfx_handle;
         }
@@ -211,6 +231,32 @@ public static void RegisterResizeCallback(ResizeCallbackDelegate callback)
                 return;
             }
             var func = Marshal.GetDelegateForFunctionPointer<RegisterGlobalClickDelegate>(_ffi.ui_register_global_click_thunk_ptr);
+            func(callbackPtr);
+        }
+
+        public static void RegisterKeyCallback(KeyCallbackDelegate callback)
+        {
+            IntPtr callbackPtr = Marshal.GetFunctionPointerForDelegate(callback);
+            
+            if (_ffi.ui_register_key_thunk_ptr == IntPtr.Zero)
+            {
+                Log.Error("C#", "RegisterKeyThunkPtr函数指针为空");
+                return;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<RegisterKeyDelegate>(_ffi.ui_register_key_thunk_ptr);
+            func(callbackPtr);
+        }
+
+        public static void RegisterMouseMoveCallback(MouseMoveCallbackDelegate callback)
+        {
+            IntPtr callbackPtr = Marshal.GetFunctionPointerForDelegate(callback);
+            
+            if (_ffi.ui_register_mouse_move_thunk_ptr == IntPtr.Zero)
+            {
+                Log.Error("C#", "RegisterMouseMoveThunkPtr函数指针为空");
+                return;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<RegisterMouseMoveDelegate>(_ffi.ui_register_mouse_move_thunk_ptr);
             func(callbackPtr);
         }
 
@@ -387,6 +433,48 @@ public static void RegisterResizeCallback(ResizeCallbackDelegate callback)
             func(width, height);
             Log.Info("C#", $"Game preview extent set to {width}x{height}");
         }
+
+        public static void SetCameraParams(float yaw, float pitch, float x, float y, float z)
+        {
+            if (_ffi.ui_set_camera_params == IntPtr.Zero)
+            {
+                Log.Error("C#", "SetCameraParams函数指针为空");
+                return;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<SetCameraParamsDelegate>(_ffi.ui_set_camera_params);
+            func(yaw, pitch, x, y, z);
+            Log.Info("C#", $"Camera params set: yaw={yaw}, pitch={pitch}, pos=({x}, {y}, {z})");
+        }
+
+        public static bool IsPreviewWindowSelected(ulong widgetId)
+        {
+            if (_ffi.ui_is_preview_window_selected == IntPtr.Zero)
+            {
+                return false;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<IsPreviewWindowSelectedDelegate>(_ffi.ui_is_preview_window_selected);
+            return func(_widgetTree, widgetId);
+        }
+
+        public static void SetPreviewWindowSelected(ulong widgetId, bool selected)
+        {
+            if (_ffi.ui_set_preview_window_selected == IntPtr.Zero)
+            {
+                return;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<SetPreviewWindowSelectedDelegate>(_ffi.ui_set_preview_window_selected);
+            func(_widgetTree, widgetId, selected);
+        }
+
+        public static void SetLabelText(ulong widgetId, string text)
+        {
+            if (_ffi.ui_widget_set_text == IntPtr.Zero)
+            {
+                return;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<SetTextDelegate>(_ffi.ui_widget_set_text);
+            func(_widgetTree, widgetId, text);
+        }
         
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         private delegate void ClearWidgetTreeDelegate(IntPtr handle);
@@ -472,6 +560,8 @@ public static void RegisterResizeCallback(ResizeCallbackDelegate callback)
         
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public delegate void RegisterGlobalClickDelegate(IntPtr callbackPtr);
+        public delegate void RegisterKeyDelegate(IntPtr callbackPtr);
+        public delegate void RegisterMouseMoveDelegate(IntPtr callbackPtr);
         
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public delegate void RegisterUpdateDelegate(IntPtr callbackPtr);

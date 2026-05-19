@@ -77,7 +77,9 @@ impl EventDispatcher {
         let (target, click_point) = match &event.data {
             EventData::Touch(touch) => {
                 let point = Point::new(touch.x, touch.y);
-                (self.widget_tree.lock().hit_test(point), point)
+                let hit = self.widget_tree.lock().hit_test(point);
+                dfx_debug!("EventDispatcher", "TouchBegin hit_test: x={}, y={}, hit={:?}", touch.x, touch.y, hit.map(|id| id.id));
+                (hit, point)
             }
             EventData::Mouse(mouse) => {
                 let point = Point::new(mouse.x, mouse.y);

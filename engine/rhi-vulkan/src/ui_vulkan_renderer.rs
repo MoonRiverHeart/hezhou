@@ -126,6 +126,13 @@ pub struct UIVulkanRenderer {
     fxaa_descriptor_pool: vk::DescriptorPool,
     fxaa_descriptor_set: vk::DescriptorSet,
     fxaa_sampler: vk::Sampler,
+    
+    // Camera parameters
+    camera_yaw: f32,
+    camera_pitch: f32,
+    camera_x: f32,
+    camera_y: f32,
+    camera_z: f32,
 }
 
 impl UIVulkanRenderer {
@@ -626,7 +633,7 @@ p_rasterization_state: &vk::PipelineRasterizationStateCreateInfo {
                 p_push_constant_ranges: &vk::PushConstantRange {
                     stage_flags: vk::ShaderStageFlags::VERTEX,
                     offset: 0,
-                    size: 12, // rotation(float) + width(float) + height(float)
+                    size: 32, // rotation + width + height + yaw + pitch + x + y + z (8 floats)
                 },
                 ..Default::default()
             }, None).map_err(|e| format!("Failed to create game pipeline layout: {}", e))?;
@@ -1040,6 +1047,12 @@ p_rasterization_state: &vk::PipelineRasterizationStateCreateInfo {
                 fxaa_descriptor_pool,
                 fxaa_descriptor_set,
                 fxaa_sampler,
+                
+                camera_yaw: 0.0,
+                camera_pitch: 0.5,
+                camera_x: 0.0,
+                camera_y: 0.0,
+                camera_z: -3.0,
             })
         }
     }
@@ -1754,6 +1767,11 @@ let font_atlas = ui.get_font_atlas();
                 self.triangle_angle.to_radians(),
                 self.offscreen_extent.width as f32,
                 self.offscreen_extent.height as f32,
+                self.camera_yaw,
+                self.camera_pitch,
+                self.camera_x,
+                self.camera_y,
+                self.camera_z,
             ];
             self.device.cmd_push_constants(
                 self.command_buffers[image_index_usize],
@@ -2007,11 +2025,15 @@ let font_atlas = self.ui_system.lock().get_font_atlas();
             
             let mut vertices: Vec<f32> = Vec::new();
             let mut preview_vertices: Vec<f32> = Vec::new();
+            let mut vertices: Vec<f32> = Vec::new();
+            let mut preview_vertices: Vec<f32> = Vec::new();
+            let mut preview_border_vertices: Vec<f32> = Vec::new();
+            let mut is_preview_window_context = false;
             
             // 渲染UI控件
             for cmd in render_data.iter().flat_map(|data| &data.draw_commands) {
                 match cmd {
-DrawCommand::Rect { bounds, width, height, fill_color, .. } => {
+                    DrawCommand::Rect { bounds, width, height, fill_color, stroke_color, stroke_width, .. } => {
                         let x = bounds.x;
                         let y = bounds.y;
                         let w = *width;
@@ -2021,14 +2043,78 @@ DrawCommand::Rect { bounds, width, height, fill_color, .. } => {
                         let b = fill_color.b;
                         let a = fill_color.a;
                         
-                        vertices.extend_from_slice(&[
-                            x, y, r, g, b, a, 0.0, 0.0,
-                            x + w, y, r, g, b, a, 0.0, 0.0,
-                            x, y + h, r, g, b, a, 0.0, 0.0,
-                            x + w, y, r, g, b, a, 0.0, 0.0,
-                            x + w, y + h, r, g, b, a, 0.0, 0.0,
-                            x, y + h, r, g, b, a, 0.0, 0.0,
-                        ]);
+                        // 如果fill_color是透明且是preview window context，跳过填充
+                        if !is_preview_window_context || a > 0.0 {
+                            vertices.extend_from_slice(&[
+                                x, y, r, g, b, a, 0.0, 0.0,
+                                x + w, y, r, g, b, a, 0.0, 0.0,
+                                x, y + h, r, g, b, a, 0.0, 0.0,
+                                x + w, y, r, g, b, a, 0.0, 0.0,
+                                x + w, y + h, r, g, b, a, 0.0, 0.0,
+                                x, y + h, r, g, b, a, 0.0, 0.0,
+                            ]);
+                        }
+                        
+                        if let Some(stroke) = stroke_color {
+                            if *stroke_width > 0.0 {
+                                let sr = stroke.r;
+                                let sg = stroke.g;
+                                let sb = stroke.b;
+                                let sa = stroke.a;
+                                let sw = *stroke_width;
+                                
+                                let target_vertices = if is_preview_window_context {
+                                    &mut preview_border_vertices
+                                } else {
+                                    &mut vertices
+                                };
+                                
+                                // Top line
+                                target_vertices.extend_from_slice(&[
+                                    x, y, sr, sg, sb, sa, 0.0, 0.0,
+                                    x + w, y, sr, sg, sb, sa, 0.0, 0.0,
+                                    x, y + sw, sr, sg, sb, sa, 0.0, 0.0,
+                                    x + w, y, sr, sg, sb, sa, 0.0, 0.0,
+                                    x + w, y + sw, sr, sg, sb, sa, 0.0, 0.0,
+                                    x, y + sw, sr, sg, sb, sa, 0.0, 0.0,
+                                ]);
+                                
+                                // Bottom line
+                                target_vertices.extend_from_slice(&[
+                                    x, y + h - sw, sr, sg, sb, sa, 0.0, 0.0,
+                                    x + w, y + h - sw, sr, sg, sb, sa, 0.0, 0.0,
+                                    x, y + h, sr, sg, sb, sa, 0.0, 0.0,
+                                    x + w, y + h - sw, sr, sg, sb, sa, 0.0, 0.0,
+                                    x + w, y + h, sr, sg, sb, sa, 0.0, 0.0,
+                                    x, y + h, sr, sg, sb, sa, 0.0, 0.0,
+                                ]);
+                                
+                                // Left line
+                                target_vertices.extend_from_slice(&[
+                                    x, y + sw, sr, sg, sb, sa, 0.0, 0.0,
+                                    x + sw, y + sw, sr, sg, sb, sa, 0.0, 0.0,
+                                    x, y + h - sw, sr, sg, sb, sa, 0.0, 0.0,
+                                    x + sw, y + sw, sr, sg, sb, sa, 0.0, 0.0,
+                                    x + sw, y + h - sw, sr, sg, sb, sa, 0.0, 0.0,
+                                    x, y + h - sw, sr, sg, sb, sa, 0.0, 0.0,
+                                ]);
+                                
+                                // Right line
+                                target_vertices.extend_from_slice(&[
+                                    x + w - sw, y + sw, sr, sg, sb, sa, 0.0, 0.0,
+                                    x + w, y + sw, sr, sg, sb, sa, 0.0, 0.0,
+                                    x + w - sw, y + h - sw, sr, sg, sb, sa, 0.0, 0.0,
+                                    x + w, y + sw, sr, sg, sb, sa, 0.0, 0.0,
+                                    x + w, y + h - sw, sr, sg, sb, sa, 0.0, 0.0,
+                                    x + w - sw, y + h - sw, sr, sg, sb, sa, 0.0, 0.0,
+                                ]);
+                                
+                                // Reset context after border
+                                if is_preview_window_context {
+                                    is_preview_window_context = false;
+                                }
+                            }
+                        }
                     }
 DrawCommand::Text { bounds, width, height, font_color, text, font_size, alignment, .. } => {
                             let text_str = if text.is_empty() {
@@ -2121,6 +2207,7 @@ DrawCommand::Text { bounds, width, height, font_color, text, font_size, alignmen
                             // texture_id == 1 means preview texture
                             if *texture_id == 1 {
                                 preview_vertices.extend_from_slice(&quad_vertices);
+                                is_preview_window_context = true;
                             } else {
                                 vertices.extend_from_slice(&quad_vertices);
                             }
@@ -2224,6 +2311,35 @@ DrawCommand::Text { bounds, width, height, font_color, text, font_size, alignmen
                     0,
                     &[self.descriptor_set],
                     &[]
+                );
+            }
+            
+            // Draw preview border vertices (after preview texture, before end)
+            if !preview_border_vertices.is_empty() {
+                let border_offset = vertex_data.len() as u64 + preview_vertices.len() as u64 * 4;
+                let border_data: &[u8] = bytemuck::cast_slice(&preview_border_vertices);
+                let border_ptr = self.device.map_memory(
+                    self.vertex_buffer_memory,
+                    border_offset,
+                    border_data.len() as vk::DeviceSize,
+                    vk::MemoryMapFlags::empty()
+                ).map_err(|e| format!("Failed to map border memory: {}", e))?;
+                std::ptr::copy_nonoverlapping(border_data.as_ptr(), border_ptr as *mut u8, border_data.len());
+                self.device.unmap_memory(self.vertex_buffer_memory);
+                
+                self.device.cmd_bind_vertex_buffers(
+                    self.command_buffers[image_index_usize],
+                    0,
+                    &[self.vertex_buffer],
+                    &[border_offset]
+                );
+                
+                self.device.cmd_draw(
+                    self.command_buffers[image_index_usize],
+                    (preview_border_vertices.len() / 8) as u32,
+                    1,
+                    0,
+                    0
                 );
             }
             
@@ -2918,6 +3034,14 @@ self.dfx.lock().get_logger().lock().log(
             
             Ok(())
         }
+    }
+    
+    pub fn set_camera_params(&mut self, yaw: f32, pitch: f32, x: f32, y: f32, z: f32) {
+        self.camera_yaw = yaw;
+        self.camera_pitch = pitch;
+        self.camera_x = x;
+        self.camera_y = y;
+        self.camera_z = z;
     }
     
     pub fn cleanup(&mut self) {

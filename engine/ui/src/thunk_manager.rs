@@ -9,6 +9,8 @@ pub type WidgetCallback = extern "C" fn(u64);
 pub type InitCallback = extern "C" fn();
 pub type ResizeCallback = extern "C" fn(f32, f32);
 pub type GlobalClickCallback = extern "C" fn(f32, f32);
+pub type KeyCallback = extern "C" fn(u32, bool, u32);  // keycode, pressed, modifiers
+pub type MouseMoveCallback = extern "C" fn(f32, f32, bool);  // x, y, dragging
 
 static UI_CALLBACKS: LazyLock<Mutex<UICallbacks>> =
     LazyLock::new(|| Mutex::new(UICallbacks::new()));
@@ -28,6 +30,8 @@ pub struct UICallbacks {
     on_init: Option<InitCallback>,
     on_resize: Option<ResizeCallback>,
     on_global_click: Option<GlobalClickCallback>,
+    on_key: Option<KeyCallback>,
+    on_mouse_move: Option<MouseMoveCallback>,
 }
 
 impl UICallbacks {
@@ -38,6 +42,8 @@ impl UICallbacks {
             on_init: None,
             on_resize: None,
             on_global_click: None,
+            on_key: None,
+            on_mouse_move: None,
         }
     }
     
@@ -47,6 +53,8 @@ impl UICallbacks {
         self.on_init = None;
         self.on_resize = None;
         self.on_global_click = None;
+        self.on_key = None;
+        self.on_mouse_move = None;
     }
 }
 
@@ -83,6 +91,40 @@ pub extern "C" fn ui_register_global_click_callback(callback: GlobalClickCallbac
     let mut callbacks = UI_CALLBACKS.lock();
     callbacks.on_global_click = Some(callback);
     dfx_info!("UI", "注册GlobalClick回调: {:?}", callback);
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_register_key_callback(callback: KeyCallback) {
+    let mut callbacks = UI_CALLBACKS.lock();
+    callbacks.on_key = Some(callback);
+    dfx_info!("UI", "注册Key回调: {:?}", callback);
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_register_mouse_move_callback(callback: MouseMoveCallback) {
+    let mut callbacks = UI_CALLBACKS.lock();
+    callbacks.on_mouse_move = Some(callback);
+    dfx_info!("UI", "注册MouseMove回调: {:?}", callback);
+}
+
+pub fn ui_trigger_key_event(keycode: u32, pressed: bool, modifiers: u32) {
+    let callback = {
+        let callbacks = UI_CALLBACKS.lock();
+        callbacks.on_key
+    };
+    if let Some(callback) = callback {
+        callback(keycode, pressed, modifiers);
+    }
+}
+
+pub fn ui_trigger_mouse_move_event(x: f32, y: f32, dragging: bool) {
+    let callback = {
+        let callbacks = UI_CALLBACKS.lock();
+        callbacks.on_mouse_move
+    };
+    if let Some(callback) = callback {
+        callback(x, y, dragging);
+    }
 }
 
 pub fn ui_trigger_global_click(x: f32, y: f32) {

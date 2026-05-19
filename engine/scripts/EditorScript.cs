@@ -21,6 +21,8 @@ namespace Hezhou
         private static Panel _statusBar;
         private static HStack _statusItems;
         private static Label _fpsLabel;
+        private static ulong _statusLabelId;
+        private static ulong _projectLabelId;
         
         private static Panel _dropdownMenu;
         private static VStack _menuItems;
@@ -38,6 +40,24 @@ namespace Hezhou
         private static string _currentDirectory = "scripts";
         private static Dictionary<ulong, string> _fileItemPaths = new Dictionary<ulong, string>();
         private static Dictionary<ulong, string> _dirItemPaths = new Dictionary<ulong, string>();
+
+        private static bool _previewSelected = false;
+        
+        private static float _savedCameraX = 0f;
+        private static float _savedCameraY = 0f;
+        private static float _savedCameraZ = -3f;
+        private static float _savedCameraYaw = 0f;
+        private static float _savedCameraPitch = 0.5f;
+        
+        private static float _cameraX = 0f;
+        private static float _cameraY = 0f;
+        private static float _cameraZ = -3f;
+        private static float _cameraYaw = 0f;
+        private static float _cameraPitch = 0.5f;
+        
+        private static bool _mouseDragging = false;
+        private static float _lastMouseX = 0f;
+        private static float _lastMouseY = 0f;
 
         private const float TOOLBAR_HEIGHT = 40f;
         private const float STATUS_BAR_HEIGHT = 40f;
@@ -64,8 +84,86 @@ namespace Hezhou
             
             UI.RegisterResizeCallback(OnResize);
             UI.RegisterGlobalClickCallback(OnGlobalClick);
+            UI.RegisterKeyCallback(OnKey);
+            UI.RegisterMouseMoveCallback(OnMouseMove);
             
             Log.Info("Editor", "编辑器初始化完成");
+        }
+
+        private static void OnMouseMove(float x, float y, bool dragging)
+        {
+            if (!dragging || !_previewSelected)
+            {
+                _mouseDragging = false;
+                return;
+            }
+            
+            if (!_mouseDragging)
+            {
+                _mouseDragging = true;
+                _lastMouseX = x;
+                _lastMouseY = y;
+                return;
+            }
+            
+            float dx = x - _lastMouseX;
+            float dy = y - _lastMouseY;
+            _lastMouseX = x;
+            _lastMouseY = y;
+            
+            _cameraYaw += dx * 0.01f;
+            _cameraPitch += dy * 0.01f;
+            
+            if (_cameraPitch > 1.5f) _cameraPitch = 1.5f;
+            if (_cameraPitch < -1.5f) _cameraPitch = -1.5f;
+            
+            Log.Info("Editor", $"鼠标拖动: yaw={_cameraYaw}, pitch={_cameraPitch}");
+        }
+
+        private static void OnKey(uint keycode, bool pressed, uint modifiers)
+        {
+            if (!pressed) return;
+            
+            bool selected = UI.IsPreviewWindowSelected(_previewWindowId);
+            if (!selected) return;
+            
+            const uint KEY_ESC = 256;
+            const uint KEY_LEFT = 263;
+            const uint KEY_RIGHT = 262;
+            const uint KEY_UP = 265;
+            const uint KEY_DOWN = 264;
+            
+            if (keycode == KEY_ESC)
+            {
+                UI.SetPreviewWindowSelected(_previewWindowId, false);
+                _cameraX = _savedCameraX;
+                _cameraY = _savedCameraY;
+                _cameraZ = _savedCameraZ;
+                _cameraYaw = _savedCameraYaw;
+                _cameraPitch = _savedCameraPitch;
+                Log.Info("Editor", "ESC: 退出预览窗，恢复摄像机");
+                UpdateStatusBar();
+            }
+            else if (keycode == KEY_LEFT)
+            {
+                _cameraX -= 0.1f;
+                Log.Info("Editor", $"方向键左: cameraX={_cameraX}");
+            }
+            else if (keycode == KEY_RIGHT)
+            {
+                _cameraX += 0.1f;
+                Log.Info("Editor", $"方向键右: cameraX={_cameraX}");
+            }
+            else if (keycode == KEY_UP)
+            {
+                _cameraZ -= 0.1f;
+                Log.Info("Editor", $"方向键上: cameraZ={_cameraZ}");
+            }
+            else if (keycode == KEY_DOWN)
+            {
+                _cameraZ += 0.1f;
+                Log.Info("Editor", $"方向键下: cameraZ={_cameraZ}");
+            }
         }
 
         private static void CreateEditorLayout()
@@ -147,8 +245,8 @@ namespace Hezhou
             _statusItems = new HStack(_statusBar.Id, 20f);
             _statusItems.SetPosition(10f, 5f);
             _fpsLabel = new Label(_statusItems.Id, 120f, 25f, "FPS: 0");
-            _statusItems.AddLabel(150f, 20f, "状态: 就绪");
-            _statusItems.AddLabel(150f, 20f, "项目: 未命名");
+            _statusLabelId = _statusItems.AddLabel(150f, 20f, "状态: 就绪");
+            _projectLabelId = _statusItems.AddLabel(150f, 20f, "项目: 未命名");
             Log.Info("Editor", "状态栏创建完成");
         }
 
@@ -217,11 +315,51 @@ namespace Hezhou
                 try
                 {
                     _fpsLabel.Text = $"FPS: {((int)(1000f / deltaTime))}";
+                    
+                    bool selected = UI.IsPreviewWindowSelected(_previewWindowId);
+                    if (selected != _previewSelected)
+                    {
+                        _previewSelected = selected;
+                        if (selected)
+                        {
+                            _savedCameraX = _cameraX;
+                            _savedCameraY = _cameraY;
+                            _savedCameraZ = _cameraZ;
+                            _savedCameraYaw = _cameraYaw;
+                            _savedCameraPitch = _cameraPitch;
+                        }
+                        UpdateStatusBar();
+                    }
+                    
+                    // Pass camera params to shader when preview is selected
+                    if (_previewSelected)
+                    {
+                        UI.SetCameraParams(_cameraYaw, _cameraPitch, _cameraX, _cameraY, _cameraZ);
+                    }
+                    else
+                    {
+                        // Reset to default view when not selected
+                        UI.SetCameraParams(0f, 0.5f, 0f, 0f, -3f);
+                    }
                 }
                 catch (Exception ex)
                 {
                     Log.Error("Editor", $"Update error: {ex.Message}");
                 }
+            }
+        }
+        
+        private static void UpdateStatusBar()
+        {
+            if (_statusLabelId == 0) return;
+            
+            if (_previewSelected)
+            {
+                UI.SetLabelText(_statusLabelId, "按ESC退出Game模式");
+            }
+            else
+            {
+                UI.SetLabelText(_statusLabelId, "状态: 就绪");
             }
         }
         

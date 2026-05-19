@@ -143,11 +143,13 @@ impl UIInputHandler {
                     let mut event = Event::new(EventType::TouchMove, timestamp)
                         .with_data(EventData::Touch(TouchData::new(x, y, 0)));
                     self.event_dispatcher.lock().dispatch_event(&mut event);
+                    crate::thunk_manager::ui_trigger_mouse_move_event(x, y, true);
                 } else {
                     let mut event = Event::new(EventType::MouseMove, timestamp).with_data(
                         EventData::Mouse(MouseData::new(x, y, ui_button)),
                     );
                     self.event_dispatcher.lock().dispatch_event(&mut event);
+                    crate::thunk_manager::ui_trigger_mouse_move_event(x, y, false);
                 }
             }
             MouseAction::Scroll => {
@@ -183,6 +185,10 @@ impl UIInputHandler {
         }
 
         let modifiers = convert_key_modifiers(&key.modifiers);
+
+        // 触发C#键盘回调
+        let pressed = key.action == KeyAction::Press || key.action == KeyAction::Repeat;
+        crate::thunk_manager::ui_trigger_key_event(key.keycode as u32, pressed, modifiers);
 
         let mut event = match key.action {
             KeyAction::Press | KeyAction::Repeat => Event::new(EventType::KeyDown, timestamp)

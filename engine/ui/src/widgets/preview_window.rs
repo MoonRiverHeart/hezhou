@@ -1,4 +1,5 @@
-use crate::{Widget, WidgetId, Layout, Style, Color, Canvas, Rect, Event, EventResult, DrawCommand, WidgetState};
+use crate::{Widget, WidgetId, Layout, Style, Color, Canvas, Rect, Event, EventResult, DrawCommand, WidgetState, EventType, EventData};
+use hezhou_dfx::*;
 
 pub struct PreviewWindow {
     id: WidgetId,
@@ -8,6 +9,7 @@ pub struct PreviewWindow {
     style: Style,
     state: WidgetState,
     texture_id: u64,
+    selected: bool,
 }
 
 impl PreviewWindow {
@@ -20,6 +22,7 @@ impl PreviewWindow {
             style: Style::default(),
             state: WidgetState::Normal,
             texture_id,
+            selected: false,
         }
     }
     
@@ -33,6 +36,14 @@ impl PreviewWindow {
     
     pub fn set_texture_id(&mut self, texture_id: u64) {
         self.texture_id = texture_id;
+    }
+    
+    pub fn set_selected(&mut self, selected: bool) {
+        self.selected = selected;
+    }
+    
+    pub fn is_selected(&self) -> bool {
+        self.selected
     }
 }
 
@@ -95,9 +106,33 @@ impl Widget for PreviewWindow {
         let bounds = Rect::new(0.0, 0.0, self.layout.width, self.layout.height);
         let uv = Rect::new(0.0, 0.0, 1.0, 1.0);
         canvas.draw_image(bounds, self.texture_id, uv);
+        
+        if self.selected {
+            dfx_info!("PreviewWindow", "Drawing border: width={}, height={}, selected={}", self.layout.width, self.layout.height, self.selected);
+            let border_style = Style::new()
+                .with_background(Color::transparent())
+                .with_border(Color::new(0.2, 0.6, 1.0, 1.0), 3.0, 0.0);
+            canvas.draw_rect(bounds, &border_style);
+        }
     }
     
-    fn on_event(&mut self, _event: &Event) -> EventResult {
+    fn on_event(&mut self, event: &Event) -> EventResult {
+        dfx_info!("PreviewWindow", "on_event: type={}, target={}, self_id={}", 
+            match event.event_type {
+                EventType::TouchBegin => "TouchBegin",
+                EventType::TouchEnd => "TouchEnd",
+                EventType::KeyDown => "KeyDown",
+                _ => "Other",
+            },
+            event.target.id,
+            self.id.id
+        );
+        
+        if event.target.id == self.id.id && event.event_type == EventType::TouchBegin {
+            dfx_info!("PreviewWindow", "Setting selected=true");
+            self.selected = true;
+            return EventResult::Handled;
+        }
         EventResult::Ignored
     }
     
