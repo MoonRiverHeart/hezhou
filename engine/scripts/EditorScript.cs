@@ -332,11 +332,11 @@ private static float _cameraYaw = 0f;
                     // Pass camera params to shader when preview is selected
                     if (_previewSelected)
                     {
-                        float speed = 5f * deltaTime;
+                        float speed = 1f * deltaTime;
                         if (_keyLeftPressed) _cameraX -= speed;
                         if (_keyRightPressed) _cameraX += speed;
-                        if (_keyUpPressed) _cameraZ -= speed;
-                        if (_keyDownPressed) _cameraZ += speed;
+                        if (_keyUpPressed) _cameraZ = Math.Max(0.5f, _cameraZ - speed);
+                        if (_keyDownPressed) _cameraZ = Math.Min(10f, _cameraZ + speed);
                         
                         UI.SetCameraParams(_cameraYaw, _cameraPitch, _cameraX, _cameraY, _cameraZ);
                     }
