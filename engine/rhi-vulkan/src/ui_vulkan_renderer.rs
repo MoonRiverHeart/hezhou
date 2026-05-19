@@ -1263,7 +1263,7 @@ p_rasterization_state: &vk::PipelineRasterizationStateCreateInfo {
             let image = device.create_image(&vk::ImageCreateInfo {
                 image_type: vk::ImageType::TYPE_2D,
                 format: vk::Format::R8G8B8A8_UNORM,
-                extent: vk::Extent3D { width: 2048, height: 2048, depth: 1 },
+                extent: vk::Extent3D { width: 4096, height: 4096, depth: 1 },
                 mip_levels: 1,
                 array_layers: 1,
                 samples: vk::SampleCountFlags::TYPE_1,
@@ -1295,8 +1295,8 @@ p_rasterization_state: &vk::PipelineRasterizationStateCreateInfo {
             let data_ptr = device.map_memory(memory, 0, mem_requirements.size, vk::MemoryMapFlags::empty())
                 .map_err(|e| format!("Failed to map font texture memory: {}", e))?;
             
-            let texture_data = vec![0u8; 2048 * 2048 * 4];
-            std::ptr::copy_nonoverlapping(texture_data.as_ptr(), data_ptr as *mut u8, 2048 * 2048 * 4);
+            let texture_data = vec![0u8; 4096 * 4096 * 4];
+            std::ptr::copy_nonoverlapping(texture_data.as_ptr(), data_ptr as *mut u8, 4096 * 4096 * 4);
             
             device.unmap_memory(memory);
             
@@ -2591,8 +2591,13 @@ self.dfx.lock().get_logger().lock().log(
                     self.input_handler.lock().on_mouse_event(&mouse_event, self.frame_count);
                 }
                 WindowEvent::Key(key, _, action, mods) => {
+                    // volatile read + log 强制使用 action_raw 防止编译器优化
+                    let action_ptr = &action as *const Action as *const i32;
+                    let action_raw = unsafe { std::ptr::read_volatile(action_ptr) };
+                    dfx_info!("GLFWKey", "action={}", action_raw);
+                    
                     // Space 和 S 只在 Press 时处理
-                    if action == Action::Press {
+                    if action_raw == 1 {  // GLFW Press
                         if key == Key::Space {
                             self.space_pressed = true;
                         }
@@ -2602,14 +2607,16 @@ self.dfx.lock().get_logger().lock().log(
                     }
                     
                     // 方向键和其他键需要处理 Press/Release/Repeat
-                    let key_action = match action {
-                        Action::Press => KeyAction::Press,
-                        Action::Release => KeyAction::Release,
-                        Action::Repeat => KeyAction::Repeat,
-                    };
                     
                     // Escape键
                     if key == Key::Escape {
+                        // GLFW: Press=1, Release=0, Repeat=2 → Rust: Press=0, Release=1, Repeat=2
+                        let key_action = match action_raw {
+                            1 => KeyAction::Press,
+                            0 => KeyAction::Release,
+                            2 => KeyAction::Repeat,
+                            _ => KeyAction::Press,
+                        };
                         self.input_handler.lock().on_key_event(&KeyEvent {
                             action: key_action,
                             keycode: KeyCode::Escape,
@@ -2618,6 +2625,12 @@ self.dfx.lock().get_logger().lock().log(
                     }
                     
                     if key == Key::Backspace {
+                        let key_action = match action_raw {
+                            1 => KeyAction::Press,
+                            0 => KeyAction::Release,
+                            2 => KeyAction::Repeat,
+                            _ => KeyAction::Press,
+                        };
                         self.input_handler.lock().on_key_event(&KeyEvent {
                             action: key_action,
                             keycode: KeyCode::Backspace,
@@ -2627,6 +2640,12 @@ self.dfx.lock().get_logger().lock().log(
                     
                     // 方向键
                     if key == Key::Left {
+                        let key_action = match action_raw {
+                            1 => KeyAction::Press,
+                            0 => KeyAction::Release,
+                            2 => KeyAction::Repeat,
+                            _ => KeyAction::Press,
+                        };
                         self.input_handler.lock().on_key_event(&KeyEvent {
                             action: key_action,
                             keycode: KeyCode::Left,
@@ -2634,6 +2653,12 @@ self.dfx.lock().get_logger().lock().log(
                         }, self.frame_count);
                     }
                     if key == Key::Right {
+                        let key_action = match action_raw {
+                            1 => KeyAction::Press,
+                            0 => KeyAction::Release,
+                            2 => KeyAction::Repeat,
+                            _ => KeyAction::Press,
+                        };
                         self.input_handler.lock().on_key_event(&KeyEvent {
                             action: key_action,
                             keycode: KeyCode::Right,
@@ -2641,6 +2666,12 @@ self.dfx.lock().get_logger().lock().log(
                         }, self.frame_count);
                     }
                     if key == Key::Up {
+                        let key_action = match action_raw {
+                            1 => KeyAction::Press,
+                            0 => KeyAction::Release,
+                            2 => KeyAction::Repeat,
+                            _ => KeyAction::Press,
+                        };
                         self.input_handler.lock().on_key_event(&KeyEvent {
                             action: key_action,
                             keycode: KeyCode::Up,
@@ -2648,6 +2679,12 @@ self.dfx.lock().get_logger().lock().log(
                         }, self.frame_count);
                     }
                     if key == Key::Down {
+                        let key_action = match action_raw {
+                            1 => KeyAction::Press,
+                            0 => KeyAction::Release,
+                            2 => KeyAction::Repeat,
+                            _ => KeyAction::Press,
+                        };
                         self.input_handler.lock().on_key_event(&KeyEvent {
                             action: key_action,
                             keycode: KeyCode::Down,
@@ -2657,6 +2694,12 @@ self.dfx.lock().get_logger().lock().log(
                     
                     // Home/End键
                     if key == Key::Home {
+                        let key_action = match action_raw {
+                            1 => KeyAction::Press,
+                            0 => KeyAction::Release,
+                            2 => KeyAction::Repeat,
+                            _ => KeyAction::Press,
+                        };
                         self.input_handler.lock().on_key_event(&KeyEvent {
                             action: key_action,
                             keycode: KeyCode::Home,
@@ -2664,6 +2707,12 @@ self.dfx.lock().get_logger().lock().log(
                         }, self.frame_count);
                     }
                     if key == Key::End {
+                        let key_action = match action_raw {
+                            1 => KeyAction::Press,
+                            0 => KeyAction::Release,
+                            2 => KeyAction::Repeat,
+                            _ => KeyAction::Press,
+                        };
                         self.input_handler.lock().on_key_event(&KeyEvent {
                             action: key_action,
                             keycode: KeyCode::End,
@@ -2674,6 +2723,12 @@ self.dfx.lock().get_logger().lock().log(
                     // Ctrl+C/V/X 复制粘贴剪切
                     if mods == glfw::Modifiers::Control {
                         if key == Key::C {
+                            let key_action = match action_raw {
+                                1 => KeyAction::Press,
+                                0 => KeyAction::Release,
+                                2 => KeyAction::Repeat,
+                                _ => KeyAction::Press,
+                            };
                             self.input_handler.lock().on_key_event(&KeyEvent {
                                 action: key_action,
                                 keycode: KeyCode::C,
@@ -2681,6 +2736,12 @@ self.dfx.lock().get_logger().lock().log(
                             }, self.frame_count);
                         }
                         if key == Key::V {
+                            let key_action = match action_raw {
+                                1 => KeyAction::Press,
+                                0 => KeyAction::Release,
+                                2 => KeyAction::Repeat,
+                                _ => KeyAction::Press,
+                            };
                             self.input_handler.lock().on_key_event(&KeyEvent {
                                 action: key_action,
                                 keycode: KeyCode::V,
@@ -2688,6 +2749,12 @@ self.dfx.lock().get_logger().lock().log(
                             }, self.frame_count);
                         }
                         if key == Key::X {
+                            let key_action = match action_raw {
+                                1 => KeyAction::Press,
+                                0 => KeyAction::Release,
+                                2 => KeyAction::Repeat,
+                                _ => KeyAction::Press,
+                            };
                             self.input_handler.lock().on_key_event(&KeyEvent {
                                 action: key_action,
                                 keycode: KeyCode::X,

@@ -33,21 +33,41 @@ pub struct FontAtlas {
     current_x: u32,
     current_y: u32,
     row_height: u32,
+    cached_font_sizes: Vec<u32>,
 }
+
+const PREDEFINED_FONT_SIZES: [u32; 9] = [48, 36, 32, 24, 20, 18, 16, 14, 12];
 
 impl FontAtlas {
     pub fn new() -> Self {
         Self {
             fonts: Vec::new(),
             font_data: Vec::new(),
-            atlas_texture: vec![0u8; 2048 * 2048 * 4],
-            atlas_width: 2048,
-            atlas_height: 2048,
+            atlas_texture: vec![0u8; 4096 * 4096 * 4],
+            atlas_width: 4096,
+            atlas_height: 4096,
             character_cache: HashMap::new(),
             current_x: 0,
             current_y: 0,
             row_height: 0,
+            cached_font_sizes: PREDEFINED_FONT_SIZES.to_vec(),
         }
+    }
+    
+    pub fn get_nearest_cached_font_size(&self, requested_size: f32) -> f32 {
+        let requested = requested_size as u32;
+        let mut best_size = PREDEFINED_FONT_SIZES[0];
+        let mut best_diff = (best_size as i32 - requested as i32).abs();
+        
+        for size in PREDEFINED_FONT_SIZES.iter() {
+            let diff = (*size as i32 - requested as i32).abs();
+            if diff < best_diff {
+                best_diff = diff;
+                best_size = *size;
+            }
+        }
+        
+        best_size as f32
     }
     
     pub fn add_font(&mut self, font_data: &[u8]) -> usize {
@@ -327,10 +347,11 @@ impl FontAtlas {
     }
     
     pub fn get_char_info(&self, font_index: usize, character: char, font_size: f32) -> Option<&CharacterInfo> {
+        let cached_size = self.get_nearest_cached_font_size(font_size);
         let key = CharacterKey {
             font_index,
             character,
-            font_size: font_size as u32,
+            font_size: cached_size as u32,
         };
         
         self.character_cache.get(&key)

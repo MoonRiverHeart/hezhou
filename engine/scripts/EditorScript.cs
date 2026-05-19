@@ -19,10 +19,10 @@ namespace Hezhou
         private static Panel _propertiesPanel;
         private static VStack _propsList;
         private static Panel _statusBar;
-        private static HStack _statusItems;
-        private static Label _fpsLabel;
-        private static ulong _statusLabelId;
-        private static ulong _projectLabelId;
+        private static List _statusItems;
+        private static ListItem _fpsItem;
+        private static ListItem _statusItem;
+        private static ListItem _projectItem;
         
         private static Panel _dropdownMenu;
         private static VStack _menuItems;
@@ -122,7 +122,7 @@ private static float _cameraYaw = 0f;
             if (_cameraPitch > 1.5f) _cameraPitch = 1.5f;
             if (_cameraPitch < -1.5f) _cameraPitch = -1.5f;
             
-            Log.Info("Editor", $"鼠标拖动: yaw={_cameraYaw}, pitch={_cameraPitch}");
+            
         }
 
         private static void OnKey(uint keycode, bool pressed, uint modifiers)
@@ -236,11 +236,23 @@ private static float _cameraYaw = 0f;
             Log.Info("Editor", "属性面板创建完成");
 
             _statusBar = new Panel(rootId, 0, statusY, _screenWidth, STATUS_BAR_HEIGHT, 0.12f, 0.12f, 0.12f, 1.0f);
-            _statusItems = new HStack(_statusBar.Id, 20f);
-            _statusItems.SetPosition(10f, 5f);
-            _fpsLabel = new Label(_statusItems.Id, 120f, 25f, "FPS: 0");
-            _statusLabelId = _statusItems.AddLabel(150f, 20f, "状态: 就绪");
-            _projectLabelId = _statusItems.AddLabel(150f, 20f, "项目: 未命名");
+            _statusItems = new List(_statusBar.Id, 0f, true);  // horizontal list
+            _statusItems.SetPosition(10f * _contentScale, 0f);
+            
+            float fontSize = 14f * _contentScale;
+            
+            _fpsItem = _statusItems.AddItem("FPS: 0", false);
+            UI.SetWidgetLayout(_fpsItem.Id, 0f, 5f * _contentScale, 120f * _contentScale, 30f * _contentScale);
+            UI.SetListItemFontSize(_fpsItem.Id, fontSize);
+            
+            _statusItem = _statusItems.AddItem("状态: 就绪", true);
+            UI.SetWidgetLayout(_statusItem.Id, 130f * _contentScale, 5f * _contentScale, 150f * _contentScale, 30f * _contentScale);
+            UI.SetListItemFontSize(_statusItem.Id, fontSize);
+            
+            _projectItem = _statusItems.AddItem("项目: 未命名", true);
+            UI.SetWidgetLayout(_projectItem.Id, 290f * _contentScale, 5f * _contentScale, 150f * _contentScale, 30f * _contentScale);
+            UI.SetListItemFontSize(_projectItem.Id, fontSize);
+            
             Log.Info("Editor", "状态栏创建完成");
         }
 
@@ -304,11 +316,11 @@ private static float _cameraYaw = 0f;
 
         public static void Update(float deltaTime)
         {
-            if (deltaTime > 0 && _fpsLabel != null)
+            if (deltaTime > 0 && _fpsItem != null)
             {
                 try
                 {
-                    _fpsLabel.Text = $"FPS: {((int)(1000f / deltaTime))}";
+                    _fpsItem.Text = $"FPS: {((int)(1000f / deltaTime))}";
                     
                     bool selected = UI.IsPreviewWindowSelected(_previewWindowId);
                     
@@ -352,15 +364,15 @@ private static float _cameraYaw = 0f;
         
         private static void UpdateStatusBar()
         {
-            if (_statusLabelId == 0) return;
+            if (_statusItem == null) return;
             
             if (_previewSelected)
             {
-                UI.SetLabelText(_statusLabelId, "按ESC退出Game模式");
+                _statusItem.Text = "按ESC退出Game模式";
             }
             else
             {
-                UI.SetLabelText(_statusLabelId, "状态: 就绪");
+                _statusItem.Text = "状态: 就绪";
             }
         }
         

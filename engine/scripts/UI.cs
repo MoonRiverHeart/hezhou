@@ -112,6 +112,24 @@ namespace Hezhou
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public delegate void SetPreviewWindowSelectedDelegate(IntPtr handle, ulong widgetId, bool selected);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate ulong CreateListDelegate(IntPtr handle, float spacing, uint orientation);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate ulong CreateListInParentDelegate(IntPtr handle, ulong parentId, float spacing, uint orientation);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate ulong CreateListItemDelegate(IntPtr handle, string text);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate ulong CreateListItemInParentDelegate(IntPtr handle, ulong parentId, string text, uint showBorder);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void ListItemSetTextDelegate(IntPtr handle, ulong widgetId, string text);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void ListItemSetFontSizeDelegate(IntPtr handle, ulong widgetId, float fontSize);
 
         [StructLayout(LayoutKind.Sequential)]
         public struct FfiContext
@@ -158,6 +176,12 @@ namespace Hezhou
             public IntPtr ui_set_camera_params;
             public IntPtr ui_is_preview_window_selected;
             public IntPtr ui_set_preview_window_selected;
+            public IntPtr ui_create_list;
+            public IntPtr ui_create_list_in_parent;
+            public IntPtr ui_create_list_item;
+            public IntPtr ui_create_list_item_in_parent;
+            public IntPtr ui_list_item_set_text;
+            public IntPtr ui_list_item_set_font_size;
             public IntPtr widget_tree_ptr;
             public IntPtr dfx_handle;
         }
@@ -546,6 +570,50 @@ public static void RegisterResizeCallback(ResizeCallbackDelegate callback)
             func(_widgetTree, widgetId, callbackPtr);
         }
         
+        public static ulong CreateList(ulong parentId, float spacing = 0f, uint orientation = 0)
+        {
+            if (_ffi.ui_create_list_in_parent == IntPtr.Zero)
+            {
+                Log.Error("C#", "CreateListInParent函数指针为空");
+                return 0;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<CreateListInParentDelegate>(_ffi.ui_create_list_in_parent);
+            return func(_widgetTree, parentId, spacing, orientation);
+        }
+        
+        public static ulong CreateListItem(ulong parentId, string text, bool showBorder = false)
+        {
+            if (_ffi.ui_create_list_item_in_parent == IntPtr.Zero)
+            {
+                Log.Error("C#", "CreateListItemInParent函数指针为空");
+                return 0;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<CreateListItemInParentDelegate>(_ffi.ui_create_list_item_in_parent);
+            return func(_widgetTree, parentId, text, showBorder ? 1u : 0u);
+        }
+        
+        public static void SetListItemText(ulong widgetId, string text)
+        {
+            if (_ffi.ui_list_item_set_text == IntPtr.Zero)
+            {
+                Log.Error("C#", "ListItemSetText函数指针为空");
+                return;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<ListItemSetTextDelegate>(_ffi.ui_list_item_set_text);
+            func(_widgetTree, widgetId, text);
+        }
+        
+        public static void SetListItemFontSize(ulong widgetId, float fontSize)
+        {
+            if (_ffi.ui_list_item_set_font_size == IntPtr.Zero)
+            {
+                Log.Error("C#", "ListItemSetFontSize函数指针为空");
+                return;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<ListItemSetFontSizeDelegate>(_ffi.ui_list_item_set_font_size);
+            func(_widgetTree, widgetId, fontSize);
+        }
+        
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public delegate void WidgetCallbackDelegate(ulong widgetId);
         
@@ -706,6 +774,44 @@ public static void RegisterResizeCallback(ResizeCallbackDelegate callback)
         public void SetPosition(float x, float y)
         {
             UI.SetWidgetLayout(Id, x, y, 0, 0);
+        }
+    }
+    
+    public class List
+    {
+        public ulong Id { get; private set; }
+        
+        public List(ulong parentId, float spacing = 0f, bool horizontal = true)
+        {
+            Id = UI.CreateList(parentId, spacing, horizontal ? 0u : 1u);
+        }
+        
+        public ListItem AddItem(string text, bool showBorder = false)
+        {
+            return new ListItem(Id, text, showBorder);
+        }
+        
+        public void SetPosition(float x, float y)
+        {
+            UI.SetWidgetLayout(Id, x, y, 0, 0);
+        }
+    }
+    
+    public class ListItem
+    {
+        public ulong Id { get; private set; }
+        private string _text;
+        
+        public ListItem(ulong parentId, string text, bool showBorder = false)
+        {
+            _text = text;
+            Id = UI.CreateListItem(parentId, text, showBorder);
+        }
+        
+        public string Text
+        {
+            get => _text;
+            set { _text = value; UI.SetListItemText(Id, _text); }
         }
     }
 }

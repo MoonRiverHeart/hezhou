@@ -6,6 +6,7 @@ use std::time::{Duration, Instant};
 
 pub extern "C" fn trigger_hot_reload() {}
 pub extern "C" fn set_game_preview_extent(_width: u32, _height: u32) {}
+pub extern "C" fn set_camera_params(_yaw: f32, _pitch: f32, _x: f32, _y: f32, _z: f32) {}
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
@@ -83,8 +84,19 @@ fn main() {
         ui_text_edit_delete_char: unsafe { std::mem::transmute(ui_ffi::ui_text_edit_delete_char as *const std::ffi::c_void) },
         ui_text_edit_get_text_len: unsafe { std::mem::transmute(ui_ffi::ui_text_edit_get_text_len as *const std::ffi::c_void) },
         ui_text_edit_get_text: unsafe { std::mem::transmute(ui_ffi::ui_text_edit_get_text as *const std::ffi::c_void) },
+        ui_register_key_thunk_ptr: unsafe { std::mem::transmute(ui_ffi::ui_register_key_thunk_ptr as *const std::ffi::c_void) },
+        ui_register_mouse_move_thunk_ptr: unsafe { std::mem::transmute(ui_ffi::ui_register_mouse_move_thunk_ptr as *const std::ffi::c_void) },
         ui_trigger_hot_reload: trigger_hot_reload,
         ui_set_game_preview_extent: set_game_preview_extent,
+        ui_set_camera_params: set_camera_params,
+        ui_is_preview_window_selected: unsafe { std::mem::transmute(ui_ffi::ui_is_preview_window_selected as *const std::ffi::c_void) },
+        ui_set_preview_window_selected: unsafe { std::mem::transmute(ui_ffi::ui_set_preview_window_selected as *const std::ffi::c_void) },
+        ui_create_list: unsafe { std::mem::transmute(ui_ffi::ui_create_list as *const std::ffi::c_void) },
+        ui_create_list_in_parent: unsafe { std::mem::transmute(ui_ffi::ui_create_list_in_parent as *const std::ffi::c_void) },
+        ui_create_list_item: unsafe { std::mem::transmute(ui_ffi::ui_create_list_item as *const std::ffi::c_void) },
+        ui_create_list_item_in_parent: unsafe { std::mem::transmute(ui_ffi::ui_create_list_item_in_parent as *const std::ffi::c_void) },
+        ui_list_item_set_text: unsafe { std::mem::transmute(ui_ffi::ui_list_item_set_text as *const std::ffi::c_void) },
+        ui_list_item_set_font_size: unsafe { std::mem::transmute(ui_ffi::ui_list_item_set_font_size as *const std::ffi::c_void) },
         widget_tree_ptr: widget_tree_handle,
         dfx_handle: std::ptr::null_mut(),
     };

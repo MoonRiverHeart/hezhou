@@ -162,31 +162,33 @@ impl UIInputHandler {
     }
 
     pub fn on_key_event(&mut self, key: &KeyEvent, timestamp: u64) {
+        // volatile read + log 强制使用 action_val 防止编译器优化
+        let action_ptr = &key.action as *const KeyAction as *const u32;
+        let action_val = unsafe { std::ptr::read_volatile(action_ptr) };
+        dfx_info!("InputHandler", "keycode={} action={}", key.keycode as u32, action_val);
+        
         // 追踪 Shift 和 Ctrl 键状态
         if key.keycode == KeyCode::Shift {
-            match key.action {
-                KeyAction::Press | KeyAction::Repeat => self.shift_pressed = true,
-                KeyAction::Release => self.shift_pressed = false,
-            }
+            if action_val == 0 || action_val == 2 { self.shift_pressed = true; }
+            if action_val == 1 { self.shift_pressed = false; }
         }
         if key.keycode == KeyCode::Ctrl {
-            match key.action {
-                KeyAction::Press | KeyAction::Repeat => self.ctrl_pressed = true,
-                KeyAction::Release => self.ctrl_pressed = false,
-            }
+            if action_val == 0 || action_val == 2 { self.ctrl_pressed = true; }
+            if action_val == 1 { self.ctrl_pressed = false; }
         }
 
         let modifiers = convert_key_modifiers(&key.modifiers);
 
-        // 触发C#键盘回调
-        let pressed = key.action == KeyAction::Press || key.action == KeyAction::Repeat;
+        // 触发C#键盘回调 - 使用 volatile read 的值
+        let pressed = action_val == 0 || action_val == 2;  // Press=0, Repeat=2
         crate::thunk_manager::ui_trigger_key_event(key.keycode as u32, pressed, modifiers);
 
-        let mut event = match key.action {
-            KeyAction::Press | KeyAction::Repeat => Event::new(EventType::KeyDown, timestamp)
-                .with_data(EventData::Key(KeyData::new(key.keycode as u32, modifiers))),
-            KeyAction::Release => Event::new(EventType::KeyUp, timestamp)
-                .with_data(EventData::Key(KeyData::new(key.keycode as u32, modifiers))),
+        let mut event = if action_val == 0 || action_val == 2 {
+            Event::new(EventType::KeyDown, timestamp)
+                .with_data(EventData::Key(KeyData::new(key.keycode as u32, modifiers)))
+        } else {
+            Event::new(EventType::KeyUp, timestamp)
+                .with_data(EventData::Key(KeyData::new(key.keycode as u32, modifiers)))
         };
 
         self.event_dispatcher.lock().dispatch_event(&mut event);

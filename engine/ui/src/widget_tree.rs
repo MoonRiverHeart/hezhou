@@ -241,35 +241,68 @@ pub fn perform_layout(&mut self, font_atlas: &FontAtlas) {
             .unwrap_or("");
 
         let (width, height) = match widget_type {
-            "HStack" => {
-                let mut total_width: f32 = 0.0;
-                let mut max_height: f32 = 0.0;
-                let (spacing, padding) = self
-                    .nodes
-                    .get(&id)
-                    .and_then(|n| {
-                        if let Some(hstack) =
-                            n.widget.as_any().downcast_ref::<crate::widgets::HStack>()
-                        {
-                            Some((hstack.spacing, hstack.padding))
-                        } else {
-                            None
-                        }
-                    })
-                    .unwrap_or((8.0, crate::types::EdgeInsets::zero()));
-
-                for (i, (w, h)) in child_sizes.iter().enumerate() {
-                    total_width += w;
-                    max_height = max_height.max(*h);
-                    if i < children.len() - 1 {
-                        total_width += spacing;
-                    }
-                }
+            "HStack" | "List" => {
+                // HStack和Horizontal List使用相同的布局逻辑
+                let is_horizontal = if widget_type == "List" {
+                    self.nodes.get(&id)
+                        .and_then(|n| n.widget.as_any().downcast_ref::<crate::widgets::List>())
+                        .map(|l| l.orientation == crate::widgets::list::ListOrientation::Horizontal)
+                        .unwrap_or(true)
+                } else {
+                    true
+                };
                 
-                total_width += padding.left + padding.right;
-                max_height += padding.top + padding.bottom;
+                let (spacing, padding) = if widget_type == "HStack" {
+                    self.nodes.get(&id)
+                        .and_then(|n| {
+                            if let Some(hstack) = n.widget.as_any().downcast_ref::<crate::widgets::HStack>() {
+                                Some((hstack.spacing, hstack.padding))
+                            } else {
+                                None
+                            }
+                        })
+                        .unwrap_or((8.0, crate::types::EdgeInsets::zero()))
+                } else {
+                    self.nodes.get(&id)
+                        .and_then(|n| n.widget.as_any().downcast_ref::<crate::widgets::List>())
+                        .map(|l| (l.spacing, crate::types::EdgeInsets::zero()))
+                        .unwrap_or((0.0, crate::types::EdgeInsets::zero()))
+                };
 
-                (total_width, max_height)
+                if is_horizontal {
+                    let mut total_width: f32 = 0.0;
+                    let mut max_height: f32 = 0.0;
+                    
+                    for (i, (w, h)) in child_sizes.iter().enumerate() {
+                        total_width += w;
+                        max_height = max_height.max(*h);
+                        if i < children.len() - 1 {
+                            total_width += spacing;
+                        }
+                    }
+                    
+                    total_width += padding.left + padding.right;
+                    max_height += padding.top + padding.bottom;
+                    
+                    (total_width, max_height)
+                } else {
+                    // Vertical List
+                    let mut max_width: f32 = 0.0;
+                    let mut total_height: f32 = 0.0;
+                    
+                    for (i, (w, h)) in child_sizes.iter().enumerate() {
+                        max_width = max_width.max(*w);
+                        total_height += h;
+                        if i < children.len() - 1 {
+                            total_height += spacing;
+                        }
+                    }
+                    
+                    max_width += padding.left + padding.right;
+                    total_height += padding.top + padding.bottom;
+                    
+                    (max_width, total_height)
+                }
             }
             "VStack" => {
                 let mut max_width: f32 = 0.0;
@@ -328,6 +361,9 @@ pub fn perform_layout(&mut self, font_atlas: &FontAtlas) {
             }
             "VStack" => {
                 self.layout_vstack_children(id, &children, &child_sizes);
+            }
+            "List" => {
+                self.layout_list_children(id, &children, &child_sizes);
             }
             _ => {}
         }
@@ -420,7 +456,64 @@ pub fn perform_layout(&mut self, font_atlas: &FontAtlas) {
         }
     }
 
-pub fn generate_render_data(&mut self, font_atlas: &FontAtlas) -> Vec<RenderData> {
+    fn layout_list_children(
+        &mut self,
+        parent_id: WidgetId,
+        children: &[WidgetId],
+        child_sizes: &[(f32, f32)],
+    ) {
+        let list_info = self
+            .nodes
+            .get(&parent_id)
+            .and_then(|n| n.widget.as_any().downcast_ref::<crate::widgets::List>())
+            .map(|l| (l.spacing, l.orientation))
+            .unwrap_or((0.0, crate::widgets::list::ListOrientation::Horizontal));
+        
+        let spacing = list_info.0;
+        let is_horizontal = list_info.1 == crate::widgets::list::ListOrientation::Horizontal;
+        
+        if is_horizontal {
+            let mut current_x = 0.0;
+            
+            for (i, &child_id) in children.iter().enumerate() {
+                let (w, h) = child_sizes[i];
+                
+                if let Some(node) = self.nodes.get_mut(&child_id) {
+                    let child_layout = *node.widget.layout();
+                    
+                    node.widget.set_layout(crate::layout::Layout::new(
+                        current_x,
+                        child_layout.y,
+                        w.max(child_layout.width),
+                        h.max(child_layout.height),
+                    ));
+                }
+                
+                current_x += w + spacing;
+            }
+        } else {
+            let mut current_y = 0.0;
+            
+            for (i, &child_id) in children.iter().enumerate() {
+                let (w, h) = child_sizes[i];
+                
+                if let Some(node) = self.nodes.get_mut(&child_id) {
+                    let child_layout = *node.widget.layout();
+                    
+                    node.widget.set_layout(crate::layout::Layout::new(
+                        child_layout.x,
+                        current_y,
+                        w.max(child_layout.width),
+                        h.max(child_layout.height),
+                    ));
+                }
+                
+                current_y += h + spacing;
+            }
+        }
+    }
+
+    pub fn generate_render_data(&mut self, font_atlas: &FontAtlas) -> Vec<RenderData> {
         let mut render_data = Vec::new();
         
         if let Some(root_id) = self.root {

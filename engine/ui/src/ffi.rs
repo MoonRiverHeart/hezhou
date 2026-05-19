@@ -1226,3 +1226,164 @@ pub extern "C" fn ui_clear_widget_tree(handle: WidgetTreeHandle) {
     }
     crate::thunk_manager::ui_clear_callbacks();
 }
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_create_list(
+    handle: WidgetTreeHandle,
+    spacing: f32,
+    orientation: u32,
+) -> u64 {
+    if handle.is_null() {
+        return 0;
+    }
+    unsafe {
+        let arc = &*(handle as *const Arc<Mutex<WidgetTree>>);
+        let mut tree = arc.lock();
+        use crate::widgets::List;
+        use crate::widgets::list::ListOrientation;
+        let orient = if orientation == 0 {
+            ListOrientation::Horizontal
+        } else {
+            ListOrientation::Vertical
+        };
+        let list = List::new().with_spacing(spacing).with_orientation(orient);
+        let id = list.id();
+        let root_id = tree.root.unwrap_or(WidgetId::invalid());
+        tree.add_widget(Box::new(list), root_id);
+        id.id
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_create_list_in_parent(
+    handle: WidgetTreeHandle,
+    parent_id: u64,
+    spacing: f32,
+    orientation: u32,
+) -> u64 {
+    if handle.is_null() {
+        return 0;
+    }
+    unsafe {
+        let arc = &*(handle as *const Arc<Mutex<WidgetTree>>);
+        let mut tree = arc.lock();
+        use crate::widgets::List;
+        use crate::widgets::list::ListOrientation;
+        let orient = if orientation == 0 {
+            ListOrientation::Horizontal
+        } else {
+            ListOrientation::Vertical
+        };
+        let list = List::new().with_spacing(spacing).with_orientation(orient);
+        let id = list.id();
+        
+        let parent = if parent_id == 0 {
+            tree.root.unwrap_or(WidgetId::invalid())
+        } else {
+            WidgetId::from_raw(parent_id)
+        };
+        
+        tree.add_widget(Box::new(list), parent);
+        id.id
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_create_list_item(
+    handle: WidgetTreeHandle,
+    text: *const c_char,
+) -> u64 {
+    if handle.is_null() || text.is_null() {
+        return 0;
+    }
+    unsafe {
+        let arc = &*(handle as *const Arc<Mutex<WidgetTree>>);
+        let mut tree = arc.lock();
+        use crate::widgets::ListItem;
+        let text_str = CStr::from_ptr(text).to_string_lossy();
+        let item = ListItem::new(&text_str);
+        let id = item.id();
+        let root_id = tree.root.unwrap_or(WidgetId::invalid());
+        tree.add_widget(Box::new(item), root_id);
+        id.id
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_create_list_item_in_parent(
+    handle: WidgetTreeHandle,
+    parent_id: u64,
+    text: *const c_char,
+    show_border: u32,
+) -> u64 {
+    if handle.is_null() || text.is_null() {
+        return 0;
+    }
+    unsafe {
+        let arc = &*(handle as *const Arc<Mutex<WidgetTree>>);
+        let mut tree = arc.lock();
+        use crate::widgets::ListItem;
+        let text_str = CStr::from_ptr(text).to_string_lossy();
+        let mut item = ListItem::new(&text_str);
+        item.set_show_top_border(show_border != 0);
+        let id = item.id();
+        
+        let parent = if parent_id == 0 {
+            tree.root.unwrap_or(WidgetId::invalid())
+        } else {
+            WidgetId::from_raw(parent_id)
+        };
+        
+        tree.add_widget(Box::new(item), parent);
+        id.id
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_list_item_set_text(
+    handle: WidgetTreeHandle,
+    widget_id: u64,
+    text: *const c_char,
+) {
+    if handle.is_null() || text.is_null() {
+        return;
+    }
+    unsafe {
+        let arc = &*(handle as *const Arc<Mutex<WidgetTree>>);
+        let mut tree = arc.lock();
+        let id = WidgetId::from_raw(widget_id);
+        if let Some(widget) = tree.get_widget_mut(id) {
+            if widget.widget_type() == "ListItem" {
+                use crate::widgets::ListItem;
+                if let Some(list_item) = widget.as_any_mut().downcast_mut::<ListItem>() {
+                    let text_str = CStr::from_ptr(text).to_string_lossy();
+                    list_item.set_text(&text_str);
+                }
+            }
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_list_item_set_font_size(
+    handle: WidgetTreeHandle,
+    widget_id: u64,
+    font_size: f32,
+) {
+    if handle.is_null() {
+        return;
+    }
+    unsafe {
+        let arc = &*(handle as *const Arc<Mutex<WidgetTree>>);
+        let mut tree = arc.lock();
+        let id = WidgetId::from_raw(widget_id);
+        if let Some(widget) = tree.get_widget_mut(id) {
+            if widget.widget_type() == "ListItem" {
+                use crate::widgets::ListItem;
+                if let Some(list_item) = widget.as_any_mut().downcast_mut::<ListItem>() {
+                    list_item.set_font_size(font_size);
+                }
+            }
+        }
+    }
+}
