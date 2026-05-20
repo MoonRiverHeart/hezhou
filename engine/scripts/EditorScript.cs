@@ -165,9 +165,6 @@ private static float _cameraYaw = 0f;
             
             _cameraYaw += dx * 0.01f;
             _cameraPitch += dy * 0.01f;
-            
-            if (_cameraPitch > 1.5f) _cameraPitch = 1.5f;
-            if (_cameraPitch < -1.5f) _cameraPitch = -1.5f;
         }
 
         private static void OnKey(uint keycode, bool pressed, uint modifiers)

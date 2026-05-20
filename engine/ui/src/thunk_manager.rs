@@ -11,6 +11,7 @@ pub type ResizeCallback = extern "C" fn(f32, f32);
 pub type GlobalClickCallback = extern "C" fn(f32, f32);
 pub type KeyCallback = extern "C" fn(u32, bool, u32);  // keycode, pressed, modifiers
 pub type MouseMoveCallback = extern "C" fn(f32, f32, bool);  // x, y, dragging
+pub type DropdownSelectCallback = extern "C" fn(u64, usize);  // widget_id, selected_index
 
 static UI_CALLBACKS: LazyLock<Mutex<UICallbacks>> =
     LazyLock::new(|| Mutex::new(UICallbacks::new()));
@@ -32,6 +33,7 @@ pub struct UICallbacks {
     on_global_click: Option<GlobalClickCallback>,
     on_key: Option<KeyCallback>,
     on_mouse_move: Option<MouseMoveCallback>,
+    on_dropdown_select: HashMap<u64, DropdownSelectCallback>,
 }
 
 impl UICallbacks {
@@ -44,6 +46,7 @@ impl UICallbacks {
             on_global_click: None,
             on_key: None,
             on_mouse_move: None,
+            on_dropdown_select: HashMap::new(),
         }
     }
     
@@ -55,6 +58,7 @@ impl UICallbacks {
         self.on_global_click = None;
         self.on_key = None;
         self.on_mouse_move = None;
+        self.on_dropdown_select.clear();
     }
 }
 
@@ -221,4 +225,26 @@ pub fn ui_set_primary_button_id(id: u64) {
 pub fn ui_get_primary_button_id() -> u64 {
     let primary_id = PRIMARY_BUTTON_ID.lock();
     primary_id.unwrap_or(0)
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_register_dropdown_select_callback(widget_id: u64, callback: DropdownSelectCallback) {
+    let mut callbacks = UI_CALLBACKS.lock();
+    callbacks.on_dropdown_select.insert(widget_id, callback);
+    dfx_info!("UI", "注册DropdownSelect回调: widget={} callback={:?}", widget_id, callback);
+}
+
+pub fn trigger_dropdown_select_callback(widget_id: u64, index: usize) {
+    let callback = {
+        let callbacks = UI_CALLBACKS.lock();
+        callbacks.on_dropdown_select.get(&widget_id).copied()
+    };
+    if let Some(cb) = callback {
+        cb(widget_id, index);
+    }
+}
+
+pub fn has_dropdown_select_callback(widget_id: u64) -> bool {
+    let callbacks = UI_CALLBACKS.lock();
+    callbacks.on_dropdown_select.contains_key(&widget_id)
 }

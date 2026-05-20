@@ -15,6 +15,7 @@ namespace Hezhou
         private static MouseMoveCallbackDelegate _savedMouseMoveCallback;
         private static UpdateCallbackDelegate _savedUpdateCallback;
         private static Dictionary<ulong, WidgetCallbackDelegate> _onclickCallbacks = new Dictionary<ulong, WidgetCallbackDelegate>();
+        private static Dictionary<ulong, DropdownSelectCallbackDelegate> _dropdownCallbacks = new Dictionary<ulong, DropdownSelectCallbackDelegate>();
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public delegate ulong GetButtonIdDelegate();
@@ -146,6 +147,24 @@ namespace Hezhou
         public delegate void ListItemSetFontSizeDelegate(IntPtr handle, ulong widgetId, float fontSize);
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate ulong CreateDropdownDelegate(IntPtr handle, ulong parentId, float width, float height);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void DropdownSetOptionsDelegate(IntPtr handle, ulong widgetId, string options, ulong count);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void DropdownSetSelectedDelegate(IntPtr handle, ulong widgetId, ulong index);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate ulong DropdownGetSelectedDelegate(IntPtr handle, ulong widgetId);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void DropdownSetOnSelectThunkPtrDelegate(IntPtr handle, ulong widgetId, IntPtr callbackPtr);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void DropdownSelectCallbackDelegate(ulong widgetId, ulong index);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public delegate IntPtr SceneCreateDelegate();
         
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
@@ -257,6 +276,11 @@ namespace Hezhou
             public IntPtr ui_create_list_item_in_parent;
             public IntPtr ui_list_item_set_text;
             public IntPtr ui_list_item_set_font_size;
+            public IntPtr ui_create_dropdown;
+            public IntPtr ui_dropdown_set_options;
+            public IntPtr ui_dropdown_set_selected;
+            public IntPtr ui_dropdown_get_selected;
+            public IntPtr ui_dropdown_set_on_select_thunk_ptr;
             public IntPtr scene_create;
             public IntPtr scene_destroy;
             public IntPtr scene_create_cube;
@@ -717,6 +741,64 @@ public static ulong GetRootId()
             func(_widgetTree, widgetId, fontSize);
         }
 
+        public static ulong CreateDropdown(ulong parentId, float width, float height)
+        {
+            if (_ffi.ui_create_dropdown == IntPtr.Zero)
+            {
+                Log.Error("C#", "CreateDropdown函数指针为空");
+                return 0;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<CreateDropdownDelegate>(_ffi.ui_create_dropdown);
+            return func(_widgetTree, parentId, width, height);
+        }
+        
+        public static void DropdownSetOptions(ulong widgetId, string[] options)
+        {
+            if (_ffi.ui_dropdown_set_options == IntPtr.Zero)
+            {
+                Log.Error("C#", "DropdownSetOptions函数指针为空");
+                return;
+            }
+            string joined = string.Join("\0", options) + "\0";
+            var func = Marshal.GetDelegateForFunctionPointer<DropdownSetOptionsDelegate>(_ffi.ui_dropdown_set_options);
+            func(_widgetTree, widgetId, joined, (ulong)options.Length);
+        }
+        
+        public static void DropdownSetSelected(ulong widgetId, ulong index)
+        {
+            if (_ffi.ui_dropdown_set_selected == IntPtr.Zero)
+            {
+                Log.Error("C#", "DropdownSetSelected函数指针为空");
+                return;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<DropdownSetSelectedDelegate>(_ffi.ui_dropdown_set_selected);
+            func(_widgetTree, widgetId, index);
+        }
+        
+        public static ulong DropdownGetSelected(ulong widgetId)
+        {
+            if (_ffi.ui_dropdown_get_selected == IntPtr.Zero)
+            {
+                Log.Error("C#", "DropdownGetSelected函数指针为空");
+                return 0;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<DropdownGetSelectedDelegate>(_ffi.ui_dropdown_get_selected);
+            return func(_widgetTree, widgetId);
+        }
+        
+        public static void DropdownSetOnSelect(ulong widgetId, DropdownSelectCallbackDelegate callback)
+        {
+            if (_ffi.ui_dropdown_set_on_select_thunk_ptr == IntPtr.Zero)
+            {
+                Log.Error("C#", "DropdownSetOnSelectThunkPtr函数指针为空");
+                return;
+            }
+            _dropdownCallbacks[widgetId] = callback;
+            IntPtr callbackPtr = Marshal.GetFunctionPointerForDelegate(callback);
+            var func = Marshal.GetDelegateForFunctionPointer<DropdownSetOnSelectThunkPtrDelegate>(_ffi.ui_dropdown_set_on_select_thunk_ptr);
+            func(_widgetTree, widgetId, callbackPtr);
+        }
+
         public static IntPtr SceneCreate()
         {
             if (_ffi.scene_create == IntPtr.Zero)
@@ -1130,6 +1212,49 @@ public static ulong GetRootId()
         {
             get => _text;
             set { _text = value; UI.SetListItemText(Id, _text); }
+        }
+    }
+    
+    public class Dropdown
+    {
+        public ulong Id { get; private set; }
+        private string[] _options;
+        private UI.DropdownSelectCallbackDelegate _callback;
+        
+        public Dropdown(ulong parentId, float width, float height, string[] options = null)
+        {
+            Id = UI.CreateDropdown(parentId, width, height);
+            _options = options ?? new string[0];
+            if (_options.Length > 0)
+            {
+                UI.DropdownSetOptions(Id, _options);
+            }
+            Log.Info("C#", $"Dropdown created: id={Id}, options={_options.Length}");
+        }
+        
+        public string[] Options
+        {
+            get => _options;
+            set
+            {
+                _options = value;
+                UI.DropdownSetOptions(Id, _options);
+            }
+        }
+        
+        public ulong SelectedIndex
+        {
+            get => UI.DropdownGetSelected(Id);
+            set => UI.DropdownSetSelected(Id, value);
+        }
+        
+        public string SelectedValue => _options.Length > 0 && SelectedIndex < (ulong)_options.Length 
+            ? _options[SelectedIndex] : null;
+        
+        public void SetOnSelect(UI.DropdownSelectCallbackDelegate callback)
+        {
+            _callback = callback;
+            UI.DropdownSetOnSelect(Id, callback);
         }
     }
 

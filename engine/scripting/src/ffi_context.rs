@@ -55,6 +55,12 @@ pub type CreateListItemInParentFn = extern "C" fn(WidgetTreeHandle, u64, *const 
 pub type ListItemSetTextFn = extern "C" fn(WidgetTreeHandle, u64, *const c_char);
 pub type ListItemSetFontSizeFn = extern "C" fn(WidgetTreeHandle, u64, f32);
 
+pub type CreateDropdownFn = extern "C" fn(WidgetTreeHandle, u64, f32, f32) -> u64;
+pub type DropdownSetOptionsFn = extern "C" fn(WidgetTreeHandle, u64, *const c_char, usize);
+pub type DropdownSetSelectedFn = extern "C" fn(WidgetTreeHandle, u64, usize);
+pub type DropdownGetSelectedFn = extern "C" fn(WidgetTreeHandle, u64) -> usize;
+pub type DropdownSetOnSelectThunkPtrFn = extern "C" fn(WidgetTreeHandle, u64, *const c_void);
+
 pub type SceneCreateFn = extern "C" fn() -> *mut c_void;
 pub type SceneDestroyFn = extern "C" fn(*mut c_void);
 pub type SceneCreateCubeFn = extern "C" fn(*mut c_void) -> u64;
@@ -135,6 +141,11 @@ pub struct FfiContext {
     pub ui_create_list_item_in_parent: CreateListItemInParentFn,
     pub ui_list_item_set_text: ListItemSetTextFn,
     pub ui_list_item_set_font_size: ListItemSetFontSizeFn,
+    pub ui_create_dropdown: CreateDropdownFn,
+    pub ui_dropdown_set_options: DropdownSetOptionsFn,
+    pub ui_dropdown_set_selected: DropdownSetSelectedFn,
+    pub ui_dropdown_get_selected: DropdownGetSelectedFn,
+    pub ui_dropdown_set_on_select_thunk_ptr: DropdownSetOnSelectThunkPtrFn,
     pub scene_create: SceneCreateFn,
     pub scene_destroy: SceneDestroyFn,
     pub scene_create_cube: SceneCreateCubeFn,
