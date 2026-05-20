@@ -124,11 +124,13 @@ impl InputField {
     
     pub fn focus(&mut self) {
         self.is_focused = true;
+        crate::thunk_manager::ui_set_focused_input_field(self.id.id);
         self.flags.dirty_render = true;
     }
     
     pub fn blur(&mut self) {
         self.is_focused = false;
+        crate::thunk_manager::ui_clear_focused_input_field();
         self.flags.dirty_render = true;
     }
     
@@ -376,8 +378,12 @@ impl Widget for InputField {
             }
             
             EventType::KeyDown => {
-                if self.is_focused {
-                    if let EventData::Key(key_data) = &event.data {
+                let focused_id = crate::thunk_manager::ui_get_focused_input_field();
+                if focused_id != self.id.id {
+                    return EventResult::Ignored;
+                }
+                
+                if let EventData::Key(key_data) = &event.data {
                         let keycode = key_data.keycode;
                         let modifiers = key_data.modifiers;
                         let shift = (modifiers & 1) != 0;
@@ -458,7 +464,6 @@ impl Widget for InputField {
                         }
                     }
                 }
-            }
             
             _ => {}
         }

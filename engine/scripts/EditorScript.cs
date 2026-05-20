@@ -66,6 +66,25 @@ namespace Hezhou
         private static Panel _dropdownMenu;
         private static VStack _menuItems;
         
+        private static ulong _fileMenuId;
+        private static ulong _openMenuId;
+        private static ulong _saveMenuId;
+        
+        private static ulong _projectTreeViewId;
+        private static ulong _assetsNodeId;
+        private static ulong _scenesNodeId;
+        private static ulong _scriptsNodeId;
+        private static ulong _entitiesNodeId;
+        private static Dictionary<ulong, ulong> _entityNodeMap = new Dictionary<ulong, ulong>();
+        
+        private static ulong _assetGridViewId;
+        
+        private static UI.PopupMenuClickCallbackDelegate _fileMenuClickCallback;
+        private static UI.PopupMenuClickCallbackDelegate _openMenuClickCallback;
+        private static UI.PopupMenuClickCallbackDelegate _saveMenuClickCallback;
+        private static UI.TreeNodeSelectCallbackDelegate _treeNodeSelectCallback;
+        private static UI.GridViewClickCallbackDelegate _gridViewClickCallback;
+        
         private static Panel _scriptEditorPanel;
         private static ulong _scriptTextEditId;
         private static Label _scriptEditorLabel;
@@ -166,8 +185,14 @@ _addScriptClickCallback = OnAddScriptClick;
             _removeScriptClickCallback = OnRemoveScriptClick;
             _createEntityClickCallback = OnCreateEntityClick;
             _scriptDropdownSelectCallback = OnScriptDropdownSelect;
-            _hotReloadCompleteCallback = OnHotReloadComplete;
+_hotReloadCompleteCallback = OnHotReloadComplete;
             _tabSelectCallback = OnTabSelect;
+            
+            _fileMenuClickCallback = OnFileMenuClick;
+            _openMenuClickCallback = OnOpenMenuClick;
+            _saveMenuClickCallback = OnSaveMenuClick;
+            _treeNodeSelectCallback = OnTreeNodeSelect;
+            _gridViewClickCallback = OnGridViewClick;
             
             UI.RegisterUpdateCallback(_updateCallback);
             
@@ -333,14 +358,22 @@ _addScriptClickCallback = OnAddScriptClick;
             _toolbarButtons = new HStack(_toolbar.Id, 10f);
             _toolbarButtons.SetPosition(10f, 5f);
             
+            CreateToolbarMenus();
+            
             var newBtn = _toolbarButtons.AddButton(100f, 30f, "新建");
-            newBtn.SetOnClick(_newClickCallback);
+            newBtn.SetOnClick((id) => {
+                UI.PopupMenuShow(_fileMenuId, 10, 45);
+            });
             
             var openBtn = _toolbarButtons.AddButton(100f, 30f, "打开");
-            openBtn.SetOnClick(_openClickCallback);
+            openBtn.SetOnClick((id) => {
+                UI.PopupMenuShow(_openMenuId, 100, 45);
+            });
             
             var saveBtn = _toolbarButtons.AddButton(100f, 30f, "保存");
-            saveBtn.SetOnClick(_saveClickCallback);
+            saveBtn.SetOnClick((id) => {
+                UI.PopupMenuShow(_saveMenuId, 190, 45);
+            });
             
             var runBtn = _toolbarButtons.AddButton(100f, 30f, "运行");
             _runButtonId = runBtn.Id;  // 保存按钮ID
@@ -354,25 +387,13 @@ _addScriptClickCallback = OnAddScriptClick;
 
             _projectPanel = new Panel(rootId, 0, mainY, LEFT_PANEL_WIDTH, mainHeight, 0.2f, 0.2f, 0.2f, 1.0f);
             UI.CreateLabel(_projectPanel.Id, 10f, 10f, LEFT_PANEL_WIDTH - 20f, 25f, "项目结构");
-            _projectTree = new VStack(_projectPanel.Id, 5f);
-            _projectTree.SetPosition(10f, 40f);
-            _projectTree.AddLabel(LEFT_PANEL_WIDTH - 40f, 20f, "├─ Assets");
-            _projectTree.AddLabel(LEFT_PANEL_WIDTH - 40f, 20f, "├─ Scenes");
-            _projectTree.AddLabel(LEFT_PANEL_WIDTH - 40f, 20f, "└─ Scripts");
-            Log.Info("Editor", "项目结构面板创建完成");
+            CreateProjectStructureTree();
+            Log.Info("Editor", "项目结构面板创建完成 (TreeView)");
 
             _assetPanel = new Panel(rootId, 0, bottomY, LEFT_PANEL_WIDTH, BOTTOM_PANEL_HEIGHT, 0.2f, 0.2f, 0.2f, 1.0f);
             UI.CreateLabel(_assetPanel.Id, 10f, 10f, LEFT_PANEL_WIDTH - 20f, 25f, "资产管理");
-            _assetList = new VStack(_assetPanel.Id, 5f);
-            _assetList.SetPosition(10f, 40f);
-            _assetList.AddLabel(LEFT_PANEL_WIDTH - 40f, 20f, "Textures: 0");
-            _assetList.AddLabel(LEFT_PANEL_WIDTH - 40f, 20f, "Models: 0");
-            _assetList.AddLabel(LEFT_PANEL_WIDTH - 40f, 20f, $"Scripts: {_availableScripts.Count}");
-            
-            _createEntityBtnId = _assetList.AddButton(LEFT_PANEL_WIDTH - 40f, 25f, "创建Entity");
-            UI.SetOnClick(_createEntityBtnId, _createEntityClickCallback);
-            
-            Log.Info("Editor", "资产管理面板创建完成");
+            CreateAssetGridView();
+            Log.Info("Editor", "资产管理面板创建完成 (GridView)");
 
             _previewPanel = new Panel(rootId, previewX, mainY, previewWidth, mainHeight + BOTTOM_PANEL_HEIGHT, 0.08f, 0.08f, 0.08f, 0.3f);
             UI.CreateLabel(_previewPanel.Id, 10f, 10f, previewWidth - 20f, 25f, "游戏预览");
@@ -649,15 +670,11 @@ _addScriptClickCallback = OnAddScriptClick;
         private static void OnNewClick(ulong widgetId)
         {
             Log.Info("Editor", $"点击\"新建\"按钮, id={widgetId}");
-            ShowDropdownMenu(10, 45, 
-                new string[] { "新建场景", "新建脚本", "新建材质", "新建文件夹" },
-                new UI.WidgetCallbackDelegate[] { null, _newScriptClickCallback, null, null });
         }
         
         private static void OnNewScriptClick(ulong widgetId)
         {
             Log.Info("Editor", "创建新脚本...");
-            HideDropdownMenu();
             ShowScriptEditor();
         }
         
@@ -768,19 +785,16 @@ _addScriptClickCallback = OnAddScriptClick;
         private static void OnOpenClick(ulong widgetId)
         {
             Log.Info("Editor", $"点击\"打开\"按钮, id={widgetId}");
-            ShowDropdownMenu(100, 45, new string[] { "打开场景", "打开项目", "打开资源" });
         }
         
         private static void OnSaveClick(ulong widgetId)
         {
             Log.Info("Editor", $"点击\"保存\"按钮, id={widgetId}");
-            ShowDropdownMenu(190, 45, new string[] { "保存场景", "保存全部", "另存为..." });
         }
         
         private static void OnRunClick(ulong widgetId)
         {
             Log.Info("Editor", $"点击\"运行\"按钮, id={widgetId}");
-            HideDropdownMenu();
             
             if (_gameScene == null)
             {
@@ -812,9 +826,7 @@ _addScriptClickCallback = OnAddScriptClick;
         private static void OnGlobalClick(float x, float y)
         {
             Log.Info("Editor", $"GlobalClick at ({x}, {y})");
-            HideDropdownMenu();
             
-            // Editing模式下PreviewWindow点击拾取Entity
             if (_previewWindowId != 0 && UI.IsPreviewWindowSelected(_previewWindowId))
             {
                 GameState currentState = _gameScene != null ? _gameScene.GetGameState() : GameState.Editing;
@@ -980,6 +992,7 @@ _addScriptClickCallback = OnAddScriptClick;
         {
             if (_selectedEntityId == 0 || _gameScene == null) return;
             UI.SceneSetEntityName(_gameScene.ScenePtr, _selectedEntityId, text);
+            UpdateEntityNameInTree(_selectedEntityId, text);
             _propertiesDirty = true;
             Log.Info("Editor", $"Entity name changed to: {text}");
         }
@@ -1084,56 +1097,14 @@ _addScriptClickCallback = OnAddScriptClick;
             }
         }
         
-private static void ShowDropdownMenu(float x, float y, string[] items, UI.WidgetCallbackDelegate[] callbacks)
-        {
-            HideDropdownMenu();
-            
-            ulong rootId = UI.GetRootId();
-            _dropdownMenu = new Panel(rootId, x, y, 160, items.Length * 35 + 10, 0.25f, 0.25f, 0.25f, 0.95f);
-            UI.SetWidgetLayer(_dropdownMenu.Id, 2);
-            _menuItems = new VStack(_dropdownMenu.Id, 5f);
-            _menuItems.SetPosition(10, 10);
-            
-            for (int i = 0; i < items.Length; i++)
-            {
-                ulong btnId = _menuItems.AddButton(140, 30f, items[i]);
-                Log.Info("Editor", $"菜单项{i}: '{items[i]}', btnId={btnId}");
-                if (i < callbacks.Length && callbacks[i] != null)
-                {
-                    Log.Info("Editor", $"注册回调: btnId={btnId}");
-                    UI.SetOnClick(btnId, callbacks[i]);
-                }
-            }
-            
-            Log.Info("Editor", $"显示下拉菜单: {items.Length}项");
-        }
-        
-        private static void ShowDropdownMenu(float x, float y, string[] items)
-        {
-            ShowDropdownMenu(x, y, items, new UI.WidgetCallbackDelegate[items.Length]);
-        }
-        
-        private static void HideDropdownMenu()
-        {
-            if (_dropdownMenu != null)
-            {
-                UI.RemoveWidget(_dropdownMenu.Id);
-                _dropdownMenu = null;
-                _menuItems = null;
-                Log.Info("Editor", "隐藏下拉菜单");
-            }
-        }
-        
-        private static bool _isTransitioning = false;  // 防止快速点击
+        private static bool _isTransitioning = false;
         
         private static void OnToggleEditorClick(ulong widgetId)
         {
-            if (_isTransitioning) return;  // 正在切换中，忽略点击
+            if (_isTransitioning) return;
             
             Log.Info("Editor", $"点击\"编辑器\"切换按钮, id={widgetId}");
             _isTransitioning = true;
-            
-            HideDropdownMenu();
             
             try
             {
@@ -1184,32 +1155,14 @@ private static void ShowDropdownMenu(float x, float y, string[] items, UI.Widget
             float previewWidth = _screenWidth - LEFT_PANEL_WIDTH - RIGHT_PANEL_WIDTH;
             float previewX = LEFT_PANEL_WIDTH;
             
-            // 恢复projectTree内容（包含Entity节点）
             if (_projectPanel != null)
             {
-                if (_projectTree != null)
+                if (_projectTreeViewId != 0)
                 {
-                    UI.RemoveWidget(_projectTree.Id);
+                    UI.RemoveWidget(_projectTreeViewId);
                 }
-                
-                _projectTree = new VStack(_projectPanel.Id, 5f);
-                _projectTree.SetPosition(10f, 40f);
-                _projectTree.AddLabel(LEFT_PANEL_WIDTH - 40f, 20f, "├─ Assets");
-                _projectTree.AddLabel(LEFT_PANEL_WIDTH - 40f, 20f, "├─ Scenes");
-                _projectTree.AddLabel(LEFT_PANEL_WIDTH - 40f, 20f, "└─ Scripts");
-                
-                // 添加Entity节点
-                _projectTree.AddLabel(LEFT_PANEL_WIDTH - 40f, 20f, "Entities:");
-                if (_gameScene != null)
-                {
-                    int entityCount = _gameScene.GetEntityCount();
-                    for (int i = 0; i < entityCount; i++)
-                    {
-                        ulong entityId = _gameScene.GetEntityId(i);
-                        string name = UI.SceneGetEntityName(_gameScene.ScenePtr, entityId);
-                        _projectTree.AddLabel(LEFT_PANEL_WIDTH - 40f, 20f, $"  - {name} ({entityId})");
-                    }
-                }
+                _entityNodeMap.Clear();
+                CreateProjectStructureTree();
             }
             
             // 重新创建previewPanel和PreviewWindow
@@ -1232,20 +1185,12 @@ private static void ShowDropdownMenu(float x, float y, string[] items, UI.Widget
                 UI.SetGamePreviewExtent((uint)previewWindowWidth, (uint)previewWindowHeight);
             }
             
-            // 重新创建完整的assetPanel（包含"创建Entity"按钮）
             if (_assetPanel == null)
             {
                 _assetPanel = new Panel(rootId, 0, bottomY, LEFT_PANEL_WIDTH, BOTTOM_PANEL_HEIGHT, 0.2f, 0.2f, 0.2f, 1.0f);
                 UI.CreateLabel(_assetPanel.Id, 10f, 10f, LEFT_PANEL_WIDTH - 20f, 25f, "资产管理");
-                _assetList = new VStack(_assetPanel.Id, 5f);
-                _assetList.SetPosition(10f, 40f);
-                _assetList.AddLabel(LEFT_PANEL_WIDTH - 40f, 20f, "Textures: 0");
-                _assetList.AddLabel(LEFT_PANEL_WIDTH - 40f, 20f, "Models: 0");
-                _assetList.AddLabel(LEFT_PANEL_WIDTH - 40f, 20f, $"Scripts: {_availableScripts.Count}");
-                
-                _createEntityBtnId = _assetList.AddButton(LEFT_PANEL_WIDTH - 40f, 25f, "创建Entity");
-                UI.SetOnClick(_createEntityBtnId, _createEntityClickCallback);
-                Log.Info("Editor", $"assetPanel重建完成，createEntityBtnId={_createEntityBtnId}");
+                CreateAssetGridView();
+                Log.Info("Editor", "assetPanel重建完成 (GridView)");
             }
             
             // 重新创建完整的propertiesPanel（包含TabWidget和InputField）
@@ -1359,18 +1304,11 @@ private static void ShowDropdownMenu(float x, float y, string[] items, UI.Widget
                 _propertiesPanel = null;
             }
             
-            // 清空projectPanel中的脚本项，保留基础结构
-            if (_projectPanel != null && _projectTree != null)
+            if (_projectPanel != null && _projectTreeViewId != 0)
             {
-                // 先移除旧的projectTree
-                UI.RemoveWidget(_projectTree.Id);
-                
-                // 重新创建projectTree以清空内容
-                _projectTree = new VStack(_projectPanel.Id, 5f);
-                _projectTree.SetPosition(10f, 40f);
-                _projectTree.AddLabel(LEFT_PANEL_WIDTH - 40f, 20f, "├─ Assets");
-                _projectTree.AddLabel(LEFT_PANEL_WIDTH - 40f, 20f, "├─ Scenes");
-                _projectTree.AddLabel(LEFT_PANEL_WIDTH - 40f, 20f, "└─ Scripts");
+                UI.RemoveWidget(_projectTreeViewId);
+                _projectTreeViewId = 0;
+                _entityNodeMap.Clear();
             }
             
             if (_toggleEditorBtn != null)
@@ -1595,8 +1533,9 @@ private static void ShowDropdownMenu(float x, float y, string[] items, UI.Widget
                 Log.Info("Editor", $"创建新Entity: id={entityId}");
                 _statusItem.Text = $"创建Entity: {entityId}";
                 
-                _gameScene.SelectEntity(entityId);
-                UpdatePropertiesPanel(entityId);
+                string name = UI.SceneGetEntityName(_gameScene.ScenePtr, entityId);
+                AddEntityToTree(entityId, name);
+                SelectEntity(entityId);
             }
             else
             {
@@ -1688,6 +1627,183 @@ private static void ShowDropdownMenu(float x, float y, string[] items, UI.Widget
             Log.Info("Editor", $"TabWidget选择: widgetId={widgetId}, index={index}");
             string tabName = index == 0 ? "Transform" : "Scripts";
             _statusItem.Text = $"属性页: {tabName}";
+        }
+        
+        private static void CreateToolbarMenus()
+        {
+            _fileMenuId = UI.CreatePopupMenu(0);
+            UI.PopupMenuAddItem(_fileMenuId, "新建场景", "Ctrl+N", 1);
+            UI.PopupMenuAddItem(_fileMenuId, "新建脚本", "", 2);
+            UI.PopupMenuAddSeparator(_fileMenuId);
+            UI.PopupMenuAddItem(_fileMenuId, "退出", "", 3);
+            UI.PopupMenuSetOnClick(_fileMenuId, _fileMenuClickCallback);
+            UI.SetWidgetLayer(_fileMenuId, 2);
+            
+            _openMenuId = UI.CreatePopupMenu(0);
+            UI.PopupMenuAddItem(_openMenuId, "打开场景", "", 1);
+            UI.PopupMenuAddItem(_openMenuId, "打开项目", "", 2);
+            UI.PopupMenuAddItem(_openMenuId, "打开资源", "", 3);
+            UI.PopupMenuSetOnClick(_openMenuId, _openMenuClickCallback);
+            UI.SetWidgetLayer(_openMenuId, 2);
+            
+            _saveMenuId = UI.CreatePopupMenu(0);
+            UI.PopupMenuAddItem(_saveMenuId, "保存场景", "Ctrl+S", 1);
+            UI.PopupMenuAddItem(_saveMenuId, "保存全部", "", 2);
+            UI.PopupMenuAddItem(_saveMenuId, "另存为...", "", 3);
+            UI.PopupMenuSetOnClick(_saveMenuId, _saveMenuClickCallback);
+            UI.SetWidgetLayer(_saveMenuId, 2);
+            
+            Log.Info("Editor", "工具栏菜单创建完成 (PopupMenu)");
+        }
+        
+        private static void OnFileMenuClick(ulong widgetId, int actionId)
+        {
+            UI.PopupMenuHide(_fileMenuId);
+            if (actionId == 1) OnNewClick(0);
+            else if (actionId == 2) OnNewScriptClick(0);
+            else if (actionId == 3) { }
+            Log.Info("Editor", $"文件菜单点击: actionId={actionId}");
+        }
+        
+        private static void OnOpenMenuClick(ulong widgetId, int actionId)
+        {
+            UI.PopupMenuHide(_openMenuId);
+            if (actionId == 1) { }
+            else if (actionId == 2) OnOpenClick(0);
+            else if (actionId == 3) { }
+            Log.Info("Editor", $"打开菜单点击: actionId={actionId}");
+        }
+        
+        private static void OnSaveMenuClick(ulong widgetId, int actionId)
+        {
+            UI.PopupMenuHide(_saveMenuId);
+            if (actionId == 1) OnSaveClick(0);
+            else if (actionId == 2) { }
+            else if (actionId == 3) { }
+            Log.Info("Editor", $"保存菜单点击: actionId={actionId}");
+        }
+        
+        private static void CreateProjectStructureTree()
+        {
+            float mainHeight = _screenHeight - TOOLBAR_HEIGHT - STATUS_BAR_HEIGHT - BOTTOM_PANEL_HEIGHT;
+            _projectTreeViewId = UI.CreateTreeView(_projectPanel.Id, 10, 40, LEFT_PANEL_WIDTH - 20, mainHeight - 50);
+            
+            _assetsNodeId = UI.TreeViewAddNode(_projectTreeViewId, 0, "Assets", 0, true);
+            _scenesNodeId = UI.TreeViewAddNode(_projectTreeViewId, 0, "Scenes", 0, true);
+            _scriptsNodeId = UI.TreeViewAddNode(_projectTreeViewId, 0, "Scripts", 0, true);
+            _entitiesNodeId = UI.TreeViewAddNode(_projectTreeViewId, 0, "Entities", 0, true);
+            
+            foreach (var script in _availableScripts)
+            {
+                UI.TreeViewAddNode(_projectTreeViewId, _scriptsNodeId, script, 0, false);
+            }
+            
+            if (_gameScene != null)
+            {
+                int entityCount = _gameScene.GetEntityCount();
+                for (int i = 0; i < entityCount; i++)
+                {
+                    ulong entityId = _gameScene.GetEntityId(i);
+                    string name = UI.SceneGetEntityName(_gameScene.ScenePtr, entityId);
+                    ulong nodeId = UI.TreeViewAddNode(_projectTreeViewId, _entitiesNodeId, name, entityId, false);
+                    _entityNodeMap[entityId] = nodeId;
+                }
+            }
+            
+            UI.TreeViewSetOnSelect(_projectTreeViewId, _treeNodeSelectCallback);
+            UI.TreeViewExpandNode(_projectTreeViewId, _assetsNodeId);
+            UI.TreeViewExpandNode(_projectTreeViewId, _scenesNodeId);
+            UI.TreeViewExpandNode(_projectTreeViewId, _scriptsNodeId);
+            UI.TreeViewExpandNode(_projectTreeViewId, _entitiesNodeId);
+            
+            Log.Info("Editor", $"项目结构树创建完成: entities={_entityNodeMap.Count}");
+        }
+        
+        private static void OnTreeNodeSelect(ulong widgetId, ulong userData)
+        {
+            if (userData != 0)
+            {
+                SelectEntity(userData);
+                Log.Info("Editor", $"TreeView选中Entity: entityId={userData}");
+            }
+        }
+        
+        private static void AddEntityToTree(ulong entityId, string name)
+        {
+            if (_projectTreeViewId != 0 && _entitiesNodeId != 0)
+            {
+                ulong nodeId = UI.TreeViewAddNode(_projectTreeViewId, _entitiesNodeId, name, entityId, false);
+                _entityNodeMap[entityId] = nodeId;
+                Log.Info("Editor", $"添加Entity到树: entityId={entityId}, name={name}");
+            }
+        }
+        
+        private static void UpdateEntityNameInTree(ulong entityId, string newName)
+        {
+            if (_entityNodeMap.TryGetValue(entityId, out var nodeId))
+            {
+                UI.TreeNodeSetText(nodeId, newName);
+                Log.Info("Editor", $"更新Entity名称: entityId={entityId}, name={newName}");
+            }
+        }
+        
+        private static void RemoveEntityFromTree(ulong entityId)
+        {
+            if (_entityNodeMap.TryGetValue(entityId, out var nodeId))
+            {
+                UI.TreeViewRemoveNode(_projectTreeViewId, nodeId);
+                _entityNodeMap.Remove(entityId);
+                Log.Info("Editor", $"从树移除Entity: entityId={entityId}");
+            }
+        }
+        
+        private static void CreateAssetGridView()
+        {
+            _assetGridViewId = UI.CreateGridView(_assetPanel.Id, 10, 40, LEFT_PANEL_WIDTH - 20, BOTTOM_PANEL_HEIGHT - 50, 64);
+            RefreshAssetGridView();
+            UI.GridViewSetOnClick(_assetGridViewId, _gridViewClickCallback);
+            Log.Info("Editor", "资产GridView创建完成");
+        }
+        
+        private static void RefreshAssetGridView()
+        {
+            UI.GridViewClear(_assetGridViewId);
+            
+            UI.GridViewAddItem(_assetGridViewId, "Cube", 1);
+            UI.GridViewAddItem(_assetGridViewId, "Sphere", 2);
+            UI.GridViewAddItem(_assetGridViewId, "Plane", 3);
+            UI.GridViewAddItem(_assetGridViewId, "Cylinder", 4);
+            
+            Log.Info("Editor", $"资产GridView刷新完成: {UI.GridViewItemCount(_assetGridViewId)}项");
+        }
+        
+        private static void OnGridViewClick(ulong widgetId, int index, ulong userData)
+        {
+            if (_gameScene != null && userData != 0)
+            {
+                ulong entityId = _gameScene.CreateEntity();
+                if (entityId != 0)
+                {
+                    string name = $"Asset_{userData}";
+                    UI.SceneSetEntityName(_gameScene.ScenePtr, entityId, name);
+                    AddEntityToTree(entityId, name);
+                    SelectEntity(entityId);
+                    _statusItem.Text = $"从资产库创建Entity: {entityId}";
+                    Log.Info("Editor", $"从资产GridView创建Entity: index={index}, userData={userData}, entityId={entityId}");
+                }
+            }
+        }
+        
+        private static void SelectEntity(ulong entityId)
+        {
+            if (_gameScene == null) return;
+            _gameScene.SelectEntity(entityId);
+            _selectedEntityId = entityId;
+            UpdatePropertiesPanel(entityId);
+            if (_entityNodeMap.TryGetValue(entityId, out var nodeId))
+            {
+                UI.TreeViewSetSelected(_projectTreeViewId, nodeId);
+            }
         }
     }
 }

@@ -36,6 +36,9 @@ static SCREEN_SIZE: LazyLock<Mutex<(f32, f32)>> =
 static CONTENT_SCALE: LazyLock<Mutex<f32>> =
     LazyLock::new(|| Mutex::new(1.0));
 
+static FOCUSED_INPUT_FIELD: LazyLock<Mutex<Option<u64>>> =
+    LazyLock::new(|| Mutex::new(None));
+
 pub struct UICallbacks {
     update: Option<UpdateCallback>,
     onclicks: HashMap<u64, WidgetCallback>,
@@ -531,4 +534,29 @@ pub fn has_file_browser_select_callback(widget_id: u64) -> bool {
 pub fn has_file_browser_double_click_callback(widget_id: u64) -> bool {
     let callbacks = UI_CALLBACKS.lock();
     callbacks.on_file_browser_double_click.contains_key(&widget_id)
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_set_focused_input_field(widget_id: u64) {
+    let mut focused = FOCUSED_INPUT_FIELD.lock();
+    *focused = Some(widget_id);
+    dfx_info!("UI", "设置focus InputField: {}", widget_id);
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_clear_focused_input_field() {
+    let mut focused = FOCUSED_INPUT_FIELD.lock();
+    *focused = None;
+    dfx_info!("UI", "清除focus InputField");
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_get_focused_input_field() -> u64 {
+    let focused = FOCUSED_INPUT_FIELD.lock();
+    focused.unwrap_or(0)
+}
+
+pub fn is_input_field_focused(widget_id: u64) -> bool {
+    let focused = FOCUSED_INPUT_FIELD.lock();
+    *focused == Some(widget_id)
 }

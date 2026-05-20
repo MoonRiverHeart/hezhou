@@ -45,6 +45,7 @@ pub extern "C" fn scene_get_script_binding_count_stub(_scene: *mut std::ffi::c_v
 pub extern "C" fn scene_get_script_binding_info_stub(_scene: *mut std::ffi::c_void, _id: u64, _index: usize, _path: *mut i8, _path_size: usize, _class: *mut i8, _class_size: usize, _enabled: *mut bool) -> bool { false }
 pub extern "C" fn scene_set_script_binding_enabled_stub(_scene: *mut std::ffi::c_void, _id: u64, _index: usize, _enabled: bool) {}
 pub extern "C" fn scene_create_entity_stub(_scene: *mut std::ffi::c_void) -> u64 { 0 }
+pub extern "C" fn scene_remove_entity_stub(_scene: *mut std::ffi::c_void, _entity_id: u64) { }
 pub extern "C" fn scene_get_entity_count_stub(_scene: *mut std::ffi::c_void) -> u64 { 0 }
 pub extern "C" fn scene_get_entity_id_stub(_scene: *mut std::ffi::c_void, _index: u64) -> u64 { 0 }
 pub extern "C" fn set_status_text_stub(_text: *const i8) {}
@@ -236,6 +237,7 @@ fn main() {
         scene_create_entity: scene_create_entity_stub,
         scene_get_entity_count: scene_get_entity_count_stub,
         scene_get_entity_id: scene_get_entity_id_stub,
+        scene_remove_entity: scene_remove_entity_stub,
         widget_tree_ptr: widget_tree_handle,
         dfx_handle: std::ptr::null_mut(),
         dfx_log: unsafe { std::mem::transmute(hezhou_dfx::dfx_log as *const std::ffi::c_void) },
