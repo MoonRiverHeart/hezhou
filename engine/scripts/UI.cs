@@ -1153,6 +1153,11 @@ public static void RegisterResizeCallback(ResizeCallbackDelegate callback)
             UI.SceneSelectEntity(_scenePtr, entityId);
         }
 
+        public void ClearSelection()
+        {
+            // TODO: 添加FFI函数 scene_clear_selection
+        }
+
         public void Update(float deltaTime)
         {
             UI.SceneUpdate(_scenePtr, deltaTime);

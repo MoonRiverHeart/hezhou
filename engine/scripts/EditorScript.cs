@@ -575,6 +575,78 @@ private static float _cameraYaw = 0f;
         {
             Log.Info("Editor", $"GlobalClick at ({x}, {y})");
             HideDropdownMenu();
+            
+            // 检查是否点击了PreviewWindow
+            if (_previewWindowId != 0 && UI.IsPreviewWindowSelected(_previewWindowId))
+            {
+                Log.Info("Editor", "PreviewWindow clicked - attempting entity pick");
+                
+                if (_gameScene != null)
+                {
+                    // 将屏幕坐标转换为世界空间射线
+                    // PreviewWindow在屏幕中的位置和尺寸
+                    float previewX = LEFT_PANEL_WIDTH + 10f * _contentScale;
+                    float previewY = TOOLBAR_HEIGHT + 40f * _contentScale;
+                    float previewWidth = _screenWidth - LEFT_PANEL_WIDTH - RIGHT_PANEL_WIDTH - 20f * _contentScale;
+                    float previewHeight = _screenHeight - TOOLBAR_HEIGHT - STATUS_BAR_HEIGHT - BOTTOM_PANEL_HEIGHT - 50f * _contentScale;
+                    
+                    // 计算点击在PreviewWindow内的相对位置（0-1）
+                    float relX = (x - previewX) / previewWidth;
+                    float relY = (y - previewY) / previewHeight;
+                    
+                    Log.Info("Editor", $"PreviewWindow relative click: ({relX}, {relY})");
+                    
+                    // 转换为NDC坐标 (-1 to 1)
+                    float ndcX = (relX - 0.5f) * 2.0f;
+                    float ndcY = (0.5f - relY) * 2.0f;  // Y轴翻转
+                    
+                    // 计算射线方向（简化的视角：相机在(0, 0, 3)看向(0, 0, 0)）
+                    // TODO: 使用正确的相机参数计算射线
+                    float aspect = previewWidth / previewHeight;
+                    float fov = 60.0f;  // 视场角60度
+                    float tanFov = (float)Math.Tan(fov * 0.5f * Math.PI / 180.0f);
+                    
+                    float dirX = ndcX * tanFov * aspect;
+                    float dirY = ndcY * tanFov;
+                    float dirZ = -1.0f;  // 相机看向-Z方向
+                    
+                    // 射线起点（相机位置）
+                    float originX = _cameraX;
+                    float originY = _cameraY;
+                    float originZ = _cameraZ;
+                    
+                    Log.Info("Editor", $"Ray: origin=({originX}, {originY}, {originZ}), dir=({dirX}, {dirY}, {dirZ})");
+                    
+                    // 调用Scene.pick_entity
+                    ulong hitEntity = _gameScene.PickEntity(originX, originY, originZ, dirX, dirY, dirZ);
+                    
+                    if (hitEntity != 0)
+                    {
+                        Log.Info("Editor", $"Entity picked: id={hitEntity}");
+                        _gameScene.SelectEntity(hitEntity);
+                        _statusItem.Text = $"选中Entity: {hitEntity}";
+                        
+                        // 更新属性面板显示Entity信息
+                        UpdatePropertiesPanel(hitEntity);
+                    }
+                    else
+                    {
+                        Log.Info("Editor", "No entity hit");
+                        _gameScene.ClearSelection();
+                        _statusItem.Text = "状态: 就绪";
+                    }
+                }
+            }
+        }
+        
+        private static void UpdatePropertiesPanel(ulong entityId)
+        {
+            if (_propsList == null) return;
+            
+            // 清空属性面板
+            // TODO: 实现动态更新属性面板内容
+            
+            Log.Info("Editor", $"Properties panel updated for entity {entityId}");
         }
         
 private static void ShowDropdownMenu(float x, float y, string[] items, UI.WidgetCallbackDelegate[] callbacks)
