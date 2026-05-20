@@ -574,6 +574,12 @@ ui_list_item_set_text: unsafe { std::mem::transmute(ui_ffi::ui_list_item_set_tex
 fn compile_editor_script() {
     use std::process::Command;
     
+    // Check if mcs.bat exists (standalone release mode)
+    if !std::path::Path::new("C:\\Program Files\\Mono\\bin\\mcs.bat").exists() {
+        dfx_info!("Demo", "mcs.bat not found - standalone release mode, skipping compilation");
+        return;
+    }
+    
     let result = Command::new("C:\\Program Files\\Mono\\bin\\mcs.bat")
         .args([
             "-target:library",
