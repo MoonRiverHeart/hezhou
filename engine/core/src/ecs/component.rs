@@ -15,8 +15,8 @@ pub trait Component: Sized {
 #[macro_export]
 macro_rules! define_component {
     ($name:ident, $type_id:expr) => {
-        impl Component for $name {
-            fn type_id() -> ComponentTypeId {
+        impl $crate::ecs::Component for $name {
+            fn type_id() -> $crate::ecs::ComponentTypeId {
                 $type_id
             }
             fn type_name() -> &'static str {

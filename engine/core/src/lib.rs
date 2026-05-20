@@ -3,11 +3,13 @@ pub mod event;
 pub mod ffi;
 pub mod math;
 pub mod time_loop;
+pub mod scene_ffi;
 
 pub use ecs::*;
 pub use event::*;
 pub use math::*;
 pub use time_loop::*;
+pub use scene_ffi::*;
 
 pub struct Engine {
     pub world: World,

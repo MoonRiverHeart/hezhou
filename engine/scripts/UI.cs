@@ -131,6 +131,33 @@ namespace Hezhou
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public delegate void ListItemSetFontSizeDelegate(IntPtr handle, ulong widgetId, float fontSize);
 
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate IntPtr SceneCreateDelegate();
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void SceneDestroyDelegate(IntPtr scene);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate ulong SceneCreateCubeDelegate(IntPtr scene);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void SceneAttachScriptDelegate(IntPtr scene, ulong entityId, string scriptPath, string className);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void SceneSetGameStateDelegate(IntPtr scene, int state);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate int SceneGetGameStateDelegate(IntPtr scene);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate ulong ScenePickEntityDelegate(IntPtr scene, float ox, float oy, float oz, float dx, float dy, float dz);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void SceneSelectEntityDelegate(IntPtr scene, ulong entityId);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void SceneUpdateDelegate(IntPtr scene, float deltaTime);
+
         [StructLayout(LayoutKind.Sequential)]
         public struct FfiContext
         {
@@ -182,6 +209,15 @@ namespace Hezhou
             public IntPtr ui_create_list_item_in_parent;
             public IntPtr ui_list_item_set_text;
             public IntPtr ui_list_item_set_font_size;
+            public IntPtr scene_create;
+            public IntPtr scene_destroy;
+            public IntPtr scene_create_cube;
+            public IntPtr scene_attach_script;
+            public IntPtr scene_set_game_state;
+            public IntPtr scene_get_game_state;
+            public IntPtr scene_pick_entity;
+            public IntPtr scene_select_entity;
+            public IntPtr scene_update;
             public IntPtr widget_tree_ptr;
             public IntPtr dfx_handle;
         }
@@ -613,7 +649,106 @@ public static void RegisterResizeCallback(ResizeCallbackDelegate callback)
             var func = Marshal.GetDelegateForFunctionPointer<ListItemSetFontSizeDelegate>(_ffi.ui_list_item_set_font_size);
             func(_widgetTree, widgetId, fontSize);
         }
-        
+
+        public static IntPtr SceneCreate()
+        {
+            if (_ffi.scene_create == IntPtr.Zero)
+            {
+                Log.Error("C#", "SceneCreate函数指针为空");
+                return IntPtr.Zero;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<SceneCreateDelegate>(_ffi.scene_create);
+            return func();
+        }
+
+        public static void SceneDestroy(IntPtr scene)
+        {
+            if (_ffi.scene_destroy == IntPtr.Zero)
+            {
+                Log.Error("C#", "SceneDestroy函数指针为空");
+                return;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<SceneDestroyDelegate>(_ffi.scene_destroy);
+            func(scene);
+        }
+
+        public static ulong SceneCreateCube(IntPtr scene)
+        {
+            if (_ffi.scene_create_cube == IntPtr.Zero)
+            {
+                Log.Error("C#", "SceneCreateCube函数指针为空");
+                return 0;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<SceneCreateCubeDelegate>(_ffi.scene_create_cube);
+            return func(scene);
+        }
+
+        public static void SceneAttachScript(IntPtr scene, ulong entityId, string scriptPath, string className)
+        {
+            if (_ffi.scene_attach_script == IntPtr.Zero)
+            {
+                Log.Error("C#", "SceneAttachScript函数指针为空");
+                return;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<SceneAttachScriptDelegate>(_ffi.scene_attach_script);
+            func(scene, entityId, scriptPath, className);
+        }
+
+        public static void SceneSetGameState(IntPtr scene, int state)
+        {
+            if (_ffi.scene_set_game_state == IntPtr.Zero)
+            {
+                Log.Error("C#", "SceneSetGameState函数指针为空");
+                return;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<SceneSetGameStateDelegate>(_ffi.scene_set_game_state);
+            func(scene, state);
+        }
+
+        public static int SceneGetGameState(IntPtr scene)
+        {
+            if (_ffi.scene_get_game_state == IntPtr.Zero)
+            {
+                Log.Error("C#", "SceneGetGameState函数指针为空");
+                return 0;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<SceneGetGameStateDelegate>(_ffi.scene_get_game_state);
+            return func(scene);
+        }
+
+        public static ulong ScenePickEntity(IntPtr scene, float ox, float oy, float oz, float dx, float dy, float dz)
+        {
+            if (_ffi.scene_pick_entity == IntPtr.Zero)
+            {
+                Log.Error("C#", "ScenePickEntity函数指针为空");
+                return 0;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<ScenePickEntityDelegate>(_ffi.scene_pick_entity);
+            return func(scene, ox, oy, oz, dx, dy, dz);
+        }
+
+        public static void SceneSelectEntity(IntPtr scene, ulong entityId)
+        {
+            if (_ffi.scene_select_entity == IntPtr.Zero)
+            {
+                Log.Error("C#", "SceneSelectEntity函数指针为空");
+                return;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<SceneSelectEntityDelegate>(_ffi.scene_select_entity);
+            func(scene, entityId);
+        }
+
+        public static void SceneUpdate(IntPtr scene, float deltaTime)
+        {
+            if (_ffi.scene_update == IntPtr.Zero)
+            {
+                Log.Error("C#", "SceneUpdate函数指针为空");
+                return;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<SceneUpdateDelegate>(_ffi.scene_update);
+            func(scene, deltaTime);
+        }
+
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public delegate void WidgetCallbackDelegate(ulong widgetId);
         
@@ -812,6 +947,73 @@ public static void RegisterResizeCallback(ResizeCallbackDelegate callback)
         {
             get => _text;
             set { _text = value; UI.SetListItemText(Id, _text); }
+        }
+    }
+
+    public enum GameState
+    {
+        Editing = 0,
+        Running = 1,
+        Paused = 2
+    }
+
+    public class Scene
+    {
+        private IntPtr _scenePtr;
+
+        public Scene()
+        {
+            _scenePtr = UI.SceneCreate();
+            if (_scenePtr == IntPtr.Zero)
+            {
+                throw new Exception("Failed to create scene");
+            }
+        }
+
+        public IntPtr ScenePtr => _scenePtr;
+
+        public void Destroy()
+        {
+            if (_scenePtr != IntPtr.Zero)
+            {
+                UI.SceneDestroy(_scenePtr);
+                _scenePtr = IntPtr.Zero;
+            }
+        }
+
+        public ulong CreateCube()
+        {
+            return UI.SceneCreateCube(_scenePtr);
+        }
+
+        public void AttachScript(ulong entityId, string scriptPath, string className)
+        {
+            UI.SceneAttachScript(_scenePtr, entityId, scriptPath, className);
+        }
+
+        public void SetGameState(GameState state)
+        {
+            UI.SceneSetGameState(_scenePtr, (int)state);
+        }
+
+        public GameState GetGameState()
+        {
+            return (GameState)UI.SceneGetGameState(_scenePtr);
+        }
+
+        public ulong PickEntity(float ox, float oy, float oz, float dx, float dy, float dz)
+        {
+            return UI.ScenePickEntity(_scenePtr, ox, oy, oz, dx, dy, dz);
+        }
+
+        public void SelectEntity(ulong entityId)
+        {
+            UI.SceneSelectEntity(_scenePtr, entityId);
+        }
+
+        public void Update(float deltaTime)
+        {
+            UI.SceneUpdate(_scenePtr, deltaTime);
         }
     }
 }
