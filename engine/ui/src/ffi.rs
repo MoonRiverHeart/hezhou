@@ -1101,6 +1101,27 @@ pub extern "C" fn ui_create_text_edit_in_parent(
 }
 
 #[unsafe(no_mangle)]
+pub extern "C" fn ui_set_text_edit_show_line_numbers(
+    handle: WidgetTreeHandle,
+    widget_id: u64,
+    show: bool,
+) {
+    if handle.is_null() || widget_id == 0 {
+        return;
+    }
+    unsafe {
+        let arc = &*(handle as *const Arc<Mutex<WidgetTree>>);
+        let mut tree = arc.lock();
+        let id = WidgetId::from_raw(widget_id);
+        if let Some(widget) = tree.get_widget_mut(id) {
+            if let Some(text_edit) = widget.as_any_mut().downcast_mut::<TextEdit>() {
+                text_edit.set_show_line_numbers(show);
+            }
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
 pub extern "C" fn ui_text_edit_set_text(
     handle: WidgetTreeHandle,
     widget_id: u64,

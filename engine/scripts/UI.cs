@@ -87,6 +87,9 @@ namespace Hezhou
         public delegate void TextEditGetTextDelegate(IntPtr handle, ulong widgetId, IntPtr buffer, int bufferSize);
         
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void TextEditShowLineNumbersDelegate(IntPtr handle, ulong widgetId, bool show);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public delegate void RegisterResizeDelegate(IntPtr callbackPtr);
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
@@ -233,6 +236,7 @@ namespace Hezhou
             public IntPtr ui_text_edit_delete_char;
             public IntPtr ui_text_edit_get_text_len;
             public IntPtr ui_text_edit_get_text;
+            public IntPtr ui_text_edit_show_line_numbers;
             public IntPtr ui_trigger_hot_reload;
             public IntPtr ui_set_game_preview_extent;
             public IntPtr ui_set_camera_params;
@@ -585,7 +589,7 @@ public static void SetPreviewWindowSelected(ulong widgetId, bool selected)
             Log.Info("C#", $"PreviewWindow editMode set to: {editMode}");
         }
         
-        public static ulong GetRootId()
+public static ulong GetRootId()
         {
             if (_ffi.ui_get_root_id == IntPtr.Zero)
             {
@@ -594,6 +598,17 @@ public static void SetPreviewWindowSelected(ulong widgetId, bool selected)
             }
             var func = Marshal.GetDelegateForFunctionPointer<GetRootIdDelegate>(_ffi.ui_get_root_id);
             return func(_widgetTree);
+        }
+        
+        public static void SetTextEditShowLineNumbers(ulong widgetId, bool show)
+        {
+            if (_ffi.ui_text_edit_show_line_numbers == IntPtr.Zero)
+            {
+                Log.Error("C#", "SetTextEditShowLineNumbers函数指针为空");
+                return;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<TextEditShowLineNumbersDelegate>(_ffi.ui_text_edit_show_line_numbers);
+            func(_widgetTree, widgetId, show);
         }
 
         public static void SetWidgetLayout(ulong widgetId, float x, float y, float width, float height)

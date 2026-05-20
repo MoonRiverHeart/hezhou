@@ -42,6 +42,7 @@ pub struct TextEdit {
     h_scrollbar_dragging: bool,
     h_scrollbar_drag_start_x: f32,
     h_scrollbar_drag_start_offset: f32,
+    show_line_numbers: bool,
 }
 
 impl TextEdit {
@@ -76,6 +77,7 @@ impl TextEdit {
             h_scrollbar_dragging: false,
             h_scrollbar_drag_start_x: 0.0,
             h_scrollbar_drag_start_offset: 0.0,
+            show_line_numbers: false,
         }
     }
     
@@ -102,7 +104,13 @@ impl TextEdit {
         self.layout_dirty = true;
         self.flags.dirty_render = true;
     }
-    
+
+    pub fn set_show_line_numbers(&mut self, show: bool) {
+        self.show_line_numbers = show;
+        self.layout_dirty = true;
+        self.flags.dirty_render = true;
+    }
+
     pub fn get_text_style(&self) -> &TextStyle {
         &self.text_style
     }
@@ -315,9 +323,9 @@ impl Widget for TextEdit {
         let height = self.layout.height;
         let font_size = self.text_style.font_size;
         
-        let line_number_width = 50.0;
+        let line_number_width = if self.show_line_numbers { 50.0 } else { 0.0 };
         let text_margin_x = 10.0;
-        let text_start_x = line_number_width + text_margin_x;
+        let text_start_x = if self.show_line_numbers { line_number_width + text_margin_x } else { text_margin_x };
         let scrollbar_width = 12.0;
         let scrollbar_height = 12.0;
         let text_area_width = width - line_number_width - scrollbar_width - 2.0 * text_margin_x;
@@ -325,9 +333,11 @@ impl Widget for TextEdit {
         
         canvas.draw_rect(Rect::new(0.0, 0.0, width, height), &self.style);
         
-        let line_number_style = Style::new()
-            .with_background(Color::new(0.12, 0.12, 0.12, 1.0));
-        canvas.draw_rect(Rect::new(0.0, 0.0, line_number_width, text_area_height), &line_number_style);
+        if self.show_line_numbers {
+            let line_number_style = Style::new()
+                .with_background(Color::new(0.12, 0.12, 0.12, 1.0));
+            canvas.draw_rect(Rect::new(0.0, 0.0, line_number_width, text_area_height), &line_number_style);
+        }
         
         if let Some(font_atlas) = canvas.get_font_atlas() {
             if self.layout_dirty {
@@ -351,19 +361,21 @@ impl Widget for TextEdit {
         self.scroll_offset_y = self.scroll_offset_y.min(max_scroll_y).max(0.0);
         self.scroll_offset_x = self.scroll_offset_x.min(max_scroll_x).max(0.0);
         
-        let line_number_text_style = TextStyle::new()
-            .with_size(font_size)
-            .with_color(Color::new(0.5, 0.5, 0.5, 1.0));
-        
-        for (line_idx, line) in self.presenter.get_model().get_lines().iter().enumerate() {
-            let line_y = line.baseline_y - max_bearing_y - self.scroll_offset_y;
-            if line_y >= 0.0 && line_y < text_area_height {
-                let line_num_str = (line_idx + 1).to_string();
-                canvas.draw_text(
-                    Rect::new(5.0, line_y, line_number_width - 10.0, font_size),
-                    &line_num_str,
-                    &line_number_text_style,
-                );
+        if self.show_line_numbers {
+            let line_number_text_style = TextStyle::new()
+                .with_size(font_size)
+                .with_color(Color::new(0.5, 0.5, 0.5, 1.0));
+            
+            for (line_idx, line) in self.presenter.get_model().get_lines().iter().enumerate() {
+                let line_y = line.baseline_y - max_bearing_y - self.scroll_offset_y;
+                if line_y >= 0.0 && line_y < text_area_height {
+                    let line_num_str = (line_idx + 1).to_string();
+                    canvas.draw_text(
+                        Rect::new(5.0, line_y, line_number_width - 10.0, font_size),
+                        &line_num_str,
+                        &line_number_text_style,
+                    );
+                }
             }
         }
         

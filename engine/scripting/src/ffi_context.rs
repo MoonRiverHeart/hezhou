@@ -40,6 +40,7 @@ pub type TextEditInsertCharFn = extern "C" fn(WidgetTreeHandle, u64, c_char);
 pub type TextEditDeleteCharFn = extern "C" fn(WidgetTreeHandle, u64);
 pub type TextEditGetTextLenFn = extern "C" fn(WidgetTreeHandle, u64) -> usize;
 pub type TextEditGetTextFn = extern "C" fn(WidgetTreeHandle, u64, *mut c_char, usize);
+pub type TextEditShowLineNumbersFn = extern "C" fn(WidgetTreeHandle, u64, bool);
 pub type TriggerHotReloadFn = extern "C" fn();
 pub type SetGamePreviewExtentFn = extern "C" fn(u32, u32);
 pub type SetCameraParamsFn = extern "C" fn(f32, f32, f32, f32, f32);
@@ -117,6 +118,7 @@ pub struct FfiContext {
     pub ui_text_edit_delete_char: TextEditDeleteCharFn,
     pub ui_text_edit_get_text_len: TextEditGetTextLenFn,
     pub ui_text_edit_get_text: TextEditGetTextFn,
+    pub ui_text_edit_show_line_numbers: TextEditShowLineNumbersFn,
     pub ui_trigger_hot_reload: TriggerHotReloadFn,
     pub ui_set_game_preview_extent: SetGamePreviewExtentFn,
     pub ui_set_camera_params: SetCameraParamsFn,

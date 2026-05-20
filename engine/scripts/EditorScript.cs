@@ -526,6 +526,7 @@ private static float _cameraYaw = 0f;
             UI.SetWidgetLayout(_scriptEditorLabel.Id, 120f, 10f, 300f, 25f);
             
             _scriptTextEditId = UI.CreateTextEdit(_scriptEditorPanel.Id, editorWidth - 20f, editorHeight - 50f);
+            UI.SetTextEditShowLineNumbers(_scriptTextEditId, true);
             UI.SetWidgetLayout(_scriptTextEditId, 10f, 50f, editorWidth - 20f, editorHeight - 50f);
             UI.TextEditSetText(_scriptTextEditId, "// NewScript.cs\nusing System;\nusing Hezhou;\n\npublic class NewScript\n{\n    public void Start()\n    {\n        Console.WriteLine(\"NewScript started!\");\n    }\n    \n    public void Update(float deltaTime)\n    {\n        // Update logic here\n    }\n}");
             
@@ -1115,7 +1116,8 @@ private static void ShowDropdownMenu(float x, float y, string[] items, UI.Widget
                     UI.SetWidgetLayout(_scriptEditorLabel.Id, 120f, 10f, 300f, 25f);
                     
                     _scriptTextEditId = UI.CreateTextEdit(_scriptEditorPanel.Id, editorWidth - 20f, editorHeight - 50f);
-                    UI.SetWidgetLayout(_scriptTextEditId, 10f, 50f, editorWidth - 20f, editorHeight - 50f);
+            UI.SetTextEditShowLineNumbers(_scriptTextEditId, true);
+            UI.SetWidgetLayout(_scriptTextEditId, 10f, 50f, editorWidth - 20f, editorHeight - 50f);
                     
                     _scriptEditorVisible = true;
                     Log.Info("Editor", "编辑器面板创建完成");
