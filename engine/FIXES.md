@@ -43,3 +43,51 @@ Result: Culled when cull_mode=BACK
 Run: `cd engine && cargo run --bin mono_editor_demo --features mono --release`
 - All 6 faces should have orange outline at any rotation angle
 - Outline alpha=0.3, renders on top of game geometry
+
+---
+
+## 2026-05-20: ESC Key Handling in Running Mode
+
+### Problem
+- ESC key in Running mode only canceled PreviewWindow selection
+- Status bar showed "退出预览窗", but cube kept rotating
+- Clicking "编辑" button could switch back, but ESC was broken
+
+### Root Cause
+- C# OnKey() handled ESC by only calling `UI.SetPreviewWindowSelected(false)`
+- This canceled the PreviewWindow selection state
+- But **renderer.game_state** stayed at Running(1)
+- Cube rotation is controlled by `renderer.game_state`, not PreviewWindow selection
+
+### Solution
+- Running mode ESC now switches to Editing mode
+- Calls `_gameScene.SetGameState(GameState.Editing)`
+- Calls `UI.SetRendererGameState(0)`
+- Calls `UI.SetPreviewWindowEditMode(true)` for orange border
+- Updates button text to "运行"
+- Restores saved camera position
+
+### Files Changed
+- `engine/scripts/EditorScript.cs:173-223` - OnKey() ESC handling logic
+
+### Code Flow Comparison
+
+**Before (broken):**
+```
+ESC pressed → SetPreviewWindowSelected(false) → PreviewWindow deselected
+             → renderer.game_state still = 1 → Cube keeps rotating
+```
+
+**After (fixed):**
+```
+ESC pressed → SetGameState(Editing) → Scene state = Editing
+             → SetRendererGameState(0) → renderer.game_state = 0
+             → SetPreviewWindowEditMode(true) → Orange border
+             → SetPreviewWindowSelected(false) → PreviewWindow deselected
+             → Cube stops rotating ✅
+```
+
+### Verification
+1. Click "运行" → cube starts rotating, PreviewWindow has blue border
+2. Press ESC → cube stops, PreviewWindow has orange border, button shows "运行"
+3. Press ESC again (Editing mode) → clears entity selection if any
