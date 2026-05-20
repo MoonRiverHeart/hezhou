@@ -24,6 +24,8 @@ namespace Hezhou
         private static ListItem _statusItem;
         private static ListItem _projectItem;
         
+        private static ulong _runButtonId;  // 运行/编辑按钮ID
+        
         private static Panel _dropdownMenu;
         private static VStack _menuItems;
         
@@ -223,6 +225,7 @@ private static float _cameraYaw = 0f;
             saveBtn.SetOnClick(OnSaveClick);
             
             var runBtn = _toolbarButtons.AddButton(100f, 30f, "运行");
+            _runButtonId = runBtn.Id;  // 保存按钮ID
             runBtn.SetOnClick(OnRunClick);
             
             _toggleEditorBtn = new Button(_toolbar.Id, 100f, 30f, "编辑器");
@@ -581,6 +584,7 @@ private static float _cameraYaw = 0f;
                 _gameScene.SetGameState(GameState.Running);
                 UI.SetRendererGameState(1);  // Running
                 UI.SetPreviewWindowEditMode(_previewWindowId, false);  // 蓝色边框
+                UI.SetText(_runButtonId, "编辑");  // 更新按钮文字
                 Log.Info("Editor", "Scene和Renderer切换到Running状态");
                 _statusItem.Text = "状态: 运行中";
             }
@@ -589,6 +593,7 @@ private static float _cameraYaw = 0f;
                 _gameScene.SetGameState(GameState.Editing);
                 UI.SetRendererGameState(0);  // Editing
                 UI.SetPreviewWindowEditMode(_previewWindowId, true);  // 橙色边框
+                UI.SetText(_runButtonId, "运行");  // 更新按钮文字
                 Log.Info("Editor", "Scene和Renderer切换到Editing状态");
                 _statusItem.Text = "状态: 就绪";
             }
