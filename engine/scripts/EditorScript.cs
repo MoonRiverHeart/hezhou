@@ -393,10 +393,38 @@ private static float _cameraYaw = 0f;
                     if (_previewSelected && _gameScene != null && _gameScene.GetGameState() == GameState.Running)
                     {
                         float speed = 2f * (deltaTime / 1000f);  // 2 units/sec
-                        if (_keyLeftPressed) _cameraX -= speed;
-                        if (_keyRightPressed) _cameraX += speed;
-                        if (_keyUpPressed) _cameraZ = Math.Max(0.5f, _cameraZ - speed);
-                        if (_keyDownPressed) _cameraZ = Math.Min(10f, _cameraZ + speed);
+                        
+                        // Calculate forward and right vectors based on camera yaw
+                        // forward: direction camera is looking at (sin(yaw), 0, -cos(yaw))
+                        // right: camera's right direction (cos(yaw), 0, sin(yaw))
+                        float sinYaw = (float)Math.Sin(_cameraYaw);
+                        float cosYaw = (float)Math.Cos(_cameraYaw);
+                        float forwardX = sinYaw;
+                        float forwardZ = -cosYaw;
+                        float rightX = cosYaw;
+                        float rightZ = sinYaw;
+                        
+                        // Move in camera local space
+                        if (_keyUpPressed)    // Forward
+                        {
+                            _cameraX += speed * forwardX;
+                            _cameraZ += speed * forwardZ;
+                        }
+                        if (_keyDownPressed)  // Backward
+                        {
+                            _cameraX -= speed * forwardX;
+                            _cameraZ -= speed * forwardZ;
+                        }
+                        if (_keyLeftPressed)  // Left
+                        {
+                            _cameraX -= speed * rightX;
+                            _cameraZ -= speed * rightZ;
+                        }
+                        if (_keyRightPressed) // Right
+                        {
+                            _cameraX += speed * rightX;
+                            _cameraZ += speed * rightZ;
+                        }
                         
                         UI.SetCameraParams(_cameraYaw, _cameraPitch, _cameraX, _cameraY, _cameraZ);
                         
