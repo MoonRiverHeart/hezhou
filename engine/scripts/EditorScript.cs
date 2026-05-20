@@ -18,6 +18,11 @@ namespace Hezhou
         private static ulong _previewWindowId;
         private static Panel _propertiesPanel;
         private static VStack _propsList;
+        private static ulong _propsEntityLabelId;    // Entity ID label
+        private static ulong _propsPositionLabelId;   // Position label
+        private static ulong _propsRotationLabelId;   // Rotation label
+        private static ulong _propsScaleLabelId;      // Scale label
+        private static ulong _selectedEntityId = 0;   // 当前选中的Entity ID
         private static Panel _statusBar;
         private static List _statusItems;
         private static ListItem _fpsItem;
@@ -170,6 +175,7 @@ private static float _cameraYaw = 0f;
                     {
                         _gameScene.ClearSelection();
                         _statusItem.Text = "状态: 就绪";
+                        ClearPropertiesPanel();  // 清空属性面板
                         Log.Info("Editor", "ESC: 取消选中Entity（Editing模式）");
                     }
                 }
@@ -268,9 +274,12 @@ private static float _cameraYaw = 0f;
             UI.CreateLabel(_propertiesPanel.Id, 10f, 10f, RIGHT_PANEL_WIDTH - 20f, 25f, "属性编辑");
             _propsList = new VStack(_propertiesPanel.Id, 5f);
             _propsList.SetPosition(10f, 40f);
-            _propsList.AddLabel(RIGHT_PANEL_WIDTH - 40f, 20f, "选中: 无");
-            _propsList.AddLabel(RIGHT_PANEL_WIDTH - 40f, 20f, "位置: (0, 0)");
-            _propsList.AddLabel(RIGHT_PANEL_WIDTH - 40f, 20f, "大小: (0, 0)");
+            
+            // 保存Label ID以便后续更新
+            _propsEntityLabelId = _propsList.AddLabel(RIGHT_PANEL_WIDTH - 40f, 20f, "Entity: 无");
+            _propsPositionLabelId = _propsList.AddLabel(RIGHT_PANEL_WIDTH - 40f, 20f, "位置: (0, 0, 0)");
+            _propsRotationLabelId = _propsList.AddLabel(RIGHT_PANEL_WIDTH - 40f, 20f, "旋转: (0°, 0°, 0°)");
+            _propsScaleLabelId = _propsList.AddLabel(RIGHT_PANEL_WIDTH - 40f, 20f, "缩放: (1, 1, 1)");
             Log.Info("Editor", "属性面板创建完成");
 
             _statusBar = new Panel(rootId, 0, statusY, _screenWidth, STATUS_BAR_HEIGHT, 0.12f, 0.12f, 0.12f, 1.0f);
@@ -655,6 +664,7 @@ private static float _cameraYaw = 0f;
                         Log.Info("Editor", "No entity hit");
                         _gameScene.ClearSelection();
                         _statusItem.Text = "状态: 就绪";
+                        ClearPropertiesPanel();  // 清空属性面板
                     }
                 }
                 else
@@ -666,12 +676,44 @@ private static float _cameraYaw = 0f;
         
         private static void UpdatePropertiesPanel(ulong entityId)
         {
+            if (_propsList == null || _gameScene == null) return;
+            
+            _selectedEntityId = entityId;
+            
+            // 更新Entity ID显示
+            UI.SetText(_propsEntityLabelId, $"Entity: {entityId}");
+            
+            // 获取Entity transform
+            float px, py, pz;
+            UI.SceneGetEntityPosition(_gameScene.ScenePtr, entityId, out px, out py, out pz);
+            UI.SetText(_propsPositionLabelId, $"位置: ({px:F2}, {py:F2}, {pz:F2})");
+            
+            float rx, ry, rz, rw;
+            UI.SceneGetEntityRotation(_gameScene.ScenePtr, entityId, out rx, out ry, out rz, out rw);
+            // 将四元数转换为欧拉角（简化版本）
+            float eulerX = (float)Math.Atan2(2.0 * (rw * rx + ry * rz), 1.0 - 2.0 * (rx * rx + ry * ry)) * 180.0f / (float)Math.PI;
+            float eulerY = (float)Math.Asin(2.0 * (rw * ry - rz * rx)) * 180.0f / (float)Math.PI;
+            float eulerZ = (float)Math.Atan2(2.0 * (rw * rz + rx * ry), 1.0 - 2.0 * (ry * ry + rz * rz)) * 180.0f / (float)Math.PI;
+            UI.SetText(_propsRotationLabelId, $"旋转: ({eulerX:F0}°, {eulerY:F0}°, {eulerZ:F0}°)");
+            
+            float sx, sy, sz;
+            UI.SceneGetEntityScale(_gameScene.ScenePtr, entityId, out sx, out sy, out sz);
+            UI.SetText(_propsScaleLabelId, $"缩放: ({sx:F2}, {sy:F2}, {sz:F2})");
+            
+            Log.Info("Editor", $"Properties panel updated for entity {entityId}: pos=({px}, {py}, {pz})");
+        }
+        
+        private static void ClearPropertiesPanel()
+        {
             if (_propsList == null) return;
             
-            // 清空属性面板
-            // TODO: 实现动态更新属性面板内容
+            _selectedEntityId = 0;
+            UI.SetText(_propsEntityLabelId, "Entity: 无");
+            UI.SetText(_propsPositionLabelId, "位置: (0, 0, 0)");
+            UI.SetText(_propsRotationLabelId, "旋转: (0°, 0°, 0°)");
+            UI.SetText(_propsScaleLabelId, "缩放: (1, 1, 1)");
             
-            Log.Info("Editor", $"Properties panel updated for entity {entityId}");
+            Log.Info("Editor", "Properties panel cleared");
         }
         
 private static void ShowDropdownMenu(float x, float y, string[] items, UI.WidgetCallbackDelegate[] callbacks)
