@@ -8,10 +8,128 @@ use std::sync::atomic::{AtomicBool, Ordering};
 static mut EXECUTOR: Option<MonoUIExecutor> = None;
 static HOT_RELOAD_REQUESTED: AtomicBool = AtomicBool::new(false);
 static mut RENDERER: Option<*mut UIVulkanRenderer> = None;
+static mut SCENE: Option<*mut hezhou_core::Scene> = None;
 
 #[unsafe(no_mangle)]
 pub extern "C" fn trigger_hot_reload() {
     HOT_RELOAD_REQUESTED.store(true, Ordering::SeqCst);
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn scene_create_editor() -> *mut hezhou_core::Scene {
+    unsafe {
+        let scene = Box::new(hezhou_core::Scene::new());
+        let ptr = Box::into_raw(scene);
+        SCENE = Some(ptr);
+        ptr
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn scene_destroy_editor(scene: *mut hezhou_core::Scene) {
+    if scene.is_null() {
+        return;
+    }
+    unsafe {
+        let _ = Box::from_raw(scene);
+        SCENE = None;
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn scene_create_cube_editor(scene: *mut hezhou_core::Scene) -> u64 {
+    if scene.is_null() {
+        return 0;
+    }
+    unsafe {
+        let entity = (*scene).create_cube();
+        entity.id
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn scene_attach_script_editor(scene: *mut hezhou_core::Scene, entity_id: u64, 
+                                             script_path: *const i8, class_name: *const i8) {
+    if scene.is_null() {
+        return;
+    }
+    let script_path_str = unsafe {
+        std::ffi::CStr::from_ptr(script_path).to_string_lossy().into_owned()
+    };
+    let class_name_str = unsafe {
+        std::ffi::CStr::from_ptr(class_name).to_string_lossy().into_owned()
+    };
+    
+    unsafe {
+        let entity = hezhou_core::Entity::new(entity_id);
+        let script = hezhou_core::ScriptComponent::from_path(&script_path_str, &class_name_str);
+        (*scene).attach_script(entity, script);
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn scene_set_game_state_editor(scene: *mut hezhou_core::Scene, state: i32) {
+    if scene.is_null() {
+        return;
+    }
+    let state_enum = match state {
+        0 => hezhou_core::GameState::Editing,
+        1 => hezhou_core::GameState::Running,
+        2 => hezhou_core::GameState::Paused,
+        _ => hezhou_core::GameState::Editing,
+    };
+    
+    unsafe {
+        (*scene).set_state(state_enum);
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn scene_get_game_state_editor(scene: *mut hezhou_core::Scene) -> i32 {
+    if scene.is_null() {
+        return 0;
+    }
+    unsafe {
+        (*scene).state as i32
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn scene_pick_entity_editor(scene: *mut hezhou_core::Scene, 
+                                           ox: f32, oy: f32, oz: f32,
+                                           dx: f32, dy: f32, dz: f32) -> u64 {
+    if scene.is_null() {
+        return 0;
+    }
+    unsafe {
+        let origin = hezhou_core::Vec3::new(ox, oy, oz);
+        let dir = hezhou_core::Vec3::new(dx, dy, dz);
+        match (*scene).pick_entity(origin, dir) {
+            Some(e) => e.id,
+            None => 0,
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn scene_select_entity_editor(scene: *mut hezhou_core::Scene, entity_id: u64) {
+    if scene.is_null() {
+        return;
+    }
+    unsafe {
+        let entity = hezhou_core::Entity::new(entity_id);
+        (*scene).select_entity(entity);
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn scene_update_editor(scene: *mut hezhou_core::Scene, dt: f32) {
+    if scene.is_null() {
+        return;
+    }
+    unsafe {
+        (*scene).update(dt);
+    }
 }
 
 #[unsafe(no_mangle)]
@@ -143,8 +261,17 @@ fn main() {
         ui_create_list_in_parent: unsafe { std::mem::transmute(ui_ffi::ui_create_list_in_parent as *const std::ffi::c_void) },
         ui_create_list_item: unsafe { std::mem::transmute(ui_ffi::ui_create_list_item as *const std::ffi::c_void) },
         ui_create_list_item_in_parent: unsafe { std::mem::transmute(ui_ffi::ui_create_list_item_in_parent as *const std::ffi::c_void) },
-        ui_list_item_set_text: unsafe { std::mem::transmute(ui_ffi::ui_list_item_set_text as *const std::ffi::c_void) },
+ui_list_item_set_text: unsafe { std::mem::transmute(ui_ffi::ui_list_item_set_text as *const std::ffi::c_void) },
         ui_list_item_set_font_size: unsafe { std::mem::transmute(ui_ffi::ui_list_item_set_font_size as *const std::ffi::c_void) },
+        scene_create: unsafe { std::mem::transmute(scene_create_editor as *const std::ffi::c_void) },
+        scene_destroy: unsafe { std::mem::transmute(scene_destroy_editor as *const std::ffi::c_void) },
+        scene_create_cube: unsafe { std::mem::transmute(scene_create_cube_editor as *const std::ffi::c_void) },
+        scene_attach_script: unsafe { std::mem::transmute(scene_attach_script_editor as *const std::ffi::c_void) },
+        scene_set_game_state: unsafe { std::mem::transmute(scene_set_game_state_editor as *const std::ffi::c_void) },
+        scene_get_game_state: unsafe { std::mem::transmute(scene_get_game_state_editor as *const std::ffi::c_void) },
+        scene_pick_entity: unsafe { std::mem::transmute(scene_pick_entity_editor as *const std::ffi::c_void) },
+        scene_select_entity: unsafe { std::mem::transmute(scene_select_entity_editor as *const std::ffi::c_void) },
+        scene_update: unsafe { std::mem::transmute(scene_update_editor as *const std::ffi::c_void) },
         widget_tree_ptr: widget_tree_handle,
         dfx_handle: dfx_for_csharp as *mut std::ffi::c_void,
     };
