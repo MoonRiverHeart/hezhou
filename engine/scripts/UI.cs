@@ -278,6 +278,9 @@ namespace Hezhou
             public IntPtr set_selected_entity;
             public IntPtr widget_tree_ptr;
             public IntPtr dfx_handle;
+            public IntPtr dfx_log;
+            public IntPtr dfx_trace_begin;
+            public IntPtr dfx_trace_end;
         }
 
         public static void InitFromContext(IntPtr contextPtr)
@@ -288,6 +291,7 @@ namespace Hezhou
             if (_ffi.dfx_handle != IntPtr.Zero)
             {
                 Log.Init(_ffi.dfx_handle);
+                Log.SetFunctionPointers(_ffi.dfx_log, _ffi.dfx_trace_begin, _ffi.dfx_trace_end);
             }
             
             Log.Info("C#", "FfiContext初始化成功");

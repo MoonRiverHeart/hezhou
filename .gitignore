@@ -34,5 +34,7 @@ oh_modules/
 bin/
 obj/
 
-# Release packages (large files)
+# Release packages (large zip files)
 release/*.zip
+release/hezhou-editor/logs/
+release/hezhou-editor/traces/

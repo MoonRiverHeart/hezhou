@@ -79,6 +79,10 @@ pub type SceneRotateEntityFn = extern "C" fn(*mut c_void, u64, f32);
 
 pub type SetSelectedEntityFn = extern "C" fn(u64, bool);
 
+pub type DfxLogFn = extern "C" fn(*mut c_void, u8, *const c_char, *const c_char, *const c_char, u32);
+pub type DfxTraceBeginFn = extern "C" fn(*mut c_void, *const c_char, *const c_char);
+pub type DfxTraceEndFn = extern "C" fn(*mut c_void, *const c_char, *const c_char);
+
 #[repr(C)]
 pub struct FfiContext {
     pub ui_get_primary_button_id: GetButtonIdFn,
@@ -152,6 +156,9 @@ pub struct FfiContext {
     pub set_selected_entity: SetSelectedEntityFn,
     pub widget_tree_ptr: WidgetTreeHandle,
     pub dfx_handle: *mut c_void,
+    pub dfx_log: DfxLogFn,
+    pub dfx_trace_begin: DfxTraceBeginFn,
+    pub dfx_trace_end: DfxTraceEndFn,
 }
 
 static mut FFI_CONTEXT: Option<Box<FfiContext>> = None;

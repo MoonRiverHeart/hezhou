@@ -58,69 +58,87 @@ namespace Hezhou
     public static class Log
     {
         private static IntPtr _dfxHandle = IntPtr.Zero;
+        private static DfxLogDelegate _dfxLog = null;
+        private static DfxTraceBeginDelegate _dfxTraceBegin = null;
+        private static DfxTraceEndDelegate _dfxTraceEnd = null;
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        private delegate void DfxLogDelegate(IntPtr system, byte level, string module, string message, string file, uint line);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        private delegate void DfxTraceBeginDelegate(IntPtr system, string name, string category);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        private delegate void DfxTraceEndDelegate(IntPtr system, string name, string category);
 
         public static void Init(IntPtr dfxHandle)
         {
             _dfxHandle = dfxHandle;
         }
 
+        public static void SetFunctionPointers(IntPtr logPtr, IntPtr traceBeginPtr, IntPtr traceEndPtr)
+        {
+            if (logPtr != IntPtr.Zero)
+                _dfxLog = Marshal.GetDelegateForFunctionPointer<DfxLogDelegate>(logPtr);
+            if (traceBeginPtr != IntPtr.Zero)
+                _dfxTraceBegin = Marshal.GetDelegateForFunctionPointer<DfxTraceBeginDelegate>(traceBeginPtr);
+            if (traceEndPtr != IntPtr.Zero)
+                _dfxTraceEnd = Marshal.GetDelegateForFunctionPointer<DfxTraceEndDelegate>(traceEndPtr);
+        }
+
+        private static void CallDfxLog(byte level, string module, string message)
+        {
+            if (_dfxLog != null && _dfxHandle != IntPtr.Zero)
+                _dfxLog(_dfxHandle, level, module, message, "", 0);
+            else if (_dfxHandle != IntPtr.Zero)
+                DfxNativeMethods.dfx_log(_dfxHandle, level, module, message, "", 0);
+            else
+                Console.WriteLine($"[{level}][{module}] {message}");
+        }
+
         public static void Trace(string module, string message)
         {
-            if (_dfxHandle != IntPtr.Zero)
-                DfxNativeMethods.dfx_log(_dfxHandle, (byte)LogLevel.Trace, module, message, "", 0);
-            else
-                Console.WriteLine($"[TRACE][{module}] {message}");
+            CallDfxLog((byte)LogLevel.Trace, module, message);
         }
 
         public static void Debug(string module, string message)
         {
-            if (_dfxHandle != IntPtr.Zero)
-                DfxNativeMethods.dfx_log(_dfxHandle, (byte)LogLevel.Debug, module, message, "", 0);
-            else
-                Console.WriteLine($"[DEBUG][{module}] {message}");
+            CallDfxLog((byte)LogLevel.Debug, module, message);
         }
 
         public static void Info(string module, string message)
         {
-            if (_dfxHandle != IntPtr.Zero)
-                DfxNativeMethods.dfx_log(_dfxHandle, (byte)LogLevel.Info, module, message, "", 0);
-            else
-                Console.WriteLine($"[INFO][{module}] {message}");
+            CallDfxLog((byte)LogLevel.Info, module, message);
         }
 
         public static void Warn(string module, string message)
         {
-            if (_dfxHandle != IntPtr.Zero)
-                DfxNativeMethods.dfx_log(_dfxHandle, (byte)LogLevel.Warn, module, message, "", 0);
-            else
-                Console.WriteLine($"[WARN][{module}] {message}");
+            CallDfxLog((byte)LogLevel.Warn, module, message);
         }
 
         public static void Error(string module, string message)
         {
-            if (_dfxHandle != IntPtr.Zero)
-                DfxNativeMethods.dfx_log(_dfxHandle, (byte)LogLevel.Error, module, message, "", 0);
-            else
-                Console.WriteLine($"[ERROR][{module}] {message}");
+            CallDfxLog((byte)LogLevel.Error, module, message);
         }
 
         public static void Fatal(string module, string message)
         {
-            if (_dfxHandle != IntPtr.Zero)
-                DfxNativeMethods.dfx_log(_dfxHandle, (byte)LogLevel.Fatal, module, message, "", 0);
-            else
-                Console.WriteLine($"[FATAL][{module}] {message}");
+            CallDfxLog((byte)LogLevel.Fatal, module, message);
         }
 
         public static void TraceBegin(string name, string category = "ui")
         {
-            if (_dfxHandle != IntPtr.Zero)
+            if (_dfxTraceBegin != null && _dfxHandle != IntPtr.Zero)
+                _dfxTraceBegin(_dfxHandle, name, category);
+            else if (_dfxHandle != IntPtr.Zero)
                 DfxNativeMethods.dfx_trace_begin(_dfxHandle, name, category);
         }
 
         public static void TraceEnd(string name, string category = "ui")
         {
-            if (_dfxHandle != IntPtr.Zero)
+            if (_dfxTraceEnd != null && _dfxHandle != IntPtr.Zero)
+                _dfxTraceEnd(_dfxHandle, name, category);
+            else if (_dfxHandle != IntPtr.Zero)
                 DfxNativeMethods.dfx_trace_end(_dfxHandle, name, category);
         }
     }

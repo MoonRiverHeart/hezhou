@@ -504,9 +504,24 @@ impl Default for FontAtlas {
 pub fn create_font_atlas() -> FontAtlas {
     let mut atlas = FontAtlas::new();
     
-    let font_path = std::path::Path::new("C:\\Users\\94023\\Documents\\commandline-tools-windows-x64\\command-line-tools\\sdk\\default\\hms\\previewer\\resources\\fonts\\HarmonyOS_Sans_SC.ttf");
+    let exe_dir = std::env::current_exe()
+        .ok()
+        .and_then(|p| p.parent().map(|p| p.to_path_buf()))
+        .unwrap_or_else(|| std::path::PathBuf::from("."));
     
-    if font_path.exists() {
+    let local_font = exe_dir.join("fonts/HarmonyOS_Sans_SC.ttf");
+    let dev_font_path = "C:\\Users\\94023\\Documents\\commandline-tools-windows-x64\\command-line-tools\\sdk\\default\\hms\\previewer\\resources\\fonts\\HarmonyOS_Sans_SC.ttf";
+    
+    let font_path: std::path::PathBuf = if local_font.exists() {
+        local_font
+    } else if std::path::Path::new(dev_font_path).exists() {
+        std::path::PathBuf::from(dev_font_path)
+    } else {
+        Arc::new(Mutex::new(DfxSystem::new())).lock().get_logger().lock().log(LogLevel::Warn, "FontAtlas", &format!("Font file not found (checked {} and {})", local_font.display(), dev_font_path), file!(), line!());
+        return atlas;
+    };
+    
+    if true {
         let font_data = std::fs::read(font_path).expect("Failed to read font file");
         let font_index = atlas.add_font(&font_data);
         

@@ -398,6 +398,9 @@ ui_list_item_set_text: unsafe { std::mem::transmute(ui_ffi::ui_list_item_set_tex
         set_selected_entity: set_selected_entity,
         widget_tree_ptr: widget_tree_handle,
         dfx_handle: dfx_for_csharp as *mut std::ffi::c_void,
+        dfx_log: unsafe { std::mem::transmute(hezhou_dfx::dfx_log as *const std::ffi::c_void) },
+        dfx_trace_begin: unsafe { std::mem::transmute(hezhou_dfx::dfx_trace_begin as *const std::ffi::c_void) },
+        dfx_trace_end: unsafe { std::mem::transmute(hezhou_dfx::dfx_trace_end as *const std::ffi::c_void) },
     };
     hezhou_scripting::ffi_context::set_ffi_context(ffi_ctx);
     let ffi_ptr = hezhou_scripting::ffi_context::get_ffi_context_ptr();

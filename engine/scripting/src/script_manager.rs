@@ -18,12 +18,29 @@ impl ScriptManager {
     pub fn new() -> ScriptResult<Self> {
         // Set Mono assembly path before initialization
         // Mono needs to find mscorlib.dll, System.dll, etc.
-        // The lib path should point to the lib directory, Mono will append mono/4.5/ internally
-        let mono_lib_path = "C:\\Program Files\\Mono\\lib";
-        let mono_config_path = "C:\\Program Files\\Mono\\etc";
         
-        let lib_cstr = std::ffi::CString::new(mono_lib_path).unwrap();
-        let config_cstr = std::ffi::CString::new(mono_config_path).unwrap();
+        // Lib and config paths: use exe directory if standalone mode
+        let exe_dir = std::env::current_exe()
+            .ok()
+            .and_then(|p| p.parent().map(|p| p.to_path_buf()))
+            .unwrap_or_else(|| std::path::PathBuf::from("."));
+        
+        let local_lib = exe_dir.join("lib");
+        let mono_lib_path = if local_lib.exists() {
+            local_lib.to_string_lossy().to_string()
+        } else {
+            "C:\\Program Files\\Mono\\lib".to_string()
+        };
+        
+        let local_etc = exe_dir.join("etc");
+        let mono_config_path = if local_etc.exists() {
+            local_etc.to_string_lossy().to_string()
+        } else {
+            "C:\\Program Files\\Mono\\etc".to_string()
+        };
+        
+        let lib_cstr = std::ffi::CString::new(mono_lib_path.clone()).unwrap();
+        let config_cstr = std::ffi::CString::new(mono_config_path.clone()).unwrap();
         
         unsafe {
             wrapped_mono::binds::mono_set_dirs(lib_cstr.as_ptr(), config_cstr.as_ptr());
@@ -40,17 +57,45 @@ impl ScriptManager {
     pub fn load_script(&mut self, dll_path: &str) -> ScriptResult<String> {
         let domain = self.domain.as_ref().ok_or(ScriptError::NotInitialized)?;
         
-        let dll_name = std::ffi::CString::new("mono_ui_thunk_demo").unwrap();
-        let target_dll = std::ffi::CString::new("mono_ui_thunk_demo.exe").unwrap();
+        let dll_name1 = std::ffi::CString::new("mono_ui_thunk_demo").unwrap();
+        let target_dll1 = std::ffi::CString::new("mono_ui_thunk_demo.exe").unwrap();
         
         unsafe {
             wrapped_mono::binds::mono_dllmap_insert(
                 std::ptr::null_mut(),
-                dll_name.as_ptr(),
+                dll_name1.as_ptr(),
                 std::ptr::null(),
-                target_dll.as_ptr(),
+                target_dll1.as_ptr(),
                 std::ptr::null(),
             );
+        }
+        
+        let exe_dir = std::env::current_exe()
+            .ok()
+            .and_then(|p| p.parent().map(|p| p.to_path_buf()))
+            .unwrap_or_else(|| std::path::PathBuf::from("."));
+        
+        let local_lib = exe_dir.join("lib");
+        let is_standalone = local_lib.exists();
+        
+        if is_standalone {
+            let exe_name = std::env::current_exe()
+                .ok()
+                .and_then(|p| p.file_name().map(|n| n.to_string_lossy().to_string()))
+                .unwrap_or_else(|| "mono_editor_demo.exe".to_string());
+            
+            let dll_name2 = std::ffi::CString::new("hezhou_dfx").unwrap();
+            let target_dll2 = std::ffi::CString::new(exe_name).unwrap();
+            
+            unsafe {
+                wrapped_mono::binds::mono_dllmap_insert(
+                    std::ptr::null_mut(),
+                    dll_name2.as_ptr(),
+                    std::ptr::null(),
+                    target_dll2.as_ptr(),
+                    std::ptr::null(),
+                );
+            }
         }
 
         let assembly = domain
