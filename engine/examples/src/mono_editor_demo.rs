@@ -9,10 +9,100 @@ static mut EXECUTOR: Option<MonoUIExecutor> = None;
 static HOT_RELOAD_REQUESTED: AtomicBool = AtomicBool::new(false);
 static mut RENDERER: Option<*mut UIVulkanRenderer> = None;
 static mut SCENE: Option<*mut hezhou_core::Scene> = None;
+static mut FFI_PTR: Option<*const hezhou_scripting::ffi_context::FfiContext> = None;
+static mut STATUS_TEXT_CALLBACK: Option<hezhou_scripting::ffi_context::SetStatusTextFn> = None;
+static mut HOT_RELOAD_COMPLETE_CALLBACK: Option<hezhou_scripting::ffi_context::OnHotReloadCompleteFn> = None;
+
+#[derive(Clone, Debug)]
+struct SavedScriptBinding {
+    script_path: String,
+    class_name: String,
+    enabled: bool,
+}
+
+#[derive(Clone, Debug)]
+struct SavedEntityBinding {
+    entity_id: u64,
+    bindings: Vec<SavedScriptBinding>,
+}
+
+static mut SAVED_BINDINGS: Vec<SavedEntityBinding> = Vec::new();
 
 #[unsafe(no_mangle)]
 pub extern "C" fn trigger_hot_reload() {
     HOT_RELOAD_REQUESTED.store(true, Ordering::SeqCst);
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn set_status_text(status_ptr: *const i8) {
+    if !status_ptr.is_null() {
+        let status = unsafe { std::ffi::CStr::from_ptr(status_ptr).to_string_lossy().into_owned() };
+        dfx_info!("Status", "状态: {}", status);
+    }
+}
+
+extern "C" fn on_hot_reload_complete_placeholder() {
+    dfx_info!("HotReload", "OnHotReloadComplete callback placeholder called");
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn register_hot_reload_complete_callback(callback: hezhou_scripting::ffi_context::OnHotReloadCompleteFn) {
+    unsafe {
+        HOT_RELOAD_COMPLETE_CALLBACK = Some(callback);
+        dfx_info!("HotReload", "Hot reload complete callback registered");
+    }
+}
+
+fn save_scene_bindings() -> Vec<SavedEntityBinding> {
+    unsafe {
+        if let Some(scene_ptr) = SCENE {
+            let scene = &*scene_ptr;
+            let mut saved = Vec::new();
+            
+            for entity in &scene.root_entities {
+                let bindings = scene.entity_bindings.get(&entity.id).cloned().unwrap_or_default();
+                if !bindings.is_empty() {
+                    let saved_bindings: Vec<SavedScriptBinding> = bindings.iter().map(|b| SavedScriptBinding {
+                        script_path: b.script_path.clone(),
+                        class_name: b.class_name.clone(),
+                        enabled: b.enabled,
+                    }).collect();
+                    saved.push(SavedEntityBinding {
+                        entity_id: entity.id,
+                        bindings: saved_bindings,
+                    });
+                }
+            }
+            
+            dfx_info!("HotReload", "保存绑定数据: {} entities, {} bindings", saved.len(), saved.iter().map(|e| e.bindings.len()).sum::<usize>());
+            saved
+        } else {
+            Vec::new()
+        }
+    }
+}
+
+fn restore_scene_bindings(saved: &[SavedEntityBinding]) {
+    unsafe {
+        if let Some(scene_ptr) = SCENE {
+            let scene = &mut *scene_ptr;
+            
+            for saved_entity in saved {
+                let entity = hezhou_core::Entity::new(saved_entity.entity_id);
+                for binding in &saved_entity.bindings {
+                    scene.attach_script_binding(entity, binding.script_path.clone(), binding.class_name.clone());
+                    if !binding.enabled {
+                        let count = scene.get_script_binding_count(entity);
+                        if count > 0 {
+                            scene.set_script_binding_enabled(entity, count - 1, false);
+                        }
+                    }
+                }
+            }
+            
+            dfx_info!("HotReload", "恢复绑定数据: {} entities", saved.len());
+        }
+    }
 }
 
 #[unsafe(no_mangle)]
@@ -258,12 +348,177 @@ pub extern "C" fn scene_get_entity_scale_editor(scene: *mut std::ffi::c_void, en
 }
 
 #[unsafe(no_mangle)]
+pub extern "C" fn scene_set_entity_position_editor(scene: *mut std::ffi::c_void, entity_id: u64, x: f32, y: f32, z: f32) {
+    if scene.is_null() {
+        return;
+    }
+    unsafe {
+        hezhou_core::scene_set_entity_position(scene as *mut hezhou_core::Scene, entity_id, x, y, z);
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn scene_set_entity_scale_editor(scene: *mut std::ffi::c_void, entity_id: u64, x: f32, y: f32, z: f32) {
+    if scene.is_null() {
+        return;
+    }
+    unsafe {
+        hezhou_core::scene_set_entity_scale(scene as *mut hezhou_core::Scene, entity_id, x, y, z);
+    }
+}
+
+#[unsafe(no_mangle)]
 pub extern "C" fn scene_rotate_entity_editor(scene: *mut std::ffi::c_void, entity_id: u64, angle_degrees: f32) {
     if scene.is_null() {
         return;
     }
     unsafe {
         hezhou_core::scene_rotate_entity(scene as *mut hezhou_core::Scene, entity_id, angle_degrees);
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn scene_set_entity_name_editor(scene: *mut std::ffi::c_void, entity_id: u64, name_ptr: *const i8) {
+    if scene.is_null() || name_ptr.is_null() {
+        return;
+    }
+    unsafe {
+        hezhou_core::scene_set_entity_name(scene as *mut hezhou_core::Scene, entity_id, name_ptr);
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn scene_get_entity_name_editor(scene: *mut std::ffi::c_void, entity_id: u64, buffer_ptr: *mut i8, buffer_size: usize) -> usize {
+    if scene.is_null() || buffer_ptr.is_null() || buffer_size == 0 {
+        return 0;
+    }
+    unsafe {
+        hezhou_core::scene_get_entity_name(scene as *mut hezhou_core::Scene, entity_id, buffer_ptr, buffer_size)
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn scene_attach_script_binding_editor(scene: *mut std::ffi::c_void, entity_id: u64, 
+                                                      script_path: *const i8, class_name: *const i8) {
+    if scene.is_null() {
+        return;
+    }
+    let script_path_str = unsafe {
+        std::ffi::CStr::from_ptr(script_path).to_string_lossy().into_owned()
+    };
+    let class_name_str = unsafe {
+        std::ffi::CStr::from_ptr(class_name).to_string_lossy().into_owned()
+    };
+    
+    unsafe {
+        let scene_ptr = scene as *mut hezhou_core::Scene;
+        let entity = hezhou_core::Entity::new(entity_id);
+        (*scene_ptr).attach_script_binding(entity, script_path_str, class_name_str);
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn scene_remove_script_binding_editor(scene: *mut std::ffi::c_void, entity_id: u64, script_index: usize) {
+    if scene.is_null() {
+        return;
+    }
+    unsafe {
+        let scene_ptr = scene as *mut hezhou_core::Scene;
+        let entity = hezhou_core::Entity::new(entity_id);
+        (*scene_ptr).remove_script_binding(entity, script_index);
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn scene_get_script_binding_count_editor(scene: *mut std::ffi::c_void, entity_id: u64) -> usize {
+    if scene.is_null() {
+        return 0;
+    }
+    unsafe {
+        let scene_ptr = scene as *mut hezhou_core::Scene;
+        let entity = hezhou_core::Entity::new(entity_id);
+        (*scene_ptr).get_script_binding_count(entity)
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn scene_get_script_binding_info_editor(scene: *mut std::ffi::c_void, entity_id: u64, index: usize,
+                                                         path_buffer: *mut i8, path_buffer_size: usize,
+                                                         class_buffer: *mut i8, class_buffer_size: usize,
+                                                         out_enabled: *mut bool) -> bool {
+    if scene.is_null() || path_buffer.is_null() || class_buffer.is_null() || out_enabled.is_null() {
+        return false;
+    }
+    unsafe {
+        let scene_ptr = scene as *mut hezhou_core::Scene;
+        let entity = hezhou_core::Entity::new(entity_id);
+        if let Some(binding) = (*scene_ptr).get_script_binding(entity, index) {
+            let path_bytes = binding.script_path.as_bytes();
+            let path_copy_len = path_bytes.len().min(path_buffer_size - 1);
+            std::ptr::copy_nonoverlapping(path_bytes.as_ptr(), path_buffer as *mut u8, path_copy_len);
+            *path_buffer.add(path_copy_len) = 0;
+            
+            let class_bytes = binding.class_name.as_bytes();
+            let class_copy_len = class_bytes.len().min(class_buffer_size - 1);
+            std::ptr::copy_nonoverlapping(class_bytes.as_ptr(), class_buffer as *mut u8, class_copy_len);
+            *class_buffer.add(class_copy_len) = 0;
+            
+            *out_enabled = binding.enabled;
+            true
+        } else {
+            false
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn scene_set_script_binding_enabled_editor(scene: *mut std::ffi::c_void, entity_id: u64, index: usize, enabled: bool) {
+    if scene.is_null() {
+        return;
+    }
+    unsafe {
+        let scene_ptr = scene as *mut hezhou_core::Scene;
+        let entity = hezhou_core::Entity::new(entity_id);
+        (*scene_ptr).set_script_binding_enabled(entity, index, enabled);
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn scene_create_entity_editor(scene: *mut std::ffi::c_void) -> u64 {
+    if scene.is_null() {
+        return 0;
+    }
+    unsafe {
+        let scene_ptr = scene as *mut hezhou_core::Scene;
+        let entity = (*scene_ptr).create_entity();
+        entity.id
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn scene_get_entity_count_editor(scene: *mut std::ffi::c_void) -> u64 {
+    if scene.is_null() {
+        return 0;
+    }
+    unsafe {
+        let scene_ptr = scene as *mut hezhou_core::Scene;
+        (*scene_ptr).entity_count() as u64
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn scene_get_entity_id_editor(scene: *mut std::ffi::c_void, index: u64) -> u64 {
+    if scene.is_null() {
+        return 0;
+    }
+    unsafe {
+        let scene_ptr = scene as *mut hezhou_core::Scene;
+        let entities = &(*scene_ptr).root_entities;
+        if index < entities.len() as u64 {
+            entities[index as usize].id
+        } else {
+            0
+        }
     }
 }
 
@@ -382,6 +637,11 @@ ui_list_item_set_text: unsafe { std::mem::transmute(ui_ffi::ui_list_item_set_tex
         ui_dropdown_set_selected: unsafe { std::mem::transmute(ui_ffi::ui_dropdown_set_selected as *const std::ffi::c_void) },
         ui_dropdown_get_selected: unsafe { std::mem::transmute(ui_ffi::ui_dropdown_get_selected as *const std::ffi::c_void) },
         ui_dropdown_set_on_select_thunk_ptr: unsafe { std::mem::transmute(ui_ffi::ui_dropdown_set_on_select_thunk_ptr as *const std::ffi::c_void) },
+        ui_create_input_field: unsafe { std::mem::transmute(ui_ffi::ui_create_input_field as *const std::ffi::c_void) },
+        ui_input_field_set_text: unsafe { std::mem::transmute(ui_ffi::ui_input_field_set_text as *const std::ffi::c_void) },
+        ui_input_field_get_text: unsafe { std::mem::transmute(ui_ffi::ui_input_field_get_text as *const std::ffi::c_void) },
+        ui_input_field_set_on_change_thunk_ptr: unsafe { std::mem::transmute(ui_ffi::ui_input_field_set_on_change_thunk_ptr as *const std::ffi::c_void) },
+        ui_input_field_set_placeholder: unsafe { std::mem::transmute(ui_ffi::ui_input_field_set_placeholder as *const std::ffi::c_void) },
         scene_create: scene_create_editor,
         scene_destroy: scene_destroy_editor,
         scene_create_cube: scene_create_cube_editor,
@@ -399,16 +659,31 @@ ui_list_item_set_text: unsafe { std::mem::transmute(ui_ffi::ui_list_item_set_tex
         scene_get_entity_position: scene_get_entity_position_editor,
         scene_get_entity_rotation: scene_get_entity_rotation_editor,
         scene_get_entity_scale: scene_get_entity_scale_editor,
+        scene_set_entity_position: scene_set_entity_position_editor,
+        scene_set_entity_scale: scene_set_entity_scale_editor,
         scene_rotate_entity: scene_rotate_entity_editor,
+        scene_set_entity_name: scene_set_entity_name_editor,
+        scene_get_entity_name: scene_get_entity_name_editor,
         set_selected_entity: set_selected_entity,
+        scene_attach_script_binding: scene_attach_script_binding_editor,
+        scene_remove_script_binding: scene_remove_script_binding_editor,
+        scene_get_script_binding_count: scene_get_script_binding_count_editor,
+        scene_get_script_binding_info: scene_get_script_binding_info_editor,
+        scene_set_script_binding_enabled: scene_set_script_binding_enabled_editor,
+        scene_create_entity: scene_create_entity_editor,
+        scene_get_entity_count: scene_get_entity_count_editor,
+        scene_get_entity_id: scene_get_entity_id_editor,
         widget_tree_ptr: widget_tree_handle,
         dfx_handle: dfx_for_csharp as *mut std::ffi::c_void,
         dfx_log: unsafe { std::mem::transmute(hezhou_dfx::dfx_log as *const std::ffi::c_void) },
         dfx_trace_begin: unsafe { std::mem::transmute(hezhou_dfx::dfx_trace_begin as *const std::ffi::c_void) },
         dfx_trace_end: unsafe { std::mem::transmute(hezhou_dfx::dfx_trace_end as *const std::ffi::c_void) },
+        set_status_text: set_status_text,
+        on_hot_reload_complete: on_hot_reload_complete_placeholder,
     };
     hezhou_scripting::ffi_context::set_ffi_context(ffi_ctx);
     let ffi_ptr = hezhou_scripting::ffi_context::get_ffi_context_ptr();
+    unsafe { FFI_PTR = Some(ffi_ptr); }
     dfx_info!("Demo", "FfiContext已设置, ptr={:?}", ffi_ptr);
 
     dfx_info!("Demo", "[5] 加载Mono DLL...");
@@ -488,22 +763,75 @@ ui_list_item_set_text: unsafe { std::mem::transmute(ui_ffi::ui_list_item_set_tex
         
         if HOT_RELOAD_REQUESTED.load(Ordering::SeqCst) {
             HOT_RELOAD_REQUESTED.store(false, Ordering::SeqCst);
-            dfx_info!("HotReload", "触发重载...");
+            dfx_info!("HotReload", "触发热更新...");
             dfx_trace_begin!("HotReload", "reload");
             
             unsafe {
                 if let Some(ref mut executor) = EXECUTOR {
-                    dfx_info!("HotReload", "清理旧的UI...");
+                    let ffi_ptr_val = FFI_PTR.unwrap_or(std::ptr::null());
+                    
+                    if let Some(callback) = STATUS_TEXT_CALLBACK {
+                        let status_cstr = std::ffi::CString::new("正在热更新脚本...").unwrap();
+                        callback(status_cstr.as_ptr());
+                    }
+                    
+                    dfx_info!("HotReload", "[1] 保存Entity-Script绑定数据...");
+                    let saved_bindings = save_scene_bindings();
+                    SAVED_BINDINGS = saved_bindings;
+                    
+                    dfx_info!("HotReload", "[2] 清理旧的UI widgets...");
                     ui_ffi::ui_clear_widget_tree(widget_tree_handle as ui_ffi::WidgetTreeHandle);
                     
+                    dfx_info!("HotReload", "[3] 卸载当前assembly...");
+                    executor.shutdown();
+                    
+                    dfx_info!("HotReload", "[4] 重新编译C#脚本...");
+                    let compile_result = recompile_editor_script();
+                    
+                    if !compile_result {
+                        if let Some(callback) = STATUS_TEXT_CALLBACK {
+                            let status_cstr = std::ffi::CString::new("热更新失败: 编译错误").unwrap();
+                            callback(status_cstr.as_ptr());
+                        }
+                        dfx_error!("HotReload", "编译失败!");
+                        
+                        dfx_info!("HotReload", "尝试恢复旧assembly...");
+                        executor.reload().ok();
+                        executor.call_static_with_ptr_namespace("Hezhou", "EditorScript", "Initialize", ffi_ptr_val as usize).ok();
+                        
+                        dfx_trace_end!("HotReload", "reload");
+                        continue;
+                    }
+                    
+                    dfx_info!("HotReload", "[5] 加载新assembly...");
                     match executor.reload() {
                         Ok(_) => {
                             dfx_info!("HotReload", "Assembly reload成功!");
-                            executor.call_static_with_ptr_namespace("Hezhou", "EditorScript", "Initialize", ffi_ptr as usize)
+                            
+                            dfx_info!("HotReload", "[6] 调用Initialize重建UI...");
+                            executor.call_static_with_ptr_namespace("Hezhou", "EditorScript", "Initialize", ffi_ptr_val as usize)
                                 .expect("Initialize failed");
+                            
+                            dfx_info!("HotReload", "[7] 恢复Entity-Script绑定数据...");
+                            restore_scene_bindings(&SAVED_BINDINGS);
+                            
+                            dfx_info!("HotReload", "[8] 调用OnHotReloadComplete回调...");
+                            if let Some(callback) = HOT_RELOAD_COMPLETE_CALLBACK {
+                                callback();
+                            }
+                            
+                            if let Some(callback) = STATUS_TEXT_CALLBACK {
+                                let status_cstr = std::ffi::CString::new("热更新完成").unwrap();
+                                callback(status_cstr.as_ptr());
+                            }
+                            
                             dfx_info!("HotReload", "UI重新初始化完成!");
                         }
                         Err(e) => {
+                            if let Some(callback) = STATUS_TEXT_CALLBACK {
+                                let status_cstr = std::ffi::CString::new(format!("热更新失败: {:?}", e).as_str()).unwrap();
+                                callback(status_cstr.as_ptr());
+                            }
                             dfx_error!("HotReload", "Reload失败: {:?}", e);
                         }
                     }
@@ -608,6 +936,44 @@ fn compile_editor_script() {
         }
         Err(e) => {
             dfx_error!("Demo", "mcs not found: {:?}", e);
+        }
+    }
+}
+
+fn recompile_editor_script() -> bool {
+    use std::process::Command;
+    
+    if !std::path::Path::new("C:\\Program Files\\Mono\\bin\\mcs.bat").exists() {
+        dfx_info!("HotReload", "mcs.bat not found - assuming precompiled DLL");
+        return true;
+    }
+    
+    dfx_info!("HotReload", "执行mcs编译...");
+    
+    let result = Command::new("C:\\Program Files\\Mono\\bin\\mcs.bat")
+        .args([
+            "-target:library",
+            "-out:scripts/bin/Mono/EditorScript.dll",
+            "scripts/EditorScript.cs",
+            "scripts/UI.cs",
+            "scripts/DFX.cs",
+        ])
+        .output();
+    
+    match result {
+        Ok(output) => {
+            if output.status.success() {
+                dfx_info!("HotReload", "✓ 编译成功");
+                true
+            } else {
+                let stderr = String::from_utf8_lossy(&output.stderr);
+                dfx_error!("HotReload", "✗ 编译失败:\n{}", stderr);
+                false
+            }
+        }
+        Err(e) => {
+            dfx_error!("HotReload", "✗ mcs执行失败: {:?}", e);
+            false
         }
     }
 }

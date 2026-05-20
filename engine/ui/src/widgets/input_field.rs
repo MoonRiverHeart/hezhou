@@ -1,0 +1,316 @@
+use crate::canvas::*;
+use crate::event::*;
+use crate::layout::*;
+use crate::style::*;
+use crate::types::*;
+use crate::widget::*;
+use crate::font_atlas::FontAtlas;
+use crate::types::Point;
+
+pub struct InputField {
+    id: WidgetId,
+    parent_id: WidgetId,
+    children: Vec<WidgetId>,
+    layout: Layout,
+    style: Style,
+    state: WidgetState,
+    text: String,
+    placeholder: String,
+    cursor_position: usize,
+    is_focused: bool,
+    on_change: Option<Box<dyn FnMut(&str) + Send + Sync>>,
+    content_scale: f32,
+    flags: crate::widget::WidgetFlags,
+}
+
+impl InputField {
+    pub fn new() -> Self {
+        Self {
+            id: WidgetId::new(),
+            parent_id: WidgetId::invalid(),
+            children: Vec::new(),
+            layout: Layout::new(0.0, 0.0, 200.0, 30.0),
+            style: Style::new()
+                .with_background(Color::new(0.15, 0.15, 0.15, 1.0))
+                .with_border(Color::new(0.4, 0.4, 0.4, 1.0), 1.0, 4.0),
+            state: WidgetState::Normal,
+            text: String::new(),
+            placeholder: String::new(),
+            cursor_position: 0,
+            is_focused: false,
+            on_change: None,
+            content_scale: 1.0,
+            flags: crate::widget::WidgetFlags::default(),
+        }
+    }
+    
+    pub fn with_placeholder(mut self, placeholder: &str) -> Self {
+        self.placeholder = placeholder.to_string();
+        self
+    }
+    
+    pub fn set_text(&mut self, text: &str) {
+        self.text = text.to_string();
+        self.cursor_position = self.text.len();
+        self.flags.dirty_render = true;
+    }
+    
+    pub fn text(&self) -> &str {
+        &self.text
+    }
+    
+    pub fn set_placeholder(&mut self, placeholder: &str) {
+        self.placeholder = placeholder.to_string();
+        self.flags.dirty_render = true;
+    }
+    
+    pub fn set_on_change(&mut self, callback: Box<dyn FnMut(&str) + Send + Sync>) {
+        self.on_change = Some(callback);
+    }
+    
+    pub fn set_content_scale(&mut self, scale: f32) {
+        self.content_scale = scale;
+    }
+    
+    pub fn focus(&mut self) {
+        self.is_focused = true;
+        self.flags.dirty_render = true;
+    }
+    
+    pub fn blur(&mut self) {
+        self.is_focused = false;
+        self.flags.dirty_render = true;
+    }
+    
+    pub fn is_focused(&self) -> bool {
+        self.is_focused
+    }
+    
+    fn insert_char(&mut self, c: char) {
+        let byte_pos = self.cursor_byte_position();
+        self.text.insert(byte_pos, c);
+        self.cursor_position += 1;
+        self.trigger_on_change();
+        self.flags.dirty_render = true;
+    }
+    
+    fn delete_char(&mut self) {
+        if self.cursor_position > 0 {
+            self.cursor_position -= 1;
+            let byte_pos = self.cursor_byte_position();
+            self.text.remove(byte_pos);
+            self.trigger_on_change();
+            self.flags.dirty_render = true;
+        }
+    }
+    
+    fn cursor_byte_position(&self) -> usize {
+        self.text.char_indices()
+            .nth(self.cursor_position)
+            .map(|(i, _)| i)
+            .unwrap_or(self.text.len())
+    }
+    
+    fn trigger_on_change(&mut self) {
+        if let Some(callback) = &mut self.on_change {
+            callback(&self.text);
+        }
+    }
+}
+
+impl Widget for InputField {
+    fn id(&self) -> WidgetId {
+        self.id
+    }
+    
+    fn parent(&self) -> Option<WidgetId> {
+        if self.parent_id.is_valid() {
+            Some(self.parent_id)
+        } else {
+            None
+        }
+    }
+    
+    fn set_parent(&mut self, parent: WidgetId) {
+        self.parent_id = parent;
+    }
+    
+    fn children(&self) -> &[WidgetId] {
+        &self.children
+    }
+    
+    fn add_child(&mut self, child: WidgetId) {
+        if !self.children.contains(&child) {
+            self.children.push(child);
+        }
+    }
+    
+    fn remove_child(&mut self, child: WidgetId) {
+        self.children.retain(|c| *c != child);
+    }
+    
+    fn layout(&self) -> &Layout {
+        &self.layout
+    }
+    
+    fn set_layout(&mut self, layout: Layout) {
+        self.layout = layout;
+    }
+    fn style(&self) -> &Style {
+        &self.style
+    }
+    
+    fn set_style(&mut self, style: Style) {
+        self.style = style;
+    }
+    
+    fn state(&self) -> WidgetState {
+        self.state
+    }
+    
+    fn set_state(&mut self, state: WidgetState) {
+        self.state = state;
+    }
+    
+    fn measure(&self, _font_atlas: &FontAtlas) -> (f32, f32) {
+        (self.layout.width, self.layout.height)
+    }
+    
+    fn widget_type(&self) -> &'static str {
+        "InputField"
+    }
+    
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+    
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+        self
+    }
+    
+    fn draw(&mut self, canvas: &mut Canvas) {
+        let current_style = if self.is_focused {
+            Style::new()
+                .with_background(Color::new(0.18, 0.18, 0.18, 1.0))
+                .with_border(Color::new(0.5, 0.7, 1.0, 1.0), 2.0, 4.0)
+        } else {
+            match self.state {
+                WidgetState::Hovered => Style::new()
+                    .with_background(Color::new(0.2, 0.2, 0.2, 1.0))
+                    .with_border(Color::new(0.5, 0.5, 0.5, 1.0), 1.0, 4.0),
+                _ => self.style,
+            }
+        };
+        
+        let rect = Rect::new(0.0, 0.0, self.layout.width, self.layout.height);
+        canvas.draw_rect(rect, &current_style);
+        
+        let font_size = 14.0 * self.content_scale;
+        let display_text = if self.text.is_empty() && !self.is_focused {
+            &self.placeholder
+        } else {
+            &self.text
+        };
+        
+        let text_color = if self.text.is_empty() && !self.is_focused {
+            Color::new(0.5, 0.5, 0.5, 1.0)
+        } else {
+            Color::white()
+        };
+        
+        let text_style = TextStyle::new()
+            .with_size(font_size)
+            .with_color(text_color)
+            .with_alignment(TextAlignment {
+                horizontal: HorizontalAlignment::Left,
+                vertical: VerticalAlignment::Center,
+            });
+        
+        let text_rect = Rect::new(8.0, 0.0, self.layout.width - 16.0, self.layout.height);
+        canvas.draw_text(text_rect, display_text, &text_style);
+        
+        if self.is_focused {
+            let font_atlas = crate::font_atlas::create_font_atlas();
+            let text_width = if self.text.is_empty() {
+                0.0
+            } else {
+                let chars_before_cursor: String = self.text.chars()
+                    .take(self.cursor_position)
+                    .collect();
+                let (w, _) = font_atlas.measure_text(0, &chars_before_cursor, font_size);
+                w
+            };
+            
+            let cursor_x = 8.0 + text_width;
+            let cursor_y1 = 6.0;
+            let cursor_y2 = self.layout.height - 6.0;
+            
+            canvas.draw_line(
+                Point::new(cursor_x, cursor_y1),
+                Point::new(cursor_x, cursor_y2),
+                Color::white(),
+                1.0
+            );
+        }
+    }
+    
+    fn on_event(&mut self, event: &Event) -> EventResult {
+        match event.event_type {
+            EventType::TouchBegin => {
+                if self.state != WidgetState::Disabled {
+                    self.set_state(WidgetState::Pressed);
+                    self.focus();
+                    return EventResult::Handled;
+                }
+            }
+            
+            EventType::TouchEnd => {
+                if self.state == WidgetState::Pressed {
+                    self.set_state(WidgetState::Normal);
+                    return EventResult::Stopped;
+                }
+            }
+            
+            EventType::MouseEnter => {
+                if self.state != WidgetState::Disabled {
+                    self.set_state(WidgetState::Hovered);
+                    return EventResult::Handled;
+                }
+            }
+            
+            EventType::MouseLeave => {
+                if self.state == WidgetState::Hovered {
+                    self.set_state(WidgetState::Normal);
+                    return EventResult::Handled;
+                }
+            }
+            
+            EventType::KeyDown => {
+                if self.is_focused {
+                    if let EventData::Key(key_data) = &event.data {
+                        let keycode = key_data.keycode;
+                        
+                        if keycode == 8 {
+                            self.delete_char();
+                            return EventResult::Handled;
+                        } else if keycode == 13 {
+                            self.blur();
+                            return EventResult::Handled;
+                        } else if keycode >= 32 && keycode <= 126 {
+                            self.insert_char(keycode as u8 as char);
+                            return EventResult::Handled;
+                        } else if key_data.unicode_char > 0 {
+                            if let Some(c) = char::from_u32(key_data.unicode_char) {
+                                self.insert_char(c);
+                                return EventResult::Handled;
+                            }
+                        }
+                    }
+                }
+            }
+            
+            _ => {}
+        }
+        EventResult::Ignored
+    }
+}

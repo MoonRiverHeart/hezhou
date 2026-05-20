@@ -18,11 +18,36 @@ namespace Hezhou
         private static ulong _previewWindowId;
         private static Panel _propertiesPanel;
         private static VStack _propsList;
-        private static ulong _propsEntityLabelId;    // Entity ID label
-        private static ulong _propsPositionLabelId;   // Position label
-        private static ulong _propsRotationLabelId;   // Rotation label
-        private static ulong _propsScaleLabelId;      // Scale label
-        private static ulong _selectedEntityId = 0;   // 当前选中的Entity ID
+        private static ulong _selectedEntityId = 0;
+        
+        private static ulong _nameInputFieldId;
+        private static ulong _posXInputFieldId;
+        private static ulong _posYInputFieldId;
+        private static ulong _posZInputFieldId;
+        private static ulong _rotXInputFieldId;
+        private static ulong _rotYInputFieldId;
+        private static ulong _rotZInputFieldId;
+        private static ulong _scaleXInputFieldId;
+        private static ulong _scaleYInputFieldId;
+        private static ulong _scaleZInputFieldId;
+        
+        private static List<string> _availableScripts = new List<string>();
+        private static ulong _scriptDropdownId;
+        private static ulong _addScriptBtnId;
+        private static ulong _scriptsListContainerId;
+        private static ulong _createEntityBtnId;
+        private static Dictionary<ulong, int> _removeScriptBtnIndices = new Dictionary<ulong, int>();
+        
+        private static UI.InputFieldChangeCallbackDelegate _nameInputCallback;
+        private static UI.InputFieldChangeCallbackDelegate _posXInputCallback;
+        private static UI.InputFieldChangeCallbackDelegate _posYInputCallback;
+        private static UI.InputFieldChangeCallbackDelegate _posZInputCallback;
+        private static UI.InputFieldChangeCallbackDelegate _rotXInputCallback;
+        private static UI.InputFieldChangeCallbackDelegate _rotYInputCallback;
+        private static UI.InputFieldChangeCallbackDelegate _rotZInputCallback;
+        private static UI.InputFieldChangeCallbackDelegate _scaleXInputCallback;
+        private static UI.InputFieldChangeCallbackDelegate _scaleYInputCallback;
+        private static UI.InputFieldChangeCallbackDelegate _scaleZInputCallback;
         private static Panel _statusBar;
         private static List _statusItems;
         private static ListItem _fpsItem;
@@ -95,6 +120,12 @@ private static float _cameraYaw = 0f;
         private static UI.WidgetCallbackDelegate _fileClickCallback;
         private static Scene _gameScene;
         private static ulong _testCubeId;
+        
+        private static UI.WidgetCallbackDelegate _addScriptClickCallback;
+        private static UI.WidgetCallbackDelegate _removeScriptClickCallback;
+        private static UI.WidgetCallbackDelegate _createEntityClickCallback;
+        private static UI.DropdownSelectCallbackDelegate _scriptDropdownSelectCallback;
+        private static UI.OnHotReloadCompleteDelegate _hotReloadCompleteCallback;
 
         public static void Initialize(IntPtr contextPtr)
         {
@@ -122,6 +153,12 @@ private static float _cameraYaw = 0f;
             _backClickCallback = OnBackClick;
             _directoryClickCallback = OnDirectoryClick;
             _fileClickCallback = OnFileClick;
+             
+_addScriptClickCallback = OnAddScriptClick;
+            _removeScriptClickCallback = OnRemoveScriptClick;
+            _createEntityClickCallback = OnCreateEntityClick;
+            _scriptDropdownSelectCallback = OnScriptDropdownSelect;
+            _hotReloadCompleteCallback = OnHotReloadComplete;
             
             UI.RegisterUpdateCallback(_updateCallback);
             
@@ -132,7 +169,40 @@ private static float _cameraYaw = 0f;
             UI.RegisterKeyCallback(_keyCallback);
             UI.RegisterMouseMoveCallback(_mouseMoveCallback);
             
+            ScanScripts();
+            
             Log.Info("Editor", "编辑器初始化完成");
+        }
+        
+        private static void ScanScripts()
+        {
+            _availableScripts.Clear();
+            
+            try
+            {
+                if (Directory.Exists("scripts"))
+                {
+                    string[] files = Directory.GetFiles("scripts", "*.cs");
+                    foreach (string file in files)
+                    {
+                        string fileName = Path.GetFileName(file);
+                        if (fileName != "UI.cs" && fileName != "DFX.cs" && fileName != "EditorScript.cs")
+                        {
+                            _availableScripts.Add(fileName);
+                        }
+                    }
+                    
+                    Log.Info("Editor", $"扫描scripts目录: 找到 {_availableScripts.Count} 个可用脚本");
+                    foreach (var script in _availableScripts)
+                    {
+                        Log.Info("Editor", $"  - {script}");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Error("Editor", $"扫描scripts目录失败: {ex.Message}");
+            }
         }
 
         private static void OnMouseMove(float x, float y, bool dragging)
@@ -288,7 +358,11 @@ private static float _cameraYaw = 0f;
             _assetList.SetPosition(10f, 40f);
             _assetList.AddLabel(LEFT_PANEL_WIDTH - 40f, 20f, "Textures: 0");
             _assetList.AddLabel(LEFT_PANEL_WIDTH - 40f, 20f, "Models: 0");
-            _assetList.AddLabel(LEFT_PANEL_WIDTH - 40f, 20f, "Scripts: 1");
+            _assetList.AddLabel(LEFT_PANEL_WIDTH - 40f, 20f, $"Scripts: {_availableScripts.Count}");
+            
+            _createEntityBtnId = _assetList.AddButton(LEFT_PANEL_WIDTH - 40f, 25f, "创建Entity");
+            UI.SetOnClick(_createEntityBtnId, _createEntityClickCallback);
+            
             Log.Info("Editor", "资产管理面板创建完成");
 
             _previewPanel = new Panel(rootId, previewX, mainY, previewWidth, mainHeight + BOTTOM_PANEL_HEIGHT, 0.08f, 0.08f, 0.08f, 0.3f);
@@ -303,16 +377,78 @@ private static float _cameraYaw = 0f;
             UI.SetGamePreviewExtent((uint)previewWindowWidth, (uint)previewWindowHeight);
             Log.Info("Editor", $"游戏预览面板创建完成: PreviewWindow={previewWindowWidth}x{previewWindowHeight}, aspect={previewWindowWidth/previewWindowHeight:F2}");
 
+            _nameInputCallback = OnNameInputChange;
+            _posXInputCallback = OnPosXInputChange;
+            _posYInputCallback = OnPosYInputChange;
+            _posZInputCallback = OnPosZInputChange;
+            _rotXInputCallback = OnRotXInputChange;
+            _rotYInputCallback = OnRotYInputChange;
+            _rotZInputCallback = OnRotZInputChange;
+            _scaleXInputCallback = OnScaleXInputChange;
+            _scaleYInputCallback = OnScaleYInputChange;
+            _scaleZInputCallback = OnScaleZInputChange;
+            
             _propertiesPanel = new Panel(rootId, _screenWidth - RIGHT_PANEL_WIDTH, mainY, RIGHT_PANEL_WIDTH, mainHeight + BOTTOM_PANEL_HEIGHT, 0.2f, 0.2f, 0.2f, 1.0f);
             UI.CreateLabel(_propertiesPanel.Id, 10f, 10f, RIGHT_PANEL_WIDTH - 20f, 25f, "属性编辑");
             _propsList = new VStack(_propertiesPanel.Id, 5f);
             _propsList.SetPosition(10f, 40f);
             
-            // 保存Label ID以便后续更新
-            _propsEntityLabelId = _propsList.AddLabel(RIGHT_PANEL_WIDTH - 40f, 20f, "Entity: 无");
-            _propsPositionLabelId = _propsList.AddLabel(RIGHT_PANEL_WIDTH - 40f, 20f, "位置: (0, 0, 0)");
-            _propsRotationLabelId = _propsList.AddLabel(RIGHT_PANEL_WIDTH - 40f, 20f, "旋转: (0°, 0°, 0°)");
-            _propsScaleLabelId = _propsList.AddLabel(RIGHT_PANEL_WIDTH - 40f, 20f, "缩放: (1, 1, 1)");
+            UI.CreateLabel(_propsList.Id, RIGHT_PANEL_WIDTH - 40f, 20f, "Entity:");
+            _nameInputFieldId = UI.CreateInputField(_propsList.Id, RIGHT_PANEL_WIDTH - 40f, 25f);
+            UI.InputFieldSetPlaceholder(_nameInputFieldId, "Entity Name");
+            UI.InputFieldSetOnChange(_nameInputFieldId, _nameInputCallback);
+            
+            UI.CreateLabel(_propsList.Id, RIGHT_PANEL_WIDTH - 40f, 20f, "Transform:");
+            
+            UI.CreateLabel(_propsList.Id, RIGHT_PANEL_WIDTH - 40f, 20f, "Position:");
+            var posHStack = UI.CreateHStack(_propsList.Id, 5f);
+            _posXInputFieldId = UI.CreateInputField(posHStack, 70f, 25f);
+            UI.InputFieldSetPlaceholder(_posXInputFieldId, "X");
+            UI.InputFieldSetOnChange(_posXInputFieldId, _posXInputCallback);
+            _posYInputFieldId = UI.CreateInputField(posHStack, 70f, 25f);
+            UI.InputFieldSetPlaceholder(_posYInputFieldId, "Y");
+            UI.InputFieldSetOnChange(_posYInputFieldId, _posYInputCallback);
+            _posZInputFieldId = UI.CreateInputField(posHStack, 70f, 25f);
+            UI.InputFieldSetPlaceholder(_posZInputFieldId, "Z");
+            UI.InputFieldSetOnChange(_posZInputFieldId, _posZInputCallback);
+            
+            UI.CreateLabel(_propsList.Id, RIGHT_PANEL_WIDTH - 40f, 20f, "Rotation:");
+            var rotHStack = UI.CreateHStack(_propsList.Id, 5f);
+            _rotXInputFieldId = UI.CreateInputField(rotHStack, 70f, 25f);
+            UI.InputFieldSetPlaceholder(_rotXInputFieldId, "X");
+            UI.InputFieldSetOnChange(_rotXInputFieldId, _rotXInputCallback);
+            _rotYInputFieldId = UI.CreateInputField(rotHStack, 70f, 25f);
+            UI.InputFieldSetPlaceholder(_rotYInputFieldId, "Y");
+            UI.InputFieldSetOnChange(_rotYInputFieldId, _rotYInputCallback);
+            _rotZInputFieldId = UI.CreateInputField(rotHStack, 70f, 25f);
+            UI.InputFieldSetPlaceholder(_rotZInputFieldId, "Z");
+            UI.InputFieldSetOnChange(_rotZInputFieldId, _rotZInputCallback);
+            
+            UI.CreateLabel(_propsList.Id, RIGHT_PANEL_WIDTH - 40f, 20f, "Scale:");
+            var scaleHStack = UI.CreateHStack(_propsList.Id, 5f);
+            _scaleXInputFieldId = UI.CreateInputField(scaleHStack, 70f, 25f);
+            UI.InputFieldSetPlaceholder(_scaleXInputFieldId, "X");
+            UI.InputFieldSetOnChange(_scaleXInputFieldId, _scaleXInputCallback);
+            _scaleYInputFieldId = UI.CreateInputField(scaleHStack, 70f, 25f);
+            UI.InputFieldSetPlaceholder(_scaleYInputFieldId, "Y");
+            UI.InputFieldSetOnChange(_scaleYInputFieldId, _scaleYInputCallback);
+            _scaleZInputFieldId = UI.CreateInputField(scaleHStack, 70f, 25f);
+            UI.InputFieldSetPlaceholder(_scaleZInputFieldId, "Z");
+            UI.InputFieldSetOnChange(_scaleZInputFieldId, _scaleZInputCallback);
+            
+            UI.CreateLabel(_propsList.Id, RIGHT_PANEL_WIDTH - 40f, 20f, "Scripts:");
+            
+            var scriptHStack = UI.CreateHStack(_propsList.Id, 5f);
+            _scriptDropdownId = UI.CreateDropdown(scriptHStack, RIGHT_PANEL_WIDTH - 70f, 25f);
+            string[] scriptOptions = _availableScripts.Count > 0 ? _availableScripts.ToArray() : new string[] { "无可用脚本" };
+            UI.DropdownSetOptions(_scriptDropdownId, scriptOptions);
+            UI.DropdownSetOnSelect(_scriptDropdownId, _scriptDropdownSelectCallback);
+            
+            _addScriptBtnId = UI.CreateButton(scriptHStack, 50f, 25f, "Add");
+            UI.SetOnClick(_addScriptBtnId, _addScriptClickCallback);
+            
+            _scriptsListContainerId = UI.CreateVStack(_propsList.Id, 5f);
+            
             Log.Info("Editor", "属性面板创建完成");
 
             _statusBar = new Panel(rootId, 0, statusY, _screenWidth, STATUS_BAR_HEIGHT, 0.12f, 0.12f, 0.12f, 1.0f);
@@ -569,60 +705,47 @@ private static float _cameraYaw = 0f;
         
         private static void OnHotReloadClick(ulong widgetId)
         {
-            Log.Info("Editor", "Hot Reload triggered!");
+            Log.Info("Editor", "=== Hot Reload按钮点击 ===");
             
-            if (_scriptTextEditId == 0)
+            if (_statusItem != null)
             {
-                Log.Error("Editor", "TextEdit not created");
-                return;
+                _statusItem.Text = "正在保存脚本...";
             }
             
-            // 获取脚本内容
-            string scriptContent = UI.TextEditGetText(_scriptTextEditId);
-            Log.Info("Editor", $"Script content length: {scriptContent.Length}");
-            
-            // 保存到临时文件
-            try
+            // 保存脚本内容到文件
+            if (_scriptTextEditId != 0)
             {
-                string tempPath = "scripts/bin/Mono/NewScript.cs";
-                System.IO.Directory.CreateDirectory("scripts/bin/Mono");
-                System.IO.File.WriteAllText(tempPath, scriptContent);
-                Log.Info("Editor", $"Script saved to {tempPath}");
-                
-                // 编译（覆盖EditorScript.dll）
-                var compileProcess = new System.Diagnostics.Process();
-                compileProcess.StartInfo.FileName = "C:\\Program Files\\Mono\\bin\\mcs.bat";
-                compileProcess.StartInfo.Arguments = $"-target:library -out:scripts/bin/Mono/EditorScript.dll {tempPath} scripts/UI.cs scripts/DFX.cs";
-                compileProcess.StartInfo.UseShellExecute = false;
-                compileProcess.StartInfo.RedirectStandardOutput = true;
-                compileProcess.StartInfo.RedirectStandardError = true;
-                compileProcess.StartInfo.CreateNoWindow = true;
-                
-                compileProcess.Start();
-                string output = compileProcess.StandardOutput.ReadToEnd();
-                string error = compileProcess.StandardError.ReadToEnd();
-                compileProcess.WaitForExit();
-                
-                if (compileProcess.ExitCode == 0)
+                try
                 {
-                    Log.Info("Editor", "✓ Compilation successful!");
-                    Log.Info("Editor", "Output DLL: scripts/tmp/NewScript.dll");
-                    if (!string.IsNullOrEmpty(output))
-                        Log.Info("Editor", $"Compiler output:\n{output}");
+                    string scriptContent = UI.TextEditGetText(_scriptTextEditId);
+                    string scriptPath = "scripts/bin/Mono/EditorScript.cs";
                     
-                    // 触发Rust端hot reload
-                    Log.Info("Editor", "Triggering hot reload...");
+                    System.IO.Directory.CreateDirectory("scripts/bin/Mono");
+                    System.IO.File.WriteAllText(scriptPath, scriptContent);
+                    Log.Info("Editor", $"✓ 脚本已保存: {scriptPath} ({scriptContent.Length} chars)");
+                    
+                    // 通知Rust端触发完整的热更新流程
+                    UI.SetStatusText("正在热更新脚本...");
                     UI.TriggerHotReload();
+                    
+                    Log.Info("Editor", "已触发Rust端HotReload流程");
                 }
-                else
+                catch (Exception ex)
                 {
-                    Log.Error("Editor", "✗ Compilation failed!");
-                    Log.Error("Editor", $"Error:\n{error}");
+                    Log.Error("Editor", $"保存脚本失败: {ex.Message}");
+                    if (_statusItem != null)
+                    {
+                        _statusItem.Text = $"保存失败: {ex.Message}";
+                    }
                 }
             }
-            catch (Exception ex)
+            else
             {
-                Log.Error("Editor", ex.Message);
+                Log.Error("Editor", "TextEdit未创建");
+                if (_statusItem != null)
+                {
+                    _statusItem.Text = "错误: 编辑器未初始化";
+                }
             }
         }
         
@@ -742,27 +865,59 @@ private static float _cameraYaw = 0f;
             
             _selectedEntityId = entityId;
             
-            // 更新Entity ID显示
-            UI.SetText(_propsEntityLabelId, $"Entity: {entityId}");
+            string name = UI.SceneGetEntityName(_gameScene.ScenePtr, entityId);
+            UI.InputFieldSetText(_nameInputFieldId, name);
             
-            // 获取Entity transform
             float px, py, pz;
             UI.SceneGetEntityPosition(_gameScene.ScenePtr, entityId, out px, out py, out pz);
-            UI.SetText(_propsPositionLabelId, $"位置: ({px:F2}, {py:F2}, {pz:F2})");
+            UI.InputFieldSetText(_posXInputFieldId, px.ToString("F2"));
+            UI.InputFieldSetText(_posYInputFieldId, py.ToString("F2"));
+            UI.InputFieldSetText(_posZInputFieldId, pz.ToString("F2"));
             
             float rx, ry, rz, rw;
             UI.SceneGetEntityRotation(_gameScene.ScenePtr, entityId, out rx, out ry, out rz, out rw);
-            // 将四元数转换为欧拉角（简化版本）
             float eulerX = (float)Math.Atan2(2.0 * (rw * rx + ry * rz), 1.0 - 2.0 * (rx * rx + ry * ry)) * 180.0f / (float)Math.PI;
             float eulerY = (float)Math.Asin(2.0 * (rw * ry - rz * rx)) * 180.0f / (float)Math.PI;
             float eulerZ = (float)Math.Atan2(2.0 * (rw * rz + rx * ry), 1.0 - 2.0 * (ry * ry + rz * rz)) * 180.0f / (float)Math.PI;
-            UI.SetText(_propsRotationLabelId, $"旋转: ({eulerX:F0}°, {eulerY:F0}°, {eulerZ:F0}°)");
+            UI.InputFieldSetText(_rotXInputFieldId, eulerX.ToString("F0"));
+            UI.InputFieldSetText(_rotYInputFieldId, eulerY.ToString("F0"));
+            UI.InputFieldSetText(_rotZInputFieldId, eulerZ.ToString("F0"));
             
             float sx, sy, sz;
             UI.SceneGetEntityScale(_gameScene.ScenePtr, entityId, out sx, out sy, out sz);
-            UI.SetText(_propsScaleLabelId, $"缩放: ({sx:F2}, {sy:F2}, {sz:F2})");
+            UI.InputFieldSetText(_scaleXInputFieldId, sx.ToString("F2"));
+            UI.InputFieldSetText(_scaleYInputFieldId, sy.ToString("F2"));
+            UI.InputFieldSetText(_scaleZInputFieldId, sz.ToString("F2"));
+            
+            UpdateScriptBindingsList(entityId);
             
             Log.Info("Editor", $"Properties panel updated for entity {entityId}: pos=({px}, {py}, {pz})");
+        }
+        
+        private static void UpdateScriptBindingsList(ulong entityId)
+        {
+            if (_gameScene == null || _scriptsListContainerId == 0) return;
+            
+            _removeScriptBtnIndices.Clear();
+            
+            int scriptCount = _gameScene.GetScriptBindingCount(entityId);
+            Log.Info("Editor", $"UpdateScriptBindingsList: entityId={entityId}, count={scriptCount}");
+            
+            for (int i = 0; i < scriptCount; i++)
+            {
+                var info = _gameScene.GetScriptBindingInfo(entityId, i);
+                Log.Info("Editor", $"  Script[{i}]: path={info.ScriptPath}, class={info.ClassName}, enabled={info.Enabled}");
+                
+                string scriptName = Path.GetFileName(info.ScriptPath);
+                string labelText = $"{scriptName} ({info.ClassName}) [{(info.Enabled ? "ON" : "OFF")}]";
+                
+                var scriptRow = UI.CreateHStack(_scriptsListContainerId, 5f);
+                UI.CreateLabel(scriptRow, RIGHT_PANEL_WIDTH - 90f, 20f, labelText);
+                
+                ulong removeBtnId = UI.CreateButton(scriptRow, 40f, 20f, "X");
+                UI.SetOnClick(removeBtnId, _removeScriptClickCallback);
+                _removeScriptBtnIndices[removeBtnId] = i;
+            }
         }
         
         private static void ClearPropertiesPanel()
@@ -770,12 +925,125 @@ private static float _cameraYaw = 0f;
             if (_propsList == null) return;
             
             _selectedEntityId = 0;
-            UI.SetText(_propsEntityLabelId, "Entity: 无");
-            UI.SetText(_propsPositionLabelId, "位置: (0, 0, 0)");
-            UI.SetText(_propsRotationLabelId, "旋转: (0°, 0°, 0°)");
-            UI.SetText(_propsScaleLabelId, "缩放: (1, 1, 1)");
+            UI.InputFieldSetText(_nameInputFieldId, "");
+            UI.InputFieldSetText(_posXInputFieldId, "0");
+            UI.InputFieldSetText(_posYInputFieldId, "0");
+            UI.InputFieldSetText(_posZInputFieldId, "0");
+            UI.InputFieldSetText(_rotXInputFieldId, "0");
+            UI.InputFieldSetText(_rotYInputFieldId, "0");
+            UI.InputFieldSetText(_rotZInputFieldId, "0");
+            UI.InputFieldSetText(_scaleXInputFieldId, "1");
+            UI.InputFieldSetText(_scaleYInputFieldId, "1");
+            UI.InputFieldSetText(_scaleZInputFieldId, "1");
             
             Log.Info("Editor", "Properties panel cleared");
+        }
+        
+        private static void OnNameInputChange(ulong widgetId, string text)
+        {
+            if (_selectedEntityId == 0 || _gameScene == null) return;
+            UI.SceneSetEntityName(_gameScene.ScenePtr, _selectedEntityId, text);
+            Log.Info("Editor", $"Entity name changed to: {text}");
+        }
+        
+        private static void OnPosXInputChange(ulong widgetId, string text)
+        {
+            if (_selectedEntityId == 0 || _gameScene == null) return;
+            if (float.TryParse(text, out float x))
+            {
+                float px, py, pz;
+                UI.SceneGetEntityPosition(_gameScene.ScenePtr, _selectedEntityId, out px, out py, out pz);
+                UI.SceneSetEntityPosition(_gameScene.ScenePtr, _selectedEntityId, x, py, pz);
+                Log.Info("Editor", $"Entity position X changed to: {x}");
+            }
+        }
+        
+        private static void OnPosYInputChange(ulong widgetId, string text)
+        {
+            if (_selectedEntityId == 0 || _gameScene == null) return;
+            if (float.TryParse(text, out float y))
+            {
+                float px, py, pz;
+                UI.SceneGetEntityPosition(_gameScene.ScenePtr, _selectedEntityId, out px, out py, out pz);
+                UI.SceneSetEntityPosition(_gameScene.ScenePtr, _selectedEntityId, px, y, pz);
+                Log.Info("Editor", $"Entity position Y changed to: {y}");
+            }
+        }
+        
+        private static void OnPosZInputChange(ulong widgetId, string text)
+        {
+            if (_selectedEntityId == 0 || _gameScene == null) return;
+            if (float.TryParse(text, out float z))
+            {
+                float px, py, pz;
+                UI.SceneGetEntityPosition(_gameScene.ScenePtr, _selectedEntityId, out px, out py, out pz);
+                UI.SceneSetEntityPosition(_gameScene.ScenePtr, _selectedEntityId, px, py, z);
+                Log.Info("Editor", $"Entity position Z changed to: {z}");
+            }
+        }
+        
+        private static void OnRotXInputChange(ulong widgetId, string text)
+        {
+            if (_selectedEntityId == 0 || _gameScene == null) return;
+            if (float.TryParse(text, out float deg))
+            {
+                Log.Info("Editor", $"Entity rotation X changed to: {deg}°");
+            }
+        }
+        
+        private static void OnRotYInputChange(ulong widgetId, string text)
+        {
+            if (_selectedEntityId == 0 || _gameScene == null) return;
+            if (float.TryParse(text, out float deg))
+            {
+                Log.Info("Editor", $"Entity rotation Y changed to: {deg}°");
+            }
+        }
+        
+        private static void OnRotZInputChange(ulong widgetId, string text)
+        {
+            if (_selectedEntityId == 0 || _gameScene == null) return;
+            if (float.TryParse(text, out float deg))
+            {
+                UI.SceneRotateEntity(_gameScene.ScenePtr, _selectedEntityId, deg);
+                Log.Info("Editor", $"Entity rotation Z changed to: {deg}°");
+            }
+        }
+        
+        private static void OnScaleXInputChange(ulong widgetId, string text)
+        {
+            if (_selectedEntityId == 0 || _gameScene == null) return;
+            if (float.TryParse(text, out float x))
+            {
+                float sx, sy, sz;
+                UI.SceneGetEntityScale(_gameScene.ScenePtr, _selectedEntityId, out sx, out sy, out sz);
+                UI.SceneSetEntityScale(_gameScene.ScenePtr, _selectedEntityId, x, sy, sz);
+                Log.Info("Editor", $"Entity scale X changed to: {x}");
+            }
+        }
+        
+        private static void OnScaleYInputChange(ulong widgetId, string text)
+        {
+            if (_selectedEntityId == 0 || _gameScene == null) return;
+            if (float.TryParse(text, out float y))
+            {
+                float sx, sy, sz;
+                UI.SceneGetEntityScale(_gameScene.ScenePtr, _selectedEntityId, out sx, out sy, out sz);
+                UI.SceneSetEntityScale(_gameScene.ScenePtr, _selectedEntityId, sx, y, sz);
+                Log.Info("Editor", $"Entity scale Y changed to: {y}");
+            }
+        }
+        
+        private static void OnScaleZInputChange(ulong widgetId, string text)
+        {
+            if (_selectedEntityId == 0 || _gameScene == null) return;
+            if (float.TryParse(text, out float z))
+            {
+                float sx, sy, sz;
+                UI.SceneGetEntityScale(_gameScene.ScenePtr, _selectedEntityId, out sx, out sy, out sz);
+                UI.SceneSetEntityScale(_gameScene.ScenePtr, _selectedEntityId, sx, sy, z);
+                Log.Info("Editor", $"Entity scale Z changed to: {z}");
+            }
         }
         
 private static void ShowDropdownMenu(float x, float y, string[] items, UI.WidgetCallbackDelegate[] callbacks)
@@ -1180,6 +1448,110 @@ private static void ShowDropdownMenu(float x, float y, string[] items, UI.Widget
             {
                 Log.Error("Editor", $"loading file: {ex.Message}\n{ex.StackTrace}");
             }
+        }
+        
+        private static void OnCreateEntityClick(ulong widgetId)
+        {
+            Log.Info("Editor", "点击\"创建Entity\"按钮");
+            
+            if (_gameScene == null)
+            {
+                Log.Error("Editor", "Scene未创建!");
+                return;
+            }
+            
+            ulong entityId = _gameScene.CreateEntity();
+            if (entityId != 0)
+            {
+                Log.Info("Editor", $"创建新Entity: id={entityId}");
+                _statusItem.Text = $"创建Entity: {entityId}";
+                
+                _gameScene.SelectEntity(entityId);
+                UpdatePropertiesPanel(entityId);
+            }
+            else
+            {
+                Log.Error("Editor", "创建Entity失败!");
+            }
+        }
+        
+        private static int _selectedScriptIndex = 0;
+        
+        private static void OnScriptDropdownSelect(ulong widgetId, ulong index)
+        {
+            _selectedScriptIndex = (int)index;
+            int idx = (int)index;
+            Log.Info("Editor", $"选择脚本: index={index}, script={(idx < _availableScripts.Count ? _availableScripts[idx] : "none")}");
+        }
+        
+        private static void OnAddScriptClick(ulong widgetId)
+        {
+            Log.Info("Editor", "点击\"Add Script\"按钮");
+            
+            if (_selectedEntityId == 0 || _gameScene == null)
+            {
+                Log.Error("Editor", "未选中Entity!");
+                return;
+            }
+            
+            if (_availableScripts.Count == 0 || _selectedScriptIndex >= _availableScripts.Count)
+            {
+                Log.Error("Editor", "无可用脚本!");
+                return;
+            }
+            
+            string scriptName = _availableScripts[_selectedScriptIndex];
+            string scriptPath = $"scripts/{scriptName}";
+            string className = Path.GetFileNameWithoutExtension(scriptName);
+            
+            _gameScene.AttachScriptBinding(_selectedEntityId, scriptPath, className);
+            Log.Info("Editor", $"添加脚本绑定: entityId={_selectedEntityId}, script={scriptPath}, class={className}");
+            
+            UpdatePropertiesPanel(_selectedEntityId);
+        }
+        
+        private static void OnRemoveScriptClick(ulong widgetId)
+        {
+            Log.Info("Editor", $"点击\"Remove Script\"按钮: widgetId={widgetId}");
+            
+            if (_selectedEntityId == 0 || _gameScene == null)
+            {
+                Log.Error("Editor", "未选中Entity!");
+                return;
+            }
+            
+            if (_removeScriptBtnIndices.TryGetValue(widgetId, out int index))
+            {
+                _gameScene.RemoveScriptBinding(_selectedEntityId, index);
+                Log.Info("Editor", $"移除脚本绑定: entityId={_selectedEntityId}, index={index}");
+                
+                UpdatePropertiesPanel(_selectedEntityId);
+            }
+        }
+        
+        private static void OnHotReloadComplete()
+        {
+            Log.Info("Editor", "=== OnHotReloadComplete回调 ===");
+            
+            // 重新扫描脚本
+            ScanScripts();
+            Log.Info("Editor", $"脚本扫描完成: {_availableScripts.Count} 个脚本");
+            
+            // 刷新脚本下拉菜单选项
+            if (_scriptDropdownId != 0)
+            {
+                string[] scriptOptions = _availableScripts.Count > 0 ? _availableScripts.ToArray() : new string[] { "无可用脚本" };
+                UI.DropdownSetOptions(_scriptDropdownId, scriptOptions);
+                Log.Info("Editor", "脚本下拉菜单已刷新");
+            }
+            
+            // 更新状态栏
+            if (_statusItem != null)
+            {
+                _statusItem.Text = "状态: 就绪";
+            }
+            
+            Log.Info("Editor", "OnHotReloadComplete完成");
         }
     }
 }

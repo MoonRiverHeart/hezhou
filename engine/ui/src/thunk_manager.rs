@@ -12,6 +12,7 @@ pub type GlobalClickCallback = extern "C" fn(f32, f32);
 pub type KeyCallback = extern "C" fn(u32, bool, u32);  // keycode, pressed, modifiers
 pub type MouseMoveCallback = extern "C" fn(f32, f32, bool);  // x, y, dragging
 pub type DropdownSelectCallback = extern "C" fn(u64, usize);  // widget_id, selected_index
+pub type InputFieldChangeCallback = extern "C" fn(u64, *const std::ffi::c_char);  // widget_id, text
 
 static UI_CALLBACKS: LazyLock<Mutex<UICallbacks>> =
     LazyLock::new(|| Mutex::new(UICallbacks::new()));
@@ -34,6 +35,7 @@ pub struct UICallbacks {
     on_key: Option<KeyCallback>,
     on_mouse_move: Option<MouseMoveCallback>,
     on_dropdown_select: HashMap<u64, DropdownSelectCallback>,
+    on_input_field_change: HashMap<u64, InputFieldChangeCallback>,
 }
 
 impl UICallbacks {
@@ -47,6 +49,7 @@ impl UICallbacks {
             on_key: None,
             on_mouse_move: None,
             on_dropdown_select: HashMap::new(),
+            on_input_field_change: HashMap::new(),
         }
     }
     
@@ -59,6 +62,7 @@ impl UICallbacks {
         self.on_key = None;
         self.on_mouse_move = None;
         self.on_dropdown_select.clear();
+        self.on_input_field_change.clear();
     }
 }
 
@@ -247,4 +251,27 @@ pub fn trigger_dropdown_select_callback(widget_id: u64, index: usize) {
 pub fn has_dropdown_select_callback(widget_id: u64) -> bool {
     let callbacks = UI_CALLBACKS.lock();
     callbacks.on_dropdown_select.contains_key(&widget_id)
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_register_input_field_change_callback(widget_id: u64, callback: InputFieldChangeCallback) {
+    let mut callbacks = UI_CALLBACKS.lock();
+    callbacks.on_input_field_change.insert(widget_id, callback);
+    dfx_info!("UI", "注册InputFieldChange回调: widget={} callback={:?}", widget_id, callback);
+}
+
+pub fn trigger_input_field_change_callback(widget_id: u64, text: &str) {
+    let callback = {
+        let callbacks = UI_CALLBACKS.lock();
+        callbacks.on_input_field_change.get(&widget_id).copied()
+    };
+    if let Some(cb) = callback {
+        let text_cstr = std::ffi::CString::new(text).unwrap();
+        cb(widget_id, text_cstr.as_ptr());
+    }
+}
+
+pub fn has_input_field_change_callback(widget_id: u64) -> bool {
+    let callbacks = UI_CALLBACKS.lock();
+    callbacks.on_input_field_change.contains_key(&widget_id)
 }

@@ -27,8 +27,26 @@ pub extern "C" fn get_entity_angle_stub() -> f32 { 0.0 }
 pub extern "C" fn scene_get_entity_position_stub(_scene: *mut std::ffi::c_void, _id: u64, _x: *mut f32, _y: *mut f32, _z: *mut f32) {}
 pub extern "C" fn scene_get_entity_rotation_stub(_scene: *mut std::ffi::c_void, _id: u64, _x: *mut f32, _y: *mut f32, _z: *mut f32, _w: *mut f32) {}
 pub extern "C" fn scene_get_entity_scale_stub(_scene: *mut std::ffi::c_void, _id: u64, _x: *mut f32, _y: *mut f32, _z: *mut f32) {}
+
+pub extern "C" fn scene_set_entity_position_stub(_scene: *mut std::ffi::c_void, _id: u64, _x: f32, _y: f32, _z: f32) {}
+
+pub extern "C" fn scene_set_entity_scale_stub(_scene: *mut std::ffi::c_void, _id: u64, _x: f32, _y: f32, _z: f32) {}
+
 pub extern "C" fn scene_rotate_entity_stub(_scene: *mut std::ffi::c_void, _id: u64, _angle: f32) {}
+
+pub extern "C" fn scene_set_entity_name_stub(_scene: *mut std::ffi::c_void, _id: u64, _name: *const i8) {}
+
+pub extern "C" fn scene_get_entity_name_stub(_scene: *mut std::ffi::c_void, _id: u64, _buffer: *mut i8, _size: usize) -> usize { 0 }
+
 pub extern "C" fn set_selected_entity_stub(_id: u64, _selected: bool) {}
+pub extern "C" fn scene_attach_script_binding_stub(_scene: *mut std::ffi::c_void, _id: u64, _path: *const i8, _class: *const i8) {}
+pub extern "C" fn scene_remove_script_binding_stub(_scene: *mut std::ffi::c_void, _id: u64, _index: usize) {}
+pub extern "C" fn scene_get_script_binding_count_stub(_scene: *mut std::ffi::c_void, _id: u64) -> usize { 0 }
+pub extern "C" fn scene_get_script_binding_info_stub(_scene: *mut std::ffi::c_void, _id: u64, _index: usize, _path: *mut i8, _path_size: usize, _class: *mut i8, _class_size: usize, _enabled: *mut bool) -> bool { false }
+pub extern "C" fn scene_set_script_binding_enabled_stub(_scene: *mut std::ffi::c_void, _id: u64, _index: usize, _enabled: bool) {}
+pub extern "C" fn scene_create_entity_stub(_scene: *mut std::ffi::c_void) -> u64 { 0 }
+pub extern "C" fn scene_get_entity_count_stub(_scene: *mut std::ffi::c_void) -> u64 { 0 }
+pub extern "C" fn scene_get_entity_id_stub(_scene: *mut std::ffi::c_void, _index: u64) -> u64 { 0 }
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
@@ -126,6 +144,11 @@ fn main() {
         ui_dropdown_set_selected: unsafe { std::mem::transmute(ui_ffi::ui_dropdown_set_selected as *const std::ffi::c_void) },
         ui_dropdown_get_selected: unsafe { std::mem::transmute(ui_ffi::ui_dropdown_get_selected as *const std::ffi::c_void) },
         ui_dropdown_set_on_select_thunk_ptr: unsafe { std::mem::transmute(ui_ffi::ui_dropdown_set_on_select_thunk_ptr as *const std::ffi::c_void) },
+        ui_create_input_field: unsafe { std::mem::transmute(ui_ffi::ui_create_input_field as *const std::ffi::c_void) },
+        ui_input_field_set_text: unsafe { std::mem::transmute(ui_ffi::ui_input_field_set_text as *const std::ffi::c_void) },
+        ui_input_field_get_text: unsafe { std::mem::transmute(ui_ffi::ui_input_field_get_text as *const std::ffi::c_void) },
+        ui_input_field_set_on_change_thunk_ptr: unsafe { std::mem::transmute(ui_ffi::ui_input_field_set_on_change_thunk_ptr as *const std::ffi::c_void) },
+        ui_input_field_set_placeholder: unsafe { std::mem::transmute(ui_ffi::ui_input_field_set_placeholder as *const std::ffi::c_void) },
         scene_create: scene_create_stub,
         scene_destroy: scene_destroy_stub,
         scene_create_cube: scene_create_cube_stub,
@@ -143,8 +166,20 @@ fn main() {
         scene_get_entity_position: scene_get_entity_position_stub,
         scene_get_entity_rotation: scene_get_entity_rotation_stub,
         scene_get_entity_scale: scene_get_entity_scale_stub,
+        scene_set_entity_position: scene_set_entity_position_stub,
+        scene_set_entity_scale: scene_set_entity_scale_stub,
         scene_rotate_entity: scene_rotate_entity_stub,
+        scene_set_entity_name: scene_set_entity_name_stub,
+        scene_get_entity_name: scene_get_entity_name_stub,
         set_selected_entity: set_selected_entity_stub,
+        scene_attach_script_binding: scene_attach_script_binding_stub,
+        scene_remove_script_binding: scene_remove_script_binding_stub,
+        scene_get_script_binding_count: scene_get_script_binding_count_stub,
+        scene_get_script_binding_info: scene_get_script_binding_info_stub,
+        scene_set_script_binding_enabled: scene_set_script_binding_enabled_stub,
+        scene_create_entity: scene_create_entity_stub,
+        scene_get_entity_count: scene_get_entity_count_stub,
+        scene_get_entity_id: scene_get_entity_id_stub,
         widget_tree_ptr: widget_tree_handle,
         dfx_handle: std::ptr::null_mut(),
         dfx_log: unsafe { std::mem::transmute(hezhou_dfx::dfx_log as *const std::ffi::c_void) },

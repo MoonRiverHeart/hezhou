@@ -61,6 +61,12 @@ pub type DropdownSetSelectedFn = extern "C" fn(WidgetTreeHandle, u64, usize);
 pub type DropdownGetSelectedFn = extern "C" fn(WidgetTreeHandle, u64) -> usize;
 pub type DropdownSetOnSelectThunkPtrFn = extern "C" fn(WidgetTreeHandle, u64, *const c_void);
 
+pub type CreateInputFieldFn = extern "C" fn(WidgetTreeHandle, u64, f32, f32) -> u64;
+pub type InputFieldSetTextFn = extern "C" fn(WidgetTreeHandle, u64, *const c_char);
+pub type InputFieldGetTextFn = extern "C" fn(WidgetTreeHandle, u64, *mut c_char, usize) -> usize;
+pub type InputFieldSetOnChangeThunkPtrFn = extern "C" fn(WidgetTreeHandle, u64, *const c_void);
+pub type InputFieldSetPlaceholderFn = extern "C" fn(WidgetTreeHandle, u64, *const c_char);
+
 pub type SceneCreateFn = extern "C" fn() -> *mut c_void;
 pub type SceneDestroyFn = extern "C" fn(*mut c_void);
 pub type SceneCreateCubeFn = extern "C" fn(*mut c_void) -> u64;
@@ -81,13 +87,28 @@ pub type GetEntityAngleFn = extern "C" fn() -> f32;
 pub type SceneGetEntityPositionFn = extern "C" fn(*mut c_void, u64, *mut f32, *mut f32, *mut f32);
 pub type SceneGetEntityRotationFn = extern "C" fn(*mut c_void, u64, *mut f32, *mut f32, *mut f32, *mut f32);
 pub type SceneGetEntityScaleFn = extern "C" fn(*mut c_void, u64, *mut f32, *mut f32, *mut f32);
+pub type SceneSetEntityPositionFn = extern "C" fn(*mut c_void, u64, f32, f32, f32);
+pub type SceneSetEntityScaleFn = extern "C" fn(*mut c_void, u64, f32, f32, f32);
 pub type SceneRotateEntityFn = extern "C" fn(*mut c_void, u64, f32);
+pub type SceneSetEntityNameFn = extern "C" fn(*mut c_void, u64, *const c_char);
+pub type SceneGetEntityNameFn = extern "C" fn(*mut c_void, u64, *mut c_char, usize) -> usize;
 
 pub type SetSelectedEntityFn = extern "C" fn(u64, bool);
+
+pub type SceneAttachScriptBindingFn = extern "C" fn(*mut c_void, u64, *const c_char, *const c_char);
+pub type SceneRemoveScriptBindingFn = extern "C" fn(*mut c_void, u64, usize);
+pub type SceneGetScriptBindingCountFn = extern "C" fn(*mut c_void, u64) -> usize;
+pub type SceneGetScriptBindingInfoFn = extern "C" fn(*mut c_void, u64, usize, *mut c_char, usize, *mut c_char, usize, *mut bool) -> bool;
+pub type SceneSetScriptBindingEnabledFn = extern "C" fn(*mut c_void, u64, usize, bool);
+pub type SceneCreateEntityFn = extern "C" fn(*mut c_void) -> u64;
+pub type SceneGetEntityCountFn = extern "C" fn(*mut c_void) -> u64;
+pub type SceneGetEntityIdFn = extern "C" fn(*mut c_void, u64) -> u64;
 
 pub type DfxLogFn = extern "C" fn(*mut c_void, u8, *const c_char, *const c_char, *const c_char, u32);
 pub type DfxTraceBeginFn = extern "C" fn(*mut c_void, *const c_char, *const c_char);
 pub type DfxTraceEndFn = extern "C" fn(*mut c_void, *const c_char, *const c_char);
+pub type SetStatusTextFn = extern "C" fn(*const c_char);
+pub type OnHotReloadCompleteFn = extern "C" fn();
 
 #[repr(C)]
 pub struct FfiContext {
@@ -146,6 +167,11 @@ pub struct FfiContext {
     pub ui_dropdown_set_selected: DropdownSetSelectedFn,
     pub ui_dropdown_get_selected: DropdownGetSelectedFn,
     pub ui_dropdown_set_on_select_thunk_ptr: DropdownSetOnSelectThunkPtrFn,
+    pub ui_create_input_field: CreateInputFieldFn,
+    pub ui_input_field_set_text: InputFieldSetTextFn,
+    pub ui_input_field_get_text: InputFieldGetTextFn,
+    pub ui_input_field_set_on_change_thunk_ptr: InputFieldSetOnChangeThunkPtrFn,
+    pub ui_input_field_set_placeholder: InputFieldSetPlaceholderFn,
     pub scene_create: SceneCreateFn,
     pub scene_destroy: SceneDestroyFn,
     pub scene_create_cube: SceneCreateCubeFn,
@@ -163,13 +189,27 @@ pub struct FfiContext {
     pub scene_get_entity_position: SceneGetEntityPositionFn,
     pub scene_get_entity_rotation: SceneGetEntityRotationFn,
     pub scene_get_entity_scale: SceneGetEntityScaleFn,
+    pub scene_set_entity_position: SceneSetEntityPositionFn,
+    pub scene_set_entity_scale: SceneSetEntityScaleFn,
     pub scene_rotate_entity: SceneRotateEntityFn,
+    pub scene_set_entity_name: SceneSetEntityNameFn,
+    pub scene_get_entity_name: SceneGetEntityNameFn,
     pub set_selected_entity: SetSelectedEntityFn,
+    pub scene_attach_script_binding: SceneAttachScriptBindingFn,
+    pub scene_remove_script_binding: SceneRemoveScriptBindingFn,
+    pub scene_get_script_binding_count: SceneGetScriptBindingCountFn,
+    pub scene_get_script_binding_info: SceneGetScriptBindingInfoFn,
+    pub scene_set_script_binding_enabled: SceneSetScriptBindingEnabledFn,
+    pub scene_create_entity: SceneCreateEntityFn,
+    pub scene_get_entity_count: SceneGetEntityCountFn,
+    pub scene_get_entity_id: SceneGetEntityIdFn,
     pub widget_tree_ptr: WidgetTreeHandle,
     pub dfx_handle: *mut c_void,
     pub dfx_log: DfxLogFn,
     pub dfx_trace_begin: DfxTraceBeginFn,
     pub dfx_trace_end: DfxTraceEndFn,
+    pub set_status_text: SetStatusTextFn,
+    pub on_hot_reload_complete: OnHotReloadCompleteFn,
 }
 
 static mut FFI_CONTEXT: Option<Box<FfiContext>> = None;

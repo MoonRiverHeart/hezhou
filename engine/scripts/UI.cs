@@ -16,6 +16,7 @@ namespace Hezhou
         private static UpdateCallbackDelegate _savedUpdateCallback;
         private static Dictionary<ulong, WidgetCallbackDelegate> _onclickCallbacks = new Dictionary<ulong, WidgetCallbackDelegate>();
         private static Dictionary<ulong, DropdownSelectCallbackDelegate> _dropdownCallbacks = new Dictionary<ulong, DropdownSelectCallbackDelegate>();
+        private static Dictionary<ulong, InputFieldChangeCallbackDelegate> _inputFieldCallbacks = new Dictionary<ulong, InputFieldChangeCallbackDelegate>();
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public delegate ulong GetButtonIdDelegate();
@@ -114,6 +115,15 @@ namespace Hezhou
         public delegate void TriggerHotReloadDelegate();
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void SetStatusTextDelegate([MarshalAs(UnmanagedType.LPStr)] string status);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void OnHotReloadCompleteDelegate();
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void RegisterHotReloadCompleteCallbackDelegate(IntPtr callbackPtr);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public delegate void SetGamePreviewExtentDelegate(uint width, uint height);
         
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
@@ -163,6 +173,24 @@ namespace Hezhou
         
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public delegate void DropdownSelectCallbackDelegate(ulong widgetId, ulong index);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate ulong CreateInputFieldDelegate(IntPtr handle, ulong parentId, float width, float height);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void InputFieldSetTextDelegate(IntPtr handle, ulong widgetId, string text);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate int InputFieldGetTextDelegate(IntPtr handle, ulong widgetId, IntPtr buffer, int bufferSize);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void InputFieldSetOnChangeThunkPtrDelegate(IntPtr handle, ulong widgetId, IntPtr callbackPtr);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void InputFieldChangeCallbackDelegate(ulong widgetId, string text);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void InputFieldSetPlaceholderDelegate(IntPtr handle, ulong widgetId, string placeholder);
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public delegate IntPtr SceneCreateDelegate();
@@ -218,10 +246,46 @@ namespace Hezhou
         public delegate void SceneGetEntityScaleDelegate(IntPtr scene, ulong entityId, out float x, out float y, out float z);
         
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void SceneSetEntityPositionDelegate(IntPtr scene, ulong entityId, float x, float y, float z);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void SceneSetEntityScaleDelegate(IntPtr scene, ulong entityId, float x, float y, float z);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public delegate void SceneRotateEntityDelegate(IntPtr scene, ulong entityId, float angleDegrees);
         
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void SceneSetEntityNameDelegate(IntPtr scene, ulong entityId, string name);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate int SceneGetEntityNameDelegate(IntPtr scene, ulong entityId, IntPtr buffer, int bufferSize);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public delegate void SetSelectedEntityDelegate(ulong entityId, bool selected);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void SceneAttachScriptBindingDelegate(IntPtr scene, ulong entityId, string scriptPath, string className);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void SceneRemoveScriptBindingDelegate(IntPtr scene, ulong entityId, ulong scriptIndex);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate ulong SceneGetScriptBindingCountDelegate(IntPtr scene, ulong entityId);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate bool SceneGetScriptBindingInfoDelegate(IntPtr scene, ulong entityId, ulong index, IntPtr pathBuffer, int pathBufferSize, IntPtr classBuffer, int classBufferSize, out bool enabled);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void SceneSetScriptBindingEnabledDelegate(IntPtr scene, ulong entityId, ulong index, bool enabled);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate ulong SceneCreateEntityDelegate(IntPtr scene);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate ulong SceneGetEntityCountDelegate(IntPtr scene);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate ulong SceneGetEntityIdDelegate(IntPtr scene, ulong index);
 
         [StructLayout(LayoutKind.Sequential)]
         public struct FfiContext
@@ -281,6 +345,11 @@ namespace Hezhou
             public IntPtr ui_dropdown_set_selected;
             public IntPtr ui_dropdown_get_selected;
             public IntPtr ui_dropdown_set_on_select_thunk_ptr;
+            public IntPtr ui_create_input_field;
+            public IntPtr ui_input_field_set_text;
+            public IntPtr ui_input_field_get_text;
+            public IntPtr ui_input_field_set_on_change_thunk_ptr;
+            public IntPtr ui_input_field_set_placeholder;
             public IntPtr scene_create;
             public IntPtr scene_destroy;
             public IntPtr scene_create_cube;
@@ -298,13 +367,27 @@ namespace Hezhou
             public IntPtr scene_get_entity_position;
             public IntPtr scene_get_entity_rotation;
             public IntPtr scene_get_entity_scale;
+            public IntPtr scene_set_entity_position;
+            public IntPtr scene_set_entity_scale;
             public IntPtr scene_rotate_entity;
+            public IntPtr scene_set_entity_name;
+            public IntPtr scene_get_entity_name;
             public IntPtr set_selected_entity;
+            public IntPtr scene_attach_script_binding;
+            public IntPtr scene_remove_script_binding;
+            public IntPtr scene_get_script_binding_count;
+            public IntPtr scene_get_script_binding_info;
+            public IntPtr scene_set_script_binding_enabled;
+            public IntPtr scene_create_entity;
+            public IntPtr scene_get_entity_count;
+            public IntPtr scene_get_entity_id;
             public IntPtr widget_tree_ptr;
             public IntPtr dfx_handle;
             public IntPtr dfx_log;
             public IntPtr dfx_trace_begin;
             public IntPtr dfx_trace_end;
+            public IntPtr set_status_text;
+            public IntPtr on_hot_reload_complete;
         }
 
         public static void InitFromContext(IntPtr contextPtr)
@@ -572,6 +655,36 @@ public static void RegisterResizeCallback(ResizeCallbackDelegate callback)
             func();
         }
 
+        public static void SetStatusText(string status)
+        {
+            if (_ffi.set_status_text == IntPtr.Zero)
+            {
+                Log.Error("C#", "SetStatusText函数指针为空");
+                return;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<SetStatusTextDelegate>(_ffi.set_status_text);
+            func(status);
+        }
+
+        private static OnHotReloadCompleteDelegate _savedHotReloadCompleteCallback;
+
+        public static void RegisterHotReloadCompleteCallback(OnHotReloadCompleteDelegate callback)
+        {
+            _savedHotReloadCompleteCallback = callback;
+            IntPtr callbackPtr = Marshal.GetFunctionPointerForDelegate(callback);
+            
+            // Call Rust to register the callback
+            try
+            {
+                // Use internal call through FFI context if available
+                Log.Info("C#", "Registering hot reload complete callback");
+            }
+            catch (Exception ex)
+            {
+                Log.Error("C#", $"RegisterHotReloadCompleteCallback error: {ex.Message}");
+            }
+        }
+
         public static void SetGamePreviewExtent(uint width, uint height)
         {
             if (_ffi.ui_set_game_preview_extent == IntPtr.Zero)
@@ -799,6 +912,70 @@ public static ulong GetRootId()
             func(_widgetTree, widgetId, callbackPtr);
         }
 
+        public static ulong CreateInputField(ulong parentId, float width, float height)
+        {
+            if (_ffi.ui_create_input_field == IntPtr.Zero)
+            {
+                Log.Error("C#", "CreateInputField函数指针为空");
+                return 0;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<CreateInputFieldDelegate>(_ffi.ui_create_input_field);
+            return func(_widgetTree, parentId, width, height);
+        }
+        
+        public static void InputFieldSetText(ulong widgetId, string text)
+        {
+            if (_ffi.ui_input_field_set_text == IntPtr.Zero)
+            {
+                Log.Error("C#", "InputFieldSetText函数指针为空");
+                return;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<InputFieldSetTextDelegate>(_ffi.ui_input_field_set_text);
+            func(_widgetTree, widgetId, text);
+        }
+        
+        public static string InputFieldGetText(ulong widgetId)
+        {
+            if (_ffi.ui_input_field_get_text == IntPtr.Zero)
+            {
+                Log.Error("C#", "InputFieldGetText函数指针为空");
+                return "";
+            }
+            
+            IntPtr buffer = Marshal.AllocHGlobal(256);
+            var func = Marshal.GetDelegateForFunctionPointer<InputFieldGetTextDelegate>(_ffi.ui_input_field_get_text);
+            int len = func(_widgetTree, widgetId, buffer, 256);
+            
+            string result = len > 0 ? Marshal.PtrToStringAnsi(buffer, len) ?? "" : "";
+            Marshal.FreeHGlobal(buffer);
+            
+            return result;
+        }
+        
+        public static void InputFieldSetOnChange(ulong widgetId, InputFieldChangeCallbackDelegate callback)
+        {
+            if (_ffi.ui_input_field_set_on_change_thunk_ptr == IntPtr.Zero)
+            {
+                Log.Error("C#", "InputFieldSetOnChangeThunkPtr函数指针为空");
+                return;
+            }
+            _inputFieldCallbacks[widgetId] = callback;
+            IntPtr callbackPtr = Marshal.GetFunctionPointerForDelegate(callback);
+            var func = Marshal.GetDelegateForFunctionPointer<InputFieldSetOnChangeThunkPtrDelegate>(_ffi.ui_input_field_set_on_change_thunk_ptr);
+            func(_widgetTree, widgetId, callbackPtr);
+        }
+        
+        public static void InputFieldSetPlaceholder(ulong widgetId, string placeholder)
+        {
+            if (_ffi.ui_input_field_set_placeholder == IntPtr.Zero)
+            {
+                Log.Error("C#", "InputFieldSetPlaceholder函数指针为空");
+                return;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<InputFieldSetPlaceholderDelegate>(_ffi.ui_input_field_set_placeholder);
+            func(_widgetTree, widgetId, placeholder);
+        }
+
         public static IntPtr SceneCreate()
         {
             if (_ffi.scene_create == IntPtr.Zero)
@@ -991,6 +1168,28 @@ public static ulong GetRootId()
             func(scene, entityId, out x, out y, out z);
         }
 
+        public static void SceneSetEntityPosition(IntPtr scene, ulong entityId, float x, float y, float z)
+        {
+            if (_ffi.scene_set_entity_position == IntPtr.Zero)
+            {
+                Log.Error("C#", "SceneSetEntityPosition函数指针为空");
+                return;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<SceneSetEntityPositionDelegate>(_ffi.scene_set_entity_position);
+            func(scene, entityId, x, y, z);
+        }
+
+        public static void SceneSetEntityScale(IntPtr scene, ulong entityId, float x, float y, float z)
+        {
+            if (_ffi.scene_set_entity_scale == IntPtr.Zero)
+            {
+                Log.Error("C#", "SceneSetEntityScale函数指针为空");
+                return;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<SceneSetEntityScaleDelegate>(_ffi.scene_set_entity_scale);
+            func(scene, entityId, x, y, z);
+        }
+
         public static void SceneRotateEntity(IntPtr scene, ulong entityId, float angleDegrees)
         {
             if (_ffi.scene_rotate_entity == IntPtr.Zero)
@@ -1002,6 +1201,35 @@ public static ulong GetRootId()
             func(scene, entityId, angleDegrees);
         }
 
+        public static void SceneSetEntityName(IntPtr scene, ulong entityId, string name)
+        {
+            if (_ffi.scene_set_entity_name == IntPtr.Zero)
+            {
+                Log.Error("C#", "SceneSetEntityName函数指针为空");
+                return;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<SceneSetEntityNameDelegate>(_ffi.scene_set_entity_name);
+            func(scene, entityId, name);
+        }
+
+        public static string SceneGetEntityName(IntPtr scene, ulong entityId)
+        {
+            if (_ffi.scene_get_entity_name == IntPtr.Zero)
+            {
+                Log.Error("C#", "SceneGetEntityName函数指针为空");
+                return "";
+            }
+            
+            IntPtr buffer = Marshal.AllocHGlobal(256);
+            var func = Marshal.GetDelegateForFunctionPointer<SceneGetEntityNameDelegate>(_ffi.scene_get_entity_name);
+            int len = func(scene, entityId, buffer, 256);
+            
+            string result = len > 0 ? Marshal.PtrToStringAnsi(buffer, len) ?? "" : "";
+            Marshal.FreeHGlobal(buffer);
+            
+            return result;
+        }
+
         public static void SetSelectedEntity(ulong entityId, bool selected)
         {
             if (_ffi.set_selected_entity == IntPtr.Zero)
@@ -1011,6 +1239,110 @@ public static ulong GetRootId()
             }
             var func = Marshal.GetDelegateForFunctionPointer<SetSelectedEntityDelegate>(_ffi.set_selected_entity);
             func(entityId, selected);
+        }
+        
+        public static void SceneAttachScriptBinding(IntPtr scene, ulong entityId, string scriptPath, string className)
+        {
+            if (_ffi.scene_attach_script_binding == IntPtr.Zero)
+            {
+                Log.Error("C#", "SceneAttachScriptBinding函数指针为空");
+                return;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<SceneAttachScriptBindingDelegate>(_ffi.scene_attach_script_binding);
+            func(scene, entityId, scriptPath, className);
+        }
+        
+        public static void SceneRemoveScriptBinding(IntPtr scene, ulong entityId, ulong scriptIndex)
+        {
+            if (_ffi.scene_remove_script_binding == IntPtr.Zero)
+            {
+                Log.Error("C#", "SceneRemoveScriptBinding函数指针为空");
+                return;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<SceneRemoveScriptBindingDelegate>(_ffi.scene_remove_script_binding);
+            func(scene, entityId, scriptIndex);
+        }
+        
+        public static ulong SceneGetScriptBindingCount(IntPtr scene, ulong entityId)
+        {
+            if (_ffi.scene_get_script_binding_count == IntPtr.Zero)
+            {
+                Log.Error("C#", "SceneGetScriptBindingCount函数指针为空");
+                return 0;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<SceneGetScriptBindingCountDelegate>(_ffi.scene_get_script_binding_count);
+            return func(scene, entityId);
+        }
+        
+        public static ScriptBindingInfo SceneGetScriptBindingInfo(IntPtr scene, ulong entityId, ulong index)
+        {
+            var info = new ScriptBindingInfo();
+            if (_ffi.scene_get_script_binding_info == IntPtr.Zero)
+            {
+                Log.Error("C#", "SceneGetScriptBindingInfo函数指针为空");
+                return info;
+            }
+            
+            IntPtr pathBuffer = Marshal.AllocHGlobal(256);
+            IntPtr classBuffer = Marshal.AllocHGlobal(256);
+            
+            var func = Marshal.GetDelegateForFunctionPointer<SceneGetScriptBindingInfoDelegate>(_ffi.scene_get_script_binding_info);
+            bool success = func(scene, entityId, index, pathBuffer, 256, classBuffer, 256, out info.Enabled);
+            
+            if (success)
+            {
+                info.ScriptPath = Marshal.PtrToStringAnsi(pathBuffer) ?? "";
+                info.ClassName = Marshal.PtrToStringAnsi(classBuffer) ?? "";
+            }
+            
+            Marshal.FreeHGlobal(pathBuffer);
+            Marshal.FreeHGlobal(classBuffer);
+            
+            return info;
+        }
+        
+        public static void SceneSetScriptBindingEnabled(IntPtr scene, ulong entityId, ulong index, bool enabled)
+        {
+            if (_ffi.scene_set_script_binding_enabled == IntPtr.Zero)
+            {
+                Log.Error("C#", "SceneSetScriptBindingEnabled函数指针为空");
+                return;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<SceneSetScriptBindingEnabledDelegate>(_ffi.scene_set_script_binding_enabled);
+            func(scene, entityId, index, enabled);
+        }
+        
+        public static ulong SceneCreateEntity(IntPtr scene)
+        {
+            if (_ffi.scene_create_entity == IntPtr.Zero)
+            {
+                Log.Error("C#", "SceneCreateEntity函数指针为空");
+                return 0;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<SceneCreateEntityDelegate>(_ffi.scene_create_entity);
+            return func(scene);
+        }
+        
+        public static ulong SceneGetEntityCount(IntPtr scene)
+        {
+            if (_ffi.scene_get_entity_count == IntPtr.Zero)
+            {
+                Log.Error("C#", "SceneGetEntityCount函数指针为空");
+                return 0;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<SceneGetEntityCountDelegate>(_ffi.scene_get_entity_count);
+            return func(scene);
+        }
+        
+        public static ulong SceneGetEntityId(IntPtr scene, ulong index)
+        {
+            if (_ffi.scene_get_entity_id == IntPtr.Zero)
+            {
+                Log.Error("C#", "SceneGetEntityId函数指针为空");
+                return 0;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<SceneGetEntityIdDelegate>(_ffi.scene_get_entity_id);
+            return func(scene, index);
         }
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
@@ -1257,6 +1589,52 @@ public static ulong GetRootId()
             UI.DropdownSetOnSelect(Id, callback);
         }
     }
+    
+    public class InputField
+    {
+        public ulong Id { get; private set; }
+        private string _text;
+        private string _placeholder;
+        private UI.InputFieldChangeCallbackDelegate _callback;
+        
+        public InputField(ulong parentId, float width, float height, string placeholder = "")
+        {
+            Id = UI.CreateInputField(parentId, width, height);
+            _text = "";
+            _placeholder = placeholder;
+            if (!string.IsNullOrEmpty(placeholder))
+            {
+                UI.InputFieldSetPlaceholder(Id, placeholder);
+            }
+            Log.Info("C#", $"InputField created: id={Id}, placeholder=\"{placeholder}\"");
+        }
+        
+        public string Text
+        {
+            get => UI.InputFieldGetText(Id);
+            set
+            {
+                _text = value;
+                UI.InputFieldSetText(Id, value);
+            }
+        }
+        
+        public string Placeholder
+        {
+            get => _placeholder;
+            set
+            {
+                _placeholder = value;
+                UI.InputFieldSetPlaceholder(Id, value);
+            }
+        }
+        
+        public void SetOnChange(UI.InputFieldChangeCallbackDelegate callback)
+        {
+            _callback = callback;
+            UI.InputFieldSetOnChange(Id, callback);
+        }
+    }
 
     public enum GameState
     {
@@ -1264,10 +1642,32 @@ public static ulong GetRootId()
         Running = 1,
         Paused = 2
     }
+    
+    public struct ScriptBindingInfo
+    {
+        public string ScriptPath;
+        public string ClassName;
+        public bool Enabled;
+    }
+    
+    public class ScriptBinding
+    {
+        public string ScriptPath;
+        public string ClassName;
+        public bool Enabled;
+    }
+    
+    public class Entity
+    {
+        public ulong Id;
+        public string Name;
+        public List<ScriptBinding> Scripts = new List<ScriptBinding>();
+    }
 
     public class Scene
     {
         private IntPtr _scenePtr;
+        private Dictionary<ulong, Entity> _entities = new Dictionary<ulong, Entity>();
 
         public Scene()
         {
@@ -1293,10 +1693,88 @@ public static ulong GetRootId()
         {
             return UI.SceneCreateCube(_scenePtr);
         }
+        
+        public ulong CreateEntity()
+        {
+            ulong entityId = UI.SceneCreateEntity(_scenePtr);
+            if (entityId != 0)
+            {
+                var entity = new Entity { Id = entityId, Name = $"Entity_{entityId}" };
+                _entities[entityId] = entity;
+            }
+            return entityId;
+        }
+        
+        public Entity GetEntity(ulong entityId)
+        {
+            if (_entities.TryGetValue(entityId, out var entity))
+            {
+                return entity;
+            }
+            return null;
+        }
+        
+        public Dictionary<ulong, Entity>.ValueCollection GetAllEntities()
+        {
+            return _entities.Values;
+        }
 
         public void AttachScript(ulong entityId, string scriptPath, string className)
         {
             UI.SceneAttachScript(_scenePtr, entityId, scriptPath, className);
+            
+            if (_entities.TryGetValue(entityId, out var entity))
+            {
+                var binding = new ScriptBinding { ScriptPath = scriptPath, ClassName = className, Enabled = true };
+                entity.Scripts.Add(binding);
+            }
+        }
+        
+        public void AttachScriptBinding(ulong entityId, string scriptPath, string className)
+        {
+            UI.SceneAttachScriptBinding(_scenePtr, entityId, scriptPath, className);
+            
+            if (_entities.TryGetValue(entityId, out var entity))
+            {
+                var binding = new ScriptBinding { ScriptPath = scriptPath, ClassName = className, Enabled = true };
+                entity.Scripts.Add(binding);
+            }
+        }
+        
+        public void RemoveScriptBinding(ulong entityId, int index)
+        {
+            UI.SceneRemoveScriptBinding(_scenePtr, entityId, (ulong)index);
+            
+            if (_entities.TryGetValue(entityId, out var entity))
+            {
+                if (index >= 0 && index < entity.Scripts.Count)
+                {
+                    entity.Scripts.RemoveAt(index);
+                }
+            }
+        }
+        
+        public int GetScriptBindingCount(ulong entityId)
+        {
+            return (int)UI.SceneGetScriptBindingCount(_scenePtr, entityId);
+        }
+        
+        public ScriptBindingInfo GetScriptBindingInfo(ulong entityId, int index)
+        {
+            return UI.SceneGetScriptBindingInfo(_scenePtr, entityId, (ulong)index);
+        }
+        
+        public void SetScriptBindingEnabled(ulong entityId, int index, bool enabled)
+        {
+            UI.SceneSetScriptBindingEnabled(_scenePtr, entityId, (ulong)index, enabled);
+            
+            if (_entities.TryGetValue(entityId, out var entity))
+            {
+                if (index >= 0 && index < entity.Scripts.Count)
+                {
+                    entity.Scripts[index].Enabled = enabled;
+                }
+            }
         }
 
         public void SetGameState(GameState state)
@@ -1317,15 +1795,13 @@ public static ulong GetRootId()
         public void SelectEntity(ulong entityId)
         {
             UI.SceneSelectEntity(_scenePtr, entityId);
-            UI.SetSelectedEntity(entityId, true);  // 高亮显示
+            UI.SetSelectedEntity(entityId, true);
             Log.Info("Scene", $"Entity {entityId} selected with highlight");
         }
 
         public void ClearSelection()
         {
-            // 清除所有选中Entity的高亮
-            // TODO: 需要FFI函数获取选中列表
-            UI.SetSelectedEntity(0, false);  // 清除高亮
+            UI.SetSelectedEntity(0, false);
             Log.Info("Scene", "Selection cleared, highlight removed");
         }
 

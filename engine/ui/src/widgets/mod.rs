@@ -1,6 +1,7 @@
 pub mod button;
 pub mod dropdown;
 pub mod hstack;
+pub mod input_field;
 pub mod label;
 pub mod list;
 pub mod list_item;
@@ -12,6 +13,7 @@ pub mod vstack;
 pub use button::Button;
 pub use dropdown::Dropdown;
 pub use hstack::HStack;
+pub use input_field::InputField;
 pub use label::Label;
 pub use list::List;
 pub use list_item::ListItem;

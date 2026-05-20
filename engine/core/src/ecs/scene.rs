@@ -16,13 +16,33 @@ impl Default for GameState {
     }
 }
 
+#[repr(C)]
+#[derive(Clone, Debug)]
+pub struct ScriptBinding {
+    pub script_path: String,
+    pub class_name: String,
+    pub enabled: bool,
+}
+
+impl Default for ScriptBinding {
+    fn default() -> Self {
+        Self {
+            script_path: String::new(),
+            class_name: String::new(),
+            enabled: true,
+        }
+    }
+}
+
 pub struct Scene {
     pub world: World,
     pub state: GameState,
     pub selected_entities: Vec<Entity>,
     pub script_assets: HashMap<u64, ScriptAsset>,
     pub entity_scripts: HashMap<EntityId, Vec<ScriptComponent>>,
+    pub entity_bindings: HashMap<EntityId, Vec<ScriptBinding>>,
     pub root_entities: Vec<Entity>,
+    pub entity_names: HashMap<EntityId, String>,
 }
 
 impl Scene {
@@ -33,7 +53,9 @@ impl Scene {
             selected_entities: Vec::new(),
             script_assets: HashMap::new(),
             entity_scripts: HashMap::new(),
+            entity_bindings: HashMap::new(),
             root_entities: Vec::new(),
+            entity_names: HashMap::new(),
         }
     }
     
@@ -42,6 +64,8 @@ impl Scene {
         self.world.add_component(entity, LocalTransform::new());
         self.world.add_component(entity, SelectionComponent::default());
         self.root_entities.push(entity);
+        let default_name = format!("Entity_{}", entity.id);
+        self.entity_names.insert(entity.id, default_name);
         entity
     }
     
@@ -72,6 +96,62 @@ impl Scene {
     pub fn detach_script(&mut self, entity: Entity) {
         self.world.remove_component::<ScriptComponent>(entity);
         self.entity_scripts.remove(&entity.id);
+        self.entity_bindings.remove(&entity.id);
+    }
+    
+    pub fn attach_script_binding(&mut self, entity: Entity, script_path: String, class_name: String) {
+        if !self.world.entity_exists(entity) {
+            return;
+        }
+        
+        let binding = ScriptBinding {
+            script_path: script_path.clone(),
+            class_name: class_name.clone(),
+            enabled: true,
+        };
+        
+        if !self.entity_bindings.contains_key(&entity.id) {
+            self.entity_bindings.insert(entity.id, Vec::new());
+        }
+        self.entity_bindings.get_mut(&entity.id).unwrap().push(binding);
+        
+        let script = ScriptComponent::from_path(&script_path, &class_name);
+        self.attach_script(entity, script);
+    }
+    
+    pub fn remove_script_binding(&mut self, entity: Entity, index: usize) {
+        if let Some(bindings) = self.entity_bindings.get_mut(&entity.id) {
+            if index < bindings.len() {
+                bindings.remove(index);
+            }
+        }
+        
+        if let Some(scripts) = self.entity_scripts.get_mut(&entity.id) {
+            if index < scripts.len() {
+                scripts.remove(index);
+            }
+        }
+    }
+    
+    pub fn get_script_binding_count(&self, entity: Entity) -> usize {
+        self.entity_bindings.get(&entity.id).map(|v| v.len()).unwrap_or(0)
+    }
+    
+    pub fn get_script_binding(&self, entity: Entity, index: usize) -> Option<&ScriptBinding> {
+        self.entity_bindings.get(&entity.id).and_then(|v| v.get(index))
+    }
+    
+    pub fn set_script_binding_enabled(&mut self, entity: Entity, index: usize, enabled: bool) {
+        if let Some(bindings) = self.entity_bindings.get_mut(&entity.id) {
+            if let Some(binding) = bindings.get_mut(index) {
+                binding.enabled = enabled;
+            }
+        }
+        if let Some(scripts) = self.entity_scripts.get_mut(&entity.id) {
+            if let Some(script) = scripts.get_mut(index) {
+                script.enabled = enabled;
+            }
+        }
     }
     
     pub fn register_script_asset(&mut self, asset: ScriptAsset) {
@@ -235,6 +315,16 @@ impl Scene {
     
     pub fn get_entity_scale(&self, entity: Entity) -> Option<Vec3> {
         self.world.get_component::<LocalTransform>(entity).map(|t| t.scale)
+    }
+    
+    pub fn set_entity_name(&mut self, entity: Entity, name: String) {
+        if self.world.entity_exists(entity) {
+            self.entity_names.insert(entity.id, name);
+        }
+    }
+    
+    pub fn get_entity_name(&self, entity: Entity) -> Option<&String> {
+        self.entity_names.get(&entity.id)
     }
 }
 
