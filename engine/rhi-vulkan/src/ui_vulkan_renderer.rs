@@ -1883,15 +1883,9 @@ let font_atlas = ui.get_font_atlas();
             self.device.cmd_set_viewport(self.command_buffers[image_index_usize], 0, &[game_viewport]);
             self.device.cmd_set_scissor(self.command_buffers[image_index_usize], 0, &[game_scissor]);
             
-            // Push constants: entity transform + camera + viewport
+            // Push constants: rotation + width + height + camera
             let push_constant_data = [
                 self.entity_angle.to_radians(),  // rotation angle
-                self.entity_position[0],  // px
-                self.entity_position[1],  // py
-                self.entity_position[2],  // pz
-                self.entity_scale[0],  // sx
-                self.entity_scale[1],  // sy
-                self.entity_scale[2],  // sz
                 self.offscreen_extent.width as f32,
                 self.offscreen_extent.height as f32,
                 self.camera_yaw,
