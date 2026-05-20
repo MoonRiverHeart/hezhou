@@ -181,13 +181,17 @@ private static float _cameraYaw = 0f;
             bool selected = UI.IsPreviewWindowSelected(_previewWindowId);
             GameState currentState = _gameScene != null ? _gameScene.GetGameState() : GameState.Editing;
             
-            // ESC处理
-            if (keycode == KEY_ESC && pressed && selected)
+            // ESC处理 - Running模式下切换到Editing
+            if (keycode == KEY_ESC && pressed)
             {
                 if (currentState == GameState.Running)
                 {
-                    // Running模式：退出PreviewWindow控制
+                    // Running模式：切换到Editing
+                    _gameScene.SetGameState(GameState.Editing);
+                    UI.SetRendererGameState(0);  // Editing
+                    UI.SetPreviewWindowEditMode(_previewWindowId, true);  // 橙色边框
                     UI.SetPreviewWindowSelected(_previewWindowId, false);
+                    UI.SetText(_runButtonId, "运行");
                     _cameraX = _savedCameraX;
                     _cameraY = _savedCameraY;
                     _cameraZ = _savedCameraZ;
@@ -197,16 +201,17 @@ private static float _cameraYaw = 0f;
                     _keyRightPressed = false;
                     _keyUpPressed = false;
                     _keyDownPressed = false;
-                    Log.Info("Editor", "ESC: 退出预览窗（Running模式），恢复摄像机");
+                    _statusItem.Text = "状态: 就绪";
+                    Log.Info("Editor", "ESC: Running → Editing");
                 }
-                else
+                else if (selected)
                 {
-                    // Editing模式：取消选中Entity
+                    // Editing模式 + PreviewWindow选中：取消选中Entity
                     if (_gameScene != null)
                     {
                         _gameScene.ClearSelection();
                         _statusItem.Text = "状态: 就绪";
-                        ClearPropertiesPanel();  // 清空属性面板
+                        ClearPropertiesPanel();
                         Log.Info("Editor", "ESC: 取消选中Entity（Editing模式）");
                     }
                 }
