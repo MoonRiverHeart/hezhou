@@ -110,9 +110,12 @@ namespace Hezhou
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public delegate bool IsPreviewWindowSelectedDelegate(IntPtr handle, ulong widgetId);
 
-        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public delegate void SetPreviewWindowSelectedDelegate(IntPtr handle, ulong widgetId, bool selected);
         
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void SetPreviewWindowEditModeDelegate(IntPtr handle, ulong widgetId, bool editMode);
+
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public delegate ulong CreateListDelegate(IntPtr handle, float spacing, uint orientation);
         
@@ -235,6 +238,7 @@ namespace Hezhou
             public IntPtr ui_set_camera_params;
             public IntPtr ui_is_preview_window_selected;
             public IntPtr ui_set_preview_window_selected;
+            public IntPtr ui_set_preview_window_edit_mode;
             public IntPtr ui_create_list;
             public IntPtr ui_create_list_in_parent;
             public IntPtr ui_create_list_item;
@@ -558,40 +562,29 @@ public static void RegisterResizeCallback(ResizeCallbackDelegate callback)
             return func(_widgetTree, widgetId);
         }
 
-        public static void SetPreviewWindowSelected(ulong widgetId, bool selected)
+public static void SetPreviewWindowSelected(ulong widgetId, bool selected)
         {
             if (_ffi.ui_set_preview_window_selected == IntPtr.Zero)
             {
+                Log.Error("C#", "SetPreviewWindowSelected函数指针为空");
                 return;
             }
             var func = Marshal.GetDelegateForFunctionPointer<SetPreviewWindowSelectedDelegate>(_ffi.ui_set_preview_window_selected);
             func(_widgetTree, widgetId, selected);
         }
-
-        public static void SetLabelText(ulong widgetId, string text)
+        
+        public static void SetPreviewWindowEditMode(ulong widgetId, bool editMode)
         {
-            if (_ffi.ui_widget_set_text == IntPtr.Zero)
+            if (_ffi.ui_set_preview_window_edit_mode == IntPtr.Zero)
             {
+                Log.Error("C#", "SetPreviewWindowEditMode函数指针为空");
                 return;
             }
-            var func = Marshal.GetDelegateForFunctionPointer<SetTextDelegate>(_ffi.ui_widget_set_text);
-            func(_widgetTree, widgetId, text);
+            var func = Marshal.GetDelegateForFunctionPointer<SetPreviewWindowEditModeDelegate>(_ffi.ui_set_preview_window_edit_mode);
+            func(_widgetTree, widgetId, editMode);
+            Log.Info("C#", $"PreviewWindow editMode set to: {editMode}");
         }
         
-        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-        private delegate void ClearWidgetTreeDelegate(IntPtr handle);
-        
-        public static void ClearWidgetTree()
-        {
-            if (_widgetTree == IntPtr.Zero)
-            {
-                Log.Error("C#", "widget_tree_ptr为空");
-                return;
-            }
-            // Use the ui_clear_widget_tree function via FFI
-            // Note: We need to add this to FfiContext or call directly
-        }
-
         public static ulong GetRootId()
         {
             if (_ffi.ui_get_root_id == IntPtr.Zero)

@@ -580,6 +580,7 @@ private static float _cameraYaw = 0f;
             {
                 _gameScene.SetGameState(GameState.Running);
                 UI.SetRendererGameState(1);  // Running
+                UI.SetPreviewWindowEditMode(_previewWindowId, false);  // 蓝色边框
                 Log.Info("Editor", "Scene和Renderer切换到Running状态");
                 _statusItem.Text = "状态: 运行中";
             }
@@ -587,6 +588,7 @@ private static float _cameraYaw = 0f;
             {
                 _gameScene.SetGameState(GameState.Editing);
                 UI.SetRendererGameState(0);  // Editing
+                UI.SetPreviewWindowEditMode(_previewWindowId, true);  // 橙色边框
                 Log.Info("Editor", "Scene和Renderer切换到Editing状态");
                 _statusItem.Text = "状态: 就绪";
             }

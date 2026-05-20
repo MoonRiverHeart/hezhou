@@ -45,6 +45,8 @@ pub type SetGamePreviewExtentFn = extern "C" fn(u32, u32);
 pub type SetCameraParamsFn = extern "C" fn(f32, f32, f32, f32, f32);
 pub type IsPreviewWindowSelectedFn = extern "C" fn(WidgetTreeHandle, u64) -> bool;
 pub type SetPreviewWindowSelectedFn = extern "C" fn(WidgetTreeHandle, u64, bool);
+pub type SetPreviewWindowEditModeFn = extern "C" fn(WidgetTreeHandle, u64, bool);
+
 pub type CreateListFn = extern "C" fn(WidgetTreeHandle, f32, u32) -> u64;
 pub type CreateListInParentFn = extern "C" fn(WidgetTreeHandle, u64, f32, u32) -> u64;
 pub type CreateListItemFn = extern "C" fn(WidgetTreeHandle, *const c_char) -> u64;
@@ -120,6 +122,7 @@ pub struct FfiContext {
     pub ui_set_camera_params: SetCameraParamsFn,
     pub ui_is_preview_window_selected: IsPreviewWindowSelectedFn,
     pub ui_set_preview_window_selected: SetPreviewWindowSelectedFn,
+    pub ui_set_preview_window_edit_mode: SetPreviewWindowEditModeFn,
     pub ui_create_list: CreateListFn,
     pub ui_create_list_in_parent: CreateListInParentFn,
     pub ui_create_list_item: CreateListItemFn,

@@ -955,6 +955,28 @@ pub extern "C" fn ui_set_preview_window_selected(
 }
 
 #[unsafe(no_mangle)]
+pub extern "C" fn ui_set_preview_window_edit_mode(
+    handle: WidgetTreeHandle,
+    widget_id: u64,
+    edit_mode: bool,
+) {
+    if handle.is_null() {
+        return;
+    }
+    unsafe {
+        let arc = &*(handle as *const Arc<Mutex<WidgetTree>>);
+        let mut tree = arc.lock();
+        let id = WidgetId::from_raw(widget_id);
+        if let Some(widget) = tree.get_widget_mut(id) {
+            if let Some(preview) = widget.as_any_mut().downcast_mut::<crate::widgets::PreviewWindow>() {
+                preview.set_edit_mode(edit_mode);
+                dfx_info!("FFI", "PreviewWindow edit_mode set to: {}", edit_mode);
+            }
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
 pub extern "C" fn ui_set_widget_layout(
     handle: WidgetTreeHandle,
     widget_id: u64,

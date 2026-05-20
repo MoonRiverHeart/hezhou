@@ -9,6 +9,7 @@ pub struct PreviewWindow {
     state: WidgetState,
     texture_id: u64,
     selected: bool,
+    edit_mode: bool,  // true=Editing(橙色边框), false=Running(蓝色边框)
 }
 
 impl PreviewWindow {
@@ -22,6 +23,7 @@ impl PreviewWindow {
             state: WidgetState::Normal,
             texture_id,
             selected: false,
+            edit_mode: true,  // 默认Editing模式
         }
     }
     
@@ -43,6 +45,10 @@ impl PreviewWindow {
     
     pub fn is_selected(&self) -> bool {
         self.selected
+    }
+    
+    pub fn set_edit_mode(&mut self, edit_mode: bool) {
+        self.edit_mode = edit_mode;
     }
 }
 
@@ -107,9 +113,17 @@ impl Widget for PreviewWindow {
         canvas.draw_image(bounds, self.texture_id, uv);
         
         if self.selected {
+            // Editing模式：橙色边框 (1.0, 0.6, 0.3)
+            // Running模式：蓝色边框 (0.2, 0.6, 1.0)
+            let border_color = if self.edit_mode {
+                Color::new(1.0, 0.6, 0.3, 1.0)  // 淡橙色
+            } else {
+                Color::new(0.2, 0.6, 1.0, 1.0)  // 蓝色
+            };
+            
             let border_style = Style::new()
                 .with_background(Color::transparent())
-                .with_border(Color::new(0.2, 0.6, 1.0, 1.0), 3.0, 0.0);
+                .with_border(border_color, 3.0, 0.0);
             canvas.draw_rect(bounds, &border_style);
         }
     }
