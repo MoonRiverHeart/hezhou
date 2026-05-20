@@ -184,6 +184,37 @@ pub extern "C" fn get_renderer_game_state() -> i32 {
     }
 }
 
+#[unsafe(no_mangle)]
+pub extern "C" fn set_entity_transform(px: f32, py: f32, pz: f32,
+                                        rx: f32, ry: f32, rz: f32, rw: f32,
+                                        sx: f32, sy: f32, sz: f32) {
+    unsafe {
+        if let Some(renderer_ptr) = RENDERER {
+            (*renderer_ptr).set_entity_transform(px, py, pz, rx, ry, rz, rw, sx, sy, sz);
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn set_entity_angle(angle: f32) {
+    unsafe {
+        if let Some(renderer_ptr) = RENDERER {
+            (*renderer_ptr).set_entity_angle(angle);
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn get_entity_angle() -> f32 {
+    unsafe {
+        if let Some(renderer_ptr) = RENDERER {
+            (*renderer_ptr).get_entity_angle()
+        } else {
+            0.0
+        }
+    }
+}
+
 fn main() {
     let args: Vec<String> = std::env::args().collect();
     let screenshot_mode = args.iter().any(|a| a == "--screenshot");
@@ -303,6 +334,9 @@ ui_list_item_set_text: unsafe { std::mem::transmute(ui_ffi::ui_list_item_set_tex
         scene_update: scene_update_editor,
         set_renderer_game_state: set_renderer_game_state,
         get_renderer_game_state: get_renderer_game_state,
+        set_entity_transform: set_entity_transform,
+        set_entity_angle: set_entity_angle,
+        get_entity_angle: get_entity_angle,
         widget_tree_ptr: widget_tree_handle,
         dfx_handle: dfx_for_csharp as *mut std::ffi::c_void,
     };

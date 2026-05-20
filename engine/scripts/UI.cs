@@ -163,6 +163,17 @@ namespace Hezhou
         
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public delegate int GetRendererGameStateDelegate();
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void SetEntityTransformDelegate(float px, float py, float pz,
+                                                         float rx, float ry, float rz, float rw,
+                                                         float sx, float sy, float sz);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void SetEntityAngleDelegate(float angle);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate float GetEntityAngleDelegate();
 
         [StructLayout(LayoutKind.Sequential)]
         public struct FfiContext
@@ -226,6 +237,9 @@ namespace Hezhou
             public IntPtr scene_update;
             public IntPtr set_renderer_game_state;
             public IntPtr get_renderer_game_state;
+            public IntPtr set_entity_transform;
+            public IntPtr set_entity_angle;
+            public IntPtr get_entity_angle;
             public IntPtr widget_tree_ptr;
             public IntPtr dfx_handle;
         }
@@ -776,6 +790,41 @@ public static void RegisterResizeCallback(ResizeCallbackDelegate callback)
                 return 0;
             }
             var func = Marshal.GetDelegateForFunctionPointer<GetRendererGameStateDelegate>(_ffi.get_renderer_game_state);
+            return func();
+        }
+
+        public static void SetEntityTransform(float px, float py, float pz,
+                                               float rx, float ry, float rz, float rw,
+                                               float sx, float sy, float sz)
+        {
+            if (_ffi.set_entity_transform == IntPtr.Zero)
+            {
+                Log.Error("C#", "SetEntityTransform函数指针为空");
+                return;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<SetEntityTransformDelegate>(_ffi.set_entity_transform);
+            func(px, py, pz, rx, ry, rz, rw, sx, sy, sz);
+        }
+
+        public static void SetEntityAngle(float angle)
+        {
+            if (_ffi.set_entity_angle == IntPtr.Zero)
+            {
+                Log.Error("C#", "SetEntityAngle函数指针为空");
+                return;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<SetEntityAngleDelegate>(_ffi.set_entity_angle);
+            func(angle);
+        }
+
+        public static float GetEntityAngle()
+        {
+            if (_ffi.get_entity_angle == IntPtr.Zero)
+            {
+                Log.Error("C#", "GetEntityAngle函数指针为空");
+                return 0.0f;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<GetEntityAngleDelegate>(_ffi.get_entity_angle);
             return func();
         }
 

@@ -65,6 +65,10 @@ pub type SceneUpdateFn = extern "C" fn(*mut c_void, f32);
 pub type SetRendererGameStateFn = extern "C" fn(i32);
 pub type GetRendererGameStateFn = extern "C" fn() -> i32;
 
+pub type SetEntityTransformFn = extern "C" fn(f32, f32, f32, f32, f32, f32, f32, f32, f32, f32);
+pub type SetEntityAngleFn = extern "C" fn(f32);
+pub type GetEntityAngleFn = extern "C" fn() -> f32;
+
 #[repr(C)]
 pub struct FfiContext {
     pub ui_get_primary_button_id: GetButtonIdFn,
@@ -126,6 +130,9 @@ pub struct FfiContext {
     pub scene_update: SceneUpdateFn,
     pub set_renderer_game_state: SetRendererGameStateFn,
     pub get_renderer_game_state: GetRendererGameStateFn,
+    pub set_entity_transform: SetEntityTransformFn,
+    pub set_entity_angle: SetEntityAngleFn,
+    pub get_entity_angle: GetEntityAngleFn,
     pub widget_tree_ptr: WidgetTreeHandle,
     pub dfx_handle: *mut c_void,
 }

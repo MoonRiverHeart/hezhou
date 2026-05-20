@@ -139,6 +139,12 @@ pub struct UIVulkanRenderer {
     
     // Game state: 0=Editing, 1=Running, 2=Paused
     game_state: i32,
+    
+    // Entity transforms for rendering (simple: single cube for now)
+    entity_position: [f32; 3],
+    entity_rotation: [f32; 4],  // quaternion (x, y, z, w)
+    entity_scale: [f32; 3],
+    entity_angle: f32,  // rotation angle in degrees (for simple rotation)
 }
 
 impl UIVulkanRenderer {
@@ -1111,6 +1117,10 @@ p_rasterization_state: &vk::PipelineRasterizationStateCreateInfo {
                 camera_y: 0.0,
                 camera_z: 3.0,
                 game_state: 0,  // Editing
+                entity_position: [0.0, 0.0, 0.0],
+                entity_rotation: [0.0, 0.0, 0.0, 1.0],  // identity quaternion
+                entity_scale: [1.0, 1.0, 1.0],
+                entity_angle: 0.0,
             })
         }
     }
@@ -1786,11 +1796,11 @@ let font_atlas = ui.get_font_atlas();
             self.device.begin_command_buffer(self.command_buffers[image_index_usize], &vk::CommandBufferBeginInfo::default())
                 .map_err(|e| format!("Failed to begin command buffer: {}", e))?;
             
-            // === Game Pass: Render triangle to offscreen ===
+            // === Game Pass: Render cube to offscreen ===
             if self.game_state == 1 {  // Running
-                self.triangle_angle += 90.0 * delta_time / 1000.0; // 90度/秒, delta_time is milliseconds
-                if self.triangle_angle > 360.0 {
-                    self.triangle_angle -= 360.0;
+                self.entity_angle += 90.0 * delta_time / 1000.0; // 90度/秒, delta_time is milliseconds
+                if self.entity_angle > 360.0 {
+                    self.entity_angle -= 360.0;
                 }
             }
             
@@ -1873,9 +1883,15 @@ let font_atlas = ui.get_font_atlas();
             self.device.cmd_set_viewport(self.command_buffers[image_index_usize], 0, &[game_viewport]);
             self.device.cmd_set_scissor(self.command_buffers[image_index_usize], 0, &[game_scissor]);
             
-            // Push constants: rotation + width + height
+            // Push constants: entity transform + camera + viewport
             let push_constant_data = [
-                self.triangle_angle.to_radians(),
+                self.entity_angle.to_radians(),  // rotation angle
+                self.entity_position[0],  // px
+                self.entity_position[1],  // py
+                self.entity_position[2],  // pz
+                self.entity_scale[0],  // sx
+                self.entity_scale[1],  // sy
+                self.entity_scale[2],  // sz
                 self.offscreen_extent.width as f32,
                 self.offscreen_extent.height as f32,
                 self.camera_yaw,
@@ -3356,6 +3372,22 @@ self.dfx.lock().get_logger().lock().log(
     
     pub fn get_game_state(&self) -> i32 {
         self.game_state
+    }
+    
+    pub fn set_entity_transform(&mut self, px: f32, py: f32, pz: f32, 
+                                  rx: f32, ry: f32, rz: f32, rw: f32,
+                                  sx: f32, sy: f32, sz: f32) {
+        self.entity_position = [px, py, pz];
+        self.entity_rotation = [rx, ry, rz, rw];
+        self.entity_scale = [sx, sy, sz];
+    }
+    
+    pub fn set_entity_angle(&mut self, angle: f32) {
+        self.entity_angle = angle;
+    }
+    
+    pub fn get_entity_angle(&self) -> f32 {
+        self.entity_angle
     }
     
     pub fn cleanup(&mut self) {
