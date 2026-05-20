@@ -114,11 +114,28 @@ cargo run --bin mono_ui_thunk_demo --features mono
 - **窗口尺寸**：1280x720
 - **布局结构**：
   - 顶部工具栏（40px）：新建/打开/保存/运行/编辑器按钮
-  - 左侧项目树（250px）：项目结构导航
+  - 左侧项目树（250px）：项目结构导航，支持双击打开文件
   - 左下资产管理（200px）：资源列表
-  - 中央预览区：游戏预览窗口
-  - 右侧属性面板（250px）：属性编辑器
+  - 中央预览区：游戏预览窗口，支持Entity拾取
+  - 右侧属性面板（250px）：属性编辑器，显示选中Entity信息
   - 底部状态栏（30px）：FPS显示
+- **Entity系统**：
+  - Scene管理（create/destroy/create_cube）
+  - GameState切换：Editing(橙色边框), Running(蓝色边框), Paused
+  - Entity Transform：position/rotation/scale
+  - 运行模式下立方体自动旋转
+- **Entity拾取**：
+  - Editing模式：点击预览窗拾取Entity，显示橘色高亮边框
+  - 属性面板显示Entity ID、位置、旋转(欧拉角)、缩放
+  - ESC取消选中
+- **摄像机控制**：
+  - Running模式：鼠标拖拽旋转视角，方向键移动摄像机
+  - 方向键基于摄像机坐标系（跟随视角旋转）
+  - ESC退出控制模式
+- **脚本编辑器**：
+  - 点击"编辑器"按钮打开脚本编辑器
+  - 显示行号（可选功能）
+  - Hot Reload按钮
 - **动态布局**：窗口resize自动重新计算布局
 - **Trace记录**：运行时记录性能trace到 `traces/trace_latest.json`
 
@@ -127,6 +144,16 @@ cargo run --bin mono_ui_thunk_demo --features mono
 cd engine
 cargo run --bin mono_editor_demo --features mono --release
 ```
+
+核心功能：
+- Entity选中outline渲染（几何放大+背面剔除）
+- 方向键摄像机移动公式：
+  ```
+  forward向量（摄像机前方）: (sin(yaw), 0, -cos(yaw))
+  right向量（摄像机右侧）: (cos(yaw), 0, sin(yaw))
+  UP前进 += forward, DOWN后退 -= forward
+  LEFT左移 -= right, RIGHT右移 += right
+  ```
 
 ### NativeAOT演示
 
@@ -242,6 +269,18 @@ hezhou/
 ### wrapped_mono方法查找问题
 - `mono_class_get_method_from_name` 可能返回null
 - **解决方案**：遍历方法列表匹配名称
+
+### Vulkan管线viewport固定问题
+- Pipeline viewport stuck at initial size, ignoring `cmd_set_viewport()`
+- **解决方案**：添加 `p_dynamic_state` for VIEWPORT and SCISSOR
+- **示例**：
+  ```rust
+  p_dynamic_state: &vk::PipelineDynamicStateCreateInfo {
+      dynamic_state_count: 2,
+      p_dynamic_states: &[vk::DynamicState::VIEWPORT, vk::DynamicState::SCISSOR],
+      ..Default::default()
+  },
+  ```
 
 ### 程序卡死
 - Logger文件输出使用 `unwrap()` 可能导致panic
