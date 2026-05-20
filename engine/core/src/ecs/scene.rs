@@ -305,6 +305,19 @@ impl Scene {
         self.world.entity_count()
     }
     
+    pub fn remove_entity(&mut self, entity: Entity) {
+        if !self.world.entity_exists(entity) {
+            return;
+        }
+        
+        self.root_entities.retain(|e| *e != entity);
+        self.selected_entities.retain(|e| *e != entity);
+        self.entity_scripts.remove(&entity.id);
+        self.entity_bindings.remove(&entity.id);
+        self.entity_names.remove(&entity.id);
+        self.world.destroy_entity(entity);
+    }
+    
     pub fn get_entity_position(&self, entity: Entity) -> Option<Vec3> {
         self.world.get_component::<LocalTransform>(entity).map(|t| t.position)
     }

@@ -32,6 +32,8 @@ pub type GetRootIdFn = extern "C" fn(WidgetTreeHandle) -> u64;
 pub type SetWidgetLayoutFn = extern "C" fn(WidgetTreeHandle, u64, f32, f32, f32, f32);
 pub type SetPositionFn = extern "C" fn(WidgetTreeHandle, u64, f32, f32);
 pub type SetSizeFn = extern "C" fn(WidgetTreeHandle, u64, f32, f32);
+pub type SetWidgetLayerFn = extern "C" fn(WidgetTreeHandle, u64, u32);
+pub type GetWidgetLayerFn = extern "C" fn(WidgetTreeHandle, u64) -> u32;
 pub type RemoveWidgetFn = extern "C" fn(WidgetTreeHandle, u64);
 pub type CreateTextEditFn = extern "C" fn(WidgetTreeHandle, f32, f32) -> u64;
 pub type CreateTextEditInParentFn = extern "C" fn(WidgetTreeHandle, u64, f32, f32) -> u64;
@@ -66,6 +68,64 @@ pub type InputFieldSetTextFn = extern "C" fn(WidgetTreeHandle, u64, *const c_cha
 pub type InputFieldGetTextFn = extern "C" fn(WidgetTreeHandle, u64, *mut c_char, usize) -> usize;
 pub type InputFieldSetOnChangeThunkPtrFn = extern "C" fn(WidgetTreeHandle, u64, *const c_void);
 pub type InputFieldSetPlaceholderFn = extern "C" fn(WidgetTreeHandle, u64, *const c_char);
+
+pub type CreateTabWidgetFn = extern "C" fn(WidgetTreeHandle, u64, f32, f32, f32, f32) -> u64;
+pub type TabWidgetAddTabFn = extern "C" fn(WidgetTreeHandle, u64, *const c_char, u64, bool) -> u32;
+pub type TabWidgetSetActiveFn = extern "C" fn(WidgetTreeHandle, u64, usize);
+pub type TabWidgetGetActiveFn = extern "C" fn(WidgetTreeHandle, u64) -> usize;
+pub type TabWidgetRemoveTabFn = extern "C" fn(WidgetTreeHandle, u64, usize);
+pub type TabWidgetSetOnSelectThunkPtrFn = extern "C" fn(WidgetTreeHandle, u64, *const c_void);
+pub type TabWidgetSetOnCloseThunkPtrFn = extern "C" fn(WidgetTreeHandle, u64, *const c_void);
+pub type TabWidgetGetTabCountFn = extern "C" fn(WidgetTreeHandle, u64) -> usize;
+
+pub type CreateTreeViewFn = extern "C" fn(WidgetTreeHandle, u64, f32, f32, f32, f32) -> u64;
+pub type TreeViewAddNodeFn = extern "C" fn(WidgetTreeHandle, u64, u64, *const c_char, u64, bool) -> u64;
+pub type TreeViewRemoveNodeFn = extern "C" fn(WidgetTreeHandle, u64, u64);
+pub type TreeViewSetSelectedFn = extern "C" fn(WidgetTreeHandle, u64, u64);
+pub type TreeViewGetSelectedFn = extern "C" fn(WidgetTreeHandle, u64) -> u64;
+pub type TreeViewExpandNodeFn = extern "C" fn(WidgetTreeHandle, u64, u64);
+pub type TreeViewCollapseNodeFn = extern "C" fn(WidgetTreeHandle, u64, u64);
+pub type TreeViewSetOnSelectThunkPtrFn = extern "C" fn(WidgetTreeHandle, u64, *const c_void);
+pub type TreeNodeSetTextFn = extern "C" fn(WidgetTreeHandle, u64, *const c_char);
+pub type TreeNodeGetUserDataFn = extern "C" fn(WidgetTreeHandle, u64) -> u64;
+pub type TreeViewClearSelectionFn = extern "C" fn(WidgetTreeHandle, u64);
+
+pub type CreatePopupMenuFn = extern "C" fn(WidgetTreeHandle, u64) -> u64;
+pub type PopupMenuAddItemFn = extern "C" fn(WidgetTreeHandle, u64, *const c_char, *const c_char, usize);
+pub type PopupMenuAddSeparatorFn = extern "C" fn(WidgetTreeHandle, u64);
+pub type PopupMenuShowFn = extern "C" fn(WidgetTreeHandle, u64, f32, f32);
+pub type PopupMenuHideFn = extern "C" fn(WidgetTreeHandle, u64);
+pub type PopupMenuIsVisibleFn = extern "C" fn(WidgetTreeHandle, u64) -> bool;
+pub type PopupMenuSetOnClickThunkPtrFn = extern "C" fn(WidgetTreeHandle, u64, *const c_void);
+
+pub type CreateGridViewFn = extern "C" fn(WidgetTreeHandle, u64, f32, f32, f32, f32, f32) -> u64;
+pub type GridViewAddItemFn = extern "C" fn(WidgetTreeHandle, u64, *const c_char, u64) -> u32;
+pub type GridViewRemoveItemFn = extern "C" fn(WidgetTreeHandle, u64, usize);
+pub type GridViewSetSelectedFn = extern "C" fn(WidgetTreeHandle, u64, usize);
+pub type GridViewGetSelectedFn = extern "C" fn(WidgetTreeHandle, u64) -> usize;
+pub type GridViewGetSelectedUserDataFn = extern "C" fn(WidgetTreeHandle, u64) -> u64;
+pub type GridViewClearFn = extern "C" fn(WidgetTreeHandle, u64);
+pub type GridViewItemCountFn = extern "C" fn(WidgetTreeHandle, u64) -> usize;
+pub type GridViewSetOnClickThunkPtrFn = extern "C" fn(WidgetTreeHandle, u64, *const c_void);
+
+pub type CreateDialogFn = extern "C" fn(WidgetTreeHandle, u64, *const c_char, f32, f32) -> u64;
+pub type DialogSetContentFn = extern "C" fn(WidgetTreeHandle, u64, u64);
+pub type DialogAddButtonFn = extern "C" fn(WidgetTreeHandle, u64, *const c_char, i32);
+pub type DialogShowFn = extern "C" fn(WidgetTreeHandle, u64);
+pub type DialogHideFn = extern "C" fn(WidgetTreeHandle, u64);
+pub type DialogIsVisibleFn = extern "C" fn(WidgetTreeHandle, u64) -> bool;
+pub type DialogGetResultFn = extern "C" fn(WidgetTreeHandle, u64) -> i32;
+pub type DialogSetOnResultThunkPtrFn = extern "C" fn(WidgetTreeHandle, u64, *const c_void);
+
+pub type CreateFileBrowserFn = extern "C" fn(WidgetTreeHandle, u64, f32, f32, f32, f32, *const c_char) -> u64;
+pub type FileBrowserSetPathFn = extern "C" fn(WidgetTreeHandle, u64, *const c_char);
+pub type FileBrowserSetFilterFn = extern "C" fn(WidgetTreeHandle, u64, *const c_char);
+pub type FileBrowserNavigateUpFn = extern "C" fn(WidgetTreeHandle, u64);
+pub type FileBrowserRefreshFn = extern "C" fn(WidgetTreeHandle, u64);
+pub type FileBrowserGetSelectedPathFn = extern "C" fn(WidgetTreeHandle, u64, *mut c_char, usize) -> bool;
+pub type FileBrowserGetCurrentPathFn = extern "C" fn(WidgetTreeHandle, u64, *mut c_char, usize) -> bool;
+pub type FileBrowserSetOnSelectThunkPtrFn = extern "C" fn(WidgetTreeHandle, u64, *const c_void);
+pub type FileBrowserSetOnDoubleClickThunkPtrFn = extern "C" fn(WidgetTreeHandle, u64, *const c_void);
 
 pub type SceneCreateFn = extern "C" fn() -> *mut c_void;
 pub type SceneDestroyFn = extern "C" fn(*mut c_void);
@@ -103,6 +163,7 @@ pub type SceneSetScriptBindingEnabledFn = extern "C" fn(*mut c_void, u64, usize,
 pub type SceneCreateEntityFn = extern "C" fn(*mut c_void) -> u64;
 pub type SceneGetEntityCountFn = extern "C" fn(*mut c_void) -> u64;
 pub type SceneGetEntityIdFn = extern "C" fn(*mut c_void, u64) -> u64;
+pub type SceneRemoveEntityFn = extern "C" fn(*mut c_void, u64);
 
 pub type DfxLogFn = extern "C" fn(*mut c_void, u8, *const c_char, *const c_char, *const c_char, u32);
 pub type DfxTraceBeginFn = extern "C" fn(*mut c_void, *const c_char, *const c_char);
@@ -141,6 +202,8 @@ pub struct FfiContext {
     pub ui_set_widget_layout: SetWidgetLayoutFn,
     pub ui_widget_set_position: SetPositionFn,
     pub ui_widget_set_size: SetSizeFn,
+    pub ui_widget_set_layer: SetWidgetLayerFn,
+    pub ui_widget_get_layer: GetWidgetLayerFn,
     pub ui_remove_widget: RemoveWidgetFn,
     pub ui_create_text_edit: CreateTextEditFn,
     pub ui_create_text_edit_in_parent: CreateTextEditInParentFn,
@@ -172,6 +235,58 @@ pub struct FfiContext {
     pub ui_input_field_get_text: InputFieldGetTextFn,
     pub ui_input_field_set_on_change_thunk_ptr: InputFieldSetOnChangeThunkPtrFn,
     pub ui_input_field_set_placeholder: InputFieldSetPlaceholderFn,
+    pub ui_create_tab_widget: CreateTabWidgetFn,
+    pub ui_tab_widget_add_tab: TabWidgetAddTabFn,
+    pub ui_tab_widget_set_active: TabWidgetSetActiveFn,
+    pub ui_tab_widget_get_active: TabWidgetGetActiveFn,
+    pub ui_tab_widget_remove_tab: TabWidgetRemoveTabFn,
+    pub ui_tab_widget_set_on_select_thunk_ptr: TabWidgetSetOnSelectThunkPtrFn,
+    pub ui_tab_widget_set_on_close_thunk_ptr: TabWidgetSetOnCloseThunkPtrFn,
+    pub ui_tab_widget_get_tab_count: TabWidgetGetTabCountFn,
+    pub ui_create_tree_view: CreateTreeViewFn,
+    pub ui_tree_view_add_node: TreeViewAddNodeFn,
+    pub ui_tree_view_remove_node: TreeViewRemoveNodeFn,
+    pub ui_tree_view_set_selected: TreeViewSetSelectedFn,
+    pub ui_tree_view_get_selected: TreeViewGetSelectedFn,
+    pub ui_tree_view_expand_node: TreeViewExpandNodeFn,
+    pub ui_tree_view_collapse_node: TreeViewCollapseNodeFn,
+    pub ui_tree_view_set_on_select_thunk_ptr: TreeViewSetOnSelectThunkPtrFn,
+    pub ui_tree_node_set_text: TreeNodeSetTextFn,
+    pub ui_tree_node_get_user_data: TreeNodeGetUserDataFn,
+    pub ui_tree_view_clear_selection: TreeViewClearSelectionFn,
+    pub ui_create_popup_menu: CreatePopupMenuFn,
+    pub ui_popup_menu_add_item: PopupMenuAddItemFn,
+    pub ui_popup_menu_add_separator: PopupMenuAddSeparatorFn,
+    pub ui_popup_menu_show: PopupMenuShowFn,
+    pub ui_popup_menu_hide: PopupMenuHideFn,
+    pub ui_popup_menu_is_visible: PopupMenuIsVisibleFn,
+    pub ui_popup_menu_set_on_click_thunk_ptr: PopupMenuSetOnClickThunkPtrFn,
+    pub ui_create_grid_view: CreateGridViewFn,
+    pub ui_grid_view_add_item: GridViewAddItemFn,
+    pub ui_grid_view_remove_item: GridViewRemoveItemFn,
+    pub ui_grid_view_set_selected: GridViewSetSelectedFn,
+    pub ui_grid_view_get_selected: GridViewGetSelectedFn,
+    pub ui_grid_view_get_selected_user_data: GridViewGetSelectedUserDataFn,
+    pub ui_grid_view_clear: GridViewClearFn,
+    pub ui_grid_view_item_count: GridViewItemCountFn,
+    pub ui_grid_view_set_on_click_thunk_ptr: GridViewSetOnClickThunkPtrFn,
+    pub ui_create_dialog: CreateDialogFn,
+    pub ui_dialog_set_content: DialogSetContentFn,
+    pub ui_dialog_add_button: DialogAddButtonFn,
+    pub ui_dialog_show: DialogShowFn,
+    pub ui_dialog_hide: DialogHideFn,
+    pub ui_dialog_is_visible: DialogIsVisibleFn,
+    pub ui_dialog_get_result: DialogGetResultFn,
+    pub ui_dialog_set_on_result_thunk_ptr: DialogSetOnResultThunkPtrFn,
+    pub ui_create_file_browser: CreateFileBrowserFn,
+    pub ui_file_browser_set_path: FileBrowserSetPathFn,
+    pub ui_file_browser_set_filter: FileBrowserSetFilterFn,
+    pub ui_file_browser_navigate_up: FileBrowserNavigateUpFn,
+    pub ui_file_browser_refresh: FileBrowserRefreshFn,
+    pub ui_file_browser_get_selected_path: FileBrowserGetSelectedPathFn,
+    pub ui_file_browser_get_current_path: FileBrowserGetCurrentPathFn,
+    pub ui_file_browser_set_on_select_thunk_ptr: FileBrowserSetOnSelectThunkPtrFn,
+    pub ui_file_browser_set_on_double_click_thunk_ptr: FileBrowserSetOnDoubleClickThunkPtrFn,
     pub scene_create: SceneCreateFn,
     pub scene_destroy: SceneDestroyFn,
     pub scene_create_cube: SceneCreateCubeFn,
@@ -203,6 +318,7 @@ pub struct FfiContext {
     pub scene_create_entity: SceneCreateEntityFn,
     pub scene_get_entity_count: SceneGetEntityCountFn,
     pub scene_get_entity_id: SceneGetEntityIdFn,
+    pub scene_remove_entity: SceneRemoveEntityFn,
     pub widget_tree_ptr: WidgetTreeHandle,
     pub dfx_handle: *mut c_void,
     pub dfx_log: DfxLogFn,

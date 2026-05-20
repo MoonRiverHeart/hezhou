@@ -522,6 +522,18 @@ pub extern "C" fn scene_get_entity_id_editor(scene: *mut std::ffi::c_void, index
     }
 }
 
+#[unsafe(no_mangle)]
+pub extern "C" fn scene_remove_entity_editor(scene: *mut std::ffi::c_void, entity_id: u64) {
+    if scene.is_null() {
+        return;
+    }
+    unsafe {
+        let scene_ptr = scene as *mut hezhou_core::Scene;
+        let entity = hezhou_core::Entity::new(entity_id);
+        (*scene_ptr).remove_entity(entity);
+    }
+}
+
 fn main() {
     let args: Vec<String> = std::env::args().collect();
     let screenshot_mode = args.iter().any(|a| a == "--screenshot");
@@ -611,6 +623,8 @@ fn main() {
         ui_set_widget_layout: unsafe { std::mem::transmute(ui_ffi::ui_set_widget_layout as *const std::ffi::c_void) },
         ui_widget_set_position: unsafe { std::mem::transmute(ui_ffi::ui_widget_set_position as *const std::ffi::c_void) },
         ui_widget_set_size: unsafe { std::mem::transmute(ui_ffi::ui_widget_set_size as *const std::ffi::c_void) },
+        ui_widget_set_layer: unsafe { std::mem::transmute(ui_ffi::ui_widget_set_layer as *const std::ffi::c_void) },
+        ui_widget_get_layer: unsafe { std::mem::transmute(ui_ffi::ui_widget_get_layer as *const std::ffi::c_void) },
         ui_remove_widget: unsafe { std::mem::transmute(ui_ffi::ui_remove_widget as *const std::ffi::c_void) },
         ui_create_text_edit: unsafe { std::mem::transmute(ui_ffi::ui_create_text_edit as *const std::ffi::c_void) },
         ui_create_text_edit_in_parent: unsafe { std::mem::transmute(ui_ffi::ui_create_text_edit_in_parent as *const std::ffi::c_void) },
@@ -642,6 +656,58 @@ ui_list_item_set_text: unsafe { std::mem::transmute(ui_ffi::ui_list_item_set_tex
         ui_input_field_get_text: unsafe { std::mem::transmute(ui_ffi::ui_input_field_get_text as *const std::ffi::c_void) },
         ui_input_field_set_on_change_thunk_ptr: unsafe { std::mem::transmute(ui_ffi::ui_input_field_set_on_change_thunk_ptr as *const std::ffi::c_void) },
         ui_input_field_set_placeholder: unsafe { std::mem::transmute(ui_ffi::ui_input_field_set_placeholder as *const std::ffi::c_void) },
+        ui_create_tab_widget: unsafe { std::mem::transmute(ui_ffi::ui_create_tab_widget as *const std::ffi::c_void) },
+        ui_tab_widget_add_tab: unsafe { std::mem::transmute(ui_ffi::ui_tab_widget_add_tab as *const std::ffi::c_void) },
+        ui_tab_widget_set_active: unsafe { std::mem::transmute(ui_ffi::ui_tab_widget_set_active as *const std::ffi::c_void) },
+        ui_tab_widget_get_active: unsafe { std::mem::transmute(ui_ffi::ui_tab_widget_get_active as *const std::ffi::c_void) },
+        ui_tab_widget_remove_tab: unsafe { std::mem::transmute(ui_ffi::ui_tab_widget_remove_tab as *const std::ffi::c_void) },
+        ui_tab_widget_set_on_select_thunk_ptr: unsafe { std::mem::transmute(ui_ffi::ui_tab_widget_set_on_select_thunk_ptr as *const std::ffi::c_void) },
+        ui_tab_widget_set_on_close_thunk_ptr: unsafe { std::mem::transmute(ui_ffi::ui_tab_widget_set_on_close_thunk_ptr as *const std::ffi::c_void) },
+        ui_tab_widget_get_tab_count: unsafe { std::mem::transmute(ui_ffi::ui_tab_widget_get_tab_count as *const std::ffi::c_void) },
+        ui_create_tree_view: unsafe { std::mem::transmute(ui_ffi::ui_create_tree_view as *const std::ffi::c_void) },
+        ui_tree_view_add_node: unsafe { std::mem::transmute(ui_ffi::ui_tree_view_add_node as *const std::ffi::c_void) },
+        ui_tree_view_remove_node: unsafe { std::mem::transmute(ui_ffi::ui_tree_view_remove_node as *const std::ffi::c_void) },
+        ui_tree_view_set_selected: unsafe { std::mem::transmute(ui_ffi::ui_tree_view_set_selected as *const std::ffi::c_void) },
+        ui_tree_view_get_selected: unsafe { std::mem::transmute(ui_ffi::ui_tree_view_get_selected as *const std::ffi::c_void) },
+        ui_tree_view_expand_node: unsafe { std::mem::transmute(ui_ffi::ui_tree_view_expand_node as *const std::ffi::c_void) },
+        ui_tree_view_collapse_node: unsafe { std::mem::transmute(ui_ffi::ui_tree_view_collapse_node as *const std::ffi::c_void) },
+        ui_tree_view_set_on_select_thunk_ptr: unsafe { std::mem::transmute(ui_ffi::ui_tree_view_set_on_select_thunk_ptr as *const std::ffi::c_void) },
+        ui_tree_node_set_text: unsafe { std::mem::transmute(ui_ffi::ui_tree_node_set_text as *const std::ffi::c_void) },
+        ui_tree_node_get_user_data: unsafe { std::mem::transmute(ui_ffi::ui_tree_node_get_user_data as *const std::ffi::c_void) },
+        ui_tree_view_clear_selection: unsafe { std::mem::transmute(ui_ffi::ui_tree_view_clear_selection as *const std::ffi::c_void) },
+        ui_create_popup_menu: unsafe { std::mem::transmute(ui_ffi::ui_create_popup_menu as *const std::ffi::c_void) },
+        ui_popup_menu_add_item: unsafe { std::mem::transmute(ui_ffi::ui_popup_menu_add_item as *const std::ffi::c_void) },
+        ui_popup_menu_add_separator: unsafe { std::mem::transmute(ui_ffi::ui_popup_menu_add_separator as *const std::ffi::c_void) },
+        ui_popup_menu_show: unsafe { std::mem::transmute(ui_ffi::ui_popup_menu_show as *const std::ffi::c_void) },
+        ui_popup_menu_hide: unsafe { std::mem::transmute(ui_ffi::ui_popup_menu_hide as *const std::ffi::c_void) },
+        ui_popup_menu_is_visible: unsafe { std::mem::transmute(ui_ffi::ui_popup_menu_is_visible as *const std::ffi::c_void) },
+        ui_popup_menu_set_on_click_thunk_ptr: unsafe { std::mem::transmute(ui_ffi::ui_popup_menu_set_on_click_thunk_ptr as *const std::ffi::c_void) },
+        ui_create_grid_view: unsafe { std::mem::transmute(ui_ffi::ui_create_grid_view as *const std::ffi::c_void) },
+        ui_grid_view_add_item: unsafe { std::mem::transmute(ui_ffi::ui_grid_view_add_item as *const std::ffi::c_void) },
+        ui_grid_view_remove_item: unsafe { std::mem::transmute(ui_ffi::ui_grid_view_remove_item as *const std::ffi::c_void) },
+        ui_grid_view_set_selected: unsafe { std::mem::transmute(ui_ffi::ui_grid_view_set_selected as *const std::ffi::c_void) },
+        ui_grid_view_get_selected: unsafe { std::mem::transmute(ui_ffi::ui_grid_view_get_selected as *const std::ffi::c_void) },
+        ui_grid_view_get_selected_user_data: unsafe { std::mem::transmute(ui_ffi::ui_grid_view_get_selected_user_data as *const std::ffi::c_void) },
+        ui_grid_view_clear: unsafe { std::mem::transmute(ui_ffi::ui_grid_view_clear as *const std::ffi::c_void) },
+        ui_grid_view_item_count: unsafe { std::mem::transmute(ui_ffi::ui_grid_view_item_count as *const std::ffi::c_void) },
+        ui_grid_view_set_on_click_thunk_ptr: unsafe { std::mem::transmute(ui_ffi::ui_grid_view_set_on_click_thunk_ptr as *const std::ffi::c_void) },
+        ui_create_dialog: unsafe { std::mem::transmute(ui_ffi::ui_create_dialog as *const std::ffi::c_void) },
+        ui_dialog_set_content: unsafe { std::mem::transmute(ui_ffi::ui_dialog_set_content as *const std::ffi::c_void) },
+        ui_dialog_add_button: unsafe { std::mem::transmute(ui_ffi::ui_dialog_add_button as *const std::ffi::c_void) },
+        ui_dialog_show: unsafe { std::mem::transmute(ui_ffi::ui_dialog_show as *const std::ffi::c_void) },
+        ui_dialog_hide: unsafe { std::mem::transmute(ui_ffi::ui_dialog_hide as *const std::ffi::c_void) },
+        ui_dialog_is_visible: unsafe { std::mem::transmute(ui_ffi::ui_dialog_is_visible as *const std::ffi::c_void) },
+        ui_dialog_get_result: unsafe { std::mem::transmute(ui_ffi::ui_dialog_get_result as *const std::ffi::c_void) },
+        ui_dialog_set_on_result_thunk_ptr: unsafe { std::mem::transmute(ui_ffi::ui_dialog_set_on_result_thunk_ptr as *const std::ffi::c_void) },
+        ui_create_file_browser: unsafe { std::mem::transmute(ui_ffi::ui_create_file_browser as *const std::ffi::c_void) },
+        ui_file_browser_set_path: unsafe { std::mem::transmute(ui_ffi::ui_file_browser_set_path as *const std::ffi::c_void) },
+        ui_file_browser_set_filter: unsafe { std::mem::transmute(ui_ffi::ui_file_browser_set_filter as *const std::ffi::c_void) },
+        ui_file_browser_navigate_up: unsafe { std::mem::transmute(ui_ffi::ui_file_browser_navigate_up as *const std::ffi::c_void) },
+        ui_file_browser_refresh: unsafe { std::mem::transmute(ui_ffi::ui_file_browser_refresh as *const std::ffi::c_void) },
+        ui_file_browser_get_selected_path: unsafe { std::mem::transmute(ui_ffi::ui_file_browser_get_selected_path as *const std::ffi::c_void) },
+        ui_file_browser_get_current_path: unsafe { std::mem::transmute(ui_ffi::ui_file_browser_get_current_path as *const std::ffi::c_void) },
+        ui_file_browser_set_on_select_thunk_ptr: unsafe { std::mem::transmute(ui_ffi::ui_file_browser_set_on_select_thunk_ptr as *const std::ffi::c_void) },
+        ui_file_browser_set_on_double_click_thunk_ptr: unsafe { std::mem::transmute(ui_ffi::ui_file_browser_set_on_double_click_thunk_ptr as *const std::ffi::c_void) },
         scene_create: scene_create_editor,
         scene_destroy: scene_destroy_editor,
         scene_create_cube: scene_create_cube_editor,
@@ -673,6 +739,7 @@ ui_list_item_set_text: unsafe { std::mem::transmute(ui_ffi::ui_list_item_set_tex
         scene_create_entity: scene_create_entity_editor,
         scene_get_entity_count: scene_get_entity_count_editor,
         scene_get_entity_id: scene_get_entity_id_editor,
+        scene_remove_entity: scene_remove_entity_editor,
         widget_tree_ptr: widget_tree_handle,
         dfx_handle: dfx_for_csharp as *mut std::ffi::c_void,
         dfx_log: unsafe { std::mem::transmute(hezhou_dfx::dfx_log as *const std::ffi::c_void) },

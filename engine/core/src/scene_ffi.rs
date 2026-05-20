@@ -222,6 +222,17 @@ pub extern "C" fn scene_entity_count(scene: *const Scene) -> u32 {
 }
 
 #[no_mangle]
+pub extern "C" fn scene_remove_entity(scene: *mut Scene, entity_id: u64) {
+    if scene.is_null() {
+        return;
+    }
+    unsafe {
+        let entity = Entity::new(entity_id);
+        (*scene).remove_entity(entity);
+    }
+}
+
+#[no_mangle]
 pub extern "C" fn scene_get_entity_position(scene: *const Scene, entity_id: u64, 
                                              out_x: *mut f32, out_y: *mut f32, out_z: *mut f32) {
     if scene.is_null() || out_x.is_null() || out_y.is_null() || out_z.is_null() {

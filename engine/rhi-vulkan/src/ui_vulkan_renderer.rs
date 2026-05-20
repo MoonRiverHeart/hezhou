@@ -2556,6 +2556,29 @@ let font_atlas = self.ui_system.lock().get_font_atlas();
                     DrawCommand::Shadow { .. } => {}
                     DrawCommand::SetTransform { .. } => {}
                     DrawCommand::ResetTransform => {}
+                    DrawCommand::RectOutline { bounds, width, height, color, stroke_width } => {
+                        let x = bounds.x;
+                        let y = bounds.y;
+                        let w = *width;
+                        let h = *height;
+                        let r = color.r;
+                        let g = color.g;
+                        let b = color.b;
+                        let a = color.a;
+                        let sw = *stroke_width;
+                        
+                        let line_vertices: Vec<f32> = vec![
+                            x, y, r, g, b, a,
+                            x + w, y, r, g, b, a,
+                            x + w, y, r, g, b, a,
+                            x + w, y + h, r, g, b, a,
+                            x + w, y + h, r, g, b, a,
+                            x, y + h, r, g, b, a,
+                            x, y + h, r, g, b, a,
+                            x, y, r, g, b, a,
+                        ];
+                        current_vertices.extend_from_slice(&line_vertices);
+                    }
                 }
             }
             

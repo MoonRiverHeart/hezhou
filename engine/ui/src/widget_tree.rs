@@ -4,6 +4,20 @@ use crate::types::*;
 use crate::widget::*;
 use std::collections::HashMap;
 
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
+pub enum RenderLayer {
+    Background = 0,
+    Content = 1,
+    Popup = 2,
+    Overlay = 3,
+}
+
+impl Default for RenderLayer {
+    fn default() -> Self {
+        RenderLayer::Content
+    }
+}
+
 pub struct WidgetTree {
     pub root: Option<WidgetId>,
     pub nodes: HashMap<WidgetId, WidgetNode>,
@@ -15,6 +29,7 @@ struct WidgetNode {
     widget: Box<dyn Widget>,
     flags: crate::widget::WidgetFlags,
     render_data: Option<RenderData>,
+    layer: RenderLayer,
 }
 
 #[repr(C)]
@@ -23,6 +38,8 @@ pub struct RenderData {
     pub draw_commands: Vec<crate::canvas::DrawCommand>,
     pub bounds: Rect,
     pub z_index: i32,
+    pub layer: RenderLayer,
+    pub widget_id: u64,
 }
 
 impl WidgetTree {
@@ -77,6 +94,7 @@ impl WidgetTree {
                 widget,
                 flags: crate::widget::WidgetFlags::default(),
                 render_data: None,
+                layer: RenderLayer::default(),
             },
         );
         self.children_map.insert(id, Vec::new());
@@ -91,6 +109,7 @@ impl WidgetTree {
                 widget,
                 flags: crate::widget::WidgetFlags::default(),
                 render_data: None,
+                layer: RenderLayer::default(),
             },
         );
 
@@ -128,6 +147,16 @@ impl WidgetTree {
 
     pub fn get_widget_mut(&mut self, id: WidgetId) -> Option<&mut Box<dyn Widget>> {
         self.nodes.get_mut(&id).map(|node| &mut node.widget)
+    }
+    
+    pub fn set_widget_layer(&mut self, id: WidgetId, layer: RenderLayer) {
+        if let Some(node) = self.nodes.get_mut(&id) {
+            node.layer = layer;
+        }
+    }
+    
+    pub fn get_widget_layer(&self, id: WidgetId) -> RenderLayer {
+        self.nodes.get(&id).map(|node| node.layer).unwrap_or_default()
     }
 
     pub fn get_children(&self, id: WidgetId) -> &[WidgetId] {
@@ -520,6 +549,7 @@ pub fn perform_layout(&mut self, font_atlas: &FontAtlas) {
             self.generate_render_data_recursive(root_id, 0.0, 0.0, &mut render_data, font_atlas);
         }
         
+        render_data.sort_by_key(|r| r.layer);
         render_data
     }
     
@@ -536,6 +566,7 @@ pub fn perform_layout(&mut self, font_atlas: &FontAtlas) {
                 let layout = *node.widget.as_ref().layout();
                 let abs_x = parent_abs_x + layout.x;
                 let abs_y = parent_abs_y + layout.y;
+                let layer = node.layer;
                 
                 let mut canvas = Canvas::with_font_atlas(font_atlas as *const FontAtlas, 0);
                 node.widget.as_mut().draw(&mut canvas);
@@ -550,6 +581,8 @@ pub fn perform_layout(&mut self, font_atlas: &FontAtlas) {
                     draw_commands: absolute_commands,
                     bounds: Rect::new(abs_x, abs_y, layout.width, layout.height),
                     z_index: 0,
+                    layer,
+                    widget_id: id.id,
                 });
 
                 node.render_data = Some(render_data.last().unwrap().clone());
@@ -631,6 +664,15 @@ pub fn perform_layout(&mut self, font_atlas: &FontAtlas) {
             DrawCommand::ClearClip => DrawCommand::ClearClip,
             DrawCommand::SetTransform { transform } => DrawCommand::SetTransform { transform: *transform },
             DrawCommand::ResetTransform => DrawCommand::ResetTransform,
+            DrawCommand::RectOutline { bounds, width, height, color, stroke_width } => {
+                DrawCommand::RectOutline {
+                    bounds: Point::new(bounds.x + offset_x, bounds.y + offset_y),
+                    width: *width,
+                    height: *height,
+                    color: *color,
+                    stroke_width: *stroke_width,
+                }
+            }
         }
     }
 }

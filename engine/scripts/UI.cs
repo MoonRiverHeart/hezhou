@@ -17,6 +17,14 @@ namespace Hezhou
         private static Dictionary<ulong, WidgetCallbackDelegate> _onclickCallbacks = new Dictionary<ulong, WidgetCallbackDelegate>();
         private static Dictionary<ulong, DropdownSelectCallbackDelegate> _dropdownCallbacks = new Dictionary<ulong, DropdownSelectCallbackDelegate>();
         private static Dictionary<ulong, InputFieldChangeCallbackDelegate> _inputFieldCallbacks = new Dictionary<ulong, InputFieldChangeCallbackDelegate>();
+        private static Dictionary<ulong, TabSelectCallbackDelegate> _tabSelectCallbacks = new Dictionary<ulong, TabSelectCallbackDelegate>();
+        private static Dictionary<ulong, TabCloseCallbackDelegate> _tabCloseCallbacks = new Dictionary<ulong, TabCloseCallbackDelegate>();
+        private static Dictionary<ulong, TreeNodeSelectCallbackDelegate> _treeNodeSelectCallbacks = new Dictionary<ulong, TreeNodeSelectCallbackDelegate>();
+        private static Dictionary<ulong, PopupMenuClickCallbackDelegate> _popupMenuCallbacks = new Dictionary<ulong, PopupMenuClickCallbackDelegate>();
+        private static Dictionary<ulong, GridViewClickCallbackDelegate> _gridViewCallbacks = new Dictionary<ulong, GridViewClickCallbackDelegate>();
+        private static Dictionary<ulong, DialogResultCallbackDelegate> _dialogCallbacks = new Dictionary<ulong, DialogResultCallbackDelegate>();
+        private static Dictionary<ulong, FileBrowserSelectCallbackDelegate> _fileBrowserSelectCallbacks = new Dictionary<ulong, FileBrowserSelectCallbackDelegate>();
+        private static Dictionary<ulong, FileBrowserDoubleClickCallbackDelegate> _fileBrowserDoubleClickCallbacks = new Dictionary<ulong, FileBrowserDoubleClickCallbackDelegate>();
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public delegate ulong GetButtonIdDelegate();
@@ -193,6 +201,192 @@ namespace Hezhou
         public delegate void InputFieldSetPlaceholderDelegate(IntPtr handle, ulong widgetId, string placeholder);
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate ulong CreateTabWidgetDelegate(IntPtr handle, ulong parentId, float x, float y, float width, float height);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate uint TabWidgetAddTabDelegate(IntPtr handle, ulong tabWidgetId, string title, ulong contentWidgetId, bool closable);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void TabWidgetSetActiveDelegate(IntPtr handle, ulong tabWidgetId, ulong index);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate ulong TabWidgetGetActiveDelegate(IntPtr handle, ulong tabWidgetId);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void TabWidgetRemoveTabDelegate(IntPtr handle, ulong tabWidgetId, ulong index);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void TabWidgetSetOnSelectThunkPtrDelegate(IntPtr handle, ulong tabWidgetId, IntPtr callbackPtr);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void TabWidgetSetOnCloseThunkPtrDelegate(IntPtr handle, ulong tabWidgetId, IntPtr callbackPtr);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate ulong TabWidgetGetTabCountDelegate(IntPtr handle, ulong tabWidgetId);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void TabSelectCallbackDelegate(ulong widgetId, ulong index);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void TabCloseCallbackDelegate(ulong widgetId, ulong index);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate ulong CreateTreeViewDelegate(IntPtr handle, ulong parentId, float x, float y, float width, float height);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate ulong TreeViewAddNodeDelegate(IntPtr handle, ulong treeViewId, ulong parentNodeId, string text, ulong userData, bool hasChildren);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void TreeViewRemoveNodeDelegate(IntPtr handle, ulong treeViewId, ulong nodeId);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void TreeViewSetSelectedDelegate(IntPtr handle, ulong treeViewId, ulong nodeId);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate ulong TreeViewGetSelectedDelegate(IntPtr handle, ulong treeViewId);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void TreeViewExpandNodeDelegate(IntPtr handle, ulong treeViewId, ulong nodeId);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void TreeViewCollapseNodeDelegate(IntPtr handle, ulong treeViewId, ulong nodeId);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void TreeViewSetOnSelectThunkPtrDelegate(IntPtr handle, ulong treeViewId, IntPtr callbackPtr);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void TreeNodeSelectCallbackDelegate(ulong widgetId, ulong userData);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void PopupMenuClickCallbackDelegate(ulong widgetId, int actionId);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void GridViewClickCallbackDelegate(ulong widgetId, int index, ulong userData);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void DialogResultCallbackDelegate(ulong dialogId, int result);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void FileBrowserSelectCallbackDelegate(ulong browserId, string path);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void FileBrowserDoubleClickCallbackDelegate(ulong browserId, string path);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void TreeNodeSetTextDelegate(IntPtr handle, ulong nodeId, string text);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate ulong TreeNodeGetUserDataDelegate(IntPtr handle, ulong nodeId);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void TreeViewClearSelectionDelegate(IntPtr handle, ulong treeViewId);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate ulong CreatePopupMenuDelegate(IntPtr handle, ulong parentId);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void PopupMenuAddItemDelegate(IntPtr handle, ulong menuId, string text, string shortcut, int actionId);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void PopupMenuAddSeparatorDelegate(IntPtr handle, ulong menuId);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void PopupMenuShowDelegate(IntPtr handle, ulong menuId, float x, float y);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void PopupMenuHideDelegate(IntPtr handle, ulong menuId);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate bool PopupMenuIsVisibleDelegate(IntPtr handle, ulong menuId);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void PopupMenuSetOnClickThunkPtrDelegate(IntPtr handle, ulong menuId, IntPtr callbackPtr);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate ulong CreateGridViewDelegate(IntPtr handle, ulong parentId, float x, float y, float width, float height, float cellSize);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate uint GridViewAddItemDelegate(IntPtr handle, ulong gridId, string label, ulong userData);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void GridViewRemoveItemDelegate(IntPtr handle, ulong gridId, int index);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void GridViewSetSelectedDelegate(IntPtr handle, ulong gridId, int index);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate int GridViewGetSelectedDelegate(IntPtr handle, ulong gridId);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate ulong GridViewGetSelectedUserDataDelegate(IntPtr handle, ulong gridId);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void GridViewClearDelegate(IntPtr handle, ulong gridId);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate int GridViewItemCountDelegate(IntPtr handle, ulong gridId);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void GridViewSetOnClickThunkPtrDelegate(IntPtr handle, ulong gridId, IntPtr callbackPtr);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate ulong CreateDialogDelegate(IntPtr handle, ulong parentId, string title, float width, float height);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void DialogSetContentDelegate(IntPtr handle, ulong dialogId, ulong contentId);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void DialogAddButtonDelegate(IntPtr handle, ulong dialogId, string text, int action);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void DialogShowDelegate(IntPtr handle, ulong dialogId);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void DialogHideDelegate(IntPtr handle, ulong dialogId);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate bool DialogIsVisibleDelegate(IntPtr handle, ulong dialogId);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate int DialogGetResultDelegate(IntPtr handle, ulong dialogId);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void DialogSetOnResultThunkPtrDelegate(IntPtr handle, ulong dialogId, IntPtr callbackPtr);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate ulong CreateFileBrowserDelegate(IntPtr handle, ulong parentId, float x, float y, float width, float height, string initialPath);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void FileBrowserSetPathDelegate(IntPtr handle, ulong browserId, string path);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void FileBrowserSetFilterDelegate(IntPtr handle, ulong browserId, string filter);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void FileBrowserNavigateUpDelegate(IntPtr handle, ulong browserId);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void FileBrowserRefreshDelegate(IntPtr handle, ulong browserId);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate bool FileBrowserGetSelectedPathDelegate(IntPtr handle, ulong browserId, IntPtr buffer, int size);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate bool FileBrowserGetCurrentPathDelegate(IntPtr handle, ulong browserId, IntPtr buffer, int size);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void FileBrowserSetOnSelectThunkPtrDelegate(IntPtr handle, ulong browserId, IntPtr callbackPtr);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void FileBrowserSetOnDoubleClickThunkPtrDelegate(IntPtr handle, ulong browserId, IntPtr callbackPtr);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void SetWidgetLayerDelegate(IntPtr handle, ulong widgetId, uint layer);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate uint GetWidgetLayerDelegate(IntPtr handle, ulong widgetId);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public delegate IntPtr SceneCreateDelegate();
         
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
@@ -286,6 +480,73 @@ namespace Hezhou
         
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public delegate ulong SceneGetEntityIdDelegate(IntPtr scene, ulong index);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void SceneRemoveEntityDelegate(IntPtr scene, ulong entityId);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate int AssetLibraryGetCategoryCountDelegate();
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate bool AssetLibraryGetCategoryNameDelegate(int index, IntPtr buffer, int bufferSize);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate int AssetLibraryGetAssetCountDelegate(int categoryIndex);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate bool AssetLibraryGetAssetInfoDelegate(int categoryIndex, int assetIndex, 
+            out ulong id, IntPtr nameBuffer, int nameSize, out uint type, IntPtr descBuffer, int descSize);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate ulong AssetLibraryCreateEntityFromTemplateDelegate(IntPtr scene, ulong templateId);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate ulong AssetLibraryCreateMeshEntityDelegate(IntPtr scene, uint meshType);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate bool ProjectCreateNewDelegate([MarshalAs(UnmanagedType.LPStr)] string name, [MarshalAs(UnmanagedType.LPStr)] string path);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate bool ProjectLoadDelegate([MarshalAs(UnmanagedType.LPStr)] string path);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate bool ProjectSaveDelegate();
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate bool ProjectGetNameDelegate(IntPtr buffer, int size);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate bool ProjectGetPathDelegate(IntPtr buffer, int size);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate int ProjectGetEntityCountDelegate();
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate bool ProjectIsLoadedDelegate();
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void ProjectSyncToSceneDelegate(IntPtr scene);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void ProjectSyncFromSceneDelegate(IntPtr scene);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate bool ProjectGetSettingsDelegate(out uint width, out uint height, out uint fps);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate bool ProjectSetSettingsDelegate(uint width, uint height, uint fps);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate bool ProjectGetEntityInfoDelegate(ulong entityId, IntPtr nameBuffer, int nameSize,
+            IntPtr posBuffer, IntPtr rotBuffer, IntPtr scaleBuffer, IntPtr meshTypeBuffer, int meshTypeSize);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate bool ProjectAddEntityDelegate(ulong entityId, [MarshalAs(UnmanagedType.LPStr)] string name,
+            float posX, float posY, float posZ, float rotX, float rotY, float rotZ,
+            float scaleX, float scaleY, float scaleZ, [MarshalAs(UnmanagedType.LPStr)] string meshType);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate bool ProjectRemoveEntityDelegate(ulong entityId);
 
         [StructLayout(LayoutKind.Sequential)]
         public struct FfiContext
@@ -319,6 +580,8 @@ namespace Hezhou
             public IntPtr ui_set_widget_layout;
             public IntPtr ui_widget_set_position;
             public IntPtr ui_widget_set_size;
+            public IntPtr ui_widget_set_layer;
+            public IntPtr ui_widget_get_layer;
             public IntPtr ui_remove_widget;
             public IntPtr ui_create_text_edit;
             public IntPtr ui_create_text_edit_in_parent;
@@ -350,6 +613,58 @@ namespace Hezhou
             public IntPtr ui_input_field_get_text;
             public IntPtr ui_input_field_set_on_change_thunk_ptr;
             public IntPtr ui_input_field_set_placeholder;
+            public IntPtr ui_create_tab_widget;
+            public IntPtr ui_tab_widget_add_tab;
+            public IntPtr ui_tab_widget_set_active;
+            public IntPtr ui_tab_widget_get_active;
+            public IntPtr ui_tab_widget_remove_tab;
+            public IntPtr ui_tab_widget_set_on_select_thunk_ptr;
+            public IntPtr ui_tab_widget_set_on_close_thunk_ptr;
+            public IntPtr ui_tab_widget_get_tab_count;
+            public IntPtr ui_create_tree_view;
+            public IntPtr ui_tree_view_add_node;
+            public IntPtr ui_tree_view_remove_node;
+            public IntPtr ui_tree_view_set_selected;
+            public IntPtr ui_tree_view_get_selected;
+            public IntPtr ui_tree_view_expand_node;
+            public IntPtr ui_tree_view_collapse_node;
+            public IntPtr ui_tree_view_set_on_select_thunk_ptr;
+            public IntPtr ui_tree_node_set_text;
+            public IntPtr ui_tree_node_get_user_data;
+            public IntPtr ui_tree_view_clear_selection;
+            public IntPtr ui_create_popup_menu;
+            public IntPtr ui_popup_menu_add_item;
+            public IntPtr ui_popup_menu_add_separator;
+            public IntPtr ui_popup_menu_show;
+            public IntPtr ui_popup_menu_hide;
+            public IntPtr ui_popup_menu_is_visible;
+            public IntPtr ui_popup_menu_set_on_click_thunk_ptr;
+            public IntPtr ui_create_grid_view;
+            public IntPtr ui_grid_view_add_item;
+            public IntPtr ui_grid_view_remove_item;
+            public IntPtr ui_grid_view_set_selected;
+            public IntPtr ui_grid_view_get_selected;
+            public IntPtr ui_grid_view_get_selected_user_data;
+            public IntPtr ui_grid_view_clear;
+            public IntPtr ui_grid_view_item_count;
+            public IntPtr ui_grid_view_set_on_click_thunk_ptr;
+            public IntPtr ui_create_dialog;
+            public IntPtr ui_dialog_set_content;
+            public IntPtr ui_dialog_add_button;
+            public IntPtr ui_dialog_show;
+            public IntPtr ui_dialog_hide;
+            public IntPtr ui_dialog_is_visible;
+            public IntPtr ui_dialog_get_result;
+            public IntPtr ui_dialog_set_on_result_thunk_ptr;
+            public IntPtr ui_create_file_browser;
+            public IntPtr ui_file_browser_set_path;
+            public IntPtr ui_file_browser_set_filter;
+            public IntPtr ui_file_browser_navigate_up;
+            public IntPtr ui_file_browser_refresh;
+            public IntPtr ui_file_browser_get_selected_path;
+            public IntPtr ui_file_browser_get_current_path;
+            public IntPtr ui_file_browser_set_on_select_thunk_ptr;
+            public IntPtr ui_file_browser_set_on_double_click_thunk_ptr;
             public IntPtr scene_create;
             public IntPtr scene_destroy;
             public IntPtr scene_create_cube;
@@ -381,6 +696,7 @@ namespace Hezhou
             public IntPtr scene_create_entity;
             public IntPtr scene_get_entity_count;
             public IntPtr scene_get_entity_id;
+            public IntPtr scene_remove_entity;
             public IntPtr widget_tree_ptr;
             public IntPtr dfx_handle;
             public IntPtr dfx_log;
@@ -388,6 +704,26 @@ namespace Hezhou
             public IntPtr dfx_trace_end;
             public IntPtr set_status_text;
             public IntPtr on_hot_reload_complete;
+            public IntPtr asset_library_get_category_count;
+            public IntPtr asset_library_get_category_name;
+            public IntPtr asset_library_get_asset_count;
+            public IntPtr asset_library_get_asset_info;
+            public IntPtr asset_library_create_entity_from_template;
+            public IntPtr asset_library_create_mesh_entity;
+            public IntPtr project_create_new;
+            public IntPtr project_load;
+            public IntPtr project_save;
+            public IntPtr project_get_name;
+            public IntPtr project_get_path;
+            public IntPtr project_get_entity_count;
+            public IntPtr project_is_loaded;
+            public IntPtr project_sync_to_scene;
+            public IntPtr project_sync_from_scene;
+            public IntPtr project_get_settings;
+            public IntPtr project_set_settings;
+            public IntPtr project_get_entity_info;
+            public IntPtr project_add_entity;
+            public IntPtr project_remove_entity;
         }
 
         public static void InitFromContext(IntPtr contextPtr)
@@ -774,6 +1110,28 @@ public static ulong GetRootId()
             var func = Marshal.GetDelegateForFunctionPointer<SetWidgetLayoutDelegate>(_ffi.ui_set_widget_layout);
             func(_widgetTree, widgetId, x, y, width, height);
         }
+        
+        public static void SetWidgetLayer(ulong widgetId, uint layer)
+        {
+            if (_ffi.ui_widget_set_layer == IntPtr.Zero)
+            {
+                Log.Error("C#", "SetWidgetLayer函数指针为空");
+                return;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<SetWidgetLayerDelegate>(_ffi.ui_widget_set_layer);
+            func(_widgetTree, widgetId, layer);
+        }
+        
+        public static uint GetWidgetLayer(ulong widgetId)
+        {
+            if (_ffi.ui_widget_get_layer == IntPtr.Zero)
+            {
+                Log.Error("C#", "GetWidgetLayer函数指针为空");
+                return 1;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<GetWidgetLayerDelegate>(_ffi.ui_widget_get_layer);
+            return func(_widgetTree, widgetId);
+        }
 
         public static void RemoveWidget(ulong widgetId)
         {
@@ -974,6 +1332,598 @@ public static ulong GetRootId()
             }
             var func = Marshal.GetDelegateForFunctionPointer<InputFieldSetPlaceholderDelegate>(_ffi.ui_input_field_set_placeholder);
             func(_widgetTree, widgetId, placeholder);
+        }
+
+        public static ulong CreateTabWidget(ulong parentId, float x, float y, float width, float height)
+        {
+            if (_ffi.ui_create_tab_widget == IntPtr.Zero)
+            {
+                Log.Error("C#", "CreateTabWidget函数指针为空");
+                return 0;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<CreateTabWidgetDelegate>(_ffi.ui_create_tab_widget);
+            return func(_widgetTree, parentId, x, y, width, height);
+        }
+        
+        public static uint TabWidgetAddTab(ulong tabWidgetId, string title, ulong contentId, bool closable = false)
+        {
+            if (_ffi.ui_tab_widget_add_tab == IntPtr.Zero)
+            {
+                Log.Error("C#", "TabWidgetAddTab函数指针为空");
+                return 0;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<TabWidgetAddTabDelegate>(_ffi.ui_tab_widget_add_tab);
+            return func(_widgetTree, tabWidgetId, title, contentId, closable);
+        }
+        
+        public static void TabWidgetSetActive(ulong tabWidgetId, ulong index)
+        {
+            if (_ffi.ui_tab_widget_set_active == IntPtr.Zero)
+            {
+                Log.Error("C#", "TabWidgetSetActive函数指针为空");
+                return;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<TabWidgetSetActiveDelegate>(_ffi.ui_tab_widget_set_active);
+            func(_widgetTree, tabWidgetId, index);
+        }
+        
+        public static ulong TabWidgetGetActive(ulong tabWidgetId)
+        {
+            if (_ffi.ui_tab_widget_get_active == IntPtr.Zero)
+            {
+                Log.Error("C#", "TabWidgetGetActive函数指针为空");
+                return 0;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<TabWidgetGetActiveDelegate>(_ffi.ui_tab_widget_get_active);
+            return func(_widgetTree, tabWidgetId);
+        }
+        
+        public static void TabWidgetRemoveTab(ulong tabWidgetId, ulong index)
+        {
+            if (_ffi.ui_tab_widget_remove_tab == IntPtr.Zero)
+            {
+                Log.Error("C#", "TabWidgetRemoveTab函数指针为空");
+                return;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<TabWidgetRemoveTabDelegate>(_ffi.ui_tab_widget_remove_tab);
+            func(_widgetTree, tabWidgetId, index);
+        }
+        
+        public static void TabWidgetSetOnSelect(ulong tabWidgetId, TabSelectCallbackDelegate callback)
+        {
+            if (_ffi.ui_tab_widget_set_on_select_thunk_ptr == IntPtr.Zero)
+            {
+                Log.Error("C#", "TabWidgetSetOnSelectThunkPtr函数指针为空");
+                return;
+            }
+            _tabSelectCallbacks[tabWidgetId] = callback;
+            IntPtr callbackPtr = Marshal.GetFunctionPointerForDelegate(callback);
+            var func = Marshal.GetDelegateForFunctionPointer<TabWidgetSetOnSelectThunkPtrDelegate>(_ffi.ui_tab_widget_set_on_select_thunk_ptr);
+            func(_widgetTree, tabWidgetId, callbackPtr);
+        }
+        
+        public static void TabWidgetSetOnClose(ulong tabWidgetId, TabCloseCallbackDelegate callback)
+        {
+            if (_ffi.ui_tab_widget_set_on_close_thunk_ptr == IntPtr.Zero)
+            {
+                Log.Error("C#", "TabWidgetSetOnCloseThunkPtr函数指针为空");
+                return;
+            }
+            _tabCloseCallbacks[tabWidgetId] = callback;
+            IntPtr callbackPtr = Marshal.GetFunctionPointerForDelegate(callback);
+            var func = Marshal.GetDelegateForFunctionPointer<TabWidgetSetOnCloseThunkPtrDelegate>(_ffi.ui_tab_widget_set_on_close_thunk_ptr);
+            func(_widgetTree, tabWidgetId, callbackPtr);
+        }
+        
+        public static ulong TabWidgetGetTabCount(ulong tabWidgetId)
+        {
+            if (_ffi.ui_tab_widget_get_tab_count == IntPtr.Zero)
+            {
+                Log.Error("C#", "TabWidgetGetTabCount函数指针为空");
+                return 0;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<TabWidgetGetTabCountDelegate>(_ffi.ui_tab_widget_get_tab_count);
+            return func(_widgetTree, tabWidgetId);
+        }
+
+        public static ulong CreateTreeView(ulong parentId, float x, float y, float width, float height)
+        {
+            if (_ffi.ui_create_tree_view == IntPtr.Zero)
+            {
+                Log.Error("C#", "CreateTreeView函数指针为空");
+                return 0;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<CreateTreeViewDelegate>(_ffi.ui_create_tree_view);
+            return func(_widgetTree, parentId, x, y, width, height);
+        }
+        
+        public static ulong TreeViewAddNode(ulong treeViewId, ulong parentNodeId, string text, ulong userData, bool hasChildren)
+        {
+            if (_ffi.ui_tree_view_add_node == IntPtr.Zero)
+            {
+                Log.Error("C#", "TreeViewAddNode函数指针为空");
+                return 0;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<TreeViewAddNodeDelegate>(_ffi.ui_tree_view_add_node);
+            return func(_widgetTree, treeViewId, parentNodeId, text, userData, hasChildren);
+        }
+        
+        public static void TreeViewRemoveNode(ulong treeViewId, ulong nodeId)
+        {
+            if (_ffi.ui_tree_view_remove_node == IntPtr.Zero)
+            {
+                Log.Error("C#", "TreeViewRemoveNode函数指针为空");
+                return;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<TreeViewRemoveNodeDelegate>(_ffi.ui_tree_view_remove_node);
+            func(_widgetTree, treeViewId, nodeId);
+        }
+        
+        public static void TreeViewSetSelected(ulong treeViewId, ulong nodeId)
+        {
+            if (_ffi.ui_tree_view_set_selected == IntPtr.Zero)
+            {
+                Log.Error("C#", "TreeViewSetSelected函数指针为空");
+                return;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<TreeViewSetSelectedDelegate>(_ffi.ui_tree_view_set_selected);
+            func(_widgetTree, treeViewId, nodeId);
+        }
+        
+        public static ulong TreeViewGetSelected(ulong treeViewId)
+        {
+            if (_ffi.ui_tree_view_get_selected == IntPtr.Zero)
+            {
+                Log.Error("C#", "TreeViewGetSelected函数指针为空");
+                return 0;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<TreeViewGetSelectedDelegate>(_ffi.ui_tree_view_get_selected);
+            return func(_widgetTree, treeViewId);
+        }
+        
+        public static void TreeViewExpandNode(ulong treeViewId, ulong nodeId)
+        {
+            if (_ffi.ui_tree_view_expand_node == IntPtr.Zero)
+            {
+                Log.Error("C#", "TreeViewExpandNode函数指针为空");
+                return;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<TreeViewExpandNodeDelegate>(_ffi.ui_tree_view_expand_node);
+            func(_widgetTree, treeViewId, nodeId);
+        }
+        
+        public static void TreeViewCollapseNode(ulong treeViewId, ulong nodeId)
+        {
+            if (_ffi.ui_tree_view_collapse_node == IntPtr.Zero)
+            {
+                Log.Error("C#", "TreeViewCollapseNode函数指针为空");
+                return;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<TreeViewCollapseNodeDelegate>(_ffi.ui_tree_view_collapse_node);
+            func(_widgetTree, treeViewId, nodeId);
+        }
+        
+        public static void TreeViewSetOnSelect(ulong treeViewId, TreeNodeSelectCallbackDelegate callback)
+        {
+            if (_ffi.ui_tree_view_set_on_select_thunk_ptr == IntPtr.Zero)
+            {
+                Log.Error("C#", "TreeViewSetOnSelectThunkPtr函数指针为空");
+                return;
+            }
+            _treeNodeSelectCallbacks[treeViewId] = callback;
+            IntPtr callbackPtr = Marshal.GetFunctionPointerForDelegate(callback);
+            var func = Marshal.GetDelegateForFunctionPointer<TreeViewSetOnSelectThunkPtrDelegate>(_ffi.ui_tree_view_set_on_select_thunk_ptr);
+            func(_widgetTree, treeViewId, callbackPtr);
+        }
+        
+        public static void TreeNodeSetText(ulong nodeId, string text)
+        {
+            if (_ffi.ui_tree_node_set_text == IntPtr.Zero)
+            {
+                Log.Error("C#", "TreeNodeSetText函数指针为空");
+                return;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<TreeNodeSetTextDelegate>(_ffi.ui_tree_node_set_text);
+            func(_widgetTree, nodeId, text);
+        }
+        
+        public static ulong TreeNodeGetUserData(ulong nodeId)
+        {
+            if (_ffi.ui_tree_node_get_user_data == IntPtr.Zero)
+            {
+                Log.Error("C#", "TreeNodeGetUserData函数指针为空");
+                return 0;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<TreeNodeGetUserDataDelegate>(_ffi.ui_tree_node_get_user_data);
+            return func(_widgetTree, nodeId);
+        }
+        
+        public static void TreeViewClearSelection(ulong treeViewId)
+        {
+            if (_ffi.ui_tree_view_clear_selection == IntPtr.Zero)
+            {
+                Log.Error("C#", "TreeViewClearSelection函数指针为空");
+                return;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<TreeViewClearSelectionDelegate>(_ffi.ui_tree_view_clear_selection);
+            func(_widgetTree, treeViewId);
+        }
+
+        public static ulong CreatePopupMenu(ulong parentId)
+        {
+            if (_ffi.ui_create_popup_menu == IntPtr.Zero)
+            {
+                Log.Error("C#", "CreatePopupMenu函数指针为空");
+                return 0;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<CreatePopupMenuDelegate>(_ffi.ui_create_popup_menu);
+            return func(_widgetTree, parentId);
+        }
+        
+        public static void PopupMenuAddItem(ulong menuId, string text, string shortcut, int actionId)
+        {
+            if (_ffi.ui_popup_menu_add_item == IntPtr.Zero)
+            {
+                Log.Error("C#", "PopupMenuAddItem函数指针为空");
+                return;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<PopupMenuAddItemDelegate>(_ffi.ui_popup_menu_add_item);
+            func(_widgetTree, menuId, text, shortcut ?? "", actionId);
+        }
+        
+        public static void PopupMenuAddSeparator(ulong menuId)
+        {
+            if (_ffi.ui_popup_menu_add_separator == IntPtr.Zero)
+            {
+                Log.Error("C#", "PopupMenuAddSeparator函数指针为空");
+                return;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<PopupMenuAddSeparatorDelegate>(_ffi.ui_popup_menu_add_separator);
+            func(_widgetTree, menuId);
+        }
+        
+        public static void PopupMenuShow(ulong menuId, float x, float y)
+        {
+            if (_ffi.ui_popup_menu_show == IntPtr.Zero)
+            {
+                Log.Error("C#", "PopupMenuShow函数指针为空");
+                return;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<PopupMenuShowDelegate>(_ffi.ui_popup_menu_show);
+            func(_widgetTree, menuId, x, y);
+        }
+        
+        public static void PopupMenuHide(ulong menuId)
+        {
+            if (_ffi.ui_popup_menu_hide == IntPtr.Zero)
+            {
+                Log.Error("C#", "PopupMenuHide函数指针为空");
+                return;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<PopupMenuHideDelegate>(_ffi.ui_popup_menu_hide);
+            func(_widgetTree, menuId);
+        }
+        
+        public static bool PopupMenuIsVisible(ulong menuId)
+        {
+            if (_ffi.ui_popup_menu_is_visible == IntPtr.Zero)
+            {
+                return false;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<PopupMenuIsVisibleDelegate>(_ffi.ui_popup_menu_is_visible);
+            return func(_widgetTree, menuId);
+        }
+        
+        public static void PopupMenuSetOnClick(ulong menuId, PopupMenuClickCallbackDelegate callback)
+        {
+            if (_ffi.ui_popup_menu_set_on_click_thunk_ptr == IntPtr.Zero)
+            {
+                Log.Error("C#", "PopupMenuSetOnClickThunkPtr函数指针为空");
+                return;
+            }
+            _popupMenuCallbacks[menuId] = callback;
+            IntPtr callbackPtr = Marshal.GetFunctionPointerForDelegate(callback);
+            var func = Marshal.GetDelegateForFunctionPointer<PopupMenuSetOnClickThunkPtrDelegate>(_ffi.ui_popup_menu_set_on_click_thunk_ptr);
+            func(_widgetTree, menuId, callbackPtr);
+        }
+
+        public static ulong CreateGridView(ulong parentId, float x, float y, float width, float height, float cellSize = 64)
+        {
+            if (_ffi.ui_create_grid_view == IntPtr.Zero)
+            {
+                Log.Error("C#", "CreateGridView函数指针为空");
+                return 0;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<CreateGridViewDelegate>(_ffi.ui_create_grid_view);
+            return func(_widgetTree, parentId, x, y, width, height, cellSize);
+        }
+        
+        public static uint GridViewAddItem(ulong gridId, string label, ulong userData)
+        {
+            if (_ffi.ui_grid_view_add_item == IntPtr.Zero)
+            {
+                Log.Error("C#", "GridViewAddItem函数指针为空");
+                return 0;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<GridViewAddItemDelegate>(_ffi.ui_grid_view_add_item);
+            return func(_widgetTree, gridId, label, userData);
+        }
+        
+        public static void GridViewRemoveItem(ulong gridId, int index)
+        {
+            if (_ffi.ui_grid_view_remove_item == IntPtr.Zero)
+            {
+                Log.Error("C#", "GridViewRemoveItem函数指针为空");
+                return;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<GridViewRemoveItemDelegate>(_ffi.ui_grid_view_remove_item);
+            func(_widgetTree, gridId, index);
+        }
+        
+        public static void GridViewSetSelected(ulong gridId, int index)
+        {
+            if (_ffi.ui_grid_view_set_selected == IntPtr.Zero)
+            {
+                Log.Error("C#", "GridViewSetSelected函数指针为空");
+                return;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<GridViewSetSelectedDelegate>(_ffi.ui_grid_view_set_selected);
+            func(_widgetTree, gridId, index);
+        }
+        
+        public static int GridViewGetSelected(ulong gridId)
+        {
+            if (_ffi.ui_grid_view_get_selected == IntPtr.Zero)
+            {
+                Log.Error("C#", "GridViewGetSelected函数指针为空");
+                return -1;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<GridViewGetSelectedDelegate>(_ffi.ui_grid_view_get_selected);
+            int index = func(_widgetTree, gridId);
+            return index == int.MaxValue ? -1 : index;
+        }
+        
+        public static ulong GridViewGetSelectedUserData(ulong gridId)
+        {
+            if (_ffi.ui_grid_view_get_selected_user_data == IntPtr.Zero)
+            {
+                Log.Error("C#", "GridViewGetSelectedUserData函数指针为空");
+                return 0;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<GridViewGetSelectedUserDataDelegate>(_ffi.ui_grid_view_get_selected_user_data);
+            return func(_widgetTree, gridId);
+        }
+        
+        public static void GridViewClear(ulong gridId)
+        {
+            if (_ffi.ui_grid_view_clear == IntPtr.Zero)
+            {
+                Log.Error("C#", "GridViewClear函数指针为空");
+                return;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<GridViewClearDelegate>(_ffi.ui_grid_view_clear);
+            func(_widgetTree, gridId);
+        }
+        
+        public static int GridViewItemCount(ulong gridId)
+        {
+            if (_ffi.ui_grid_view_item_count == IntPtr.Zero)
+            {
+                Log.Error("C#", "GridViewItemCount函数指针为空");
+                return 0;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<GridViewItemCountDelegate>(_ffi.ui_grid_view_item_count);
+            return func(_widgetTree, gridId);
+        }
+        
+        public static void GridViewSetOnClick(ulong gridId, GridViewClickCallbackDelegate callback)
+        {
+            if (_ffi.ui_grid_view_set_on_click_thunk_ptr == IntPtr.Zero)
+            {
+                Log.Error("C#", "GridViewSetOnClickThunkPtr函数指针为空");
+                return;
+            }
+            _gridViewCallbacks[gridId] = callback;
+            IntPtr callbackPtr = Marshal.GetFunctionPointerForDelegate(callback);
+            var func = Marshal.GetDelegateForFunctionPointer<GridViewSetOnClickThunkPtrDelegate>(_ffi.ui_grid_view_set_on_click_thunk_ptr);
+            func(_widgetTree, gridId, callbackPtr);
+        }
+
+        public static ulong CreateDialog(ulong parentId, string title, float width, float height)
+        {
+            if (_ffi.ui_create_dialog == IntPtr.Zero)
+            {
+                Log.Error("C#", "CreateDialog函数指针为空");
+                return 0;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<CreateDialogDelegate>(_ffi.ui_create_dialog);
+            return func(_widgetTree, parentId, title, width, height);
+        }
+        
+        public static void DialogSetContent(ulong dialogId, ulong contentId)
+        {
+            if (_ffi.ui_dialog_set_content == IntPtr.Zero)
+            {
+                Log.Error("C#", "DialogSetContent函数指针为空");
+                return;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<DialogSetContentDelegate>(_ffi.ui_dialog_set_content);
+            func(_widgetTree, dialogId, contentId);
+        }
+        
+        public static void DialogAddButton(ulong dialogId, string text, int action)
+        {
+            if (_ffi.ui_dialog_add_button == IntPtr.Zero)
+            {
+                Log.Error("C#", "DialogAddButton函数指针为空");
+                return;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<DialogAddButtonDelegate>(_ffi.ui_dialog_add_button);
+            func(_widgetTree, dialogId, text, action);
+        }
+        
+        public static void DialogShow(ulong dialogId)
+        {
+            if (_ffi.ui_dialog_show == IntPtr.Zero)
+            {
+                Log.Error("C#", "DialogShow函数指针为空");
+                return;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<DialogShowDelegate>(_ffi.ui_dialog_show);
+            func(_widgetTree, dialogId);
+        }
+        
+        public static void DialogHide(ulong dialogId)
+        {
+            if (_ffi.ui_dialog_hide == IntPtr.Zero)
+            {
+                Log.Error("C#", "DialogHide函数指针为空");
+                return;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<DialogHideDelegate>(_ffi.ui_dialog_hide);
+            func(_widgetTree, dialogId);
+        }
+        
+        public static bool DialogIsVisible(ulong dialogId)
+        {
+            if (_ffi.ui_dialog_is_visible == IntPtr.Zero)
+            {
+                return false;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<DialogIsVisibleDelegate>(_ffi.ui_dialog_is_visible);
+            return func(_widgetTree, dialogId);
+        }
+        
+        public static int DialogGetResult(ulong dialogId)
+        {
+            if (_ffi.ui_dialog_get_result == IntPtr.Zero)
+            {
+                return -1;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<DialogGetResultDelegate>(_ffi.ui_dialog_get_result);
+            return func(_widgetTree, dialogId);
+        }
+        
+        public static void DialogSetOnResult(ulong dialogId, DialogResultCallbackDelegate callback)
+        {
+            if (_ffi.ui_dialog_set_on_result_thunk_ptr == IntPtr.Zero)
+            {
+                Log.Error("C#", "DialogSetOnResultThunkPtr函数指针为空");
+                return;
+            }
+            _dialogCallbacks[dialogId] = callback;
+            IntPtr callbackPtr = Marshal.GetFunctionPointerForDelegate(callback);
+            var func = Marshal.GetDelegateForFunctionPointer<DialogSetOnResultThunkPtrDelegate>(_ffi.ui_dialog_set_on_result_thunk_ptr);
+            func(_widgetTree, dialogId, callbackPtr);
+        }
+        
+        public static ulong CreateFileBrowser(ulong parentId, float x, float y, float width, float height, string initialPath = null)
+        {
+            if (_ffi.ui_create_file_browser == IntPtr.Zero)
+            {
+                Log.Error("C#", "CreateFileBrowser函数指针为空");
+                return 0;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<CreateFileBrowserDelegate>(_ffi.ui_create_file_browser);
+            return func(_widgetTree, parentId, x, y, width, height, initialPath ?? ".");
+        }
+        
+        public static void FileBrowserSetPath(ulong browserId, string path)
+        {
+            if (_ffi.ui_file_browser_set_path == IntPtr.Zero)
+            {
+                Log.Error("C#", "FileBrowserSetPath函数指针为空");
+                return;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<FileBrowserSetPathDelegate>(_ffi.ui_file_browser_set_path);
+            func(_widgetTree, browserId, path);
+        }
+        
+        public static void FileBrowserSetFilter(ulong browserId, string filter)
+        {
+            if (_ffi.ui_file_browser_set_filter == IntPtr.Zero)
+            {
+                Log.Error("C#", "FileBrowserSetFilter函数指针为空");
+                return;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<FileBrowserSetFilterDelegate>(_ffi.ui_file_browser_set_filter);
+            func(_widgetTree, browserId, filter);
+        }
+        
+        public static void FileBrowserNavigateUp(ulong browserId)
+        {
+            if (_ffi.ui_file_browser_navigate_up == IntPtr.Zero)
+            {
+                Log.Error("C#", "FileBrowserNavigateUp函数指针为空");
+                return;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<FileBrowserNavigateUpDelegate>(_ffi.ui_file_browser_navigate_up);
+            func(_widgetTree, browserId);
+        }
+        
+        public static void FileBrowserRefresh(ulong browserId)
+        {
+            if (_ffi.ui_file_browser_refresh == IntPtr.Zero)
+            {
+                Log.Error("C#", "FileBrowserRefresh函数指针为空");
+                return;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<FileBrowserRefreshDelegate>(_ffi.ui_file_browser_refresh);
+            func(_widgetTree, browserId);
+        }
+        
+        public static string FileBrowserGetSelectedPath(ulong browserId)
+        {
+            if (_ffi.ui_file_browser_get_selected_path == IntPtr.Zero)
+            {
+                return "";
+            }
+            IntPtr buffer = Marshal.AllocHGlobal(512);
+            var func = Marshal.GetDelegateForFunctionPointer<FileBrowserGetSelectedPathDelegate>(_ffi.ui_file_browser_get_selected_path);
+            bool success = func(_widgetTree, browserId, buffer, 512);
+            string result = success ? Marshal.PtrToStringAnsi(buffer) ?? "" : "";
+            Marshal.FreeHGlobal(buffer);
+            return result;
+        }
+        
+        public static string FileBrowserGetCurrentPath(ulong browserId)
+        {
+            if (_ffi.ui_file_browser_get_current_path == IntPtr.Zero)
+            {
+                return "";
+            }
+            IntPtr buffer = Marshal.AllocHGlobal(512);
+            var func = Marshal.GetDelegateForFunctionPointer<FileBrowserGetCurrentPathDelegate>(_ffi.ui_file_browser_get_current_path);
+            bool success = func(_widgetTree, browserId, buffer, 512);
+            string result = success ? Marshal.PtrToStringAnsi(buffer) ?? "" : "";
+            Marshal.FreeHGlobal(buffer);
+            return result;
+        }
+        
+        public static void FileBrowserSetOnSelect(ulong browserId, FileBrowserSelectCallbackDelegate callback)
+        {
+            if (_ffi.ui_file_browser_set_on_select_thunk_ptr == IntPtr.Zero)
+            {
+                Log.Error("C#", "FileBrowserSetOnSelectThunkPtr函数指针为空");
+                return;
+            }
+            _fileBrowserSelectCallbacks[browserId] = callback;
+            IntPtr callbackPtr = Marshal.GetFunctionPointerForDelegate(callback);
+            var func = Marshal.GetDelegateForFunctionPointer<FileBrowserSetOnSelectThunkPtrDelegate>(_ffi.ui_file_browser_set_on_select_thunk_ptr);
+            func(_widgetTree, browserId, callbackPtr);
+        }
+        
+        public static void FileBrowserSetOnDoubleClick(ulong browserId, FileBrowserDoubleClickCallbackDelegate callback)
+        {
+            if (_ffi.ui_file_browser_set_on_double_click_thunk_ptr == IntPtr.Zero)
+            {
+                Log.Error("C#", "FileBrowserSetOnDoubleClickThunkPtr函数指针为空");
+                return;
+            }
+            _fileBrowserDoubleClickCallbacks[browserId] = callback;
+            IntPtr callbackPtr = Marshal.GetFunctionPointerForDelegate(callback);
+            var func = Marshal.GetDelegateForFunctionPointer<FileBrowserSetOnDoubleClickThunkPtrDelegate>(_ffi.ui_file_browser_set_on_double_click_thunk_ptr);
+            func(_widgetTree, browserId, callbackPtr);
         }
 
         public static IntPtr SceneCreate()
@@ -1344,6 +2294,286 @@ public static ulong GetRootId()
             var func = Marshal.GetDelegateForFunctionPointer<SceneGetEntityIdDelegate>(_ffi.scene_get_entity_id);
             return func(scene, index);
         }
+        
+        public static void SceneRemoveEntity(IntPtr scene, ulong entityId)
+        {
+            if (_ffi.scene_remove_entity == IntPtr.Zero)
+            {
+                Log.Error("C#", "SceneRemoveEntity函数指针为空");
+                return;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<SceneRemoveEntityDelegate>(_ffi.scene_remove_entity);
+            func(scene, entityId);
+        }
+
+        public static int AssetLibraryGetCategoryCount()
+        {
+            if (_ffi.asset_library_get_category_count == IntPtr.Zero)
+            {
+                return 0;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<AssetLibraryGetCategoryCountDelegate>(_ffi.asset_library_get_category_count);
+            return func();
+        }
+        
+        public static string AssetLibraryGetCategoryName(int index)
+        {
+            if (_ffi.asset_library_get_category_name == IntPtr.Zero)
+            {
+                return "";
+            }
+            IntPtr buffer = Marshal.AllocHGlobal(256);
+            var func = Marshal.GetDelegateForFunctionPointer<AssetLibraryGetCategoryNameDelegate>(_ffi.asset_library_get_category_name);
+            bool success = func(index, buffer, 256);
+            string result = success ? Marshal.PtrToStringAnsi(buffer) ?? "" : "";
+            Marshal.FreeHGlobal(buffer);
+            return result;
+        }
+        
+        public static int AssetLibraryGetAssetCount(int categoryIndex)
+        {
+            if (_ffi.asset_library_get_asset_count == IntPtr.Zero)
+            {
+                return 0;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<AssetLibraryGetAssetCountDelegate>(_ffi.asset_library_get_asset_count);
+            return func(categoryIndex);
+        }
+        
+        public static AssetInfo AssetLibraryGetAssetInfo(int categoryIndex, int assetIndex)
+        {
+            var info = new AssetInfo();
+            if (_ffi.asset_library_get_asset_info == IntPtr.Zero)
+            {
+                return info;
+            }
+            
+            IntPtr nameBuffer = Marshal.AllocHGlobal(256);
+            IntPtr descBuffer = Marshal.AllocHGlobal(256);
+            
+            var func = Marshal.GetDelegateForFunctionPointer<AssetLibraryGetAssetInfoDelegate>(_ffi.asset_library_get_asset_info);
+            bool success = func(categoryIndex, assetIndex, out info.Id, nameBuffer, 256, out uint typeValue, descBuffer, 256);
+            
+            if (success)
+            {
+                info.Name = Marshal.PtrToStringAnsi(nameBuffer) ?? "";
+                info.Type = (AssetType)typeValue;
+                info.Description = Marshal.PtrToStringAnsi(descBuffer) ?? "";
+            }
+            
+            Marshal.FreeHGlobal(nameBuffer);
+            Marshal.FreeHGlobal(descBuffer);
+            
+            return info;
+        }
+        
+        public static ulong AssetLibraryCreateEntityFromTemplate(IntPtr scene, ulong templateId)
+        {
+            if (_ffi.asset_library_create_entity_from_template == IntPtr.Zero)
+            {
+                return 0;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<AssetLibraryCreateEntityFromTemplateDelegate>(_ffi.asset_library_create_entity_from_template);
+            return func(scene, templateId);
+        }
+        
+        public static ulong AssetLibraryCreateMeshEntity(IntPtr scene, int meshType)
+        {
+            if (_ffi.asset_library_create_mesh_entity == IntPtr.Zero)
+            {
+                return 0;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<AssetLibraryCreateMeshEntityDelegate>(_ffi.asset_library_create_mesh_entity);
+            return func(scene, (uint)meshType);
+        }
+
+        public static bool ProjectCreateNew(string name, string path)
+        {
+            if (_ffi.project_create_new == IntPtr.Zero)
+            {
+                Log.Error("C#", "ProjectCreateNew函数指针为空");
+                return false;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<ProjectCreateNewDelegate>(_ffi.project_create_new);
+            return func(name, path);
+        }
+        
+        public static bool ProjectLoad(string path)
+        {
+            if (_ffi.project_load == IntPtr.Zero)
+            {
+                Log.Error("C#", "ProjectLoad函数指针为空");
+                return false;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<ProjectLoadDelegate>(_ffi.project_load);
+            return func(path);
+        }
+        
+        public static bool ProjectSave()
+        {
+            if (_ffi.project_save == IntPtr.Zero)
+            {
+                Log.Error("C#", "ProjectSave函数指针为空");
+                return false;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<ProjectSaveDelegate>(_ffi.project_save);
+            return func();
+        }
+        
+        public static string ProjectGetName()
+        {
+            if (_ffi.project_get_name == IntPtr.Zero)
+            {
+                return "";
+            }
+            IntPtr buffer = Marshal.AllocHGlobal(256);
+            var func = Marshal.GetDelegateForFunctionPointer<ProjectGetNameDelegate>(_ffi.project_get_name);
+            bool success = func(buffer, 256);
+            string result = success ? Marshal.PtrToStringAnsi(buffer) ?? "" : "";
+            Marshal.FreeHGlobal(buffer);
+            return result;
+        }
+        
+        public static string ProjectGetPath()
+        {
+            if (_ffi.project_get_path == IntPtr.Zero)
+            {
+                return "";
+            }
+            IntPtr buffer = Marshal.AllocHGlobal(512);
+            var func = Marshal.GetDelegateForFunctionPointer<ProjectGetPathDelegate>(_ffi.project_get_path);
+            bool success = func(buffer, 512);
+            string result = success ? Marshal.PtrToStringAnsi(buffer) ?? "" : "";
+            Marshal.FreeHGlobal(buffer);
+            return result;
+        }
+        
+        public static int ProjectGetEntityCount()
+        {
+            if (_ffi.project_get_entity_count == IntPtr.Zero)
+            {
+                return 0;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<ProjectGetEntityCountDelegate>(_ffi.project_get_entity_count);
+            return func();
+        }
+        
+        public static bool ProjectIsLoaded()
+        {
+            if (_ffi.project_is_loaded == IntPtr.Zero)
+            {
+                return false;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<ProjectIsLoadedDelegate>(_ffi.project_is_loaded);
+            return func();
+        }
+        
+        public static void ProjectSyncToScene(IntPtr scene)
+        {
+            if (_ffi.project_sync_to_scene == IntPtr.Zero)
+            {
+                return;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<ProjectSyncToSceneDelegate>(_ffi.project_sync_to_scene);
+            func(scene);
+        }
+        
+        public static void ProjectSyncFromScene(IntPtr scene)
+        {
+            if (_ffi.project_sync_from_scene == IntPtr.Zero)
+            {
+                return;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<ProjectSyncFromSceneDelegate>(_ffi.project_sync_from_scene);
+            func(scene);
+        }
+        
+        public static ProjectSettings ProjectGetSettings()
+        {
+            var settings = new ProjectSettings();
+            if (_ffi.project_get_settings == IntPtr.Zero)
+            {
+                return settings;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<ProjectGetSettingsDelegate>(_ffi.project_get_settings);
+            func(out settings.GameWidth, out settings.GameHeight, out settings.Fps);
+            return settings;
+        }
+        
+        public static bool ProjectSetSettings(uint width, uint height, uint fps)
+        {
+            if (_ffi.project_set_settings == IntPtr.Zero)
+            {
+                return false;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<ProjectSetSettingsDelegate>(_ffi.project_set_settings);
+            return func(width, height, fps);
+        }
+        
+        public static ProjectEntityInfo ProjectGetEntityInfo(ulong entityId)
+        {
+            var info = new ProjectEntityInfo();
+            if (_ffi.project_get_entity_info == IntPtr.Zero)
+            {
+                return info;
+            }
+            
+            IntPtr nameBuffer = Marshal.AllocHGlobal(256);
+            IntPtr posBuffer = Marshal.AllocHGlobal(12);
+            IntPtr rotBuffer = Marshal.AllocHGlobal(12);
+            IntPtr scaleBuffer = Marshal.AllocHGlobal(12);
+            IntPtr meshTypeBuffer = Marshal.AllocHGlobal(64);
+            
+            var func = Marshal.GetDelegateForFunctionPointer<ProjectGetEntityInfoDelegate>(_ffi.project_get_entity_info);
+            bool success = func(entityId, nameBuffer, 256, posBuffer, rotBuffer, scaleBuffer, meshTypeBuffer, 64);
+            
+            if (success)
+            {
+                info.Id = entityId;
+                info.Name = Marshal.PtrToStringAnsi(nameBuffer) ?? "";
+                info.MeshType = Marshal.PtrToStringAnsi(meshTypeBuffer) ?? "";
+                
+                info.Position = new float[3];
+                info.Rotation = new float[3];
+                info.Scale = new float[3];
+                
+                Marshal.Copy(posBuffer, info.Position, 0, 3);
+                Marshal.Copy(rotBuffer, info.Rotation, 0, 3);
+                Marshal.Copy(scaleBuffer, info.Scale, 0, 3);
+            }
+            
+            Marshal.FreeHGlobal(nameBuffer);
+            Marshal.FreeHGlobal(posBuffer);
+            Marshal.FreeHGlobal(rotBuffer);
+            Marshal.FreeHGlobal(scaleBuffer);
+            Marshal.FreeHGlobal(meshTypeBuffer);
+            
+            return info;
+        }
+        
+        public static bool ProjectAddEntity(ulong entityId, string name,
+            float posX, float posY, float posZ,
+            float rotX, float rotY, float rotZ,
+            float scaleX, float scaleY, float scaleZ,
+            string meshType)
+        {
+            if (_ffi.project_add_entity == IntPtr.Zero)
+            {
+                return false;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<ProjectAddEntityDelegate>(_ffi.project_add_entity);
+            return func(entityId, name, posX, posY, posZ, rotX, rotY, rotZ, scaleX, scaleY, scaleZ, meshType);
+        }
+        
+        public static bool ProjectRemoveEntity(ulong entityId)
+        {
+            if (_ffi.project_remove_entity == IntPtr.Zero)
+            {
+                return false;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<ProjectRemoveEntityDelegate>(_ffi.project_remove_entity);
+            return func(entityId);
+        }
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public delegate void WidgetCallbackDelegate(ulong widgetId);
@@ -1503,6 +2733,61 @@ public static ulong GetRootId()
             return UI.CreatePanel(Id, x, y, width, height, r, g, b, a);
         }
         
+public void SetPosition(float x, float y)
+        {
+            UI.SetWidgetLayout(Id, x, y, 0, 0);
+        }
+    }
+
+    public class TabWidget
+    {
+        public ulong Id { get; private set; }
+        private UI.TabSelectCallbackDelegate _selectCallback;
+        private UI.TabCloseCallbackDelegate _closeCallback;
+        
+        public TabWidget(ulong parentId, float x, float y, float width, float height)
+        {
+            Id = UI.CreateTabWidget(parentId, x, y, width, height);
+            Log.Info("Editor", $"TabWidget创建成功: id={Id}");
+        }
+        
+        public uint AddTab(string title, ulong contentId, bool closable = false)
+        {
+            return UI.TabWidgetAddTab(Id, title, contentId, closable);
+        }
+        
+        public void SetActive(ulong index)
+        {
+            UI.TabWidgetSetActive(Id, index);
+        }
+        
+        public ulong GetActive()
+        {
+            return UI.TabWidgetGetActive(Id);
+        }
+        
+        public void RemoveTab(ulong index)
+        {
+            UI.TabWidgetRemoveTab(Id, index);
+        }
+        
+        public ulong GetTabCount()
+        {
+            return UI.TabWidgetGetTabCount(Id);
+        }
+        
+        public void SetOnSelect(UI.TabSelectCallbackDelegate callback)
+        {
+            _selectCallback = callback;
+            UI.TabWidgetSetOnSelect(Id, callback);
+        }
+        
+        public void SetOnClose(UI.TabCloseCallbackDelegate callback)
+        {
+            _closeCallback = callback;
+            UI.TabWidgetSetOnClose(Id, callback);
+        }
+        
         public void SetPosition(float x, float y)
         {
             UI.SetWidgetLayout(Id, x, y, 0, 0);
@@ -1635,6 +2920,341 @@ public static ulong GetRootId()
             UI.InputFieldSetOnChange(Id, callback);
         }
     }
+    
+    public class TreeView
+    {
+        public ulong Id { get; private set; }
+        private UI.TreeNodeSelectCallbackDelegate _selectCallback;
+        
+        public TreeView(ulong parentId, float x, float y, float width, float height)
+        {
+            Id = UI.CreateTreeView(parentId, x, y, width, height);
+            Log.Info("Editor", $"TreeView创建成功: id={Id}");
+        }
+        
+        public TreeNode AddRootNode(string text, ulong userData = 0, bool hasChildren = false)
+        {
+            ulong nodeId = UI.TreeViewAddNode(Id, 0, text, userData, hasChildren);
+            return new TreeNode(nodeId, text, userData);
+        }
+        
+        public TreeNode AddChildNode(ulong parentNodeId, string text, ulong userData = 0, bool hasChildren = false)
+        {
+            ulong nodeId = UI.TreeViewAddNode(Id, parentNodeId, text, userData, hasChildren);
+            return new TreeNode(nodeId, text, userData);
+        }
+        
+        public void RemoveNode(ulong nodeId)
+        {
+            UI.TreeViewRemoveNode(Id, nodeId);
+        }
+        
+        public void SetSelected(ulong nodeId)
+        {
+            UI.TreeViewSetSelected(Id, nodeId);
+        }
+        
+        public ulong GetSelected()
+        {
+            return UI.TreeViewGetSelected(Id);
+        }
+        
+        public void ExpandNode(ulong nodeId)
+        {
+            UI.TreeViewExpandNode(Id, nodeId);
+        }
+        
+        public void CollapseNode(ulong nodeId)
+        {
+            UI.TreeViewCollapseNode(Id, nodeId);
+        }
+        
+        public void ClearSelection()
+        {
+            UI.TreeViewClearSelection(Id);
+        }
+        
+        public void SetOnSelect(UI.TreeNodeSelectCallbackDelegate callback)
+        {
+            _selectCallback = callback;
+            UI.TreeViewSetOnSelect(Id, callback);
+        }
+        
+        public void SetPosition(float x, float y)
+        {
+            UI.SetWidgetLayout(Id, x, y, 0, 0);
+        }
+    }
+    
+    public class TreeNode
+    {
+        public ulong Id { get; private set; }
+        private string _text;
+        private ulong _userData;
+        
+        public TreeNode(ulong id, string text, ulong userData = 0)
+        {
+            Id = id;
+            _text = text;
+            _userData = userData;
+        }
+        
+        public string Text
+        {
+            get => _text;
+            set { _text = value; UI.TreeNodeSetText(Id, _text); }
+        }
+        
+        public ulong UserData
+        {
+            get => _userData;
+        }
+        
+        public ulong GetUserDataFromWidget()
+        {
+            return UI.TreeNodeGetUserData(Id);
+        }
+    }
+    
+    public class PopupMenu
+    {
+        public ulong Id { get; private set; }
+        private UI.PopupMenuClickCallbackDelegate _callback;
+        
+        public PopupMenu(ulong parentId)
+        {
+            Id = UI.CreatePopupMenu(parentId);
+            Log.Info("Editor", $"PopupMenu创建成功: id={Id}");
+        }
+        
+        public void AddItem(string text, string shortcut, int actionId)
+        {
+            UI.PopupMenuAddItem(Id, text, shortcut, actionId);
+        }
+        
+        public void AddItem(string text, int actionId)
+        {
+            UI.PopupMenuAddItem(Id, text, null, actionId);
+        }
+        
+        public void AddSeparator()
+        {
+            UI.PopupMenuAddSeparator(Id);
+        }
+        
+        public void Show(float x, float y)
+        {
+            UI.PopupMenuShow(Id, x, y);
+        }
+        
+        public void Hide()
+        {
+            UI.PopupMenuHide(Id);
+        }
+        
+        public bool IsVisible => UI.PopupMenuIsVisible(Id);
+        
+        public void SetOnClick(UI.PopupMenuClickCallbackDelegate callback)
+        {
+            _callback = callback;
+            UI.PopupMenuSetOnClick(Id, callback);
+        }
+    }
+    
+    public class GridView
+    {
+        public ulong Id { get; private set; }
+        private UI.GridViewClickCallbackDelegate _callback;
+        private float _cellSize;
+        
+        public GridView(ulong parentId, float x, float y, float width, float height, float cellSize = 64)
+        {
+            _cellSize = cellSize;
+            Id = UI.CreateGridView(parentId, x, y, width, height, cellSize);
+            Log.Info("Editor", $"GridView创建成功: id={Id}, cellSize={cellSize}");
+        }
+        
+        public uint AddItem(string label, ulong userData)
+        {
+            return UI.GridViewAddItem(Id, label, userData);
+        }
+        
+        public void RemoveItem(int index)
+        {
+            UI.GridViewRemoveItem(Id, index);
+        }
+        
+        public void SetSelected(int index)
+        {
+            UI.GridViewSetSelected(Id, index);
+        }
+        
+        public int SelectedIndex => UI.GridViewGetSelected(Id);
+        
+        public ulong SelectedUserData => UI.GridViewGetSelectedUserData(Id);
+        
+        public void Clear()
+        {
+            UI.GridViewClear(Id);
+        }
+        
+        public int ItemCount => UI.GridViewItemCount(Id);
+        
+        public void SetOnClick(UI.GridViewClickCallbackDelegate callback)
+        {
+            _callback = callback;
+            UI.GridViewSetOnClick(Id, callback);
+        }
+        
+        public float CellSize => _cellSize;
+    }
+
+    public enum AssetType
+    {
+        EntityTemplate = 0,
+        Texture = 1,
+        Material = 2,
+        Script = 3
+    }
+    
+    public struct AssetInfo
+    {
+        public ulong Id;
+        public string Name;
+        public AssetType Type;
+        public string Description;
+    }
+    
+    public struct ProjectSettings
+    {
+        public uint GameWidth;
+        public uint GameHeight;
+        public uint Fps;
+    }
+    
+    public struct ProjectEntityInfo
+    {
+        public ulong Id;
+        public string Name;
+        public float[] Position;
+        public float[] Rotation;
+        public float[] Scale;
+        public string MeshType;
+    }
+    
+    public static class AssetLibrary
+    {
+        public static int GetCategoryCount()
+        {
+            return UI.AssetLibraryGetCategoryCount();
+        }
+        
+        public static string GetCategoryName(int index)
+        {
+            return UI.AssetLibraryGetCategoryName(index);
+        }
+        
+        public static int GetAssetCount(int categoryIndex)
+        {
+            return UI.AssetLibraryGetAssetCount(categoryIndex);
+        }
+        
+        public static AssetInfo GetAssetInfo(int categoryIndex, int assetIndex)
+        {
+            return UI.AssetLibraryGetAssetInfo(categoryIndex, assetIndex);
+        }
+        
+        public static ulong CreateEntityFromTemplate(IntPtr scene, ulong templateId)
+        {
+            return UI.AssetLibraryCreateEntityFromTemplate(scene, templateId);
+        }
+        
+        public static ulong CreateMeshEntity(IntPtr scene, int meshType)
+        {
+            return UI.AssetLibraryCreateMeshEntity(scene, meshType);
+        }
+    }
+    
+    public static class Project
+    {
+        public static bool CreateNew(string name, string path)
+        {
+            return UI.ProjectCreateNew(name, path);
+        }
+        
+        public static bool Load(string path)
+        {
+            return UI.ProjectLoad(path);
+        }
+        
+        public static bool Save()
+        {
+            return UI.ProjectSave();
+        }
+        
+        public static string GetName()
+        {
+            return UI.ProjectGetName();
+        }
+        
+        public static string GetPath()
+        {
+            return UI.ProjectGetPath();
+        }
+        
+        public static int GetEntityCount()
+        {
+            return UI.ProjectGetEntityCount();
+        }
+        
+        public static bool IsLoaded()
+        {
+            return UI.ProjectIsLoaded();
+        }
+        
+        public static void SyncToScene(IntPtr scene)
+        {
+            UI.ProjectSyncToScene(scene);
+        }
+        
+        public static void SyncFromScene(IntPtr scene)
+        {
+            UI.ProjectSyncFromScene(scene);
+        }
+        
+        public static ProjectSettings GetSettings()
+        {
+            return UI.ProjectGetSettings();
+        }
+        
+        public static bool SetSettings(uint width, uint height, uint fps)
+        {
+            return UI.ProjectSetSettings(width, height, fps);
+        }
+        
+        public static ProjectEntityInfo GetEntityInfo(ulong entityId)
+        {
+            return UI.ProjectGetEntityInfo(entityId);
+        }
+        
+        public static bool AddEntity(ulong entityId, string name, 
+            float posX, float posY, float posZ,
+            float rotX, float rotY, float rotZ,
+            float scaleX, float scaleY, float scaleZ,
+            string meshType)
+        {
+            return UI.ProjectAddEntity(entityId, name, 
+                posX, posY, posZ, 
+                rotX, rotY, rotZ,
+                scaleX, scaleY, scaleZ, 
+                meshType);
+        }
+        
+        public static bool RemoveEntity(ulong entityId)
+        {
+            return UI.ProjectRemoveEntity(entityId);
+        }
+    }
 
     public enum GameState
     {
@@ -1717,6 +3337,35 @@ public static ulong GetRootId()
         public Dictionary<ulong, Entity>.ValueCollection GetAllEntities()
         {
             return _entities.Values;
+        }
+        
+        public int GetEntityCount()
+        {
+            return _entities.Count;
+        }
+        
+        public ulong GetEntityId(int index)
+        {
+            if (index < 0 || index >= _entities.Count)
+                return 0;
+            
+            int i = 0;
+            foreach (var key in _entities.Keys)
+            {
+                if (i == index)
+                    return key;
+                i++;
+            }
+            return 0;
+        }
+        
+        public void RemoveEntity(ulong entityId)
+        {
+            if (_entities.ContainsKey(entityId))
+            {
+                UI.SceneRemoveEntity(_scenePtr, entityId);
+                _entities.Remove(entityId);
+            }
         }
 
         public void AttachScript(ulong entityId, string scriptPath, string className)

@@ -17,6 +17,9 @@ pub struct InputField {
     text: String,
     placeholder: String,
     cursor_position: usize,
+    selection_start: usize,
+    selection_end: usize,
+    has_selection: bool,
     is_focused: bool,
     on_change: Option<Box<dyn FnMut(&str) + Send + Sync>>,
     content_scale: f32,
@@ -37,11 +40,58 @@ impl InputField {
             text: String::new(),
             placeholder: String::new(),
             cursor_position: 0,
+            selection_start: 0,
+            selection_end: 0,
+            has_selection: false,
             is_focused: false,
             on_change: None,
             content_scale: 1.0,
             flags: crate::widget::WidgetFlags::default(),
         }
+    }
+    
+    pub fn clear_selection(&mut self) {
+        self.selection_start = 0;
+        self.selection_end = 0;
+        self.has_selection = false;
+        self.flags.dirty_render = true;
+    }
+    
+    pub fn select_all(&mut self) {
+        self.selection_start = 0;
+        self.selection_end = self.text.len();
+        self.has_selection = true;
+        self.cursor_position = self.text.len();
+        self.flags.dirty_render = true;
+    }
+    
+    pub fn has_selection(&self) -> bool {
+        self.has_selection
+    }
+    
+    pub fn get_selected_text(&self) -> Option<&str> {
+        if self.has_selection && !self.text.is_empty() {
+            let start = self.selection_start.min(self.selection_end);
+            let end = self.selection_start.max(self.selection_end);
+            if start < end && end <= self.text.len() {
+                let start_byte = self.text.char_indices().nth(start).map(|(i, _)| i).unwrap_or(0);
+                let end_byte = self.text.char_indices().nth(end).map(|(i, _)| i).unwrap_or(self.text.len());
+                Some(&self.text[start_byte..end_byte])
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    }
+    
+    fn extend_selection(&mut self) {
+        if !self.has_selection {
+            self.selection_start = self.cursor_position;
+        }
+        self.selection_end = self.cursor_position;
+        self.has_selection = true;
+        self.flags.dirty_render = true;
     }
     
     pub fn with_placeholder(mut self, placeholder: &str) -> Self {
@@ -114,6 +164,22 @@ impl InputField {
     fn trigger_on_change(&mut self) {
         if let Some(callback) = &mut self.on_change {
             callback(&self.text);
+        }
+    }
+    
+    fn delete_selection(&mut self) {
+        if self.has_selection {
+            let start = self.selection_start.min(self.selection_end);
+            let end = self.selection_start.max(self.selection_end);
+            
+            let start_byte = self.text.char_indices().nth(start).map(|(i, _)| i).unwrap_or(0);
+            let end_byte = self.text.char_indices().nth(end).map(|(i, _)| i).unwrap_or(self.text.len());
+            
+            self.text.replace_range(start_byte..end_byte, "");
+            self.cursor_position = start;
+            self.clear_selection();
+            self.trigger_on_change();
+            self.flags.dirty_render = true;
         }
     }
 }
@@ -206,6 +272,29 @@ impl Widget for InputField {
         canvas.draw_rect(rect, &current_style);
         
         let font_size = 14.0 * self.content_scale;
+        
+        if self.has_selection && !self.text.is_empty() {
+            let start = self.selection_start.min(self.selection_end);
+            let end = self.selection_start.max(self.selection_end);
+            
+            let font_atlas = crate::font_atlas::create_font_atlas();
+            let chars_before_start: String = self.text.chars().take(start).collect();
+            let (start_x, _) = font_atlas.measure_text(0, &chars_before_start, font_size);
+            
+            let chars_selected: String = self.text.chars().take(end).collect();
+            let (end_x, _) = font_atlas.measure_text(0, &chars_selected, font_size);
+            
+            let selection_rect = Rect::new(
+                8.0 + start_x,
+                6.0,
+                end_x - start_x,
+                self.layout.height - 12.0
+            );
+            let selection_style = Style::new()
+                .with_background(Color::new(0.2, 0.4, 0.8, 0.5));
+            canvas.draw_rect(selection_rect, &selection_style);
+        }
+        
         let display_text = if self.text.is_empty() && !self.is_focused {
             &self.placeholder
         } else {
@@ -260,6 +349,7 @@ impl Widget for InputField {
                 if self.state != WidgetState::Disabled {
                     self.set_state(WidgetState::Pressed);
                     self.focus();
+                    self.clear_selection();
                     return EventResult::Handled;
                 }
             }
@@ -289,21 +379,82 @@ impl Widget for InputField {
                 if self.is_focused {
                     if let EventData::Key(key_data) = &event.data {
                         let keycode = key_data.keycode;
+                        let modifiers = key_data.modifiers;
+                        let shift = (modifiers & 1) != 0;
+                        let ctrl = (modifiers & 2) != 0;
+                        
+                        if ctrl && keycode == 1 {
+                            self.select_all();
+                            return EventResult::Handled;
+                        }
                         
                         if keycode == 8 {
-                            self.delete_char();
+                            if self.has_selection {
+                                self.delete_selection();
+                            } else {
+                                self.delete_char();
+                            }
                             return EventResult::Handled;
                         } else if keycode == 13 {
                             self.blur();
                             return EventResult::Handled;
                         } else if keycode >= 32 && keycode <= 126 {
+                            if self.has_selection {
+                                self.delete_selection();
+                            }
                             self.insert_char(keycode as u8 as char);
                             return EventResult::Handled;
                         } else if key_data.unicode_char > 0 {
                             if let Some(c) = char::from_u32(key_data.unicode_char) {
+                                if self.has_selection {
+                                    self.delete_selection();
+                                }
                                 self.insert_char(c);
                                 return EventResult::Handled;
                             }
+                        }
+                        
+                        let left_keycode = 80u32;
+                        let right_keycode = 79u32;
+                        let home_keycode = 74u32;
+                        let end_keycode = 77u32;
+                        
+                        if keycode == left_keycode {
+                            if self.cursor_position > 0 {
+                                self.cursor_position -= 1;
+                                if shift {
+                                    self.extend_selection();
+                                } else {
+                                    self.clear_selection();
+                                }
+                            }
+                            return EventResult::Handled;
+                        } else if keycode == right_keycode {
+                            if self.cursor_position < self.text.chars().count() {
+                                self.cursor_position += 1;
+                                if shift {
+                                    self.extend_selection();
+                                } else {
+                                    self.clear_selection();
+                                }
+                            }
+                            return EventResult::Handled;
+                        } else if keycode == home_keycode {
+                            self.cursor_position = 0;
+                            if shift {
+                                self.extend_selection();
+                            } else {
+                                self.clear_selection();
+                            }
+                            return EventResult::Handled;
+                        } else if keycode == end_keycode {
+                            self.cursor_position = self.text.chars().count();
+                            if shift {
+                                self.extend_selection();
+                            } else {
+                                self.clear_selection();
+                            }
+                            return EventResult::Handled;
                         }
                     }
                 }

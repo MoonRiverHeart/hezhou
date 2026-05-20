@@ -187,6 +187,16 @@ impl Canvas {
         });
     }
 
+    pub fn draw_rect_outline(&mut self, bounds: Rect, color: Color, width: f32) {
+        self.commands.push(DrawCommand::RectOutline {
+            bounds: self.transform.transform_point(&bounds.origin()),
+            width: bounds.width,
+            height: bounds.height,
+            color: Color::new(color.r, color.g, color.b, color.a * self.opacity),
+            stroke_width: width,
+        });
+    }
+
     pub fn draw_shadow(&mut self, bounds: Rect, shadow: &Shadow) {
         self.commands.push(DrawCommand::Shadow {
             bounds,
@@ -269,6 +279,14 @@ pub enum DrawCommand {
         end: Point,
         color: Color,
         width: f32,
+    },
+
+    RectOutline {
+        bounds: Point,
+        width: f32,
+        height: f32,
+        color: Color,
+        stroke_width: f32,
     },
 
     Shadow {

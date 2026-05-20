@@ -13,6 +13,16 @@ pub type KeyCallback = extern "C" fn(u32, bool, u32);  // keycode, pressed, modi
 pub type MouseMoveCallback = extern "C" fn(f32, f32, bool);  // x, y, dragging
 pub type DropdownSelectCallback = extern "C" fn(u64, usize);  // widget_id, selected_index
 pub type InputFieldChangeCallback = extern "C" fn(u64, *const std::ffi::c_char);  // widget_id, text
+pub type TabSelectCallback = extern "C" fn(u64, usize);  // widget_id, tab_index
+pub type TabCloseCallback = extern "C" fn(u64, usize);   // widget_id, tab_index
+pub type TreeNodeSelectCallback = extern "C" fn(u64, u64);  // widget_id, user_data
+pub type TreeNodeToggleCallback = extern "C" fn(u64);  // widget_id
+pub type PopupMenuClickCallback = extern "C" fn(u64, usize);  // widget_id, action_id
+pub type PopupMenuCloseCallback = extern "C" fn(u64);  // widget_id
+pub type GridViewClickCallback = extern "C" fn(u64, usize, u64);  // widget_id, index, user_data
+pub type DialogResultCallback = extern "C" fn(u64, i32);  // dialog_id, result
+pub type FileBrowserSelectCallback = extern "C" fn(u64, *const std::ffi::c_char);  // browser_id, path
+pub type FileBrowserDoubleClickCallback = extern "C" fn(u64, *const std::ffi::c_char);  // browser_id, path
 
 static UI_CALLBACKS: LazyLock<Mutex<UICallbacks>> =
     LazyLock::new(|| Mutex::new(UICallbacks::new()));
@@ -36,6 +46,16 @@ pub struct UICallbacks {
     on_mouse_move: Option<MouseMoveCallback>,
     on_dropdown_select: HashMap<u64, DropdownSelectCallback>,
     on_input_field_change: HashMap<u64, InputFieldChangeCallback>,
+    on_tab_select: HashMap<u64, TabSelectCallback>,
+    on_tab_close: HashMap<u64, TabCloseCallback>,
+    on_tree_node_select: HashMap<u64, TreeNodeSelectCallback>,
+    on_tree_node_toggle: HashMap<u64, TreeNodeToggleCallback>,
+    on_popup_menu_click: HashMap<u64, PopupMenuClickCallback>,
+    on_popup_menu_close: HashMap<u64, PopupMenuCloseCallback>,
+    on_grid_view_click: HashMap<u64, GridViewClickCallback>,
+    on_dialog_result: HashMap<u64, DialogResultCallback>,
+    on_file_browser_select: HashMap<u64, FileBrowserSelectCallback>,
+    on_file_browser_double_click: HashMap<u64, FileBrowserDoubleClickCallback>,
 }
 
 impl UICallbacks {
@@ -50,6 +70,16 @@ impl UICallbacks {
             on_mouse_move: None,
             on_dropdown_select: HashMap::new(),
             on_input_field_change: HashMap::new(),
+            on_tab_select: HashMap::new(),
+            on_tab_close: HashMap::new(),
+            on_tree_node_select: HashMap::new(),
+            on_tree_node_toggle: HashMap::new(),
+            on_popup_menu_click: HashMap::new(),
+            on_popup_menu_close: HashMap::new(),
+            on_grid_view_click: HashMap::new(),
+            on_dialog_result: HashMap::new(),
+            on_file_browser_select: HashMap::new(),
+            on_file_browser_double_click: HashMap::new(),
         }
     }
     
@@ -63,6 +93,16 @@ impl UICallbacks {
         self.on_mouse_move = None;
         self.on_dropdown_select.clear();
         self.on_input_field_change.clear();
+        self.on_tab_select.clear();
+        self.on_tab_close.clear();
+        self.on_tree_node_select.clear();
+        self.on_tree_node_toggle.clear();
+        self.on_popup_menu_click.clear();
+        self.on_popup_menu_close.clear();
+        self.on_grid_view_click.clear();
+        self.on_dialog_result.clear();
+        self.on_file_browser_select.clear();
+        self.on_file_browser_double_click.clear();
     }
 }
 
@@ -274,4 +314,221 @@ pub fn trigger_input_field_change_callback(widget_id: u64, text: &str) {
 pub fn has_input_field_change_callback(widget_id: u64) -> bool {
     let callbacks = UI_CALLBACKS.lock();
     callbacks.on_input_field_change.contains_key(&widget_id)
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_register_tab_select_callback(widget_id: u64, callback: TabSelectCallback) {
+    let mut callbacks = UI_CALLBACKS.lock();
+    callbacks.on_tab_select.insert(widget_id, callback);
+    dfx_info!("UI", "注册TabSelect回调: widget={} callback={:?}", widget_id, callback);
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_register_tab_close_callback(widget_id: u64, callback: TabCloseCallback) {
+    let mut callbacks = UI_CALLBACKS.lock();
+    callbacks.on_tab_close.insert(widget_id, callback);
+    dfx_info!("UI", "注册TabClose回调: widget={} callback={:?}", widget_id, callback);
+}
+
+pub fn trigger_tab_select_callback(widget_id: u64, index: usize) {
+    let callback = {
+        let callbacks = UI_CALLBACKS.lock();
+        callbacks.on_tab_select.get(&widget_id).copied()
+    };
+    if let Some(cb) = callback {
+        cb(widget_id, index);
+    }
+}
+
+pub fn trigger_tab_close_callback(widget_id: u64, index: usize) {
+    let callback = {
+        let callbacks = UI_CALLBACKS.lock();
+        callbacks.on_tab_close.get(&widget_id).copied()
+    };
+    if let Some(cb) = callback {
+        cb(widget_id, index);
+    }
+}
+
+pub fn has_tab_select_callback(widget_id: u64) -> bool {
+    let callbacks = UI_CALLBACKS.lock();
+    callbacks.on_tab_select.contains_key(&widget_id)
+}
+
+pub fn has_tab_close_callback(widget_id: u64) -> bool {
+    let callbacks = UI_CALLBACKS.lock();
+    callbacks.on_tab_close.contains_key(&widget_id)
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_register_tree_node_select_callback(widget_id: u64, callback: TreeNodeSelectCallback) {
+    let mut callbacks = UI_CALLBACKS.lock();
+    callbacks.on_tree_node_select.insert(widget_id, callback);
+    dfx_info!("UI", "注册TreeNodeSelect回调: widget={} callback={:?}", widget_id, callback);
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_register_tree_node_toggle_callback(widget_id: u64, callback: TreeNodeToggleCallback) {
+    let mut callbacks = UI_CALLBACKS.lock();
+    callbacks.on_tree_node_toggle.insert(widget_id, callback);
+    dfx_info!("UI", "注册TreeNodeToggle回调: widget={} callback={:?}", widget_id, callback);
+}
+
+pub fn trigger_tree_node_select_callback(widget_id: u64, user_data: u64) {
+    let callback = {
+        let callbacks = UI_CALLBACKS.lock();
+        callbacks.on_tree_node_select.get(&widget_id).copied()
+    };
+    if let Some(cb) = callback {
+        cb(widget_id, user_data);
+    }
+}
+
+pub fn trigger_tree_node_toggle_callback(widget_id: u64) {
+    let callback = {
+        let callbacks = UI_CALLBACKS.lock();
+        callbacks.on_tree_node_toggle.get(&widget_id).copied()
+    };
+    if let Some(cb) = callback {
+        cb(widget_id);
+    }
+}
+
+pub fn has_tree_node_select_callback(widget_id: u64) -> bool {
+    let callbacks = UI_CALLBACKS.lock();
+    callbacks.on_tree_node_select.contains_key(&widget_id)
+}
+
+pub fn has_tree_node_toggle_callback(widget_id: u64) -> bool {
+    let callbacks = UI_CALLBACKS.lock();
+    callbacks.on_tree_node_toggle.contains_key(&widget_id)
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_register_popup_menu_click_callback(widget_id: u64, callback: PopupMenuClickCallback) {
+    let mut callbacks = UI_CALLBACKS.lock();
+    callbacks.on_popup_menu_click.insert(widget_id, callback);
+    dfx_info!("UI", "注册PopupMenuClick回调: widget={} callback={:?}", widget_id, callback);
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_register_popup_menu_close_callback(widget_id: u64, callback: PopupMenuCloseCallback) {
+    let mut callbacks = UI_CALLBACKS.lock();
+    callbacks.on_popup_menu_close.insert(widget_id, callback);
+    dfx_info!("UI", "注册PopupMenuClose回调: widget={} callback={:?}", widget_id, callback);
+}
+
+pub fn trigger_popup_menu_click_callback(widget_id: u64, action_id: usize) {
+    let callback = {
+        let callbacks = UI_CALLBACKS.lock();
+        callbacks.on_popup_menu_click.get(&widget_id).copied()
+    };
+    if let Some(cb) = callback {
+        cb(widget_id, action_id);
+    }
+}
+
+pub fn trigger_popup_menu_close_callback(widget_id: u64) {
+    let callback = {
+        let callbacks = UI_CALLBACKS.lock();
+        callbacks.on_popup_menu_close.get(&widget_id).copied()
+    };
+    if let Some(cb) = callback {
+        cb(widget_id);
+    }
+}
+
+pub fn has_popup_menu_click_callback(widget_id: u64) -> bool {
+    let callbacks = UI_CALLBACKS.lock();
+    callbacks.on_popup_menu_click.contains_key(&widget_id)
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_register_grid_view_click_callback(widget_id: u64, callback: GridViewClickCallback) {
+    let mut callbacks = UI_CALLBACKS.lock();
+    callbacks.on_grid_view_click.insert(widget_id, callback);
+    dfx_info!("UI", "注册GridViewClick回调: widget={} callback={:?}", widget_id, callback);
+}
+
+pub fn trigger_grid_view_click_callback(widget_id: u64, index: usize, user_data: u64) {
+    let callback = {
+        let callbacks = UI_CALLBACKS.lock();
+        callbacks.on_grid_view_click.get(&widget_id).copied()
+    };
+    if let Some(cb) = callback {
+        cb(widget_id, index, user_data);
+    }
+}
+
+pub fn has_grid_view_click_callback(widget_id: u64) -> bool {
+    let callbacks = UI_CALLBACKS.lock();
+    callbacks.on_grid_view_click.contains_key(&widget_id)
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_register_dialog_result_callback(widget_id: u64, callback: DialogResultCallback) {
+    let mut callbacks = UI_CALLBACKS.lock();
+    callbacks.on_dialog_result.insert(widget_id, callback);
+    dfx_info!("UI", "注册DialogResult回调: widget={} callback={:?}", widget_id, callback);
+}
+
+pub fn trigger_dialog_result_callback(dialog_id: u64, result: i32) {
+    let callback = {
+        let callbacks = UI_CALLBACKS.lock();
+        callbacks.on_dialog_result.get(&dialog_id).copied()
+    };
+    if let Some(cb) = callback {
+        cb(dialog_id, result);
+    }
+}
+
+pub fn has_dialog_result_callback(widget_id: u64) -> bool {
+    let callbacks = UI_CALLBACKS.lock();
+    callbacks.on_dialog_result.contains_key(&widget_id)
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_register_file_browser_select_callback(widget_id: u64, callback: FileBrowserSelectCallback) {
+    let mut callbacks = UI_CALLBACKS.lock();
+    callbacks.on_file_browser_select.insert(widget_id, callback);
+    dfx_info!("UI", "注册FileBrowserSelect回调: widget={} callback={:?}", widget_id, callback);
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_register_file_browser_double_click_callback(widget_id: u64, callback: FileBrowserDoubleClickCallback) {
+    let mut callbacks = UI_CALLBACKS.lock();
+    callbacks.on_file_browser_double_click.insert(widget_id, callback);
+    dfx_info!("UI", "注册FileBrowserDoubleClick回调: widget={} callback={:?}", widget_id, callback);
+}
+
+pub fn trigger_file_browser_select_callback(browser_id: u64, path: &str) {
+    let callback = {
+        let callbacks = UI_CALLBACKS.lock();
+        callbacks.on_file_browser_select.get(&browser_id).copied()
+    };
+    if let Some(cb) = callback {
+        let path_cstr = std::ffi::CString::new(path).unwrap();
+        cb(browser_id, path_cstr.as_ptr());
+    }
+}
+
+pub fn trigger_file_browser_double_click_callback(browser_id: u64, path: &str) {
+    let callback = {
+        let callbacks = UI_CALLBACKS.lock();
+        callbacks.on_file_browser_double_click.get(&browser_id).copied()
+    };
+    if let Some(cb) = callback {
+        let path_cstr = std::ffi::CString::new(path).unwrap();
+        cb(browser_id, path_cstr.as_ptr());
+    }
+}
+
+pub fn has_file_browser_select_callback(widget_id: u64) -> bool {
+    let callbacks = UI_CALLBACKS.lock();
+    callbacks.on_file_browser_select.contains_key(&widget_id)
+}
+
+pub fn has_file_browser_double_click_callback(widget_id: u64) -> bool {
+    let callbacks = UI_CALLBACKS.lock();
+    callbacks.on_file_browser_double_click.contains_key(&widget_id)
 }

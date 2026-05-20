@@ -48,6 +48,38 @@ impl Quaternion {
         )
     }
 
+    pub fn from_euler_degrees(x_deg: f32, y_deg: f32, z_deg: f32) -> Self {
+        Self::from_euler(
+            x_deg.to_radians(),
+            y_deg.to_radians(),
+            z_deg.to_radians(),
+        )
+    }
+
+    pub fn to_euler(&self) -> [f32; 3] {
+        let sinr_cosp = 2.0 * (self.w * self.x + self.y * self.z);
+        let cosr_cosp = 1.0 - 2.0 * (self.x * self.x + self.y * self.y);
+        let roll = sinr_cosp.atan2(cosr_cosp);
+
+        let sinp = 2.0 * (self.w * self.y - self.z * self.x);
+        let pitch = if sinp.abs() >= 1.0 {
+            std::f32::consts::FRAC_PI_2.copysign(sinp)
+        } else {
+            sinp.asin()
+        };
+
+        let siny_cosp = 2.0 * (self.w * self.z + self.x * self.y);
+        let cosy_cosp = 1.0 - 2.0 * (self.y * self.y + self.z * self.z);
+        let yaw = siny_cosp.atan2(cosy_cosp);
+
+        [roll, pitch, yaw]
+    }
+
+    pub fn to_euler_degrees(&self) -> [f32; 3] {
+        let euler = self.to_euler();
+        [euler[0].to_degrees(), euler[1].to_degrees(), euler[2].to_degrees()]
+    }
+
     pub fn magnitude(&self) -> f32 {
         (self.x * self.x + self.y * self.y + self.z * self.z + self.w * self.w).sqrt()
     }

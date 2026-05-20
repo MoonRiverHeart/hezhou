@@ -25,10 +25,12 @@ $SourceFile = "$ScriptsDir/RotationScript.cs"
 $UiFile = "$ScriptsDir/UI.cs"
 $DfxFile = "$ScriptsDir/DFX.cs"
 $EditorFile = "$ScriptsDir/EditorScript.cs"
+$TestFile = "$ScriptsDir/AssetProjectTest.cs"
 Write-Host "[Info] Compiling: $SourceFile"
 Write-Host "[Info] Including: $UiFile"
 Write-Host "[Info] Including: $DfxFile"
 Write-Host "[Info] Including: $EditorFile"
+Write-Host "[Info] Including: $TestFile"
 
 if (-not (Test-Path $SourceFile)) {
     Write-Host "[Error] Source file not found: $SourceFile" -ForegroundColor Red
@@ -63,6 +65,7 @@ $Output = & $McsPath `
     $UiFile `
     $DfxFile `
     $EditorFile `
+    $TestFile `
     -define:MONO `
     2>&1
 

@@ -18,7 +18,14 @@ namespace Hezhou
         private static ulong _previewWindowId;
         private static Panel _propertiesPanel;
         private static VStack _propsList;
+        private static TabWidget _propsTabWidget;
+        private static ulong _transformTabContentId;
+        private static ulong _scriptsTabContentId;
         private static ulong _selectedEntityId = 0;
+        
+        private static bool _propertiesDirty = false;
+        private static ulong _lastPropertiesEntityId = 0;
+        private static int _lastScriptBindingCount = -1;
         
         private static ulong _nameInputFieldId;
         private static ulong _posXInputFieldId;
@@ -126,6 +133,7 @@ private static float _cameraYaw = 0f;
         private static UI.WidgetCallbackDelegate _createEntityClickCallback;
         private static UI.DropdownSelectCallbackDelegate _scriptDropdownSelectCallback;
         private static UI.OnHotReloadCompleteDelegate _hotReloadCompleteCallback;
+        private static UI.TabSelectCallbackDelegate _tabSelectCallback;
 
         public static void Initialize(IntPtr contextPtr)
         {
@@ -159,6 +167,7 @@ _addScriptClickCallback = OnAddScriptClick;
             _createEntityClickCallback = OnCreateEntityClick;
             _scriptDropdownSelectCallback = OnScriptDropdownSelect;
             _hotReloadCompleteCallback = OnHotReloadComplete;
+            _tabSelectCallback = OnTabSelect;
             
             UI.RegisterUpdateCallback(_updateCallback);
             
@@ -372,6 +381,7 @@ _addScriptClickCallback = OnAddScriptClick;
             float previewWindowWidth = previewWidth - 20f;
             float previewWindowHeight = mainHeight - 20f;
             _previewWindowId = UI.CreatePreviewWindow(_previewPanel.Id, 10f, 40f, previewWindowWidth, previewWindowHeight, 1);
+            UI.SetWidgetLayer(_previewWindowId, 0);
             
             // 设置Game Pass渲染尺寸匹配PreviewWindow（避免拉伸变形）
             UI.SetGamePreviewExtent((uint)previewWindowWidth, (uint)previewWindowHeight);
@@ -390,18 +400,20 @@ _addScriptClickCallback = OnAddScriptClick;
             
             _propertiesPanel = new Panel(rootId, _screenWidth - RIGHT_PANEL_WIDTH, mainY, RIGHT_PANEL_WIDTH, mainHeight + BOTTOM_PANEL_HEIGHT, 0.2f, 0.2f, 0.2f, 1.0f);
             UI.CreateLabel(_propertiesPanel.Id, 10f, 10f, RIGHT_PANEL_WIDTH - 20f, 25f, "属性编辑");
-            _propsList = new VStack(_propertiesPanel.Id, 5f);
-            _propsList.SetPosition(10f, 40f);
             
-            UI.CreateLabel(_propsList.Id, RIGHT_PANEL_WIDTH - 40f, 20f, "Entity:");
-            _nameInputFieldId = UI.CreateInputField(_propsList.Id, RIGHT_PANEL_WIDTH - 40f, 25f);
+            float tabWidgetY = 40f;
+            float tabWidgetHeight = mainHeight + BOTTOM_PANEL_HEIGHT - tabWidgetY - 10f;
+            
+            _propsTabWidget = new TabWidget(_propertiesPanel.Id, 10f, tabWidgetY, RIGHT_PANEL_WIDTH - 20f, tabWidgetHeight);
+            
+            _transformTabContentId = UI.CreateVStack(_propsTabWidget.Id, 5f);
+            UI.CreateLabel(_transformTabContentId, RIGHT_PANEL_WIDTH - 40f, 20f, "Entity:");
+            _nameInputFieldId = UI.CreateInputField(_transformTabContentId, RIGHT_PANEL_WIDTH - 40f, 25f);
             UI.InputFieldSetPlaceholder(_nameInputFieldId, "Entity Name");
             UI.InputFieldSetOnChange(_nameInputFieldId, _nameInputCallback);
             
-            UI.CreateLabel(_propsList.Id, RIGHT_PANEL_WIDTH - 40f, 20f, "Transform:");
-            
-            UI.CreateLabel(_propsList.Id, RIGHT_PANEL_WIDTH - 40f, 20f, "Position:");
-            var posHStack = UI.CreateHStack(_propsList.Id, 5f);
+            UI.CreateLabel(_transformTabContentId, RIGHT_PANEL_WIDTH - 40f, 20f, "Position:");
+            var posHStack = UI.CreateHStack(_transformTabContentId, 5f);
             _posXInputFieldId = UI.CreateInputField(posHStack, 70f, 25f);
             UI.InputFieldSetPlaceholder(_posXInputFieldId, "X");
             UI.InputFieldSetOnChange(_posXInputFieldId, _posXInputCallback);
@@ -412,8 +424,8 @@ _addScriptClickCallback = OnAddScriptClick;
             UI.InputFieldSetPlaceholder(_posZInputFieldId, "Z");
             UI.InputFieldSetOnChange(_posZInputFieldId, _posZInputCallback);
             
-            UI.CreateLabel(_propsList.Id, RIGHT_PANEL_WIDTH - 40f, 20f, "Rotation:");
-            var rotHStack = UI.CreateHStack(_propsList.Id, 5f);
+            UI.CreateLabel(_transformTabContentId, RIGHT_PANEL_WIDTH - 40f, 20f, "Rotation:");
+            var rotHStack = UI.CreateHStack(_transformTabContentId, 5f);
             _rotXInputFieldId = UI.CreateInputField(rotHStack, 70f, 25f);
             UI.InputFieldSetPlaceholder(_rotXInputFieldId, "X");
             UI.InputFieldSetOnChange(_rotXInputFieldId, _rotXInputCallback);
@@ -424,8 +436,8 @@ _addScriptClickCallback = OnAddScriptClick;
             UI.InputFieldSetPlaceholder(_rotZInputFieldId, "Z");
             UI.InputFieldSetOnChange(_rotZInputFieldId, _rotZInputCallback);
             
-            UI.CreateLabel(_propsList.Id, RIGHT_PANEL_WIDTH - 40f, 20f, "Scale:");
-            var scaleHStack = UI.CreateHStack(_propsList.Id, 5f);
+            UI.CreateLabel(_transformTabContentId, RIGHT_PANEL_WIDTH - 40f, 20f, "Scale:");
+            var scaleHStack = UI.CreateHStack(_transformTabContentId, 5f);
             _scaleXInputFieldId = UI.CreateInputField(scaleHStack, 70f, 25f);
             UI.InputFieldSetPlaceholder(_scaleXInputFieldId, "X");
             UI.InputFieldSetOnChange(_scaleXInputFieldId, _scaleXInputCallback);
@@ -436,9 +448,9 @@ _addScriptClickCallback = OnAddScriptClick;
             UI.InputFieldSetPlaceholder(_scaleZInputFieldId, "Z");
             UI.InputFieldSetOnChange(_scaleZInputFieldId, _scaleZInputCallback);
             
-            UI.CreateLabel(_propsList.Id, RIGHT_PANEL_WIDTH - 40f, 20f, "Scripts:");
+            _scriptsTabContentId = UI.CreateVStack(_propsTabWidget.Id, 5f);
             
-            var scriptHStack = UI.CreateHStack(_propsList.Id, 5f);
+            var scriptHStack = UI.CreateHStack(_scriptsTabContentId, 5f);
             _scriptDropdownId = UI.CreateDropdown(scriptHStack, RIGHT_PANEL_WIDTH - 70f, 25f);
             string[] scriptOptions = _availableScripts.Count > 0 ? _availableScripts.ToArray() : new string[] { "无可用脚本" };
             UI.DropdownSetOptions(_scriptDropdownId, scriptOptions);
@@ -447,9 +459,13 @@ _addScriptClickCallback = OnAddScriptClick;
             _addScriptBtnId = UI.CreateButton(scriptHStack, 50f, 25f, "Add");
             UI.SetOnClick(_addScriptBtnId, _addScriptClickCallback);
             
-            _scriptsListContainerId = UI.CreateVStack(_propsList.Id, 5f);
+            _scriptsListContainerId = UI.CreateVStack(_scriptsTabContentId, 5f);
             
-            Log.Info("Editor", "属性面板创建完成");
+            _propsTabWidget.AddTab("Transform", _transformTabContentId, false);
+            _propsTabWidget.AddTab("Scripts", _scriptsTabContentId, false);
+            _propsTabWidget.SetOnSelect(_tabSelectCallback);
+            
+            Log.Info("Editor", "属性面板创建完成 (TabWidget)");
 
             _statusBar = new Panel(rootId, 0, statusY, _screenWidth, STATUS_BAR_HEIGHT, 0.12f, 0.12f, 0.12f, 1.0f);
             _statusItems = new List(_statusBar.Id, 0f, true);  // horizontal list
@@ -863,6 +879,14 @@ _addScriptClickCallback = OnAddScriptClick;
         {
             if (_propsList == null || _gameScene == null) return;
             
+            if (!_propertiesDirty && _lastPropertiesEntityId == entityId)
+            {
+                return;
+            }
+            
+            _propertiesDirty = false;
+            _lastPropertiesEntityId = entityId;
+            
             _selectedEntityId = entityId;
             
             string name = UI.SceneGetEntityName(_gameScene.ScenePtr, entityId);
@@ -898,9 +922,22 @@ _addScriptClickCallback = OnAddScriptClick;
         {
             if (_gameScene == null || _scriptsListContainerId == 0) return;
             
+            int scriptCount = _gameScene.GetScriptBindingCount(entityId);
+            
+            if (scriptCount == _lastScriptBindingCount && _lastPropertiesEntityId == entityId)
+            {
+                return;
+            }
+            
+            _lastScriptBindingCount = scriptCount;
             _removeScriptBtnIndices.Clear();
             
-            int scriptCount = _gameScene.GetScriptBindingCount(entityId);
+            if (scriptCount == 0)
+            {
+                Log.Info("Editor", "UpdateScriptBindingsList: no scripts attached");
+                return;
+            }
+            
             Log.Info("Editor", $"UpdateScriptBindingsList: entityId={entityId}, count={scriptCount}");
             
             for (int i = 0; i < scriptCount; i++)
@@ -943,6 +980,7 @@ _addScriptClickCallback = OnAddScriptClick;
         {
             if (_selectedEntityId == 0 || _gameScene == null) return;
             UI.SceneSetEntityName(_gameScene.ScenePtr, _selectedEntityId, text);
+            _propertiesDirty = true;
             Log.Info("Editor", $"Entity name changed to: {text}");
         }
         
@@ -1052,6 +1090,7 @@ private static void ShowDropdownMenu(float x, float y, string[] items, UI.Widget
             
             ulong rootId = UI.GetRootId();
             _dropdownMenu = new Panel(rootId, x, y, 160, items.Length * 35 + 10, 0.25f, 0.25f, 0.25f, 0.95f);
+            UI.SetWidgetLayer(_dropdownMenu.Id, 2);
             _menuItems = new VStack(_dropdownMenu.Id, 5f);
             _menuItems.SetPosition(10, 10);
             
@@ -1145,64 +1184,154 @@ private static void ShowDropdownMenu(float x, float y, string[] items, UI.Widget
             float previewWidth = _screenWidth - LEFT_PANEL_WIDTH - RIGHT_PANEL_WIDTH;
             float previewX = LEFT_PANEL_WIDTH;
             
-            // 恢复projectTree内容
+            // 恢复projectTree内容（包含Entity节点）
             if (_projectPanel != null)
             {
-                // 移除旧的projectTree（如果有）
                 if (_projectTree != null)
                 {
                     UI.RemoveWidget(_projectTree.Id);
                 }
                 
-                // 创建新的projectTree
                 _projectTree = new VStack(_projectPanel.Id, 5f);
                 _projectTree.SetPosition(10f, 40f);
                 _projectTree.AddLabel(LEFT_PANEL_WIDTH - 40f, 20f, "├─ Assets");
                 _projectTree.AddLabel(LEFT_PANEL_WIDTH - 40f, 20f, "├─ Scenes");
                 _projectTree.AddLabel(LEFT_PANEL_WIDTH - 40f, 20f, "└─ Scripts");
+                
+                // 添加Entity节点
+                _projectTree.AddLabel(LEFT_PANEL_WIDTH - 40f, 20f, "Entities:");
+                if (_gameScene != null)
+                {
+                    int entityCount = _gameScene.GetEntityCount();
+                    for (int i = 0; i < entityCount; i++)
+                    {
+                        ulong entityId = _gameScene.GetEntityId(i);
+                        string name = UI.SceneGetEntityName(_gameScene.ScenePtr, entityId);
+                        _projectTree.AddLabel(LEFT_PANEL_WIDTH - 40f, 20f, $"  - {name} ({entityId})");
+                    }
+                }
             }
             
-            // 重新创建主界面panels
+            // 重新创建previewPanel和PreviewWindow
             if (_previewPanel == null)
             {
                 _previewPanel = new Panel(rootId, previewX, mainY, previewWidth, mainHeight + BOTTOM_PANEL_HEIGHT, 0.08f, 0.08f, 0.08f, 0.3f);
                 UI.CreateLabel(_previewPanel.Id, 10f, 10f, previewWidth - 20f, 25f, "游戏预览");
                 
-                // 创建预览窗组件
                 float previewWindowWidth = previewWidth - 20f;
                 float previewWindowHeight = mainHeight - 20f;
                 _previewWindowId = UI.CreatePreviewWindow(_previewPanel.Id, 10f, 40f, previewWindowWidth, previewWindowHeight, 1);
-                
-                // 设置Game Pass渲染尺寸匹配PreviewWindow
+                UI.SetWidgetLayer(_previewWindowId, 0);
                 UI.SetGamePreviewExtent((uint)previewWindowWidth, (uint)previewWindowHeight);
                 Log.Info("Editor", $"PreviewWindow创建完成 (ShowMainLayout): {previewWindowWidth}x{previewWindowHeight}");
             }
             else
             {
-                // PreviewWindow已存在，更新渲染尺寸
                 float previewWindowWidth = previewWidth - 20f;
                 float previewWindowHeight = mainHeight - 20f;
                 UI.SetGamePreviewExtent((uint)previewWindowWidth, (uint)previewWindowHeight);
             }
             
+            // 重新创建完整的assetPanel（包含"创建Entity"按钮）
             if (_assetPanel == null)
             {
                 _assetPanel = new Panel(rootId, 0, bottomY, LEFT_PANEL_WIDTH, BOTTOM_PANEL_HEIGHT, 0.2f, 0.2f, 0.2f, 1.0f);
                 UI.CreateLabel(_assetPanel.Id, 10f, 10f, LEFT_PANEL_WIDTH - 20f, 25f, "资产管理");
-                var assetList = new VStack(_assetPanel.Id, 5f);
-                assetList.SetPosition(10f, 40f);
-                assetList.AddLabel(LEFT_PANEL_WIDTH - 40f, 20f, "Textures: 0");
+                _assetList = new VStack(_assetPanel.Id, 5f);
+                _assetList.SetPosition(10f, 40f);
+                _assetList.AddLabel(LEFT_PANEL_WIDTH - 40f, 20f, "Textures: 0");
+                _assetList.AddLabel(LEFT_PANEL_WIDTH - 40f, 20f, "Models: 0");
+                _assetList.AddLabel(LEFT_PANEL_WIDTH - 40f, 20f, $"Scripts: {_availableScripts.Count}");
+                
+                _createEntityBtnId = _assetList.AddButton(LEFT_PANEL_WIDTH - 40f, 25f, "创建Entity");
+                UI.SetOnClick(_createEntityBtnId, _createEntityClickCallback);
+                Log.Info("Editor", $"assetPanel重建完成，createEntityBtnId={_createEntityBtnId}");
             }
             
+            // 重新创建完整的propertiesPanel（包含TabWidget和InputField）
             if (_propertiesPanel == null)
             {
                 _propertiesPanel = new Panel(rootId, _screenWidth - RIGHT_PANEL_WIDTH, mainY, RIGHT_PANEL_WIDTH, mainHeight + BOTTOM_PANEL_HEIGHT, 0.2f, 0.2f, 0.2f, 1.0f);
                 UI.CreateLabel(_propertiesPanel.Id, 10f, 10f, RIGHT_PANEL_WIDTH - 20f, 25f, "属性编辑");
+                
+                float tabWidgetY = 40f;
+                float tabWidgetHeight = mainHeight + BOTTOM_PANEL_HEIGHT - tabWidgetY - 10f;
+                
+                _propsTabWidget = new TabWidget(_propertiesPanel.Id, 10f, tabWidgetY, RIGHT_PANEL_WIDTH - 20f, tabWidgetHeight);
+                
+                // Transform Tab Content
+                _transformTabContentId = UI.CreateVStack(_propsTabWidget.Id, 5f);
+                UI.CreateLabel(_transformTabContentId, RIGHT_PANEL_WIDTH - 40f, 20f, "Entity:");
+                _nameInputFieldId = UI.CreateInputField(_transformTabContentId, RIGHT_PANEL_WIDTH - 40f, 25f);
+                UI.InputFieldSetPlaceholder(_nameInputFieldId, "Entity Name");
+                UI.InputFieldSetOnChange(_nameInputFieldId, _nameInputCallback);
+                
+                UI.CreateLabel(_transformTabContentId, RIGHT_PANEL_WIDTH - 40f, 20f, "Position:");
+                var posHStack = UI.CreateHStack(_transformTabContentId, 5f);
+                _posXInputFieldId = UI.CreateInputField(posHStack, 70f, 25f);
+                UI.InputFieldSetPlaceholder(_posXInputFieldId, "X");
+                UI.InputFieldSetOnChange(_posXInputFieldId, _posXInputCallback);
+                _posYInputFieldId = UI.CreateInputField(posHStack, 70f, 25f);
+                UI.InputFieldSetPlaceholder(_posYInputFieldId, "Y");
+                UI.InputFieldSetOnChange(_posYInputFieldId, _posYInputCallback);
+                _posZInputFieldId = UI.CreateInputField(posHStack, 70f, 25f);
+                UI.InputFieldSetPlaceholder(_posZInputFieldId, "Z");
+                UI.InputFieldSetOnChange(_posZInputFieldId, _posZInputCallback);
+                
+                UI.CreateLabel(_transformTabContentId, RIGHT_PANEL_WIDTH - 40f, 20f, "Rotation:");
+                var rotHStack = UI.CreateHStack(_transformTabContentId, 5f);
+                _rotXInputFieldId = UI.CreateInputField(rotHStack, 70f, 25f);
+                UI.InputFieldSetPlaceholder(_rotXInputFieldId, "X");
+                UI.InputFieldSetOnChange(_rotXInputFieldId, _rotXInputCallback);
+                _rotYInputFieldId = UI.CreateInputField(rotHStack, 70f, 25f);
+                UI.InputFieldSetPlaceholder(_rotYInputFieldId, "Y");
+                UI.InputFieldSetOnChange(_rotYInputFieldId, _rotYInputCallback);
+                _rotZInputFieldId = UI.CreateInputField(rotHStack, 70f, 25f);
+                UI.InputFieldSetPlaceholder(_rotZInputFieldId, "Z");
+                UI.InputFieldSetOnChange(_rotZInputFieldId, _rotZInputCallback);
+                
+                UI.CreateLabel(_transformTabContentId, RIGHT_PANEL_WIDTH - 40f, 20f, "Scale:");
+                var scaleHStack = UI.CreateHStack(_transformTabContentId, 5f);
+                _scaleXInputFieldId = UI.CreateInputField(scaleHStack, 70f, 25f);
+                UI.InputFieldSetPlaceholder(_scaleXInputFieldId, "X");
+                UI.InputFieldSetOnChange(_scaleXInputFieldId, _scaleXInputCallback);
+                _scaleYInputFieldId = UI.CreateInputField(scaleHStack, 70f, 25f);
+                UI.InputFieldSetPlaceholder(_scaleYInputFieldId, "Y");
+                UI.InputFieldSetOnChange(_scaleYInputFieldId, _scaleYInputCallback);
+                _scaleZInputFieldId = UI.CreateInputField(scaleHStack, 70f, 25f);
+                UI.InputFieldSetPlaceholder(_scaleZInputFieldId, "Z");
+                UI.InputFieldSetOnChange(_scaleZInputFieldId, _scaleZInputCallback);
+                
+                // Scripts Tab Content
+                _scriptsTabContentId = UI.CreateVStack(_propsTabWidget.Id, 5f);
+                
+                var scriptHStack = UI.CreateHStack(_scriptsTabContentId, 5f);
+                _scriptDropdownId = UI.CreateDropdown(scriptHStack, RIGHT_PANEL_WIDTH - 70f, 25f);
+                string[] scriptOptions = _availableScripts.Count > 0 ? _availableScripts.ToArray() : new string[] { "无可用脚本" };
+                UI.DropdownSetOptions(_scriptDropdownId, scriptOptions);
+                UI.DropdownSetOnSelect(_scriptDropdownId, _scriptDropdownSelectCallback);
+                
+                _addScriptBtnId = UI.CreateButton(scriptHStack, 50f, 25f, "Add");
+                UI.SetOnClick(_addScriptBtnId, _addScriptClickCallback);
+                
+                _scriptsListContainerId = UI.CreateVStack(_scriptsTabContentId, 5f);
+                
+                _propsTabWidget.AddTab("Transform", _transformTabContentId, false);
+                _propsTabWidget.AddTab("Scripts", _scriptsTabContentId, false);
+                _propsTabWidget.SetOnSelect(_tabSelectCallback);
+                
+                Log.Info("Editor", "propertiesPanel重建完成 (TabWidget + InputFields)");
             }
             
             if (_toggleEditorBtn != null)
             {
                 _toggleEditorBtn.Text = "编辑器";
+            }
+            
+            // 如果有选中的Entity，更新属性面板
+            if (_selectedEntityId != 0 && _gameScene != null)
+            {
+                UpdatePropertiesPanel(_selectedEntityId);
             }
             
             Log.Info("Editor", "主界面显示完成");
@@ -1552,6 +1681,13 @@ private static void ShowDropdownMenu(float x, float y, string[] items, UI.Widget
             }
             
             Log.Info("Editor", "OnHotReloadComplete完成");
+        }
+        
+        private static void OnTabSelect(ulong widgetId, ulong index)
+        {
+            Log.Info("Editor", $"TabWidget选择: widgetId={widgetId}, index={index}");
+            string tabName = index == 0 ? "Transform" : "Scripts";
+            _statusItem.Text = $"属性页: {tabName}";
         }
     }
 }

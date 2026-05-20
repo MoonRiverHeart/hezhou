@@ -1,5 +1,6 @@
 use crate::*;
 use crate::thunk_manager::*;
+use crate::widget_tree::RenderLayer;
 use hezhou_dfx::*;
 use parking_lot::Mutex;
 use std::ffi::{c_char, CStr};
@@ -1690,4 +1691,1472 @@ pub extern "C" fn ui_input_field_set_placeholder(
             }
         }
     }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_create_tab_widget(
+    handle: WidgetTreeHandle,
+    parent_id: u64,
+    x: f32,
+    y: f32,
+    width: f32,
+    height: f32,
+) -> u64 {
+    if handle.is_null() {
+        return 0;
+    }
+    unsafe {
+        let arc = &*(handle as *const Arc<Mutex<WidgetTree>>);
+        let mut tree = arc.lock();
+        
+        let mut tab_widget = crate::widgets::TabWidget::new()
+            .with_layout(x, y, width, height);
+        
+        let content_scale = crate::thunk_manager::ui_get_content_scale();
+        tab_widget.set_content_scale(content_scale);
+        
+        let id = tab_widget.id();
+        
+        let parent = if parent_id == 0 {
+            tree.root.unwrap_or(WidgetId::invalid())
+        } else {
+            WidgetId::from_raw(parent_id)
+        };
+        
+        tree.add_widget(Box::new(tab_widget), parent);
+        dfx_info!("FFI", "CreateTabWidget: id={}, parent={}, scale={}", id.id, parent_id, content_scale);
+        id.id
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_tab_widget_add_tab(
+    handle: WidgetTreeHandle,
+    tab_widget_id: u64,
+    title: *const c_char,
+    content_widget_id: u64,
+    closable: bool,
+) -> u32 {
+    if handle.is_null() || title.is_null() {
+        return 0;
+    }
+    unsafe {
+        let title_str = CStr::from_ptr(title).to_string_lossy().into_owned();
+        let arc = &*(handle as *const Arc<Mutex<WidgetTree>>);
+        let mut tree = arc.lock();
+        let id = WidgetId::from_raw(tab_widget_id);
+        
+        if let Some(widget) = tree.get_widget_mut(id) {
+            if widget.widget_type() == "TabWidget" {
+                use crate::widgets::TabWidget;
+                if let Some(tab_widget) = widget.as_any_mut().downcast_mut::<TabWidget>() {
+                    let content_id = WidgetId::from_raw(content_widget_id);
+                    let index = tab_widget.add_tab(&title_str, content_id, closable);
+                    dfx_info!("FFI", "TabWidgetAddTab: widget_id={}, title={}, content={}, closable={}, index={}", 
+                        tab_widget_id, title_str, content_widget_id, closable, index);
+                    return index as u32;
+                }
+            }
+        }
+        0
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_tab_widget_set_active(
+    handle: WidgetTreeHandle,
+    tab_widget_id: u64,
+    index: usize,
+) {
+    if handle.is_null() {
+        return;
+    }
+    unsafe {
+        let arc = &*(handle as *const Arc<Mutex<WidgetTree>>);
+        let mut tree = arc.lock();
+        let id = WidgetId::from_raw(tab_widget_id);
+        
+        if let Some(widget) = tree.get_widget_mut(id) {
+            if widget.widget_type() == "TabWidget" {
+                use crate::widgets::TabWidget;
+                if let Some(tab_widget) = widget.as_any_mut().downcast_mut::<TabWidget>() {
+                    tab_widget.set_active(index);
+                    dfx_info!("FFI", "TabWidgetSetActive: widget_id={}, index={}", tab_widget_id, index);
+                }
+            }
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_tab_widget_get_active(
+    handle: WidgetTreeHandle,
+    tab_widget_id: u64,
+) -> usize {
+    if handle.is_null() {
+        return 0;
+    }
+    unsafe {
+        let arc = &*(handle as *const Arc<Mutex<WidgetTree>>);
+        let tree = arc.lock();
+        let id = WidgetId::from_raw(tab_widget_id);
+        
+        if let Some(widget) = tree.get_widget(id) {
+            if widget.widget_type() == "TabWidget" {
+                use crate::widgets::TabWidget;
+                if let Some(tab_widget) = widget.as_any().downcast_ref::<TabWidget>() {
+                    return tab_widget.active_index();
+                }
+            }
+        }
+        0
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_tab_widget_remove_tab(
+    handle: WidgetTreeHandle,
+    tab_widget_id: u64,
+    index: usize,
+) {
+    if handle.is_null() {
+        return;
+    }
+    unsafe {
+        let arc = &*(handle as *const Arc<Mutex<WidgetTree>>);
+        let mut tree = arc.lock();
+        let id = WidgetId::from_raw(tab_widget_id);
+        
+        if let Some(widget) = tree.get_widget_mut(id) {
+            if widget.widget_type() == "TabWidget" {
+                use crate::widgets::TabWidget;
+                if let Some(tab_widget) = widget.as_any_mut().downcast_mut::<TabWidget>() {
+                    tab_widget.remove_tab(index);
+                    dfx_info!("FFI", "TabWidgetRemoveTab: widget_id={}, index={}", tab_widget_id, index);
+                }
+            }
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_tab_widget_set_on_select_thunk_ptr(
+    handle: WidgetTreeHandle,
+    tab_widget_id: u64,
+    callback_ptr: *const std::ffi::c_void,
+) {
+    if callback_ptr.is_null() {
+        return;
+    }
+    let callback: crate::thunk_manager::TabSelectCallback = unsafe { std::mem::transmute(callback_ptr) };
+    crate::thunk_manager::ui_register_tab_select_callback(tab_widget_id, callback);
+    dfx_info!("FFI", "TabWidgetSetOnSelectThunkPtr: widget_id={}", tab_widget_id);
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_tab_widget_set_on_close_thunk_ptr(
+    handle: WidgetTreeHandle,
+    tab_widget_id: u64,
+    callback_ptr: *const std::ffi::c_void,
+) {
+    if callback_ptr.is_null() {
+        return;
+    }
+    let callback: crate::thunk_manager::TabCloseCallback = unsafe { std::mem::transmute(callback_ptr) };
+    crate::thunk_manager::ui_register_tab_close_callback(tab_widget_id, callback);
+    dfx_info!("FFI", "TabWidgetSetOnCloseThunkPtr: widget_id={}", tab_widget_id);
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_tab_widget_get_tab_count(
+    handle: WidgetTreeHandle,
+    tab_widget_id: u64,
+) -> usize {
+    if handle.is_null() {
+        return 0;
+    }
+    unsafe {
+        let arc = &*(handle as *const Arc<Mutex<WidgetTree>>);
+        let tree = arc.lock();
+        let id = WidgetId::from_raw(tab_widget_id);
+        
+        if let Some(widget) = tree.get_widget(id) {
+            if widget.widget_type() == "TabWidget" {
+                use crate::widgets::TabWidget;
+                if let Some(tab_widget) = widget.as_any().downcast_ref::<TabWidget>() {
+                    return tab_widget.tab_count();
+                }
+            }
+        }
+        0
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_create_tree_view(
+    handle: WidgetTreeHandle,
+    parent_id: u64,
+    x: f32,
+    y: f32,
+    width: f32,
+    height: f32,
+) -> u64 {
+    if handle.is_null() {
+        return 0;
+    }
+    unsafe {
+        let arc = &*(handle as *const Arc<Mutex<WidgetTree>>);
+        let mut tree = arc.lock();
+        
+        let content_scale = crate::thunk_manager::ui_get_content_scale();
+        let mut tree_view = crate::widgets::TreeView::new()
+            .with_layout(x, y, width, height)
+            .with_content_scale(content_scale);
+        
+        let id = tree_view.id();
+        
+        let parent = if parent_id == 0 {
+            tree.root.unwrap_or(WidgetId::invalid())
+        } else {
+            WidgetId::from_raw(parent_id)
+        };
+        
+        tree.add_widget(Box::new(tree_view), parent);
+        dfx_info!("FFI", "CreateTreeView: id={}, parent={}, scale={}", id.id, parent_id, content_scale);
+        id.id
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_tree_view_add_node(
+    handle: WidgetTreeHandle,
+    tree_view_id: u64,
+    parent_node_id: u64,
+    text: *const c_char,
+    user_data: u64,
+    has_children: bool,
+) -> u64 {
+    if handle.is_null() || text.is_null() {
+        return 0;
+    }
+    unsafe {
+        let text_str = CStr::from_ptr(text).to_string_lossy().into_owned();
+        let arc = &*(handle as *const Arc<Mutex<WidgetTree>>);
+        let mut tree = arc.lock();
+        
+        let tree_view_widget_id = WidgetId::from_raw(tree_view_id);
+        
+        let content_scale = crate::thunk_manager::ui_get_content_scale();
+        let mut node = crate::widgets::TreeNode::new(&text_str)
+            .with_content_scale(content_scale)
+            .with_user_data(user_data)
+            .with_has_children(has_children);
+        
+        let node_id = node.id();
+        
+        if parent_node_id == 0 {
+            node.set_depth(0);
+            if let Some(widget) = tree.get_widget_mut(tree_view_widget_id) {
+                if widget.widget_type() == "TreeView" {
+                    use crate::widgets::TreeView;
+                    if let Some(tree_view) = widget.as_any_mut().downcast_mut::<TreeView>() {
+                        tree_view.add_root_node(node_id);
+                    }
+                }
+            }
+        } else {
+            let parent_id = WidgetId::from_raw(parent_node_id);
+            if let Some(widget) = tree.get_widget(parent_id) {
+                if widget.widget_type() == "TreeNode" {
+                    use crate::widgets::TreeNode;
+                    if let Some(parent_node) = widget.as_any().downcast_ref::<TreeNode>() {
+                        node.set_depth(parent_node.depth() + 1);
+                        node.set_parent(parent_id);
+                    }
+                }
+            }
+            if let Some(widget) = tree.get_widget_mut(tree_view_widget_id) {
+                if widget.widget_type() == "TreeView" {
+                    use crate::widgets::TreeView;
+                    if let Some(tree_view) = widget.as_any_mut().downcast_mut::<TreeView>() {
+                        tree_view.add_child_node(parent_id, node_id);
+                    }
+                }
+            }
+        }
+        
+        tree.add_widget(Box::new(node), tree_view_widget_id);
+        dfx_info!("FFI", "TreeViewAddNode: node_id={}, parent={}, text={}, user_data={}, has_children={}", 
+            node_id.id, parent_node_id, text_str, user_data, has_children);
+        node_id.id
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_tree_view_remove_node(
+    handle: WidgetTreeHandle,
+    tree_view_id: u64,
+    node_id: u64,
+) {
+    if handle.is_null() {
+        return;
+    }
+    unsafe {
+        let arc = &*(handle as *const Arc<Mutex<WidgetTree>>);
+        let mut tree = arc.lock();
+        
+        let tree_view_widget_id = WidgetId::from_raw(tree_view_id);
+        let node_widget_id = WidgetId::from_raw(node_id);
+        
+        if let Some(widget) = tree.get_widget_mut(tree_view_widget_id) {
+            if widget.widget_type() == "TreeView" {
+                use crate::widgets::TreeView;
+                if let Some(tree_view) = widget.as_any_mut().downcast_mut::<TreeView>() {
+                    tree_view.remove_node(node_widget_id);
+                }
+            }
+        }
+        
+        tree.remove_widget(node_widget_id);
+        dfx_info!("FFI", "TreeViewRemoveNode: tree_view_id={}, node_id={}", tree_view_id, node_id);
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_tree_view_set_selected(
+    handle: WidgetTreeHandle,
+    tree_view_id: u64,
+    node_id: u64,
+) {
+    if handle.is_null() {
+        return;
+    }
+    unsafe {
+        let arc = &*(handle as *const Arc<Mutex<WidgetTree>>);
+        let mut tree = arc.lock();
+        
+        let tree_view_widget_id = WidgetId::from_raw(tree_view_id);
+        let node_widget_id = WidgetId::from_raw(node_id);
+        
+        if let Some(widget) = tree.get_widget_mut(tree_view_widget_id) {
+            if widget.widget_type() == "TreeView" {
+                use crate::widgets::TreeView;
+                if let Some(tree_view) = widget.as_any_mut().downcast_mut::<TreeView>() {
+                    tree_view.set_selected(node_widget_id);
+                }
+            }
+        }
+        
+        if let Some(widget) = tree.get_widget_mut(node_widget_id) {
+            if widget.widget_type() == "TreeNode" {
+                use crate::widgets::TreeNode;
+                if let Some(node) = widget.as_any_mut().downcast_mut::<TreeNode>() {
+                    node.set_selected(true);
+                }
+            }
+        }
+        
+        dfx_info!("FFI", "TreeViewSetSelected: tree_view_id={}, node_id={}", tree_view_id, node_id);
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_tree_view_get_selected(
+    handle: WidgetTreeHandle,
+    tree_view_id: u64,
+) -> u64 {
+    if handle.is_null() {
+        return 0;
+    }
+    unsafe {
+        let arc = &*(handle as *const Arc<Mutex<WidgetTree>>);
+        let tree = arc.lock();
+        
+        let tree_view_widget_id = WidgetId::from_raw(tree_view_id);
+        
+        if let Some(widget) = tree.get_widget(tree_view_widget_id) {
+            if widget.widget_type() == "TreeView" {
+                use crate::widgets::TreeView;
+                if let Some(tree_view) = widget.as_any().downcast_ref::<TreeView>() {
+                    return tree_view.selected_node().map(|id| id.id).unwrap_or(0);
+                }
+            }
+        }
+        0
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_tree_view_expand_node(
+    handle: WidgetTreeHandle,
+    tree_view_id: u64,
+    node_id: u64,
+) {
+    if handle.is_null() {
+        return;
+    }
+    unsafe {
+        let arc = &*(handle as *const Arc<Mutex<WidgetTree>>);
+        let mut tree = arc.lock();
+        
+        let node_widget_id = WidgetId::from_raw(node_id);
+        
+        if let Some(widget) = tree.get_widget_mut(node_widget_id) {
+            if widget.widget_type() == "TreeNode" {
+                use crate::widgets::TreeNode;
+                if let Some(node) = widget.as_any_mut().downcast_mut::<TreeNode>() {
+                    node.set_expanded(true);
+                }
+            }
+        }
+        
+        dfx_info!("FFI", "TreeViewExpandNode: tree_view_id={}, node_id={}", tree_view_id, node_id);
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_tree_view_collapse_node(
+    handle: WidgetTreeHandle,
+    tree_view_id: u64,
+    node_id: u64,
+) {
+    if handle.is_null() {
+        return;
+    }
+    unsafe {
+        let arc = &*(handle as *const Arc<Mutex<WidgetTree>>);
+        let mut tree = arc.lock();
+        
+        let node_widget_id = WidgetId::from_raw(node_id);
+        
+        if let Some(widget) = tree.get_widget_mut(node_widget_id) {
+            if widget.widget_type() == "TreeNode" {
+                use crate::widgets::TreeNode;
+                if let Some(node) = widget.as_any_mut().downcast_mut::<TreeNode>() {
+                    node.set_expanded(false);
+                }
+            }
+        }
+        
+        dfx_info!("FFI", "TreeViewCollapseNode: tree_view_id={}, node_id={}", tree_view_id, node_id);
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_tree_view_set_on_select_thunk_ptr(
+    handle: WidgetTreeHandle,
+    tree_view_id: u64,
+    callback_ptr: *const std::ffi::c_void,
+) {
+    if callback_ptr.is_null() {
+        return;
+    }
+    let callback: crate::thunk_manager::TreeNodeSelectCallback = unsafe { std::mem::transmute(callback_ptr) };
+    crate::thunk_manager::ui_register_tree_node_select_callback(tree_view_id, callback);
+    dfx_info!("FFI", "TreeViewSetOnSelectThunkPtr: tree_view_id={}", tree_view_id);
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_tree_node_set_text(
+    handle: WidgetTreeHandle,
+    node_id: u64,
+    text: *const c_char,
+) {
+    if handle.is_null() || text.is_null() {
+        return;
+    }
+    unsafe {
+        let text_str = CStr::from_ptr(text).to_string_lossy().into_owned();
+        let arc = &*(handle as *const Arc<Mutex<WidgetTree>>);
+        let mut tree = arc.lock();
+        let id = WidgetId::from_raw(node_id);
+        
+        if let Some(widget) = tree.get_widget_mut(id) {
+            if widget.widget_type() == "TreeNode" {
+                use crate::widgets::TreeNode;
+                if let Some(node) = widget.as_any_mut().downcast_mut::<TreeNode>() {
+                    node.set_text(&text_str);
+                }
+            }
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_tree_node_get_user_data(
+    handle: WidgetTreeHandle,
+    node_id: u64,
+) -> u64 {
+    if handle.is_null() {
+        return 0;
+    }
+    unsafe {
+        let arc = &*(handle as *const Arc<Mutex<WidgetTree>>);
+        let tree = arc.lock();
+        let id = WidgetId::from_raw(node_id);
+        
+        if let Some(widget) = tree.get_widget(id) {
+            if widget.widget_type() == "TreeNode" {
+                use crate::widgets::TreeNode;
+                if let Some(node) = widget.as_any().downcast_ref::<TreeNode>() {
+                    return node.user_data();
+                }
+            }
+        }
+        0
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_tree_view_clear_selection(
+    handle: WidgetTreeHandle,
+    tree_view_id: u64,
+) {
+    if handle.is_null() {
+        return;
+    }
+    unsafe {
+        let arc = &*(handle as *const Arc<Mutex<WidgetTree>>);
+        let mut tree = arc.lock();
+        
+        let tree_view_widget_id = WidgetId::from_raw(tree_view_id);
+        
+        if let Some(widget) = tree.get_widget_mut(tree_view_widget_id) {
+            if widget.widget_type() == "TreeView" {
+                use crate::widgets::TreeView;
+                if let Some(tree_view) = widget.as_any_mut().downcast_mut::<TreeView>() {
+                    let selected = tree_view.selected_node();
+                    tree_view.clear_selection();
+                    
+                    if let Some(selected_id) = selected {
+                        if let Some(selected_widget) = tree.get_widget_mut(selected_id) {
+                            if selected_widget.widget_type() == "TreeNode" {
+                                use crate::widgets::TreeNode;
+                                if let Some(node) = selected_widget.as_any_mut().downcast_mut::<TreeNode>() {
+                                    node.set_selected(false);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        dfx_info!("FFI", "TreeViewClearSelection: tree_view_id={}", tree_view_id);
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_widget_set_layer(
+    handle: WidgetTreeHandle,
+    widget_id: u64,
+    layer: u32,
+) {
+    if handle.is_null() {
+        return;
+    }
+    unsafe {
+        let arc = &*(handle as *const Arc<Mutex<WidgetTree>>);
+        let mut tree = arc.lock();
+        let id = WidgetId::from_raw(widget_id);
+        let render_layer = match layer {
+            0 => RenderLayer::Background,
+            1 => RenderLayer::Content,
+            2 => RenderLayer::Popup,
+            3 => RenderLayer::Overlay,
+            _ => RenderLayer::Content,
+        };
+        tree.set_widget_layer(id, render_layer);
+        dfx_info!("FFI", "WidgetSetLayer: widget_id={}, layer={}", widget_id, layer);
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_widget_get_layer(
+    handle: WidgetTreeHandle,
+    widget_id: u64,
+) -> u32 {
+    if handle.is_null() {
+        return 1;
+    }
+    unsafe {
+        let arc = &*(handle as *const Arc<Mutex<WidgetTree>>);
+        let tree = arc.lock();
+        let id = WidgetId::from_raw(widget_id);
+        tree.get_widget_layer(id) as u32
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_create_popup_menu(
+    handle: WidgetTreeHandle,
+    parent_id: u64,
+) -> u64 {
+    if handle.is_null() {
+        return 0;
+    }
+    unsafe {
+        let arc = &*(handle as *const Arc<Mutex<WidgetTree>>);
+        let mut tree = arc.lock();
+        
+        let content_scale = crate::thunk_manager::ui_get_content_scale();
+        let mut popup_menu = crate::widgets::PopupMenu::new();
+        popup_menu.set_content_scale(content_scale);
+        
+        let id = popup_menu.id();
+        
+        let parent = if parent_id == 0 {
+            tree.root.unwrap_or(WidgetId::invalid())
+        } else {
+            WidgetId::from_raw(parent_id)
+        };
+        
+        tree.add_widget(Box::new(popup_menu), parent);
+        tree.set_widget_layer(id, crate::widget_tree::RenderLayer::Popup);
+        dfx_info!("FFI", "CreatePopupMenu: id={}, parent={}, scale={}", id.id, parent_id, content_scale);
+        id.id
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_popup_menu_add_item(
+    handle: WidgetTreeHandle,
+    menu_id: u64,
+    text: *const c_char,
+    shortcut: *const c_char,
+    action_id: usize,
+) {
+    if handle.is_null() || text.is_null() {
+        return;
+    }
+    unsafe {
+        let text_str = CStr::from_ptr(text).to_string_lossy().into_owned();
+        let shortcut_str = if shortcut.is_null() {
+            None
+        } else {
+            Some(CStr::from_ptr(shortcut).to_string_lossy().into_owned())
+        };
+        
+        let arc = &*(handle as *const Arc<Mutex<WidgetTree>>);
+        let mut tree = arc.lock();
+        let id = WidgetId::from_raw(menu_id);
+        
+        if let Some(widget) = tree.get_widget_mut(id) {
+            if widget.widget_type() == "PopupMenu" {
+                use crate::widgets::PopupMenu;
+                if let Some(popup_menu) = widget.as_any_mut().downcast_mut::<PopupMenu>() {
+                    popup_menu.add_item(text_str.clone(), shortcut_str, action_id);
+                    dfx_info!("FFI", "PopupMenuAddItem: menu_id={}, text={}, action_id={}", menu_id, text_str, action_id);
+                }
+            }
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_popup_menu_add_separator(
+    handle: WidgetTreeHandle,
+    menu_id: u64,
+) {
+    if handle.is_null() {
+        return;
+    }
+    unsafe {
+        let arc = &*(handle as *const Arc<Mutex<WidgetTree>>);
+        let mut tree = arc.lock();
+        let id = WidgetId::from_raw(menu_id);
+        
+        if let Some(widget) = tree.get_widget_mut(id) {
+            if widget.widget_type() == "PopupMenu" {
+                use crate::widgets::PopupMenu;
+                if let Some(popup_menu) = widget.as_any_mut().downcast_mut::<PopupMenu>() {
+                    popup_menu.add_separator();
+                    dfx_info!("FFI", "PopupMenuAddSeparator: menu_id={}", menu_id);
+                }
+            }
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_popup_menu_show(
+    handle: WidgetTreeHandle,
+    menu_id: u64,
+    x: f32,
+    y: f32,
+) {
+    if handle.is_null() {
+        return;
+    }
+    unsafe {
+        let arc = &*(handle as *const Arc<Mutex<WidgetTree>>);
+        let mut tree = arc.lock();
+        let id = WidgetId::from_raw(menu_id);
+        
+        if let Some(widget) = tree.get_widget_mut(id) {
+            if widget.widget_type() == "PopupMenu" {
+                use crate::widgets::PopupMenu;
+                if let Some(popup_menu) = widget.as_any_mut().downcast_mut::<PopupMenu>() {
+                    popup_menu.show(x, y);
+                    dfx_info!("FFI", "PopupMenuShow: menu_id={}, x={}, y={}", menu_id, x, y);
+                }
+            }
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_popup_menu_hide(
+    handle: WidgetTreeHandle,
+    menu_id: u64,
+) {
+    if handle.is_null() {
+        return;
+    }
+    unsafe {
+        let arc = &*(handle as *const Arc<Mutex<WidgetTree>>);
+        let mut tree = arc.lock();
+        let id = WidgetId::from_raw(menu_id);
+        
+        if let Some(widget) = tree.get_widget_mut(id) {
+            if widget.widget_type() == "PopupMenu" {
+                use crate::widgets::PopupMenu;
+                if let Some(popup_menu) = widget.as_any_mut().downcast_mut::<PopupMenu>() {
+                    popup_menu.hide();
+                    dfx_info!("FFI", "PopupMenuHide: menu_id={}", menu_id);
+                }
+            }
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_popup_menu_is_visible(
+    handle: WidgetTreeHandle,
+    menu_id: u64,
+) -> bool {
+    if handle.is_null() {
+        return false;
+    }
+    unsafe {
+        let arc = &*(handle as *const Arc<Mutex<WidgetTree>>);
+        let tree = arc.lock();
+        let id = WidgetId::from_raw(menu_id);
+        
+        if let Some(widget) = tree.get_widget(id) {
+            if widget.widget_type() == "PopupMenu" {
+                use crate::widgets::PopupMenu;
+                if let Some(popup_menu) = widget.as_any().downcast_ref::<PopupMenu>() {
+                    return popup_menu.is_visible();
+                }
+            }
+        }
+        false
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_popup_menu_set_on_click_thunk_ptr(
+    handle: WidgetTreeHandle,
+    menu_id: u64,
+    callback_ptr: *const std::ffi::c_void,
+) {
+    if callback_ptr.is_null() {
+        return;
+    }
+    let callback: crate::thunk_manager::PopupMenuClickCallback = unsafe { std::mem::transmute(callback_ptr) };
+    crate::thunk_manager::ui_register_popup_menu_click_callback(menu_id, callback);
+    dfx_info!("FFI", "PopupMenuSetOnClickThunkPtr: menu_id={}", menu_id);
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_create_grid_view(
+    handle: WidgetTreeHandle,
+    parent_id: u64,
+    x: f32,
+    y: f32,
+    width: f32,
+    height: f32,
+    cell_size: f32,
+) -> u64 {
+    if handle.is_null() {
+        return 0;
+    }
+    unsafe {
+        let arc = &*(handle as *const Arc<Mutex<WidgetTree>>);
+        let mut tree = arc.lock();
+        
+        let content_scale = crate::thunk_manager::ui_get_content_scale();
+        let mut grid_view = crate::widgets::GridView::new()
+            .with_cell_size(cell_size * content_scale)
+            .with_spacing(8.0 * content_scale);
+        grid_view.set_content_scale(content_scale);
+        grid_view.set_layout(Layout::new(x, y, width, height));
+        
+        let id = grid_view.id();
+        
+        let parent = if parent_id == 0 {
+            tree.root.unwrap_or(WidgetId::invalid())
+        } else {
+            WidgetId::from_raw(parent_id)
+        };
+        
+        tree.add_widget(Box::new(grid_view), parent);
+        dfx_info!("FFI", "CreateGridView: id={}, parent={}, cell_size={}, scale={}", id.id, parent_id, cell_size, content_scale);
+        id.id
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_grid_view_add_item(
+    handle: WidgetTreeHandle,
+    grid_id: u64,
+    label: *const c_char,
+    user_data: u64,
+) -> u32 {
+    if handle.is_null() || label.is_null() {
+        return 0;
+    }
+    unsafe {
+        let label_str = CStr::from_ptr(label).to_string_lossy().into_owned();
+        let arc = &*(handle as *const Arc<Mutex<WidgetTree>>);
+        let mut tree = arc.lock();
+        let id = WidgetId::from_raw(grid_id);
+        
+        if let Some(widget) = tree.get_widget_mut(id) {
+            if widget.widget_type() == "GridView" {
+                use crate::widgets::GridView;
+                if let Some(grid_view) = widget.as_any_mut().downcast_mut::<GridView>() {
+                    let index = grid_view.add_item(label_str.clone(), user_data);
+                    dfx_info!("FFI", "GridViewAddItem: grid_id={}, label={}, user_data={}, index={}", grid_id, label_str, user_data, index);
+                    return index as u32;
+                }
+            }
+        }
+        0
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_grid_view_remove_item(
+    handle: WidgetTreeHandle,
+    grid_id: u64,
+    index: usize,
+) {
+    if handle.is_null() {
+        return;
+    }
+    unsafe {
+        let arc = &*(handle as *const Arc<Mutex<WidgetTree>>);
+        let mut tree = arc.lock();
+        let id = WidgetId::from_raw(grid_id);
+        
+        if let Some(widget) = tree.get_widget_mut(id) {
+            if widget.widget_type() == "GridView" {
+                use crate::widgets::GridView;
+                if let Some(grid_view) = widget.as_any_mut().downcast_mut::<GridView>() {
+                    grid_view.remove_item(index);
+                    dfx_info!("FFI", "GridViewRemoveItem: grid_id={}, index={}", grid_id, index);
+                }
+            }
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_grid_view_set_selected(
+    handle: WidgetTreeHandle,
+    grid_id: u64,
+    index: usize,
+) {
+    if handle.is_null() {
+        return;
+    }
+    unsafe {
+        let arc = &*(handle as *const Arc<Mutex<WidgetTree>>);
+        let mut tree = arc.lock();
+        let id = WidgetId::from_raw(grid_id);
+        
+        if let Some(widget) = tree.get_widget_mut(id) {
+            if widget.widget_type() == "GridView" {
+                use crate::widgets::GridView;
+                if let Some(grid_view) = widget.as_any_mut().downcast_mut::<GridView>() {
+                    grid_view.set_selected(index);
+                    dfx_info!("FFI", "GridViewSetSelected: grid_id={}, index={}", grid_id, index);
+                }
+            }
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_grid_view_get_selected(
+    handle: WidgetTreeHandle,
+    grid_id: u64,
+) -> usize {
+    if handle.is_null() {
+        return usize::MAX;
+    }
+    unsafe {
+        let arc = &*(handle as *const Arc<Mutex<WidgetTree>>);
+        let tree = arc.lock();
+        let id = WidgetId::from_raw(grid_id);
+        
+        if let Some(widget) = tree.get_widget(id) {
+            if widget.widget_type() == "GridView" {
+                use crate::widgets::GridView;
+                if let Some(grid_view) = widget.as_any().downcast_ref::<GridView>() {
+                    return grid_view.selected_index().unwrap_or(usize::MAX);
+                }
+            }
+        }
+        usize::MAX
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_grid_view_get_selected_user_data(
+    handle: WidgetTreeHandle,
+    grid_id: u64,
+) -> u64 {
+    if handle.is_null() {
+        return 0;
+    }
+    unsafe {
+        let arc = &*(handle as *const Arc<Mutex<WidgetTree>>);
+        let tree = arc.lock();
+        let id = WidgetId::from_raw(grid_id);
+        
+        if let Some(widget) = tree.get_widget(id) {
+            if widget.widget_type() == "GridView" {
+                use crate::widgets::GridView;
+                if let Some(grid_view) = widget.as_any().downcast_ref::<GridView>() {
+                    return grid_view.selected_user_data().unwrap_or(0);
+                }
+            }
+        }
+        0
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_grid_view_clear(
+    handle: WidgetTreeHandle,
+    grid_id: u64,
+) {
+    if handle.is_null() {
+        return;
+    }
+    unsafe {
+        let arc = &*(handle as *const Arc<Mutex<WidgetTree>>);
+        let mut tree = arc.lock();
+        let id = WidgetId::from_raw(grid_id);
+        
+        if let Some(widget) = tree.get_widget_mut(id) {
+            if widget.widget_type() == "GridView" {
+                use crate::widgets::GridView;
+                if let Some(grid_view) = widget.as_any_mut().downcast_mut::<GridView>() {
+                    grid_view.clear();
+                    dfx_info!("FFI", "GridViewClear: grid_id={}", grid_id);
+                }
+            }
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_grid_view_item_count(
+    handle: WidgetTreeHandle,
+    grid_id: u64,
+) -> usize {
+    if handle.is_null() {
+        return 0;
+    }
+    unsafe {
+        let arc = &*(handle as *const Arc<Mutex<WidgetTree>>);
+        let tree = arc.lock();
+        let id = WidgetId::from_raw(grid_id);
+        
+        if let Some(widget) = tree.get_widget(id) {
+            if widget.widget_type() == "GridView" {
+                use crate::widgets::GridView;
+                if let Some(grid_view) = widget.as_any().downcast_ref::<GridView>() {
+                    return grid_view.item_count();
+                }
+            }
+        }
+        0
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_grid_view_set_on_click_thunk_ptr(
+    handle: WidgetTreeHandle,
+    grid_id: u64,
+    callback_ptr: *const std::ffi::c_void,
+) {
+    if callback_ptr.is_null() {
+        return;
+    }
+    let callback: crate::thunk_manager::GridViewClickCallback = unsafe { std::mem::transmute(callback_ptr) };
+    crate::thunk_manager::ui_register_grid_view_click_callback(grid_id, callback);
+    dfx_info!("FFI", "GridViewSetOnClickThunkPtr: grid_id={}", grid_id);
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_create_dialog(
+    handle: WidgetTreeHandle,
+    parent_id: u64,
+    title: *const c_char,
+    width: f32,
+    height: f32,
+) -> u64 {
+    if handle.is_null() || title.is_null() {
+        return 0;
+    }
+    unsafe {
+        let title_str = CStr::from_ptr(title).to_string_lossy().into_owned();
+        let arc = &*(handle as *const Arc<Mutex<WidgetTree>>);
+        let mut tree = arc.lock();
+        
+        let content_scale = crate::thunk_manager::ui_get_content_scale();
+        let screen_size = crate::thunk_manager::ui_get_screen_size();
+        let x = (screen_size.0 - width) / 2.0;
+        let y = (screen_size.1 - height) / 2.0;
+        
+        let mut dialog = crate::widgets::Dialog::new()
+            .with_title(&title_str)
+            .with_size(width, height);
+        dialog.set_layout(Layout::new(x, y, width, height));
+        dialog.set_content_scale(content_scale);
+        
+        let id = dialog.id();
+        
+        let parent = if parent_id == 0 {
+            tree.root.unwrap_or(WidgetId::invalid())
+        } else {
+            WidgetId::from_raw(parent_id)
+        };
+        
+        tree.add_widget(Box::new(dialog), parent);
+        tree.set_widget_layer(id, crate::widget_tree::RenderLayer::Overlay);
+        dfx_info!("FFI", "CreateDialog: id={}, title={}, size={}x{}, scale={}", id.id, title_str, width, height, content_scale);
+        id.id
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_dialog_set_content(
+    handle: WidgetTreeHandle,
+    dialog_id: u64,
+    content_id: u64,
+) {
+    if handle.is_null() {
+        return;
+    }
+    unsafe {
+        let arc = &*(handle as *const Arc<Mutex<WidgetTree>>);
+        let mut tree = arc.lock();
+        let id = WidgetId::from_raw(dialog_id);
+        
+        if let Some(widget) = tree.get_widget_mut(id) {
+            if widget.widget_type() == "Dialog" {
+                use crate::widgets::Dialog;
+                if let Some(dialog) = widget.as_any_mut().downcast_mut::<Dialog>() {
+                    dialog.set_content(WidgetId::from_raw(content_id));
+                    dfx_info!("FFI", "DialogSetContent: dialog_id={}, content_id={}", dialog_id, content_id);
+                }
+            }
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_dialog_add_button(
+    handle: WidgetTreeHandle,
+    dialog_id: u64,
+    text: *const c_char,
+    action: i32,
+) {
+    if handle.is_null() || text.is_null() {
+        return;
+    }
+    unsafe {
+        let text_str = CStr::from_ptr(text).to_string_lossy().into_owned();
+        let arc = &*(handle as *const Arc<Mutex<WidgetTree>>);
+        let mut tree = arc.lock();
+        let id = WidgetId::from_raw(dialog_id);
+        
+        if let Some(widget) = tree.get_widget_mut(id) {
+            if widget.widget_type() == "Dialog" {
+                use crate::widgets::Dialog;
+                use crate::widgets::dialog::DialogAction;
+                if let Some(dialog) = widget.as_any_mut().downcast_mut::<Dialog>() {
+                    let dialog_action = match action {
+                        0 => DialogAction::Ok,
+                        1 => DialogAction::Cancel,
+                        2 => DialogAction::Yes,
+                        3 => DialogAction::No,
+                        _ => DialogAction::Custom,
+                    };
+                    dialog.add_button(&text_str, dialog_action);
+                    dfx_info!("FFI", "DialogAddButton: dialog_id={}, text={}, action={}", dialog_id, text_str, action);
+                }
+            }
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_dialog_show(
+    handle: WidgetTreeHandle,
+    dialog_id: u64,
+) {
+    if handle.is_null() {
+        return;
+    }
+    unsafe {
+        let arc = &*(handle as *const Arc<Mutex<WidgetTree>>);
+        let mut tree = arc.lock();
+        let id = WidgetId::from_raw(dialog_id);
+        
+        if let Some(widget) = tree.get_widget_mut(id) {
+            if widget.widget_type() == "Dialog" {
+                use crate::widgets::Dialog;
+                if let Some(dialog) = widget.as_any_mut().downcast_mut::<Dialog>() {
+                    dialog.show();
+                }
+            }
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_dialog_hide(
+    handle: WidgetTreeHandle,
+    dialog_id: u64,
+) {
+    if handle.is_null() {
+        return;
+    }
+    unsafe {
+        let arc = &*(handle as *const Arc<Mutex<WidgetTree>>);
+        let mut tree = arc.lock();
+        let id = WidgetId::from_raw(dialog_id);
+        
+        if let Some(widget) = tree.get_widget_mut(id) {
+            if widget.widget_type() == "Dialog" {
+                use crate::widgets::Dialog;
+                if let Some(dialog) = widget.as_any_mut().downcast_mut::<Dialog>() {
+                    dialog.hide();
+                }
+            }
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_dialog_is_visible(
+    handle: WidgetTreeHandle,
+    dialog_id: u64,
+) -> bool {
+    if handle.is_null() {
+        return false;
+    }
+    unsafe {
+        let arc = &*(handle as *const Arc<Mutex<WidgetTree>>);
+        let tree = arc.lock();
+        let id = WidgetId::from_raw(dialog_id);
+        
+        if let Some(widget) = tree.get_widget(id) {
+            if widget.widget_type() == "Dialog" {
+                use crate::widgets::Dialog;
+                if let Some(dialog) = widget.as_any().downcast_ref::<Dialog>() {
+                    return dialog.is_visible();
+                }
+            }
+        }
+        false
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_dialog_get_result(
+    handle: WidgetTreeHandle,
+    dialog_id: u64,
+) -> i32 {
+    if handle.is_null() {
+        return -1;
+    }
+    unsafe {
+        let arc = &*(handle as *const Arc<Mutex<WidgetTree>>);
+        let tree = arc.lock();
+        let id = WidgetId::from_raw(dialog_id);
+        
+        if let Some(widget) = tree.get_widget(id) {
+            if widget.widget_type() == "Dialog" {
+                use crate::widgets::Dialog;
+                if let Some(dialog) = widget.as_any().downcast_ref::<Dialog>() {
+                    return dialog.result().unwrap_or(-1);
+                }
+            }
+        }
+        -1
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_dialog_set_on_result_thunk_ptr(
+    handle: WidgetTreeHandle,
+    dialog_id: u64,
+    callback_ptr: *const std::ffi::c_void,
+) {
+    if callback_ptr.is_null() {
+        return;
+    }
+    let callback: crate::thunk_manager::DialogResultCallback = unsafe { std::mem::transmute(callback_ptr) };
+    crate::thunk_manager::ui_register_dialog_result_callback(dialog_id, callback);
+    dfx_info!("FFI", "DialogSetOnResultThunkPtr: dialog_id={}", dialog_id);
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_create_file_browser(
+    handle: WidgetTreeHandle,
+    parent_id: u64,
+    x: f32,
+    y: f32,
+    width: f32,
+    height: f32,
+    initial_path: *const c_char,
+) -> u64 {
+    if handle.is_null() {
+        return 0;
+    }
+    unsafe {
+        let initial_path_str = if initial_path.is_null() {
+            ".".to_string()
+        } else {
+            CStr::from_ptr(initial_path).to_string_lossy().into_owned()
+        };
+        
+        let arc = &*(handle as *const Arc<Mutex<WidgetTree>>);
+        let mut tree = arc.lock();
+        
+        let content_scale = crate::thunk_manager::ui_get_content_scale();
+        let mut file_browser = crate::widgets::FileBrowser::new()
+            .with_initial_path(&initial_path_str)
+            .with_layout(x, y, width, height);
+        file_browser.set_content_scale(content_scale);
+        
+        let id = file_browser.id();
+        
+        let parent = if parent_id == 0 {
+            tree.root.unwrap_or(WidgetId::invalid())
+        } else {
+            WidgetId::from_raw(parent_id)
+        };
+        
+        tree.add_widget(Box::new(file_browser), parent);
+        dfx_info!("FFI", "CreateFileBrowser: id={}, parent={}, path={}, scale={}", id.id, parent_id, initial_path_str, content_scale);
+        id.id
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_file_browser_set_path(
+    handle: WidgetTreeHandle,
+    browser_id: u64,
+    path: *const c_char,
+) {
+    if handle.is_null() || path.is_null() {
+        return;
+    }
+    unsafe {
+        let path_str = CStr::from_ptr(path).to_string_lossy().into_owned();
+        let arc = &*(handle as *const Arc<Mutex<WidgetTree>>);
+        let mut tree = arc.lock();
+        let id = WidgetId::from_raw(browser_id);
+        
+        if let Some(widget) = tree.get_widget_mut(id) {
+            if widget.widget_type() == "FileBrowser" {
+                use crate::widgets::FileBrowser;
+                if let Some(file_browser) = widget.as_any_mut().downcast_mut::<FileBrowser>() {
+                    file_browser.set_path(&path_str);
+                }
+            }
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_file_browser_set_filter(
+    handle: WidgetTreeHandle,
+    browser_id: u64,
+    filter: *const c_char,
+) {
+    if handle.is_null() || filter.is_null() {
+        return;
+    }
+    unsafe {
+        let filter_str = CStr::from_ptr(filter).to_string_lossy().into_owned();
+        let arc = &*(handle as *const Arc<Mutex<WidgetTree>>);
+        let mut tree = arc.lock();
+        let id = WidgetId::from_raw(browser_id);
+        
+        if let Some(widget) = tree.get_widget_mut(id) {
+            if widget.widget_type() == "FileBrowser" {
+                use crate::widgets::FileBrowser;
+                if let Some(file_browser) = widget.as_any_mut().downcast_mut::<FileBrowser>() {
+                    file_browser.set_filter(&filter_str);
+                }
+            }
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_file_browser_navigate_up(
+    handle: WidgetTreeHandle,
+    browser_id: u64,
+) {
+    if handle.is_null() {
+        return;
+    }
+    unsafe {
+        let arc = &*(handle as *const Arc<Mutex<WidgetTree>>);
+        let mut tree = arc.lock();
+        let id = WidgetId::from_raw(browser_id);
+        
+        if let Some(widget) = tree.get_widget_mut(id) {
+            if widget.widget_type() == "FileBrowser" {
+                use crate::widgets::FileBrowser;
+                if let Some(file_browser) = widget.as_any_mut().downcast_mut::<FileBrowser>() {
+                    file_browser.navigate_up();
+                }
+            }
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_file_browser_refresh(
+    handle: WidgetTreeHandle,
+    browser_id: u64,
+) {
+    if handle.is_null() {
+        return;
+    }
+    unsafe {
+        let arc = &*(handle as *const Arc<Mutex<WidgetTree>>);
+        let mut tree = arc.lock();
+        let id = WidgetId::from_raw(browser_id);
+        
+        if let Some(widget) = tree.get_widget_mut(id) {
+            if widget.widget_type() == "FileBrowser" {
+                use crate::widgets::FileBrowser;
+                if let Some(file_browser) = widget.as_any_mut().downcast_mut::<FileBrowser>() {
+                    file_browser.refresh();
+                }
+            }
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_file_browser_get_selected_path(
+    handle: WidgetTreeHandle,
+    browser_id: u64,
+    buffer: *mut c_char,
+    size: usize,
+) -> bool {
+    if handle.is_null() || buffer.is_null() || size == 0 {
+        return false;
+    }
+    unsafe {
+        let arc = &*(handle as *const Arc<Mutex<WidgetTree>>);
+        let tree = arc.lock();
+        let id = WidgetId::from_raw(browser_id);
+        
+        if let Some(widget) = tree.get_widget(id) {
+            if widget.widget_type() == "FileBrowser" {
+                use crate::widgets::FileBrowser;
+                if let Some(file_browser) = widget.as_any().downcast_ref::<FileBrowser>() {
+                    if let Some(path) = file_browser.get_selected_path() {
+                        let copy_len = path.len().min(size - 1);
+                        std::ptr::copy_nonoverlapping(
+                            path.as_ptr(),
+                            buffer as *mut u8,
+                            copy_len,
+                        );
+                        *buffer.add(copy_len) = 0;
+                        return true;
+                    }
+                }
+            }
+        }
+        false
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_file_browser_get_current_path(
+    handle: WidgetTreeHandle,
+    browser_id: u64,
+    buffer: *mut c_char,
+    size: usize,
+) -> bool {
+    if handle.is_null() || buffer.is_null() || size == 0 {
+        return false;
+    }
+    unsafe {
+        let arc = &*(handle as *const Arc<Mutex<WidgetTree>>);
+        let tree = arc.lock();
+        let id = WidgetId::from_raw(browser_id);
+        
+        if let Some(widget) = tree.get_widget(id) {
+            if widget.widget_type() == "FileBrowser" {
+                use crate::widgets::FileBrowser;
+                if let Some(file_browser) = widget.as_any().downcast_ref::<FileBrowser>() {
+                    let path = file_browser.current_path();
+                    let copy_len = path.len().min(size - 1);
+                    std::ptr::copy_nonoverlapping(
+                        path.as_ptr(),
+                        buffer as *mut u8,
+                        copy_len,
+                    );
+                    *buffer.add(copy_len) = 0;
+                    return true;
+                }
+            }
+        }
+        false
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_file_browser_set_on_select_thunk_ptr(
+    handle: WidgetTreeHandle,
+    browser_id: u64,
+    callback_ptr: *const std::ffi::c_void,
+) {
+    if callback_ptr.is_null() {
+        return;
+    }
+    let callback: crate::thunk_manager::FileBrowserSelectCallback = unsafe { std::mem::transmute(callback_ptr) };
+    crate::thunk_manager::ui_register_file_browser_select_callback(browser_id, callback);
+    dfx_info!("FFI", "FileBrowserSetOnSelectThunkPtr: browser_id={}", browser_id);
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_file_browser_set_on_double_click_thunk_ptr(
+    handle: WidgetTreeHandle,
+    browser_id: u64,
+    callback_ptr: *const std::ffi::c_void,
+) {
+    if callback_ptr.is_null() {
+        return;
+    }
+    let callback: crate::thunk_manager::FileBrowserDoubleClickCallback = unsafe { std::mem::transmute(callback_ptr) };
+    crate::thunk_manager::ui_register_file_browser_double_click_callback(browser_id, callback);
+    dfx_info!("FFI", "FileBrowserSetOnDoubleClickThunkPtr: browser_id={}", browser_id);
 }
