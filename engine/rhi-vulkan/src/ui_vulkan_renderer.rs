@@ -102,6 +102,7 @@ pub struct UIVulkanRenderer {
     game_render_pass: vk::RenderPass,
     game_pipeline: vk::Pipeline,
     game_pipeline_layout: vk::PipelineLayout,
+    outline_pipeline: vk::Pipeline,  // for rendering selection outline
     offscreen_image: vk::Image,
     offscreen_image_memory: vk::DeviceMemory,
     offscreen_image_view: vk::ImageView,
@@ -145,6 +146,11 @@ pub struct UIVulkanRenderer {
     entity_rotation: [f32; 4],  // quaternion (x, y, z, w)
     entity_scale: [f32; 3],
     entity_angle: f32,  // rotation angle in degrees (for simple rotation)
+    
+    // Selection highlight
+    selected_entity_id: u64,
+    is_entity_selected: bool,
+    highlight_color: [f32; 4],  // RGBA (orange: 1.0, 0.6, 0.3, 1.0)
 }
 
 impl UIVulkanRenderer {
@@ -698,6 +704,7 @@ p_rasterization_state: &vk::PipelineRasterizationStateCreateInfo {
                 ..Default::default()
             }, None).map_err(|e| format!("Failed to create game pipeline layout: {}", e))?;
             
+            // Main game pipeline (FILL mode)
             let game_pipeline = device.create_graphics_pipelines(vk::PipelineCache::null(), &[
                 vk::GraphicsPipelineCreateInfo {
                     stage_count: 2,
@@ -1086,6 +1093,7 @@ p_rasterization_state: &vk::PipelineRasterizationStateCreateInfo {
                 game_render_pass,
                 game_pipeline,
                 game_pipeline_layout,
+                outline_pipeline: game_pipeline,  // placeholder: reuse game_pipeline
                 offscreen_image,
                 offscreen_image_memory,
                 offscreen_image_view,
@@ -1121,6 +1129,9 @@ p_rasterization_state: &vk::PipelineRasterizationStateCreateInfo {
                 entity_rotation: [0.0, 0.0, 0.0, 1.0],  // identity quaternion
                 entity_scale: [1.0, 1.0, 1.0],
                 entity_angle: 0.0,
+                selected_entity_id: 0,
+                is_entity_selected: false,
+                highlight_color: [1.0, 0.6, 0.3, 1.0],  // orange
             })
         }
     }
@@ -1902,6 +1913,20 @@ let font_atlas = ui.get_font_atlas();
                 bytemuck::cast_slice(&push_constant_data)
             );
             self.device.cmd_draw(self.command_buffers[image_index_usize], 36, 1, 0, 0); // 36 vertices for cube
+            
+            // Render outline if entity is selected
+            if self.is_entity_selected {
+                dfx_info!("Vulkan", "Rendering outline for selected entity");
+                
+                // Render slightly larger cube for outline effect
+                // In a proper implementation, this would use a separate outline shader
+                // For now, we just draw the same cube again (visual placeholder)
+                // TODO: Create outline shader with stencil buffer
+                
+                // Simple outline: draw wireframe or extra geometry
+                // This is a placeholder - actual outline requires shader modification
+                self.device.cmd_draw(self.command_buffers[image_index_usize], 36, 1, 0, 0);
+            }
             
             // End game render pass
             self.device.cmd_end_render_pass(self.command_buffers[image_index_usize]);
@@ -3385,8 +3410,8 @@ self.dfx.lock().get_logger().lock().log(
     }
     
     pub fn set_selected_entity(&mut self, entity_id: u64, selected: bool) {
-        // TODO: 实现渲染选中Entity的高亮边框
-        // 目前简单记录选中状态
+        self.selected_entity_id = entity_id;
+        self.is_entity_selected = selected;
         dfx_info!("Vulkan", "Selected entity: id={}, selected={}", entity_id, selected);
     }
     
