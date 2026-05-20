@@ -7,6 +7,28 @@ use std::time::{Duration, Instant};
 pub extern "C" fn trigger_hot_reload() {}
 pub extern "C" fn set_game_preview_extent(_width: u32, _height: u32) {}
 pub extern "C" fn set_camera_params(_yaw: f32, _pitch: f32, _x: f32, _y: f32, _z: f32) {}
+pub extern "C" fn register_key_stub(_ptr: *const std::ffi::c_void) {}
+pub extern "C" fn register_mouse_move_stub(_ptr: *const std::ffi::c_void) {}
+pub extern "C" fn set_preview_window_edit_mode_stub(_handle: WidgetTreeHandle, _id: u64, _mode: bool) {}
+pub extern "C" fn scene_create_stub() -> *mut std::ffi::c_void { std::ptr::null_mut() }
+pub extern "C" fn scene_destroy_stub(_scene: *mut std::ffi::c_void) {}
+pub extern "C" fn scene_create_cube_stub(_scene: *mut std::ffi::c_void) -> u64 { 0 }
+pub extern "C" fn scene_attach_script_stub(_scene: *mut std::ffi::c_void, _id: u64, _path: *const i8, _class: *const i8) {}
+pub extern "C" fn scene_set_game_state_stub(_scene: *mut std::ffi::c_void, _state: i32) {}
+pub extern "C" fn scene_get_game_state_stub(_scene: *mut std::ffi::c_void) -> i32 { 0 }
+pub extern "C" fn scene_pick_entity_stub(_scene: *mut std::ffi::c_void, _ox: f32, _oy: f32, _oz: f32, _dx: f32, _dy: f32, _dz: f32) -> u64 { 0 }
+pub extern "C" fn scene_select_entity_stub(_scene: *mut std::ffi::c_void, _id: u64) {}
+pub extern "C" fn scene_update_stub(_scene: *mut std::ffi::c_void, _dt: f32) {}
+pub extern "C" fn set_renderer_game_state_stub(_state: i32) {}
+pub extern "C" fn get_renderer_game_state_stub() -> i32 { 0 }
+pub extern "C" fn set_entity_transform_stub(_px: f32, _py: f32, _pz: f32, _rx: f32, _ry: f32, _rz: f32, _rw: f32, _sx: f32, _sy: f32, _sz: f32) {}
+pub extern "C" fn set_entity_angle_stub(_angle: f32) {}
+pub extern "C" fn get_entity_angle_stub() -> f32 { 0.0 }
+pub extern "C" fn scene_get_entity_position_stub(_scene: *mut std::ffi::c_void, _id: u64, _x: *mut f32, _y: *mut f32, _z: *mut f32) {}
+pub extern "C" fn scene_get_entity_rotation_stub(_scene: *mut std::ffi::c_void, _id: u64, _x: *mut f32, _y: *mut f32, _z: *mut f32, _w: *mut f32) {}
+pub extern "C" fn scene_get_entity_scale_stub(_scene: *mut std::ffi::c_void, _id: u64, _x: *mut f32, _y: *mut f32, _z: *mut f32) {}
+pub extern "C" fn scene_rotate_entity_stub(_scene: *mut std::ffi::c_void, _id: u64, _angle: f32) {}
+pub extern "C" fn set_selected_entity_stub(_id: u64, _selected: bool) {}
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
@@ -56,6 +78,8 @@ fn main() {
         ui_register_update_thunk_ptr: ui_ffi::ui_register_update_thunk_ptr,
         ui_register_resize_thunk_ptr: ui_ffi::ui_register_resize_thunk_ptr,
         ui_register_global_click_thunk_ptr: ui_ffi::ui_register_global_click_thunk_ptr,
+        ui_register_key_thunk_ptr: register_key_stub,
+        ui_register_mouse_move_thunk_ptr: register_mouse_move_stub,
         ui_trigger_resize: ui_ffi::ui_trigger_resize,
         ui_get_screen_size: ui_ffi::ui_get_screen_size,
         ui_set_content_scale: ui_ffi::ui_set_content_scale,
@@ -82,7 +106,7 @@ fn main() {
         ui_text_edit_set_text: unsafe { std::mem::transmute(ui_ffi::ui_text_edit_set_text as *const std::ffi::c_void) },
         ui_text_edit_insert_char: unsafe { std::mem::transmute(ui_ffi::ui_text_edit_insert_char as *const std::ffi::c_void) },
         ui_text_edit_delete_char: unsafe { std::mem::transmute(ui_ffi::ui_text_edit_delete_char as *const std::ffi::c_void) },
-ui_text_edit_get_text_len: unsafe { std::mem::transmute(ui_ffi::ui_text_edit_get_text_len as *const std::ffi::c_void) },
+        ui_text_edit_get_text_len: unsafe { std::mem::transmute(ui_ffi::ui_text_edit_get_text_len as *const std::ffi::c_void) },
         ui_text_edit_get_text: unsafe { std::mem::transmute(ui_ffi::ui_text_edit_get_text as *const std::ffi::c_void) },
         ui_text_edit_show_line_numbers: unsafe { std::mem::transmute(ui_ffi::ui_set_text_edit_show_line_numbers as *const std::ffi::c_void) },
         ui_trigger_hot_reload: trigger_hot_reload,
@@ -90,12 +114,32 @@ ui_text_edit_get_text_len: unsafe { std::mem::transmute(ui_ffi::ui_text_edit_get
         ui_set_camera_params: set_camera_params,
         ui_is_preview_window_selected: unsafe { std::mem::transmute(ui_ffi::ui_is_preview_window_selected as *const std::ffi::c_void) },
         ui_set_preview_window_selected: unsafe { std::mem::transmute(ui_ffi::ui_set_preview_window_selected as *const std::ffi::c_void) },
+        ui_set_preview_window_edit_mode: unsafe { std::mem::transmute(set_preview_window_edit_mode_stub as *const std::ffi::c_void) },
         ui_create_list: unsafe { std::mem::transmute(ui_ffi::ui_create_list as *const std::ffi::c_void) },
         ui_create_list_in_parent: unsafe { std::mem::transmute(ui_ffi::ui_create_list_in_parent as *const std::ffi::c_void) },
         ui_create_list_item: unsafe { std::mem::transmute(ui_ffi::ui_create_list_item as *const std::ffi::c_void) },
         ui_create_list_item_in_parent: unsafe { std::mem::transmute(ui_ffi::ui_create_list_item_in_parent as *const std::ffi::c_void) },
         ui_list_item_set_text: unsafe { std::mem::transmute(ui_ffi::ui_list_item_set_text as *const std::ffi::c_void) },
         ui_list_item_set_font_size: unsafe { std::mem::transmute(ui_ffi::ui_list_item_set_font_size as *const std::ffi::c_void) },
+        scene_create: scene_create_stub,
+        scene_destroy: scene_destroy_stub,
+        scene_create_cube: scene_create_cube_stub,
+        scene_attach_script: scene_attach_script_stub,
+        scene_set_game_state: scene_set_game_state_stub,
+        scene_get_game_state: scene_get_game_state_stub,
+        scene_pick_entity: scene_pick_entity_stub,
+        scene_select_entity: scene_select_entity_stub,
+        scene_update: scene_update_stub,
+        set_renderer_game_state: set_renderer_game_state_stub,
+        get_renderer_game_state: get_renderer_game_state_stub,
+        set_entity_transform: set_entity_transform_stub,
+        set_entity_angle: set_entity_angle_stub,
+        get_entity_angle: get_entity_angle_stub,
+        scene_get_entity_position: scene_get_entity_position_stub,
+        scene_get_entity_rotation: scene_get_entity_rotation_stub,
+        scene_get_entity_scale: scene_get_entity_scale_stub,
+        scene_rotate_entity: scene_rotate_entity_stub,
+        set_selected_entity: set_selected_entity_stub,
         widget_tree_ptr: widget_tree_handle,
         dfx_handle: std::ptr::null_mut(),
     };

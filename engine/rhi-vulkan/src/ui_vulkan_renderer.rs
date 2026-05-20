@@ -758,6 +758,14 @@ p_multisample_state: &vk::PipelineMultisampleStateCreateInfo {
                         rasterization_samples: vk::SampleCountFlags::TYPE_1,
                         ..Default::default()
                     },
+                    p_depth_stencil_state: &vk::PipelineDepthStencilStateCreateInfo {
+                        depth_test_enable: vk::TRUE,
+                        depth_write_enable: vk::TRUE,
+                        depth_compare_op: vk::CompareOp::LESS,
+                        depth_bounds_test_enable: vk::FALSE,
+                        stencil_test_enable: vk::FALSE,
+                        ..Default::default()
+                    },
                     p_dynamic_state: &vk::PipelineDynamicStateCreateInfo {
                         dynamic_state_count: 2,
                         p_dynamic_states: &[vk::DynamicState::VIEWPORT, vk::DynamicState::SCISSOR] as *const _,

@@ -40,21 +40,20 @@ vec3 positions[8] = vec3[](
 );
 
 // 36 vertices for 6 faces (2 triangles per face)
-// Left/Right/Bottom: CW winding
-// Back/Front/Top: CCW winding
+// Physical CCW winding (normal points outward)
 int vertex_indices[36] = int[](
-    // Back face (Z-) - red
-    0, 1, 2, 0, 2, 3,
-    // Front face (Z+) - green
+    // Back face (Z-, z=-0.5) - red: normal points to -Z
+    0, 2, 1, 0, 3, 2,
+    // Front face (Z+, z=+0.5) - green: normal points to +Z
     4, 7, 6, 4, 6, 5,
-    // Left face (X-) - blue: normal flipped
+    // Left face (X-, x=-0.5) - blue: normal points to -X
     0, 7, 3, 0, 4, 7,
-    // Right face (X+) - yellow: normal flipped
-    1, 6, 5, 1, 2, 6,
-    // Bottom face (Y-) - cyan: normal flipped
-    0, 5, 1, 0, 4, 5,
-    // Top face (Y+) - magenta
-    3, 2, 6, 3, 6, 7
+    // Right face (X+, x=+0.5) - yellow: normal points to +X
+    1, 2, 6, 1, 6, 5,
+    // Bottom face (Y-, y=-0.5) - cyan: normal points to -Y
+    0, 1, 5, 0, 5, 4,
+    // Top face (Y+, y=+0.5) - magenta: normal points to +Y
+    3, 7, 6, 3, 6, 2
 );
 
 // Face colors

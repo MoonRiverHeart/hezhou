@@ -78,6 +78,21 @@ private static float _cameraYaw = 0f;
         private const float BOTTOM_PANEL_HEIGHT = 200f;
         
         private static UI.UpdateCallbackDelegate _updateCallback;
+        private static UI.ResizeCallbackDelegate _resizeCallback;
+        private static UI.GlobalClickCallbackDelegate _globalClickCallback;
+        private static UI.KeyCallbackDelegate _keyCallback;
+        private static UI.MouseMoveCallbackDelegate _mouseMoveCallback;
+        private static UI.WidgetCallbackDelegate _newClickCallback;
+        private static UI.WidgetCallbackDelegate _openClickCallback;
+        private static UI.WidgetCallbackDelegate _saveClickCallback;
+        private static UI.WidgetCallbackDelegate _runClickCallback;
+        private static UI.WidgetCallbackDelegate _toggleEditorClickCallback;
+        private static UI.WidgetCallbackDelegate _hotReloadClickCallback;
+        private static UI.WidgetCallbackDelegate _newScriptClickCallback;
+        private static UI.WidgetCallbackDelegate _openInExplorerCallback;
+        private static UI.WidgetCallbackDelegate _backClickCallback;
+        private static UI.WidgetCallbackDelegate _directoryClickCallback;
+        private static UI.WidgetCallbackDelegate _fileClickCallback;
         private static Scene _gameScene;
         private static ulong _testCubeId;
 
@@ -92,14 +107,30 @@ private static float _cameraYaw = 0f;
             Log.Info("Editor", $"屏幕尺寸: {_screenWidth}x{_screenHeight}, DPI缩放: {_contentScale}");
             
             _updateCallback = Update;
+            _resizeCallback = OnResize;
+            _globalClickCallback = OnGlobalClick;
+            _keyCallback = OnKey;
+            _mouseMoveCallback = OnMouseMove;
+            _newClickCallback = OnNewClick;
+            _openClickCallback = OnOpenClick;
+            _saveClickCallback = OnSaveClick;
+            _runClickCallback = OnRunClick;
+            _toggleEditorClickCallback = OnToggleEditorClick;
+            _hotReloadClickCallback = OnHotReloadClick;
+            _newScriptClickCallback = OnNewScriptClick;
+            _openInExplorerCallback = OpenInExplorer;
+            _backClickCallback = OnBackClick;
+            _directoryClickCallback = OnDirectoryClick;
+            _fileClickCallback = OnFileClick;
+            
             UI.RegisterUpdateCallback(_updateCallback);
             
             CreateEditorLayout();
             
-            UI.RegisterResizeCallback(OnResize);
-            UI.RegisterGlobalClickCallback(OnGlobalClick);
-            UI.RegisterKeyCallback(OnKey);
-            UI.RegisterMouseMoveCallback(OnMouseMove);
+            UI.RegisterResizeCallback(_resizeCallback);
+            UI.RegisterGlobalClickCallback(_globalClickCallback);
+            UI.RegisterKeyCallback(_keyCallback);
+            UI.RegisterMouseMoveCallback(_mouseMoveCallback);
             
             Log.Info("Editor", "编辑器初始化完成");
         }
@@ -222,21 +253,21 @@ private static float _cameraYaw = 0f;
             _toolbarButtons.SetPosition(10f, 5f);
             
             var newBtn = _toolbarButtons.AddButton(100f, 30f, "新建");
-            newBtn.SetOnClick(OnNewClick);
+            newBtn.SetOnClick(_newClickCallback);
             
             var openBtn = _toolbarButtons.AddButton(100f, 30f, "打开");
-            openBtn.SetOnClick(OnOpenClick);
+            openBtn.SetOnClick(_openClickCallback);
             
             var saveBtn = _toolbarButtons.AddButton(100f, 30f, "保存");
-            saveBtn.SetOnClick(OnSaveClick);
+            saveBtn.SetOnClick(_saveClickCallback);
             
             var runBtn = _toolbarButtons.AddButton(100f, 30f, "运行");
             _runButtonId = runBtn.Id;  // 保存按钮ID
-            runBtn.SetOnClick(OnRunClick);
+            runBtn.SetOnClick(_runClickCallback);
             
             _toggleEditorBtn = new Button(_toolbar.Id, 100f, 30f, "编辑器");
             UI.SetWidgetLayout(_toggleEditorBtn.Id, _screenWidth - 120f, 5f, 100f, 30f);
-            _toggleEditorBtn.SetOnClick(OnToggleEditorClick);
+            _toggleEditorBtn.SetOnClick(_toggleEditorClickCallback);
             
             Log.Info("Editor", "工具栏创建完成");
 
@@ -466,7 +497,7 @@ private static float _cameraYaw = 0f;
             Log.Info("Editor", $"点击\"新建\"按钮, id={widgetId}");
             ShowDropdownMenu(10, 45, 
                 new string[] { "新建场景", "新建脚本", "新建材质", "新建文件夹" },
-                new UI.WidgetCallbackDelegate[] { null, OnNewScriptClick, null, null });
+                new UI.WidgetCallbackDelegate[] { null, _newScriptClickCallback, null, null });
         }
         
         private static void OnNewScriptClick(ulong widgetId)
@@ -520,7 +551,7 @@ private static float _cameraYaw = 0f;
             
             var hotReloadBtn = new Button(_scriptEditorPanel.Id, 100f, 30f, "Hot Reload");
             UI.SetWidgetLayout(hotReloadBtn.Id, 10f, 10f, 100f, 30f);
-            hotReloadBtn.SetOnClick(OnHotReloadClick);
+            hotReloadBtn.SetOnClick(_hotReloadClickCallback);
             
             _scriptEditorLabel = new Label(_scriptEditorPanel.Id, 200f, 25f, "Script Editor - NewScript.cs");
             UI.SetWidgetLayout(_scriptEditorLabel.Id, 120f, 10f, 300f, 25f);
@@ -980,7 +1011,7 @@ private static void ShowDropdownMenu(float x, float y, string[] items, UI.Widget
             _projectTree.SetPosition(10f, 40f);
             
             var openBtn = _projectTree.AddButton(LEFT_PANEL_WIDTH - 40f, 20f, "📂 打开目录");
-            UI.SetOnClick(openBtn, OpenInExplorer);
+            UI.SetOnClick(openBtn, _openInExplorerCallback);
             
             try
             {
@@ -990,7 +1021,7 @@ private static void ShowDropdownMenu(float x, float y, string[] items, UI.Widget
                     if (_currentDirectory != "scripts" && Directory.GetParent(_currentDirectory) != null)
                     {
                         ulong backBtnId = _projectTree.AddButton(LEFT_PANEL_WIDTH - 40f, 20f, "⬆ 返回上级");
-                        UI.SetOnClick(backBtnId, OnBackClick);
+                        UI.SetOnClick(backBtnId, _backClickCallback);
                     }
                     
                     AddDirectoryItems(_projectTree, _currentDirectory, 0);
@@ -1016,7 +1047,7 @@ private static void ShowDropdownMenu(float x, float y, string[] items, UI.Widget
                     string name = Path.GetFileName(dir);
                     ulong btnId = stack.AddButton(LEFT_PANEL_WIDTH - 40f, 20f, $"{prefix}📁 {name}/");
                     _dirItemPaths[btnId] = dir;
-                    UI.SetOnClick(btnId, OnDirectoryClick);
+                    UI.SetOnClick(btnId, _directoryClickCallback);
                 }
                 
                 string[] files = Directory.GetFiles(path);
@@ -1026,8 +1057,8 @@ private static void ShowDropdownMenu(float x, float y, string[] items, UI.Widget
                     {
                         string name = Path.GetFileName(file);
                         ulong btnId = stack.AddButton(LEFT_PANEL_WIDTH - 40f, 20f, $"{prefix}📄 {name}");
-                        _fileItemPaths[btnId] = file;
-                        UI.SetOnClick(btnId, OnFileClick);
+                    _fileItemPaths[btnId] = file;
+                    UI.SetOnClick(btnId, _fileClickCallback);
                     }
                 }
             }
@@ -1110,7 +1141,7 @@ private static void ShowDropdownMenu(float x, float y, string[] items, UI.Widget
                     
                     var hotReloadBtn = new Button(_scriptEditorPanel.Id, 100f, 30f, "Hot Reload");
                     UI.SetWidgetLayout(hotReloadBtn.Id, 10f, 10f, 100f, 30f);
-                    hotReloadBtn.SetOnClick(OnHotReloadClick);
+                    hotReloadBtn.SetOnClick(_hotReloadClickCallback);
                     
                     _scriptEditorLabel = new Label(_scriptEditorPanel.Id, 200f, 25f, fileName);
                     UI.SetWidgetLayout(_scriptEditorLabel.Id, 120f, 10f, 300f, 25f);

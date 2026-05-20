@@ -204,6 +204,67 @@ cargo run --bin rotation_demo --features native-aot
 - **Depth**: Outline should use `depth_write_enable: FALSE` to not block normal geometry
 - **Blend**: Outline uses alpha blend (SRC_ALPHA, ONE_MINUS_SRC_ALPHA)
 
+### Cube Rendering in rotation.vert
+
+**Shader Path**: `engine/shaders/rotation.vert`
+
+**8 Vertex Positions** (corners of unit cube centered at origin):
+```
+v0: (-0.5, -0.5, -0.5)  back-bottom-left   (左后下)
+v1: (+0.5, -0.5, -0.5)  back-bottom-right  (右后下)
+v2: (+0.5, +0.5, -0.5)  back-top-right     (右后上)
+v3: (-0.5, +0.5, -0.5)  back-top-left      (左后上)
+v4: (-0.5, -0.5, +0.5)  front-bottom-left  (左前下)
+v5: (+0.5, -0.5, +0.5)  front-bottom-right (右前下)
+v6: (+0.5, +0.5, +0.5)  front-top-right    (右前上)
+v7: (-0.5, +0.5, +0.5)  front-top-left     (左前上)
+```
+
+**Face Colors**:
+```
+Back   (Z-, z=-0.5): RGB(1.0, 0.2, 0.2) 红色
+Front  (Z+, z=+0.5): RGB(0.2, 1.0, 0.2) 绿色
+Left   (X-, x=-0.5): RGB(0.2, 0.2, 1.0) 蓝色
+Right  (X+, x=+0.5): RGB(1.0, 1.0, 0.2) 黄色
+Bottom (Y-, y=-0.5): RGB(0.2, 1.0, 1.0) 青色
+Top    (Y+, y=+0.5): RGB(1.0, 0.2, 1.0) 紫色
+```
+
+**Vertex Indices** (36 indices for 6 faces × 2 triangles × 3 vertices):
+```
+Back:   0, 2, 1, 0, 3, 2   (v0→v2→v1→v3, normal to -Z)
+Front:  4, 7, 6, 4, 6, 5   (v4→v7→v6→v5, normal to +Z)
+Left:   0, 7, 3, 0, 4, 7   (v0→v7→v3→v4, normal to -X)
+Right:  1, 2, 6, 1, 6, 5   (v1→v2→v6→v5, normal to +X)
+Bottom: 0, 1, 5, 0, 5, 4   (v0→v1→v5→v4, normal to -Y)
+Top:    3, 7, 6, 3, 6, 2   (v3→v7→v6→v2, normal to +Y)
+```
+
+**Winding Order Note**:
+- Vulkan perspective projection flips Y-axis: `mat4[1][1] = -f`
+- Physical CCW (counter-clockwise) → Screen CW (clockwise) after Y-flip
+- Pipeline `front_face: CLOCKWISE` means physical CCW triangles are front faces
+
+### Depth Testing
+
+**Problem**: Without depth testing, render order determines visibility (later triangles overwrite earlier ones regardless of spatial distance).
+
+**Solution**: Add `p_depth_stencil_state` to game_pipeline:
+```rust
+p_depth_stencil_state: &vk::PipelineDepthStencilStateCreateInfo {
+    depth_test_enable: vk::TRUE,       // Enable depth comparison
+    depth_write_enable: vk::TRUE,      // Write depth values to buffer
+    depth_compare_op: vk::CompareOp::LESS,  // Near objects occlude far objects
+    depth_bounds_test_enable: vk::FALSE,
+    stencil_test_enable: vk::FALSE,
+    ..Default::default()
+},
+```
+
+**File**: `engine/rhi-vulkan/src/ui_vulkan_renderer.rs:757-768`
+
+**Render Pass**: game_render_pass has depth attachment (D32_SFLOAT format) at attachment index 1
+
 ## DFX Logging System
 
 ### Usage

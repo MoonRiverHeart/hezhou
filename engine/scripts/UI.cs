@@ -1,5 +1,6 @@
 using System;
 using System.Runtime.InteropServices;
+using System.Collections.Generic;
 
 namespace Hezhou
 {
@@ -7,6 +8,13 @@ namespace Hezhou
     {
         private static IntPtr _widgetTree;
         private static FfiContext _ffi;
+        
+        private static ResizeCallbackDelegate _savedResizeCallback;
+        private static GlobalClickCallbackDelegate _savedGlobalClickCallback;
+        private static KeyCallbackDelegate _savedKeyCallback;
+        private static MouseMoveCallbackDelegate _savedMouseMoveCallback;
+        private static UpdateCallbackDelegate _savedUpdateCallback;
+        private static Dictionary<ulong, WidgetCallbackDelegate> _onclickCallbacks = new Dictionary<ulong, WidgetCallbackDelegate>();
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public delegate ulong GetButtonIdDelegate();
@@ -320,6 +328,7 @@ namespace Hezhou
 
 public static void RegisterResizeCallback(ResizeCallbackDelegate callback)
         {
+            _savedResizeCallback = callback;
             IntPtr callbackPtr = Marshal.GetFunctionPointerForDelegate(callback);
             
             if (_ffi.ui_register_resize_thunk_ptr == IntPtr.Zero)
@@ -333,6 +342,7 @@ public static void RegisterResizeCallback(ResizeCallbackDelegate callback)
         
         public static void RegisterGlobalClickCallback(GlobalClickCallbackDelegate callback)
         {
+            _savedGlobalClickCallback = callback;
             IntPtr callbackPtr = Marshal.GetFunctionPointerForDelegate(callback);
             
             if (_ffi.ui_register_global_click_thunk_ptr == IntPtr.Zero)
@@ -346,6 +356,7 @@ public static void RegisterResizeCallback(ResizeCallbackDelegate callback)
 
         public static void RegisterKeyCallback(KeyCallbackDelegate callback)
         {
+            _savedKeyCallback = callback;
             IntPtr callbackPtr = Marshal.GetFunctionPointerForDelegate(callback);
             
             if (_ffi.ui_register_key_thunk_ptr == IntPtr.Zero)
@@ -359,6 +370,7 @@ public static void RegisterResizeCallback(ResizeCallbackDelegate callback)
 
         public static void RegisterMouseMoveCallback(MouseMoveCallbackDelegate callback)
         {
+            _savedMouseMoveCallback = callback;
             IntPtr callbackPtr = Marshal.GetFunctionPointerForDelegate(callback);
             
             if (_ffi.ui_register_mouse_move_thunk_ptr == IntPtr.Zero)
@@ -651,6 +663,7 @@ public static ulong GetRootId()
                 Log.Error("C#", "SetOnClick函数指针为空");
                 return;
             }
+            _onclickCallbacks[widgetId] = callback;
             IntPtr callbackPtr = Marshal.GetFunctionPointerForDelegate(callback);
             var func = Marshal.GetDelegateForFunctionPointer<SetOnClickDelegate>(_ffi.ui_button_set_on_click_thunk_ptr);
             func(_widgetTree, widgetId, callbackPtr);
@@ -936,6 +949,7 @@ public static ulong GetRootId()
         
         public static void RegisterUpdateCallback(UpdateCallbackDelegate callback)
         {
+            _savedUpdateCallback = callback;
             IntPtr callbackPtr = Marshal.GetFunctionPointerForDelegate(callback);
             
             if (_ffi.ui_register_update_thunk_ptr == IntPtr.Zero)
