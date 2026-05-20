@@ -216,6 +216,15 @@ pub extern "C" fn get_entity_angle() -> f32 {
 }
 
 #[unsafe(no_mangle)]
+pub extern "C" fn set_selected_entity(entity_id: u64, selected: bool) {
+    unsafe {
+        if let Some(renderer_ptr) = RENDERER {
+            (*renderer_ptr).set_selected_entity(entity_id, selected);
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
 pub extern "C" fn scene_get_entity_position_editor(scene: *mut std::ffi::c_void, entity_id: u64,
                                                     out_x: *mut f32, out_y: *mut f32, out_z: *mut f32) {
     if scene.is_null() || out_x.is_null() || out_y.is_null() || out_z.is_null() {
@@ -384,6 +393,7 @@ ui_list_item_set_text: unsafe { std::mem::transmute(ui_ffi::ui_list_item_set_tex
         scene_get_entity_rotation: scene_get_entity_rotation_editor,
         scene_get_entity_scale: scene_get_entity_scale_editor,
         scene_rotate_entity: scene_rotate_entity_editor,
+        set_selected_entity: set_selected_entity,
         widget_tree_ptr: widget_tree_handle,
         dfx_handle: dfx_for_csharp as *mut std::ffi::c_void,
     };

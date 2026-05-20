@@ -74,6 +74,8 @@ pub type SceneGetEntityRotationFn = extern "C" fn(*mut c_void, u64, *mut f32, *m
 pub type SceneGetEntityScaleFn = extern "C" fn(*mut c_void, u64, *mut f32, *mut f32, *mut f32);
 pub type SceneRotateEntityFn = extern "C" fn(*mut c_void, u64, f32);
 
+pub type SetSelectedEntityFn = extern "C" fn(u64, bool);
+
 #[repr(C)]
 pub struct FfiContext {
     pub ui_get_primary_button_id: GetButtonIdFn,
@@ -142,6 +144,7 @@ pub struct FfiContext {
     pub scene_get_entity_rotation: SceneGetEntityRotationFn,
     pub scene_get_entity_scale: SceneGetEntityScaleFn,
     pub scene_rotate_entity: SceneRotateEntityFn,
+    pub set_selected_entity: SetSelectedEntityFn,
     pub widget_tree_ptr: WidgetTreeHandle,
     pub dfx_handle: *mut c_void,
 }

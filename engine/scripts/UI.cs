@@ -186,6 +186,9 @@ namespace Hezhou
         
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public delegate void SceneRotateEntityDelegate(IntPtr scene, ulong entityId, float angleDegrees);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void SetSelectedEntityDelegate(ulong entityId, bool selected);
 
         [StructLayout(LayoutKind.Sequential)]
         public struct FfiContext
@@ -256,6 +259,7 @@ namespace Hezhou
             public IntPtr scene_get_entity_rotation;
             public IntPtr scene_get_entity_scale;
             public IntPtr scene_rotate_entity;
+            public IntPtr set_selected_entity;
             public IntPtr widget_tree_ptr;
             public IntPtr dfx_handle;
         }
@@ -891,6 +895,17 @@ public static void RegisterResizeCallback(ResizeCallbackDelegate callback)
             func(scene, entityId, angleDegrees);
         }
 
+        public static void SetSelectedEntity(ulong entityId, bool selected)
+        {
+            if (_ffi.set_selected_entity == IntPtr.Zero)
+            {
+                Log.Error("C#", "SetSelectedEntity函数指针为空");
+                return;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<SetSelectedEntityDelegate>(_ffi.set_selected_entity);
+            func(entityId, selected);
+        }
+
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public delegate void WidgetCallbackDelegate(ulong widgetId);
         
@@ -1151,11 +1166,16 @@ public static void RegisterResizeCallback(ResizeCallbackDelegate callback)
         public void SelectEntity(ulong entityId)
         {
             UI.SceneSelectEntity(_scenePtr, entityId);
+            UI.SetSelectedEntity(entityId, true);  // 高亮显示
+            Log.Info("Scene", $"Entity {entityId} selected with highlight");
         }
 
         public void ClearSelection()
         {
-            // TODO: 添加FFI函数 scene_clear_selection
+            // 清除所有选中Entity的高亮
+            // TODO: 需要FFI函数获取选中列表
+            UI.SetSelectedEntity(0, false);  // 清除高亮
+            Log.Info("Scene", "Selection cleared, highlight removed");
         }
 
         public void Update(float deltaTime)

@@ -3384,6 +3384,12 @@ self.dfx.lock().get_logger().lock().log(
         self.entity_angle
     }
     
+    pub fn set_selected_entity(&mut self, entity_id: u64, selected: bool) {
+        // TODO: 实现渲染选中Entity的高亮边框
+        // 目前简单记录选中状态
+        dfx_info!("Vulkan", "Selected entity: id={}, selected={}", entity_id, selected);
+    }
+    
     pub fn cleanup(&mut self) {
         unsafe {
             self.device.device_wait_idle().expect("Failed to wait for device idle");

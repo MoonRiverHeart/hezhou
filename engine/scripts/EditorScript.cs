@@ -143,20 +143,34 @@ private static float _cameraYaw = 0f;
             bool selected = UI.IsPreviewWindowSelected(_previewWindowId);
             GameState currentState = _gameScene != null ? _gameScene.GetGameState() : GameState.Editing;
             
-            // ESC退出PreviewWindow选中（只在Running模式下）
-            if (keycode == KEY_ESC && pressed && selected && currentState == GameState.Running)
+            // ESC处理
+            if (keycode == KEY_ESC && pressed && selected)
             {
-                UI.SetPreviewWindowSelected(_previewWindowId, false);
-                _cameraX = _savedCameraX;
-                _cameraY = _savedCameraY;
-                _cameraZ = _savedCameraZ;
-                _cameraYaw = _savedCameraYaw;
-                _cameraPitch = _savedCameraPitch;
-                _keyLeftPressed = false;
-                _keyRightPressed = false;
-                _keyUpPressed = false;
-                _keyDownPressed = false;
-                Log.Info("Editor", "ESC: 退出预览窗，恢复摄像机");
+                if (currentState == GameState.Running)
+                {
+                    // Running模式：退出PreviewWindow控制
+                    UI.SetPreviewWindowSelected(_previewWindowId, false);
+                    _cameraX = _savedCameraX;
+                    _cameraY = _savedCameraY;
+                    _cameraZ = _savedCameraZ;
+                    _cameraYaw = _savedCameraYaw;
+                    _cameraPitch = _savedCameraPitch;
+                    _keyLeftPressed = false;
+                    _keyRightPressed = false;
+                    _keyUpPressed = false;
+                    _keyDownPressed = false;
+                    Log.Info("Editor", "ESC: 退出预览窗（Running模式），恢复摄像机");
+                }
+                else
+                {
+                    // Editing模式：取消选中Entity
+                    if (_gameScene != null)
+                    {
+                        _gameScene.ClearSelection();
+                        _statusItem.Text = "状态: 就绪";
+                        Log.Info("Editor", "ESC: 取消选中Entity（Editing模式）");
+                    }
+                }
                 UpdateStatusBar();
                 return;
             }
