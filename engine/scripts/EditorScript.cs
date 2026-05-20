@@ -71,6 +71,8 @@ private static float _cameraYaw = 0f;
         private const float BOTTOM_PANEL_HEIGHT = 200f;
         
         private static UI.UpdateCallbackDelegate _updateCallback;
+        private static Scene _gameScene;
+        private static ulong _testCubeId;
 
         public static void Initialize(IntPtr contextPtr)
         {
@@ -162,6 +164,18 @@ private static float _cameraYaw = 0f;
 
         private static void CreateEditorLayout()
         {
+            // Create game scene
+            _gameScene = new Scene();
+            Log.Info("Editor", $"Scene created: ptr={_gameScene.ScenePtr}");
+            
+            // Create test cube
+            _testCubeId = _gameScene.CreateCube();
+            Log.Info("Editor", $"Test cube created: entityId={_testCubeId}");
+            
+            // Set to editing mode
+            _gameScene.SetGameState(GameState.Editing);
+            Log.Info("Editor", $"Scene state: {_gameScene.GetGameState()}");
+            
             float toolbarY = 0f;
             float mainY = TOOLBAR_HEIGHT;
             float mainHeight = _screenHeight - TOOLBAR_HEIGHT - STATUS_BAR_HEIGHT - BOTTOM_PANEL_HEIGHT;
@@ -349,6 +363,12 @@ private static float _cameraYaw = 0f;
                         if (_keyDownPressed) _cameraZ = Math.Min(10f, _cameraZ + speed);
                         
                         UI.SetCameraParams(_cameraYaw, _cameraPitch, _cameraX, _cameraY, _cameraZ);
+                        
+                        // Update scene when running
+                        if (_gameScene != null && _gameScene.GetGameState() == GameState.Running)
+                        {
+                            _gameScene.Update(deltaTime / 1000f);
+                        }
                     }
                     else
                     {
@@ -527,7 +547,26 @@ private static float _cameraYaw = 0f;
         {
             Log.Info("Editor", $"点击\"运行\"按钮, id={widgetId}");
             HideDropdownMenu();
-            Log.Info("Editor", "开始运行游戏...");
+            
+            if (_gameScene == null)
+            {
+                Log.Error("Editor", "Scene未创建!");
+                return;
+            }
+            
+            var currentState = _gameScene.GetGameState();
+            if (currentState == GameState.Editing)
+            {
+                _gameScene.SetGameState(GameState.Running);
+                Log.Info("Editor", "Scene切换到Running状态");
+                _statusItem.Text = "状态: 运行中";
+            }
+            else
+            {
+                _gameScene.SetGameState(GameState.Editing);
+                Log.Info("Editor", "Scene切换到Editing状态");
+                _statusItem.Text = "状态: 就绪";
+            }
         }
         
         private static void OnGlobalClick(float x, float y)
