@@ -845,7 +845,7 @@ p_multisample_state: &vk::PipelineMultisampleStateCreateInfo {
                     },
                     p_rasterization_state: &vk::PipelineRasterizationStateCreateInfo {
                         polygon_mode: vk::PolygonMode::FILL,
-                        cull_mode: vk::CullModeFlags::FRONT,  // Cull front faces, render back faces
+                        cull_mode: vk::CullModeFlags::NONE,  // Don't cull - winding order changes with rotation
                         front_face: vk::FrontFace::CLOCKWISE,
                         line_width: 1.0,
                         ..Default::default()
@@ -860,9 +860,9 @@ p_multisample_state: &vk::PipelineMultisampleStateCreateInfo {
                         ..Default::default()
                     },
                     p_depth_stencil_state: &vk::PipelineDepthStencilStateCreateInfo {
-                        depth_test_enable: vk::TRUE,
-                        depth_write_enable: vk::FALSE,  // Don't write depth for outline
-                        depth_compare_op: vk::CompareOp::LESS,
+                        depth_test_enable: vk::TRUE,   // Do depth test for proper occlusion
+                        depth_write_enable: vk::FALSE,  // Don't write depth (read-only)
+                        depth_compare_op: vk::CompareOp::LESS_OR_EQUAL,  // Render at same depth or closer
                         depth_bounds_test_enable: vk::FALSE,
                         stencil_test_enable: vk::FALSE,
                         ..Default::default()
@@ -1240,7 +1240,7 @@ p_multisample_state: &vk::PipelineMultisampleStateCreateInfo {
                 entity_angle: 0.0,
                 selected_entity_id: 0,
                 is_entity_selected: false,
-                highlight_color: [1.0, 0.6, 0.3, 1.0],  // orange
+                highlight_color: [1.0, 0.6, 0.3, 0.3],  // orange with high transparency
             })
         }
     }
@@ -2007,44 +2007,7 @@ let font_atlas = ui.get_font_atlas();
                 self.offscreen_extent.width, self.offscreen_extent.height,
                 self.offscreen_extent.width as f32 / self.offscreen_extent.height as f32));
             
-            // Push constants: rotation + scale + color + width + height + camera
-            // First render outline if selected (back faces, larger scale)
-            if self.is_entity_selected {
-                let outline_scale = 1.05;  // Slightly larger
-                let outline_push_constant_data = [
-                    self.entity_angle.to_radians(),  // rotation angle
-                    outline_scale,  // scale for outline
-                    self.highlight_color[0],  // orange R
-                    self.highlight_color[1],  // orange G
-                    self.highlight_color[2],  // orange B
-                    self.highlight_color[3],  // alpha (will trigger outline in shader)
-                    self.offscreen_extent.width as f32,
-                    self.offscreen_extent.height as f32,
-                    self.camera_yaw,
-                    self.camera_pitch,
-                    self.camera_x,
-                    self.camera_y,
-                    self.camera_z,
-                ];
-                
-                self.device.cmd_bind_pipeline(
-                    self.command_buffers[image_index_usize],
-                    vk::PipelineBindPoint::GRAPHICS,
-                    self.outline_pipeline
-                );
-                
-                self.device.cmd_push_constants(
-                    self.command_buffers[image_index_usize],
-                    self.game_pipeline_layout,
-                    vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT,
-                    0,
-                    bytemuck::cast_slice(&outline_push_constant_data)
-                );
-                
-                self.device.cmd_draw(self.command_buffers[image_index_usize], 36, 1, 0, 0);
-            }
-            
-            // Then render normal cube (front faces, normal scale)
+            // First render normal cube (opaque)
             let normal_push_constant_data = [
                 self.entity_angle.to_radians(),  // rotation angle
                 1.0,  // normal scale
@@ -2075,7 +2038,43 @@ let font_atlas = ui.get_font_atlas();
                 bytemuck::cast_slice(&normal_push_constant_data)
             );
             
-            self.device.cmd_draw(self.command_buffers[image_index_usize], 36, 1, 0, 0); // 36 vertices for cube
+            self.device.cmd_draw(self.command_buffers[image_index_usize], 36, 1, 0, 0);
+            
+            // Then render outline on top if selected (transparent overlay)
+            if self.is_entity_selected {
+                let outline_scale = 1.05;  // Slightly larger
+                let outline_push_constant_data = [
+                    self.entity_angle.to_radians(),  // rotation angle
+                    outline_scale,  // scale for outline
+                    self.highlight_color[0],  // orange R
+                    self.highlight_color[1],  // orange G
+                    self.highlight_color[2],  // orange B
+                    self.highlight_color[3],  // alpha (transparent overlay)
+                    self.offscreen_extent.width as f32,
+                    self.offscreen_extent.height as f32,
+                    self.camera_yaw,
+                    self.camera_pitch,
+                    self.camera_x,
+                    self.camera_y,
+                    self.camera_z,
+                ];
+                
+                self.device.cmd_bind_pipeline(
+                    self.command_buffers[image_index_usize],
+                    vk::PipelineBindPoint::GRAPHICS,
+                    self.outline_pipeline
+                );
+                
+                self.device.cmd_push_constants(
+                    self.command_buffers[image_index_usize],
+                    self.game_pipeline_layout,
+                    vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT,
+                    0,
+                    bytemuck::cast_slice(&outline_push_constant_data)
+                );
+                
+                self.device.cmd_draw(self.command_buffers[image_index_usize], 36, 1, 0, 0);
+            }
             
             // End game render pass
             self.device.cmd_end_render_pass(self.command_buffers[image_index_usize]);
