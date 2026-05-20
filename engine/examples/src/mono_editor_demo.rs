@@ -163,6 +163,27 @@ pub extern "C" fn set_camera_params(yaw: f32, pitch: f32, x: f32, y: f32, z: f32
     }
 }
 
+#[unsafe(no_mangle)]
+pub extern "C" fn set_renderer_game_state(state: i32) {
+    unsafe {
+        if let Some(renderer_ptr) = RENDERER {
+            (*renderer_ptr).set_game_state(state);
+            dfx_info!("Demo", "Renderer game_state set to: {}", state);
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn get_renderer_game_state() -> i32 {
+    unsafe {
+        if let Some(renderer_ptr) = RENDERER {
+            (*renderer_ptr).get_game_state()
+        } else {
+            0
+        }
+    }
+}
+
 fn main() {
     let args: Vec<String> = std::env::args().collect();
     let screenshot_mode = args.iter().any(|a| a == "--screenshot");
@@ -280,6 +301,8 @@ ui_list_item_set_text: unsafe { std::mem::transmute(ui_ffi::ui_list_item_set_tex
         scene_pick_entity: scene_pick_entity_editor,
         scene_select_entity: scene_select_entity_editor,
         scene_update: scene_update_editor,
+        set_renderer_game_state: set_renderer_game_state,
+        get_renderer_game_state: get_renderer_game_state,
         widget_tree_ptr: widget_tree_handle,
         dfx_handle: dfx_for_csharp as *mut std::ffi::c_void,
     };

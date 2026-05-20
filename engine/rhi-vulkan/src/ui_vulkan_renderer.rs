@@ -136,6 +136,9 @@ pub struct UIVulkanRenderer {
     camera_x: f32,
     camera_y: f32,
     camera_z: f32,
+    
+    // Game state: 0=Editing, 1=Running, 2=Paused
+    game_state: i32,
 }
 
 impl UIVulkanRenderer {
@@ -1107,6 +1110,7 @@ p_rasterization_state: &vk::PipelineRasterizationStateCreateInfo {
                 camera_x: 0.0,
                 camera_y: 0.0,
                 camera_z: 3.0,
+                game_state: 0,  // Editing
             })
         }
     }
@@ -1783,9 +1787,11 @@ let font_atlas = ui.get_font_atlas();
                 .map_err(|e| format!("Failed to begin command buffer: {}", e))?;
             
             // === Game Pass: Render triangle to offscreen ===
-            self.triangle_angle += 90.0 * delta_time / 1000.0; // 90度/秒, delta_time is milliseconds
-            if self.triangle_angle > 360.0 {
-                self.triangle_angle -= 360.0;
+            if self.game_state == 1 {  // Running
+                self.triangle_angle += 90.0 * delta_time / 1000.0; // 90度/秒, delta_time is milliseconds
+                if self.triangle_angle > 360.0 {
+                    self.triangle_angle -= 360.0;
+                }
             }
             
             // Transition offscreen image to COLOR_ATTACHMENT_OPTIMAL
@@ -3342,6 +3348,14 @@ self.dfx.lock().get_logger().lock().log(
         self.camera_x = x;
         self.camera_y = y;
         self.camera_z = z;
+    }
+    
+    pub fn set_game_state(&mut self, state: i32) {
+        self.game_state = state;
+    }
+    
+    pub fn get_game_state(&self) -> i32 {
+        self.game_state
     }
     
     pub fn cleanup(&mut self) {

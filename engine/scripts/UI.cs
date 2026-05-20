@@ -158,6 +158,12 @@ namespace Hezhou
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public delegate void SceneUpdateDelegate(IntPtr scene, float deltaTime);
 
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void SetRendererGameStateDelegate(int state);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate int GetRendererGameStateDelegate();
+
         [StructLayout(LayoutKind.Sequential)]
         public struct FfiContext
         {
@@ -218,6 +224,8 @@ namespace Hezhou
             public IntPtr scene_pick_entity;
             public IntPtr scene_select_entity;
             public IntPtr scene_update;
+            public IntPtr set_renderer_game_state;
+            public IntPtr get_renderer_game_state;
             public IntPtr widget_tree_ptr;
             public IntPtr dfx_handle;
         }
@@ -747,6 +755,28 @@ public static void RegisterResizeCallback(ResizeCallbackDelegate callback)
             }
             var func = Marshal.GetDelegateForFunctionPointer<SceneUpdateDelegate>(_ffi.scene_update);
             func(scene, deltaTime);
+        }
+
+        public static void SetRendererGameState(int state)
+        {
+            if (_ffi.set_renderer_game_state == IntPtr.Zero)
+            {
+                Log.Error("C#", "SetRendererGameState函数指针为空");
+                return;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<SetRendererGameStateDelegate>(_ffi.set_renderer_game_state);
+            func(state);
+        }
+
+        public static int GetRendererGameState()
+        {
+            if (_ffi.get_renderer_game_state == IntPtr.Zero)
+            {
+                Log.Error("C#", "GetRendererGameState函数指针为空");
+                return 0;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<GetRendererGameStateDelegate>(_ffi.get_renderer_game_state);
+            return func();
         }
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]

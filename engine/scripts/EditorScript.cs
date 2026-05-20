@@ -558,13 +558,15 @@ private static float _cameraYaw = 0f;
             if (currentState == GameState.Editing)
             {
                 _gameScene.SetGameState(GameState.Running);
-                Log.Info("Editor", "Scene切换到Running状态");
+                UI.SetRendererGameState(1);  // Running
+                Log.Info("Editor", "Scene和Renderer切换到Running状态");
                 _statusItem.Text = "状态: 运行中";
             }
             else
             {
                 _gameScene.SetGameState(GameState.Editing);
-                Log.Info("Editor", "Scene切换到Editing状态");
+                UI.SetRendererGameState(0);  // Editing
+                Log.Info("Editor", "Scene和Renderer切换到Editing状态");
                 _statusItem.Text = "状态: 就绪";
             }
         }

@@ -62,6 +62,9 @@ pub type ScenePickEntityFn = extern "C" fn(*mut c_void, f32, f32, f32, f32, f32,
 pub type SceneSelectEntityFn = extern "C" fn(*mut c_void, u64);
 pub type SceneUpdateFn = extern "C" fn(*mut c_void, f32);
 
+pub type SetRendererGameStateFn = extern "C" fn(i32);
+pub type GetRendererGameStateFn = extern "C" fn() -> i32;
+
 #[repr(C)]
 pub struct FfiContext {
     pub ui_get_primary_button_id: GetButtonIdFn,
@@ -121,6 +124,8 @@ pub struct FfiContext {
     pub scene_pick_entity: ScenePickEntityFn,
     pub scene_select_entity: SceneSelectEntityFn,
     pub scene_update: SceneUpdateFn,
+    pub set_renderer_game_state: SetRendererGameStateFn,
+    pub get_renderer_game_state: GetRendererGameStateFn,
     pub widget_tree_ptr: WidgetTreeHandle,
     pub dfx_handle: *mut c_void,
 }
