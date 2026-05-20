@@ -123,7 +123,7 @@ impl Widget for PreviewWindow {
             
             let border_style = Style::new()
                 .with_background(Color::transparent())
-                .with_border(border_color, 3.0, 0.0);
+                .with_border(border_color, 1.0, 0.0);
             canvas.draw_rect(bounds, &border_style);
         }
     }
