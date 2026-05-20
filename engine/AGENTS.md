@@ -163,9 +163,7 @@ cargo run --bin rotation_demo --features native-aot
 - Line center y = `(baseline_y - max_bearing_y + font_size) / 2`
 - Then find closest grapheme by x-coordinate within that line
 
-### Common Issues
-1. **Cursor/Click position mismatch**: Ensure font metrics are used consistently
-2. **Second line cursor offset**: Use `baseline_y - font_ascent` for comparison
+### Cursor/Click position offset: Use `baseline_y - font_ascent` for comparison
 3. **Selection highlight offset**: Highlight rect y should be `baseline_y - max_bearing_y`
 4. **Ctrl+C/V not working**: GLFW `mods` parameter must be parsed and passed to `KeyModifiers`
 
@@ -178,6 +176,33 @@ cargo run --bin rotation_demo --features native-aot
 - GLFW backend: Parse `glfw::Modifiers` to set `KeyModifiers.shift/ctrl/alt`
 - UIInputHandler: Track Shift/Ctrl state via separate KeyEvents
 - TouchData modifiers: bit 0 = Shift, bit 1 = Ctrl, bit 2 = Alt
+
+## Vulkan Rendering
+
+### Dynamic Viewport/Scissor
+- **Problem**: Pipeline viewport stuck at initial size (512x512), ignoring `cmd_set_viewport()`
+- **Symptom**: Rendered geometry aspect ratio wrong (compressed/stretched)
+- **Root Cause**: Pipeline created without `p_dynamic_state` for VIEWPORT/SCISSOR
+- **Solution**: Add `vk::PipelineDynamicStateCreateInfo` with VIEWPORT and SCISSOR states
+- **Example**:
+  ```rust
+  p_dynamic_state: &vk::PipelineDynamicStateCreateInfo {
+      dynamic_state_count: 2,
+      p_dynamic_states: &[vk::DynamicState::VIEWPORT, vk::DynamicState::SCISSOR] as *const _,
+      ..Default::default()
+  },
+  ```
+- **When needed**: Any pipeline that needs runtime viewport resize (e.g., game preview matching window size)
+
+### Push Constant Layout
+- Must match shader exactly: size and field order
+- Common mistake: Rust array size mismatch with shader `layout(push_constant)` struct
+- **Debug tip**: Hardcode aspect ratio in shader to isolate push constant vs viewport issue
+
+### Outline Rendering
+- **Technique**: Render back faces (CULL_FRONT) with scale > 1.0, then render front faces normally
+- **Depth**: Outline should use `depth_write_enable: FALSE` to not block normal geometry
+- **Blend**: Outline uses alpha blend (SRC_ALPHA, ONE_MINUS_SRC_ALPHA)
 
 ## DFX Logging System
 
