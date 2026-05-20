@@ -1325,7 +1325,7 @@ pub extern "C" fn ui_create_list_item_in_parent(
         use crate::widgets::ListItem;
         let text_str = CStr::from_ptr(text).to_string_lossy();
         let mut item = ListItem::new(&text_str);
-        item.set_show_top_border(show_border != 0);
+        item.set_show_border(show_border != 0);
         let id = item.id();
         
         let parent = if parent_id == 0 {

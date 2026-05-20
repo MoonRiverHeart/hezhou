@@ -16,7 +16,7 @@ pub struct ListItem {
     text: String,
     text_style: TextStyle,
     border_color: Color,
-    show_top_border: bool,
+    show_border: bool,
 }
 
 impl ListItem {
@@ -32,7 +32,7 @@ impl ListItem {
             text: text.to_string(),
             text_style: TextStyle::new().with_size(14.0).with_color(Color::white()),
             border_color: Color::new(0.3, 0.3, 0.3, 0.3),
-            show_top_border: false,
+            show_border: false,
         }
     }
 
@@ -50,8 +50,8 @@ impl ListItem {
         self.flags.dirty_render = true;
     }
 
-    pub fn set_show_top_border(&mut self, show: bool) {
-        self.show_top_border = show;
+    pub fn set_show_border(&mut self, show: bool) {
+        self.show_border = show;
         self.flags.dirty_render = true;
     }
 
@@ -132,12 +132,22 @@ fn draw(&mut self, canvas: &mut Canvas) {
             canvas.draw_rect(Rect::new(0.0, 0.0, width, height), &self.style);
         }
 
-        if self.show_top_border {
-            let line_height = 1.0;
-            canvas.draw_rect(
-                Rect::new(0.0, 0.0, width, line_height),
-                &Style::new().with_background(self.border_color),
-            );
+        if self.show_border {
+            let is_horizontal = width > height * 2.0;
+            
+            if is_horizontal {
+                let line_width = 1.0;
+                canvas.draw_rect(
+                    Rect::new(width - line_width, 0.0, line_width, height),
+                    &Style::new().with_background(self.border_color),
+                );
+            } else {
+                let line_height = 1.0;
+                canvas.draw_rect(
+                    Rect::new(0.0, height - line_height, width, line_height),
+                    &Style::new().with_background(self.border_color),
+                );
+            }
         }
 
         let text_style = TextStyle::new()
