@@ -516,11 +516,11 @@ p_rasterization_state: &vk::PipelineRasterizationStateCreateInfo {
                         max_depth_bounds: 1.0,
                         ..Default::default()
                     },
-                    p_multisample_state: &vk::PipelineMultisampleStateCreateInfo {
-                    rasterization_samples: vk::SampleCountFlags::TYPE_1,
-                    ..Default::default()
-                },
-                p_color_blend_state: &vk::PipelineColorBlendStateCreateInfo {
+p_multisample_state: &vk::PipelineMultisampleStateCreateInfo {
+                        rasterization_samples: vk::SampleCountFlags::TYPE_1,
+                        ..Default::default()
+                    },
+                    p_color_blend_state: &vk::PipelineColorBlendStateCreateInfo {
                     logic_op_enable: vk::FALSE,
                     attachment_count: 1,
                     p_attachments: &vk::PipelineColorBlendAttachmentState {
@@ -758,6 +758,11 @@ p_rasterization_state: &vk::PipelineRasterizationStateCreateInfo {
                         rasterization_samples: vk::SampleCountFlags::TYPE_1,
                         ..Default::default()
                     },
+                    p_dynamic_state: &vk::PipelineDynamicStateCreateInfo {
+                        dynamic_state_count: 2,
+                        p_dynamic_states: &[vk::DynamicState::VIEWPORT, vk::DynamicState::SCISSOR] as *const _,
+                        ..Default::default()
+                    },
                     p_color_blend_state: &vk::PipelineColorBlendStateCreateInfo {
                         logic_op_enable: vk::FALSE,
                         attachment_count: 1,
@@ -839,6 +844,11 @@ p_rasterization_state: &vk::PipelineRasterizationStateCreateInfo {
                     },
                     p_multisample_state: &vk::PipelineMultisampleStateCreateInfo {
                         rasterization_samples: vk::SampleCountFlags::TYPE_1,
+                        ..Default::default()
+                    },
+                    p_dynamic_state: &vk::PipelineDynamicStateCreateInfo {
+                        dynamic_state_count: 2,
+                        p_dynamic_states: &[vk::DynamicState::VIEWPORT, vk::DynamicState::SCISSOR] as *const _,
                         ..Default::default()
                     },
                     p_depth_stencil_state: &vk::PipelineDepthStencilStateCreateInfo {
@@ -1984,6 +1994,10 @@ let font_atlas = ui.get_font_atlas();
             };
             self.device.cmd_set_viewport(self.command_buffers[image_index_usize], 0, &[game_viewport]);
             self.device.cmd_set_scissor(self.command_buffers[image_index_usize], 0, &[game_scissor]);
+            
+            dfx_info!("Vulkan", &format!("Drawing cube: extent={}x{}, aspect={:.2}", 
+                self.offscreen_extent.width, self.offscreen_extent.height,
+                self.offscreen_extent.width as f32 / self.offscreen_extent.height as f32));
             
             // Push constants: rotation + scale + color + width + height + camera
             // First render outline if selected (back faces, larger scale)
