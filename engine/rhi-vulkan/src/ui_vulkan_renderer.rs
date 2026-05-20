@@ -697,9 +697,9 @@ p_rasterization_state: &vk::PipelineRasterizationStateCreateInfo {
             let game_pipeline_layout = device.create_pipeline_layout(&vk::PipelineLayoutCreateInfo {
                 push_constant_range_count: 1,
                 p_push_constant_ranges: &vk::PushConstantRange {
-                    stage_flags: vk::ShaderStageFlags::VERTEX,
+                    stage_flags: vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT,
                     offset: 0,
-                    size: 32, // rotation + width + height + yaw + pitch + x + y + z (8 floats)
+                    size: 56, // rotation + scale + color(RGBA) + width + height + yaw + pitch + x + y + z (14 floats)
                 },
                 ..Default::default()
             }, None).map_err(|e| format!("Failed to create game pipeline layout: {}", e))?;
@@ -783,6 +783,97 @@ p_rasterization_state: &vk::PipelineRasterizationStateCreateInfo {
             
             device.destroy_shader_module(game_vert_shader, None);
             device.destroy_shader_module(game_frag_shader, None);
+            
+            // Outline pipeline (render back faces with orange color)
+            let outline_vert_shader = Self::create_shader_module(&device, game_vert_code)?;
+            let outline_frag_shader = Self::create_shader_module(&device, game_frag_code)?;
+            
+            let outline_pipeline = device.create_graphics_pipelines(vk::PipelineCache::null(), &[
+                vk::GraphicsPipelineCreateInfo {
+                    stage_count: 2,
+                    p_stages: &[
+                        vk::PipelineShaderStageCreateInfo {
+                            stage: vk::ShaderStageFlags::VERTEX,
+                            module: outline_vert_shader,
+                            p_name: b"main\0".as_ptr() as *const i8,
+                            ..Default::default()
+                        },
+                        vk::PipelineShaderStageCreateInfo {
+                            stage: vk::ShaderStageFlags::FRAGMENT,
+                            module: outline_frag_shader,
+                            p_name: b"main\0".as_ptr() as *const i8,
+                            ..Default::default()
+                        },
+                    ] as *const _,
+                    p_vertex_input_state: &vk::PipelineVertexInputStateCreateInfo {
+                        ..Default::default()
+                    },
+                    p_input_assembly_state: &vk::PipelineInputAssemblyStateCreateInfo {
+                        topology: vk::PrimitiveTopology::TRIANGLE_LIST,
+                        primitive_restart_enable: vk::FALSE,
+                        ..Default::default()
+                    },
+                    p_viewport_state: &vk::PipelineViewportStateCreateInfo {
+                        viewport_count: 1,
+                        p_viewports: &vk::Viewport {
+                            x: 0.0,
+                            y: 0.0,
+                            width: offscreen_extent.width as f32,
+                            height: offscreen_extent.height as f32,
+                            min_depth: 0.0,
+                            max_depth: 1.0,
+                        },
+                        scissor_count: 1,
+                        p_scissors: &vk::Rect2D {
+                            offset: vk::Offset2D { x: 0, y: 0 },
+                            extent: offscreen_extent,
+                        },
+                        ..Default::default()
+                    },
+                    p_rasterization_state: &vk::PipelineRasterizationStateCreateInfo {
+                        polygon_mode: vk::PolygonMode::FILL,
+                        cull_mode: vk::CullModeFlags::FRONT,  // Cull front faces, render back faces
+                        front_face: vk::FrontFace::CLOCKWISE,
+                        line_width: 1.0,
+                        ..Default::default()
+                    },
+                    p_multisample_state: &vk::PipelineMultisampleStateCreateInfo {
+                        rasterization_samples: vk::SampleCountFlags::TYPE_1,
+                        ..Default::default()
+                    },
+                    p_depth_stencil_state: &vk::PipelineDepthStencilStateCreateInfo {
+                        depth_test_enable: vk::TRUE,
+                        depth_write_enable: vk::FALSE,  // Don't write depth for outline
+                        depth_compare_op: vk::CompareOp::LESS,
+                        depth_bounds_test_enable: vk::FALSE,
+                        stencil_test_enable: vk::FALSE,
+                        ..Default::default()
+                    },
+                    p_color_blend_state: &vk::PipelineColorBlendStateCreateInfo {
+                        logic_op_enable: vk::FALSE,
+                        attachment_count: 1,
+                        p_attachments: &vk::PipelineColorBlendAttachmentState {
+                            blend_enable: vk::TRUE,
+                            src_color_blend_factor: vk::BlendFactor::SRC_ALPHA,
+                            dst_color_blend_factor: vk::BlendFactor::ONE_MINUS_SRC_ALPHA,
+                            color_blend_op: vk::BlendOp::ADD,
+                            src_alpha_blend_factor: vk::BlendFactor::ONE,
+                            dst_alpha_blend_factor: vk::BlendFactor::ZERO,
+                            alpha_blend_op: vk::BlendOp::ADD,
+                            color_write_mask: vk::ColorComponentFlags::R | vk::ColorComponentFlags::G | vk::ColorComponentFlags::B | vk::ColorComponentFlags::A,
+                            ..Default::default()
+                        },
+                        ..Default::default()
+                    },
+                    layout: game_pipeline_layout,
+                    render_pass: game_render_pass,
+                    subpass: 0,
+                    ..Default::default()
+                }
+            ], None).map_err(|(_, e)| format!("Failed to create outline pipeline: {}", e))?[0];
+            
+            device.destroy_shader_module(outline_vert_shader, None);
+            device.destroy_shader_module(outline_frag_shader, None);
             
             // Preview texture sampler (for UI to sample offscreen image)
             let preview_sampler = device.create_sampler(&vk::SamplerCreateInfo {
@@ -1093,7 +1184,7 @@ p_rasterization_state: &vk::PipelineRasterizationStateCreateInfo {
                 game_render_pass,
                 game_pipeline,
                 game_pipeline_layout,
-                outline_pipeline: game_pipeline,  // placeholder: reuse game_pipeline
+                outline_pipeline,
                 offscreen_image,
                 offscreen_image_memory,
                 offscreen_image_view,
@@ -1894,9 +1985,51 @@ let font_atlas = ui.get_font_atlas();
             self.device.cmd_set_viewport(self.command_buffers[image_index_usize], 0, &[game_viewport]);
             self.device.cmd_set_scissor(self.command_buffers[image_index_usize], 0, &[game_scissor]);
             
-            // Push constants: rotation + width + height + camera
-            let push_constant_data = [
+            // Push constants: rotation + scale + color + width + height + camera
+            // First render outline if selected (back faces, larger scale)
+            if self.is_entity_selected {
+                let outline_scale = 1.05;  // Slightly larger
+                let outline_push_constant_data = [
+                    self.entity_angle.to_radians(),  // rotation angle
+                    outline_scale,  // scale for outline
+                    self.highlight_color[0],  // orange R
+                    self.highlight_color[1],  // orange G
+                    self.highlight_color[2],  // orange B
+                    self.highlight_color[3],  // alpha (will trigger outline in shader)
+                    self.offscreen_extent.width as f32,
+                    self.offscreen_extent.height as f32,
+                    self.camera_yaw,
+                    self.camera_pitch,
+                    self.camera_x,
+                    self.camera_y,
+                    self.camera_z,
+                ];
+                
+                self.device.cmd_bind_pipeline(
+                    self.command_buffers[image_index_usize],
+                    vk::PipelineBindPoint::GRAPHICS,
+                    self.outline_pipeline
+                );
+                
+                self.device.cmd_push_constants(
+                    self.command_buffers[image_index_usize],
+                    self.game_pipeline_layout,
+                    vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT,
+                    0,
+                    bytemuck::cast_slice(&outline_push_constant_data)
+                );
+                
+                self.device.cmd_draw(self.command_buffers[image_index_usize], 36, 1, 0, 0);
+            }
+            
+            // Then render normal cube (front faces, normal scale)
+            let normal_push_constant_data = [
                 self.entity_angle.to_radians(),  // rotation angle
+                1.0,  // normal scale
+                0.0,  // outline R (alpha=0 means no outline)
+                0.0,  // outline G
+                0.0,  // outline B
+                0.0,  // alpha 0 - use face colors
                 self.offscreen_extent.width as f32,
                 self.offscreen_extent.height as f32,
                 self.camera_yaw,
@@ -1905,28 +2038,22 @@ let font_atlas = ui.get_font_atlas();
                 self.camera_y,
                 self.camera_z,
             ];
+            
+            self.device.cmd_bind_pipeline(
+                self.command_buffers[image_index_usize],
+                vk::PipelineBindPoint::GRAPHICS,
+                self.game_pipeline
+            );
+            
             self.device.cmd_push_constants(
                 self.command_buffers[image_index_usize],
                 self.game_pipeline_layout,
-                vk::ShaderStageFlags::VERTEX,
+                vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT,
                 0,
-                bytemuck::cast_slice(&push_constant_data)
+                bytemuck::cast_slice(&normal_push_constant_data)
             );
-            self.device.cmd_draw(self.command_buffers[image_index_usize], 36, 1, 0, 0); // 36 vertices for cube
             
-            // Render outline if entity is selected
-            if self.is_entity_selected {
-                dfx_info!("Vulkan", "Rendering outline for selected entity");
-                
-                // Render slightly larger cube for outline effect
-                // In a proper implementation, this would use a separate outline shader
-                // For now, we just draw the same cube again (visual placeholder)
-                // TODO: Create outline shader with stencil buffer
-                
-                // Simple outline: draw wireframe or extra geometry
-                // This is a placeholder - actual outline requires shader modification
-                self.device.cmd_draw(self.command_buffers[image_index_usize], 36, 1, 0, 0);
-            }
+            self.device.cmd_draw(self.command_buffers[image_index_usize], 36, 1, 0, 0); // 36 vertices for cube
             
             // End game render pass
             self.device.cmd_end_render_pass(self.command_buffers[image_index_usize]);

@@ -2,6 +2,11 @@
 
 layout(push_constant) uniform PushConstants {
     float rotation;
+    float scale;
+    float outline_r;
+    float outline_g;
+    float outline_b;
+    float outline_a;
     float width;
     float height;
     float cameraYaw;
@@ -63,12 +68,16 @@ vec3 face_colors[6] = vec3[](
 );
 
 layout(location = 0) out vec3 fragColor;
+layout(location = 1) out vec4 outlineColor;
 
 void main() {
     int vertex_idx = vertex_indices[gl_VertexIndex];
     int face_idx = gl_VertexIndex / 6;
     
     vec3 pos = positions[vertex_idx];
+    
+    // Apply scale
+    pos = pos * pc.scale;
     
     // Model transform: rotate around Y (cube self-rotation)
     float angle = pc.rotation;
@@ -110,4 +119,5 @@ void main() {
     gl_Position = proj * vec4(view_pos, 1.0);
     
     fragColor = face_colors[face_idx];
+    outlineColor = vec4(pc.outline_r, pc.outline_g, pc.outline_b, pc.outline_a);
 }
