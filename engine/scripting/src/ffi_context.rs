@@ -52,16 +52,6 @@ pub type CreateListItemInParentFn = extern "C" fn(WidgetTreeHandle, u64, *const 
 pub type ListItemSetTextFn = extern "C" fn(WidgetTreeHandle, u64, *const c_char);
 pub type ListItemSetFontSizeFn = extern "C" fn(WidgetTreeHandle, u64, f32);
 
-pub type SceneCreateFn = extern "C" fn() -> *mut c_void;
-pub type SceneDestroyFn = extern "C" fn(*mut c_void);
-pub type SceneCreateCubeFn = extern "C" fn(*mut c_void) -> u64;
-pub type SceneAttachScriptFn = extern "C" fn(*mut c_void, u64, *const c_char, *const c_char);
-pub type SceneSetGameStateFn = extern "C" fn(*mut c_void, i32);
-pub type SceneGetGameStateFn = extern "C" fn(*mut c_void) -> i32;
-pub type ScenePickEntityFn = extern "C" fn(*mut c_void, f32, f32, f32, f32, f32, f32) -> u64;
-pub type SceneSelectEntityFn = extern "C" fn(*mut c_void, u64);
-pub type SceneUpdateFn = extern "C" fn(*mut c_void, f32);
-
 #[repr(C)]
 pub struct FfiContext {
     pub ui_get_primary_button_id: GetButtonIdFn,
@@ -112,15 +102,6 @@ pub struct FfiContext {
     pub ui_create_list_item_in_parent: CreateListItemInParentFn,
     pub ui_list_item_set_text: ListItemSetTextFn,
     pub ui_list_item_set_font_size: ListItemSetFontSizeFn,
-    pub scene_create: SceneCreateFn,
-    pub scene_destroy: SceneDestroyFn,
-    pub scene_create_cube: SceneCreateCubeFn,
-    pub scene_attach_script: SceneAttachScriptFn,
-    pub scene_set_game_state: SceneSetGameStateFn,
-    pub scene_get_game_state: SceneGetGameStateFn,
-    pub scene_pick_entity: ScenePickEntityFn,
-    pub scene_select_entity: SceneSelectEntityFn,
-    pub scene_update: SceneUpdateFn,
     pub widget_tree_ptr: WidgetTreeHandle,
     pub dfx_handle: *mut c_void,
 }
