@@ -33,3 +33,6 @@ oh_modules/
 # C# 编译产物
 bin/
 obj/
+
+# Release packages (large files)
+release/*.zip
