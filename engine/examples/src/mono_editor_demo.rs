@@ -215,6 +215,49 @@ pub extern "C" fn get_entity_angle() -> f32 {
     }
 }
 
+#[unsafe(no_mangle)]
+pub extern "C" fn scene_get_entity_position_editor(scene: *mut std::ffi::c_void, entity_id: u64,
+                                                    out_x: *mut f32, out_y: *mut f32, out_z: *mut f32) {
+    if scene.is_null() || out_x.is_null() || out_y.is_null() || out_z.is_null() {
+        return;
+    }
+    unsafe {
+        hezhou_core::scene_get_entity_position(scene as *mut hezhou_core::Scene, entity_id, out_x, out_y, out_z);
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn scene_get_entity_rotation_editor(scene: *mut std::ffi::c_void, entity_id: u64,
+                                                    out_x: *mut f32, out_y: *mut f32, out_z: *mut f32, out_w: *mut f32) {
+    if scene.is_null() || out_x.is_null() || out_y.is_null() || out_z.is_null() || out_w.is_null() {
+        return;
+    }
+    unsafe {
+        hezhou_core::scene_get_entity_rotation(scene as *mut hezhou_core::Scene, entity_id, out_x, out_y, out_z, out_w);
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn scene_get_entity_scale_editor(scene: *mut std::ffi::c_void, entity_id: u64,
+                                                 out_x: *mut f32, out_y: *mut f32, out_z: *mut f32) {
+    if scene.is_null() || out_x.is_null() || out_y.is_null() || out_z.is_null() {
+        return;
+    }
+    unsafe {
+        hezhou_core::scene_get_entity_scale(scene as *mut hezhou_core::Scene, entity_id, out_x, out_y, out_z);
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn scene_rotate_entity_editor(scene: *mut std::ffi::c_void, entity_id: u64, angle_degrees: f32) {
+    if scene.is_null() {
+        return;
+    }
+    unsafe {
+        hezhou_core::scene_rotate_entity(scene as *mut hezhou_core::Scene, entity_id, angle_degrees);
+    }
+}
+
 fn main() {
     let args: Vec<String> = std::env::args().collect();
     let screenshot_mode = args.iter().any(|a| a == "--screenshot");
@@ -337,6 +380,10 @@ ui_list_item_set_text: unsafe { std::mem::transmute(ui_ffi::ui_list_item_set_tex
         set_entity_transform: set_entity_transform,
         set_entity_angle: set_entity_angle,
         get_entity_angle: get_entity_angle,
+        scene_get_entity_position: scene_get_entity_position_editor,
+        scene_get_entity_rotation: scene_get_entity_rotation_editor,
+        scene_get_entity_scale: scene_get_entity_scale_editor,
+        scene_rotate_entity: scene_rotate_entity_editor,
         widget_tree_ptr: widget_tree_handle,
         dfx_handle: dfx_for_csharp as *mut std::ffi::c_void,
     };

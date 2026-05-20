@@ -174,6 +174,18 @@ namespace Hezhou
         
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public delegate float GetEntityAngleDelegate();
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void SceneGetEntityPositionDelegate(IntPtr scene, ulong entityId, out float x, out float y, out float z);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void SceneGetEntityRotationDelegate(IntPtr scene, ulong entityId, out float x, out float y, out float z, out float w);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void SceneGetEntityScaleDelegate(IntPtr scene, ulong entityId, out float x, out float y, out float z);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void SceneRotateEntityDelegate(IntPtr scene, ulong entityId, float angleDegrees);
 
         [StructLayout(LayoutKind.Sequential)]
         public struct FfiContext
@@ -240,6 +252,10 @@ namespace Hezhou
             public IntPtr set_entity_transform;
             public IntPtr set_entity_angle;
             public IntPtr get_entity_angle;
+            public IntPtr scene_get_entity_position;
+            public IntPtr scene_get_entity_rotation;
+            public IntPtr scene_get_entity_scale;
+            public IntPtr scene_rotate_entity;
             public IntPtr widget_tree_ptr;
             public IntPtr dfx_handle;
         }
@@ -826,6 +842,53 @@ public static void RegisterResizeCallback(ResizeCallbackDelegate callback)
             }
             var func = Marshal.GetDelegateForFunctionPointer<GetEntityAngleDelegate>(_ffi.get_entity_angle);
             return func();
+        }
+
+        public static void SceneGetEntityPosition(IntPtr scene, ulong entityId, out float x, out float y, out float z)
+        {
+            if (_ffi.scene_get_entity_position == IntPtr.Zero)
+            {
+                Log.Error("C#", "SceneGetEntityPosition函数指针为空");
+                x = 0; y = 0; z = 0;
+                return;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<SceneGetEntityPositionDelegate>(_ffi.scene_get_entity_position);
+            func(scene, entityId, out x, out y, out z);
+        }
+
+        public static void SceneGetEntityRotation(IntPtr scene, ulong entityId, out float x, out float y, out float z, out float w)
+        {
+            if (_ffi.scene_get_entity_rotation == IntPtr.Zero)
+            {
+                Log.Error("C#", "SceneGetEntityRotation函数指针为空");
+                x = 0; y = 0; z = 0; w = 1;
+                return;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<SceneGetEntityRotationDelegate>(_ffi.scene_get_entity_rotation);
+            func(scene, entityId, out x, out y, out z, out w);
+        }
+
+        public static void SceneGetEntityScale(IntPtr scene, ulong entityId, out float x, out float y, out float z)
+        {
+            if (_ffi.scene_get_entity_scale == IntPtr.Zero)
+            {
+                Log.Error("C#", "SceneGetEntityScale函数指针为空");
+                x = 1; y = 1; z = 1;
+                return;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<SceneGetEntityScaleDelegate>(_ffi.scene_get_entity_scale);
+            func(scene, entityId, out x, out y, out z);
+        }
+
+        public static void SceneRotateEntity(IntPtr scene, ulong entityId, float angleDegrees)
+        {
+            if (_ffi.scene_rotate_entity == IntPtr.Zero)
+            {
+                Log.Error("C#", "SceneRotateEntity函数指针为空");
+                return;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<SceneRotateEntityDelegate>(_ffi.scene_rotate_entity);
+            func(scene, entityId, angleDegrees);
         }
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]

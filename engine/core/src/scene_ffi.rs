@@ -220,3 +220,67 @@ pub extern "C" fn scene_entity_count(scene: *const Scene) -> u32 {
         (*scene).entity_count() as u32
     }
 }
+
+#[no_mangle]
+pub extern "C" fn scene_get_entity_position(scene: *const Scene, entity_id: u64, 
+                                             out_x: *mut f32, out_y: *mut f32, out_z: *mut f32) {
+    if scene.is_null() || out_x.is_null() || out_y.is_null() || out_z.is_null() {
+        return;
+    }
+    unsafe {
+        let entity = Entity::new(entity_id);
+        if let Some(pos) = (*scene).get_entity_position(entity) {
+            *out_x = pos.x;
+            *out_y = pos.y;
+            *out_z = pos.z;
+        }
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn scene_get_entity_rotation(scene: *const Scene, entity_id: u64,
+                                             out_x: *mut f32, out_y: *mut f32, out_z: *mut f32, out_w: *mut f32) {
+    if scene.is_null() || out_x.is_null() || out_y.is_null() || out_z.is_null() || out_w.is_null() {
+        return;
+    }
+    unsafe {
+        let entity = Entity::new(entity_id);
+        if let Some(rot) = (*scene).get_entity_rotation(entity) {
+            *out_x = rot.x;
+            *out_y = rot.y;
+            *out_z = rot.z;
+            *out_w = rot.w;
+        }
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn scene_get_entity_scale(scene: *const Scene, entity_id: u64,
+                                          out_x: *mut f32, out_y: *mut f32, out_z: *mut f32) {
+    if scene.is_null() || out_x.is_null() || out_y.is_null() || out_z.is_null() {
+        return;
+    }
+    unsafe {
+        let entity = Entity::new(entity_id);
+        if let Some(scale) = (*scene).get_entity_scale(entity) {
+            *out_x = scale.x;
+            *out_y = scale.y;
+            *out_z = scale.z;
+        }
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn scene_rotate_entity(scene: *mut Scene, entity_id: u64, angle_degrees: f32) {
+    if scene.is_null() {
+        return;
+    }
+    unsafe {
+        let entity = Entity::new(entity_id);
+        if let Some(mut transform) = (*scene).world.get_component::<LocalTransform>(entity) {
+            let rotation = crate::math::Quaternion::from_axis_angle(crate::math::Vec3::up(), angle_degrees.to_radians());
+            transform.rotation = rotation * transform.rotation;
+            (*scene).world.add_component(entity, transform);
+        }
+    }
+}
