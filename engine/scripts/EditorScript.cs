@@ -237,20 +237,21 @@ private static float _cameraYaw = 0f;
 
             _statusBar = new Panel(rootId, 0, statusY, _screenWidth, STATUS_BAR_HEIGHT, 0.12f, 0.12f, 0.12f, 1.0f);
             _statusItems = new List(_statusBar.Id, 0f, true);  // horizontal list
-            _statusItems.SetPosition(10f * _contentScale, 0f);
+            UI.SetWidgetLayout(_statusItems.Id, 10f * _contentScale, 0f, _screenWidth - 20f * _contentScale, STATUS_BAR_HEIGHT);
             
             float fontSize = 14f * _contentScale;
+            float itemHeight = STATUS_BAR_HEIGHT - 4f * _contentScale;  // 减去padding
             
             _fpsItem = _statusItems.AddItem("FPS: 0", false);
-            UI.SetWidgetLayout(_fpsItem.Id, 0f, 5f * _contentScale, 120f * _contentScale, 30f * _contentScale);
+            UI.SetWidgetLayout(_fpsItem.Id, 0f, 2f * _contentScale, 120f * _contentScale, itemHeight);
             UI.SetListItemFontSize(_fpsItem.Id, fontSize);
             
             _statusItem = _statusItems.AddItem("状态: 就绪", true);
-            UI.SetWidgetLayout(_statusItem.Id, 130f * _contentScale, 5f * _contentScale, 150f * _contentScale, 30f * _contentScale);
+            UI.SetWidgetLayout(_statusItem.Id, 130f * _contentScale, 2f * _contentScale, 150f * _contentScale, itemHeight);
             UI.SetListItemFontSize(_statusItem.Id, fontSize);
             
             _projectItem = _statusItems.AddItem("项目: 未命名", true);
-            UI.SetWidgetLayout(_projectItem.Id, 290f * _contentScale, 5f * _contentScale, 150f * _contentScale, 30f * _contentScale);
+            UI.SetWidgetLayout(_projectItem.Id, 290f * _contentScale, 2f * _contentScale, 150f * _contentScale, itemHeight);
             UI.SetListItemFontSize(_projectItem.Id, fontSize);
             
             Log.Info("Editor", "状态栏创建完成");
