@@ -99,6 +99,13 @@ private static float _cameraYaw = 0f;
 
         private static void OnMouseMove(float x, float y, bool dragging)
         {
+            // Running模式下PreviewWindow控制摄像机
+            if (_gameScene == null || _gameScene.GetGameState() != GameState.Running)
+            {
+                _mouseDragging = false;
+                return;
+            }
+            
             if (!dragging || !_previewSelected)
             {
                 _mouseDragging = false;
@@ -123,8 +130,6 @@ private static float _cameraYaw = 0f;
             
             if (_cameraPitch > 1.5f) _cameraPitch = 1.5f;
             if (_cameraPitch < -1.5f) _cameraPitch = -1.5f;
-            
-            
         }
 
         private static void OnKey(uint keycode, bool pressed, uint modifiers)
@@ -136,8 +141,10 @@ private static float _cameraYaw = 0f;
             const uint KEY_DOWN = 48;
             
             bool selected = UI.IsPreviewWindowSelected(_previewWindowId);
+            GameState currentState = _gameScene != null ? _gameScene.GetGameState() : GameState.Editing;
             
-            if (keycode == KEY_ESC && pressed && selected)
+            // ESC退出PreviewWindow选中（只在Running模式下）
+            if (keycode == KEY_ESC && pressed && selected && currentState == GameState.Running)
             {
                 UI.SetPreviewWindowSelected(_previewWindowId, false);
                 _cameraX = _savedCameraX;
@@ -342,7 +349,9 @@ private static float _cameraYaw = 0f;
                     if (selected != _previewSelected)
                     {
                         _previewSelected = selected;
-                        if (selected)
+                        
+                        // Running模式下保存摄像机状态
+                        if (selected && _gameScene != null && _gameScene.GetGameState() == GameState.Running)
                         {
                             _savedCameraX = _cameraX;
                             _savedCameraY = _cameraY;
@@ -350,11 +359,12 @@ private static float _cameraYaw = 0f;
                             _savedCameraYaw = _cameraYaw;
                             _savedCameraPitch = _cameraPitch;
                         }
+                        
                         UpdateStatusBar();
                     }
                     
-                    // Pass camera params to shader when preview is selected
-                    if (_previewSelected)
+                    // Pass camera params to shader when preview is selected AND running
+                    if (_previewSelected && _gameScene != null && _gameScene.GetGameState() == GameState.Running)
                     {
                         float speed = 2f * (deltaTime / 1000f);  // 2 units/sec
                         if (_keyLeftPressed) _cameraX -= speed;
@@ -365,14 +375,11 @@ private static float _cameraYaw = 0f;
                         UI.SetCameraParams(_cameraYaw, _cameraPitch, _cameraX, _cameraY, _cameraZ);
                         
                         // Update scene when running
-                        if (_gameScene != null && _gameScene.GetGameState() == GameState.Running)
-                        {
-                            _gameScene.Update(deltaTime / 1000f);
-                        }
+                        _gameScene.Update(deltaTime / 1000f);
                     }
                     else
                     {
-                        // Reset to default view when not selected
+                        // Editing mode or not selected: default camera
                         UI.SetCameraParams(0f, 0f, 0f, 0f, 3f);
                     }
                 }
@@ -576,48 +583,43 @@ private static float _cameraYaw = 0f;
             Log.Info("Editor", $"GlobalClick at ({x}, {y})");
             HideDropdownMenu();
             
-            // 检查是否点击了PreviewWindow
+            // Editing模式下PreviewWindow点击拾取Entity
             if (_previewWindowId != 0 && UI.IsPreviewWindowSelected(_previewWindowId))
             {
-                Log.Info("Editor", "PreviewWindow clicked - attempting entity pick");
+                GameState currentState = _gameScene != null ? _gameScene.GetGameState() : GameState.Editing;
                 
-                if (_gameScene != null)
+                if (currentState == GameState.Editing && _gameScene != null)
                 {
+                    Log.Info("Editor", "Editing mode - attempting entity pick");
+                    
                     // 将屏幕坐标转换为世界空间射线
-                    // PreviewWindow在屏幕中的位置和尺寸
                     float previewX = LEFT_PANEL_WIDTH + 10f * _contentScale;
                     float previewY = TOOLBAR_HEIGHT + 40f * _contentScale;
                     float previewWidth = _screenWidth - LEFT_PANEL_WIDTH - RIGHT_PANEL_WIDTH - 20f * _contentScale;
                     float previewHeight = _screenHeight - TOOLBAR_HEIGHT - STATUS_BAR_HEIGHT - BOTTOM_PANEL_HEIGHT - 50f * _contentScale;
                     
-                    // 计算点击在PreviewWindow内的相对位置（0-1）
                     float relX = (x - previewX) / previewWidth;
                     float relY = (y - previewY) / previewHeight;
                     
                     Log.Info("Editor", $"PreviewWindow relative click: ({relX}, {relY})");
                     
-                    // 转换为NDC坐标 (-1 to 1)
                     float ndcX = (relX - 0.5f) * 2.0f;
-                    float ndcY = (0.5f - relY) * 2.0f;  // Y轴翻转
+                    float ndcY = (0.5f - relY) * 2.0f;
                     
-                    // 计算射线方向（简化的视角：相机在(0, 0, 3)看向(0, 0, 0)）
-                    // TODO: 使用正确的相机参数计算射线
                     float aspect = previewWidth / previewHeight;
-                    float fov = 60.0f;  // 视场角60度
+                    float fov = 60.0f;
                     float tanFov = (float)Math.Tan(fov * 0.5f * Math.PI / 180.0f);
                     
                     float dirX = ndcX * tanFov * aspect;
                     float dirY = ndcY * tanFov;
-                    float dirZ = -1.0f;  // 相机看向-Z方向
+                    float dirZ = -1.0f;
                     
-                    // 射线起点（相机位置）
                     float originX = _cameraX;
                     float originY = _cameraY;
                     float originZ = _cameraZ;
                     
                     Log.Info("Editor", $"Ray: origin=({originX}, {originY}, {originZ}), dir=({dirX}, {dirY}, {dirZ})");
                     
-                    // 调用Scene.pick_entity
                     ulong hitEntity = _gameScene.PickEntity(originX, originY, originZ, dirX, dirY, dirZ);
                     
                     if (hitEntity != 0)
@@ -625,8 +627,6 @@ private static float _cameraYaw = 0f;
                         Log.Info("Editor", $"Entity picked: id={hitEntity}");
                         _gameScene.SelectEntity(hitEntity);
                         _statusItem.Text = $"选中Entity: {hitEntity}";
-                        
-                        // 更新属性面板显示Entity信息
                         UpdatePropertiesPanel(hitEntity);
                     }
                     else
@@ -635,6 +635,10 @@ private static float _cameraYaw = 0f;
                         _gameScene.ClearSelection();
                         _statusItem.Text = "状态: 就绪";
                     }
+                }
+                else
+                {
+                    Log.Info("Editor", "Running mode - camera control");
                 }
             }
         }
