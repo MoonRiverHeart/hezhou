@@ -268,7 +268,7 @@ private static float _cameraYaw = 0f;
             
             // 设置Game Pass渲染尺寸匹配PreviewWindow（避免拉伸变形）
             UI.SetGamePreviewExtent((uint)previewWindowWidth, (uint)previewWindowHeight);
-            Log.Info("Editor", $"游戏预览面板创建完成: {previewWindowWidth}x{previewWindowHeight}");
+            Log.Info("Editor", $"游戏预览面板创建完成: PreviewWindow={previewWindowWidth}x{previewWindowHeight}, aspect={previewWindowWidth/previewWindowHeight:F2}");
 
             _propertiesPanel = new Panel(rootId, _screenWidth - RIGHT_PANEL_WIDTH, mainY, RIGHT_PANEL_WIDTH, mainHeight + BOTTOM_PANEL_HEIGHT, 0.2f, 0.2f, 0.2f, 1.0f);
             UI.CreateLabel(_propertiesPanel.Id, 10f, 10f, RIGHT_PANEL_WIDTH - 20f, 25f, "属性编辑");

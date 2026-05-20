@@ -699,7 +699,7 @@ p_rasterization_state: &vk::PipelineRasterizationStateCreateInfo {
                 p_push_constant_ranges: &vk::PushConstantRange {
                     stage_flags: vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT,
                     offset: 0,
-                    size: 56, // rotation + scale + color(RGBA) + width + height + yaw + pitch + x + y + z (14 floats)
+                    size: 52, // rotation + scale + color(RGBA) + width + height + yaw + pitch + x + y + z (13 floats)
                 },
                 ..Default::default()
             }, None).map_err(|e| format!("Failed to create game pipeline layout: {}", e))?;
