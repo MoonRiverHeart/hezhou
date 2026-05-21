@@ -232,6 +232,15 @@ pub fn run() {
         scene_get_entity_count: scene_ffi_impl::scene_get_entity_count_editor,
         scene_get_entity_id: scene_ffi_impl::scene_get_entity_id_editor,
         scene_remove_entity: scene_ffi_impl::scene_remove_entity_editor,
+        ui_entity_get_property_count: scene_ffi_impl::ui_entity_get_property_count_editor,
+        ui_entity_get_property_name: scene_ffi_impl::ui_entity_get_property_name_editor,
+        ui_entity_get_property_type: scene_ffi_impl::ui_entity_get_property_type_editor,
+        ui_entity_get_property_category: scene_ffi_impl::ui_entity_get_property_category_editor,
+        ui_entity_get_property_read_only: scene_ffi_impl::ui_entity_get_property_read_only_editor,
+        ui_entity_get_property_value_float3: scene_ffi_impl::ui_entity_get_property_value_float3_editor,
+        ui_entity_set_property_value_float3: scene_ffi_impl::ui_entity_set_property_value_float3_editor,
+        ui_entity_get_property_value_string: scene_ffi_impl::ui_entity_get_property_value_string_editor,
+        ui_entity_set_property_value_string: scene_ffi_impl::ui_entity_set_property_value_string_editor,
         widget_tree_ptr: widget_tree_handle,
         dfx_handle: dfx_for_csharp as *mut std::ffi::c_void,
         dfx_log: unsafe { std::mem::transmute(hezhou_dfx::dfx_log as *const std::ffi::c_void) },
@@ -271,6 +280,14 @@ pub fn run() {
     dfx_trace_end!("Mono", "initialize");
     dfx_trace_end!("Startup", "editor");
     dfx_info!("Demo", "编辑器UI创建成功!");
+    
+    // Connect Scene to renderer for multi-entity rendering
+    unsafe {
+        if let Some(scene_ptr) = SCENE {
+            renderer.set_scene(scene_ptr);
+            dfx_info!("Demo", "Scene connected to renderer: ptr={:?}", scene_ptr);
+        }
+    }
 
     let screenshot_path = if screenshot_mode {
         args.iter().position(|a| a == "--output")

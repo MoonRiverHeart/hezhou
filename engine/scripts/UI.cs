@@ -494,6 +494,33 @@ namespace Hezhou
         public delegate void SceneRemoveEntityDelegate(IntPtr scene, ulong entityId);
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate uint EntityGetPropertyCountDelegate();
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate IntPtr EntityGetPropertyNameDelegate(uint index);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate uint EntityGetPropertyTypeDelegate(uint index);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate IntPtr EntityGetPropertyCategoryDelegate(uint index);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate bool EntityGetPropertyReadOnlyDelegate(uint index);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate bool EntityGetPropertyValueFloat3Delegate(IntPtr scene, ulong entityId, IntPtr propertyName, out float x, out float y, out float z);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate bool EntitySetPropertyValueFloat3Delegate(IntPtr scene, ulong entityId, IntPtr propertyName, float x, float y, float z);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate uint EntityGetPropertyValueStringDelegate(IntPtr scene, ulong entityId, IntPtr propertyName, IntPtr outBuf, uint bufLen);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate bool EntitySetPropertyValueStringDelegate(IntPtr scene, ulong entityId, IntPtr propertyName, IntPtr value);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public delegate int AssetLibraryGetCategoryCountDelegate();
         
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
@@ -726,6 +753,15 @@ namespace Hezhou
             public IntPtr scene_get_entity_count;
             public IntPtr scene_get_entity_id;
             public IntPtr scene_remove_entity;
+            public IntPtr ui_entity_get_property_count;
+            public IntPtr ui_entity_get_property_name;
+            public IntPtr ui_entity_get_property_type;
+            public IntPtr ui_entity_get_property_category;
+            public IntPtr ui_entity_get_property_read_only;
+            public IntPtr ui_entity_get_property_value_float3;
+            public IntPtr ui_entity_set_property_value_float3;
+            public IntPtr ui_entity_get_property_value_string;
+            public IntPtr ui_entity_set_property_value_string;
             public IntPtr widget_tree_ptr;
             public IntPtr dfx_handle;
             public IntPtr dfx_log;
@@ -891,6 +927,126 @@ public static void RegisterResizeCallback(ResizeCallbackDelegate callback)
             
             var func = Marshal.GetDelegateForFunctionPointer<RegisterUpdateDelegate>(_ffi.ui_register_update_thunk_ptr);
             func(callbackPtr);
+        }
+
+        // Property reflection API
+        public static uint EntityGetPropertyCount()
+        {
+            if (_ffi.ui_entity_get_property_count == IntPtr.Zero)
+            {
+                Log.Error("C#", "EntityGetPropertyCount函数指针为空");
+                return 0;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<EntityGetPropertyCountDelegate>(_ffi.ui_entity_get_property_count);
+            return func();
+        }
+
+        public static string EntityGetPropertyName(uint index)
+        {
+            if (_ffi.ui_entity_get_property_name == IntPtr.Zero)
+            {
+                Log.Error("C#", "EntityGetPropertyName函数指针为空");
+                return "";
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<EntityGetPropertyNameDelegate>(_ffi.ui_entity_get_property_name);
+            IntPtr namePtr = func(index);
+            return namePtr != IntPtr.Zero ? Marshal.PtrToStringAnsi(namePtr) ?? "" : "";
+        }
+
+        public static uint EntityGetPropertyType(uint index)
+        {
+            if (_ffi.ui_entity_get_property_type == IntPtr.Zero)
+            {
+                Log.Error("C#", "EntityGetPropertyType函数指针为空");
+                return 0;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<EntityGetPropertyTypeDelegate>(_ffi.ui_entity_get_property_type);
+            return func(index);
+        }
+
+        public static string EntityGetPropertyCategory(uint index)
+        {
+            if (_ffi.ui_entity_get_property_category == IntPtr.Zero)
+            {
+                Log.Error("C#", "EntityGetPropertyCategory函数指针为空");
+                return "";
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<EntityGetPropertyCategoryDelegate>(_ffi.ui_entity_get_property_category);
+            IntPtr catPtr = func(index);
+            return catPtr != IntPtr.Zero ? Marshal.PtrToStringAnsi(catPtr) ?? "" : "";
+        }
+
+        public static bool EntityGetPropertyReadOnly(uint index)
+        {
+            if (_ffi.ui_entity_get_property_read_only == IntPtr.Zero)
+            {
+                Log.Error("C#", "EntityGetPropertyReadOnly函数指针为空");
+                return true;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<EntityGetPropertyReadOnlyDelegate>(_ffi.ui_entity_get_property_read_only);
+            return func(index);
+        }
+
+        public static bool EntityGetPropertyValueFloat3(IntPtr scene, ulong entityId, string propertyName, out float x, out float y, out float z)
+        {
+            if (_ffi.ui_entity_get_property_value_float3 == IntPtr.Zero)
+            {
+                Log.Error("C#", "EntityGetPropertyValueFloat3函数指针为空");
+                x = 0; y = 0; z = 0;
+                return false;
+            }
+            IntPtr namePtr = Marshal.StringToHGlobalAnsi(propertyName);
+            var func = Marshal.GetDelegateForFunctionPointer<EntityGetPropertyValueFloat3Delegate>(_ffi.ui_entity_get_property_value_float3);
+            bool result = func(scene, entityId, namePtr, out x, out y, out z);
+            Marshal.FreeHGlobal(namePtr);
+            return result;
+        }
+
+        public static bool EntitySetPropertyValueFloat3(IntPtr scene, ulong entityId, string propertyName, float x, float y, float z)
+        {
+            if (_ffi.ui_entity_set_property_value_float3 == IntPtr.Zero)
+            {
+                Log.Error("C#", "EntitySetPropertyValueFloat3函数指针为空");
+                return false;
+            }
+            IntPtr namePtr = Marshal.StringToHGlobalAnsi(propertyName);
+            var func = Marshal.GetDelegateForFunctionPointer<EntitySetPropertyValueFloat3Delegate>(_ffi.ui_entity_set_property_value_float3);
+            bool result = func(scene, entityId, namePtr, x, y, z);
+            Marshal.FreeHGlobal(namePtr);
+            return result;
+        }
+
+        public static string EntityGetPropertyValueString(IntPtr scene, ulong entityId, string propertyName)
+        {
+            if (_ffi.ui_entity_get_property_value_string == IntPtr.Zero)
+            {
+                Log.Error("C#", "EntityGetPropertyValueString函数指针为空");
+                return "";
+            }
+            IntPtr namePtr = Marshal.StringToHGlobalAnsi(propertyName);
+            IntPtr buffer = Marshal.AllocHGlobal(256);
+            var func = Marshal.GetDelegateForFunctionPointer<EntityGetPropertyValueStringDelegate>(_ffi.ui_entity_get_property_value_string);
+            uint len = func(scene, entityId, namePtr, buffer, 256);
+            Marshal.FreeHGlobal(namePtr);
+            string result = len > 0 ? Marshal.PtrToStringAnsi(buffer, (int)len) ?? "" : "";
+            Marshal.FreeHGlobal(buffer);
+            return result;
+        }
+
+        public static bool EntitySetPropertyValueString(IntPtr scene, ulong entityId, string propertyName, string value)
+        {
+            if (_ffi.ui_entity_set_property_value_string == IntPtr.Zero)
+            {
+                Log.Error("C#", "EntitySetPropertyValueString函数指针为空");
+                return false;
+            }
+            IntPtr namePtr = Marshal.StringToHGlobalAnsi(propertyName);
+            IntPtr valuePtr = Marshal.StringToHGlobalAnsi(value);
+            var func = Marshal.GetDelegateForFunctionPointer<EntitySetPropertyValueStringDelegate>(_ffi.ui_entity_set_property_value_string);
+            bool result = func(scene, entityId, namePtr, valuePtr);
+            Marshal.FreeHGlobal(namePtr);
+            Marshal.FreeHGlobal(valuePtr);
+            return result;
         }
     }
 }

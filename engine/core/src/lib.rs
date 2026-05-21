@@ -4,6 +4,7 @@ pub mod ffi;
 pub mod math;
 pub mod time_loop;
 pub mod scene_ffi;
+pub mod property_ffi;
 pub mod asset_library;
 pub mod project;
 pub mod asset_ffi;
@@ -13,6 +14,7 @@ pub use event::*;
 pub use math::*;
 pub use time_loop::*;
 pub use scene_ffi::*;
+pub use property_ffi::*;
 pub use asset_library::*;
 pub use project::*;
 

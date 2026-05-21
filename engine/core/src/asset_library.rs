@@ -18,7 +18,7 @@ impl Default for AssetType {
 }
 
 #[repr(C)]
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum MeshType {
     Cube = 0,
     Sphere = 1,

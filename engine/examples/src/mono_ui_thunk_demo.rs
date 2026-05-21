@@ -48,6 +48,16 @@ pub extern "C" fn scene_create_entity_stub(_scene: *mut std::ffi::c_void) -> u64
 pub extern "C" fn scene_remove_entity_stub(_scene: *mut std::ffi::c_void, _entity_id: u64) { }
 pub extern "C" fn scene_get_entity_count_stub(_scene: *mut std::ffi::c_void) -> u64 { 0 }
 pub extern "C" fn scene_get_entity_id_stub(_scene: *mut std::ffi::c_void, _index: u64) -> u64 { 0 }
+// Property reflection stubs
+pub extern "C" fn ui_entity_get_property_count_stub() -> u32 { 0 }
+pub extern "C" fn ui_entity_get_property_name_stub(_index: u32) -> *const std::ffi::c_char { std::ptr::null() }
+pub extern "C" fn ui_entity_get_property_type_stub(_index: u32) -> u32 { 0 }
+pub extern "C" fn ui_entity_get_property_category_stub(_index: u32) -> *const std::ffi::c_char { std::ptr::null() }
+pub extern "C" fn ui_entity_get_property_read_only_stub(_index: u32) -> bool { true }
+pub extern "C" fn ui_entity_get_property_value_float3_stub(_scene: *mut std::ffi::c_void, _id: u64, _name: *const std::ffi::c_char, _x: *mut f32, _y: *mut f32, _z: *mut f32) -> bool { false }
+pub extern "C" fn ui_entity_set_property_value_float3_stub(_scene: *mut std::ffi::c_void, _id: u64, _name: *const std::ffi::c_char, _x: f32, _y: f32, _z: f32) -> bool { false }
+pub extern "C" fn ui_entity_get_property_value_string_stub(_scene: *mut std::ffi::c_void, _id: u64, _name: *const std::ffi::c_char, _buf: *mut std::ffi::c_char, _len: u32) -> u32 { 0 }
+pub extern "C" fn ui_entity_set_property_value_string_stub(_scene: *mut std::ffi::c_void, _id: u64, _name: *const std::ffi::c_char, _val: *const std::ffi::c_char) -> bool { false }
 pub extern "C" fn set_status_text_stub(_text: *const i8) {}
 pub extern "C" fn on_hot_reload_complete_stub() {}
 
@@ -238,6 +248,15 @@ fn main() {
         scene_get_entity_count: scene_get_entity_count_stub,
         scene_get_entity_id: scene_get_entity_id_stub,
         scene_remove_entity: scene_remove_entity_stub,
+        ui_entity_get_property_count: ui_entity_get_property_count_stub,
+        ui_entity_get_property_name: ui_entity_get_property_name_stub,
+        ui_entity_get_property_type: ui_entity_get_property_type_stub,
+        ui_entity_get_property_category: ui_entity_get_property_category_stub,
+        ui_entity_get_property_read_only: ui_entity_get_property_read_only_stub,
+        ui_entity_get_property_value_float3: ui_entity_get_property_value_float3_stub,
+        ui_entity_set_property_value_float3: ui_entity_set_property_value_float3_stub,
+        ui_entity_get_property_value_string: ui_entity_get_property_value_string_stub,
+        ui_entity_set_property_value_string: ui_entity_set_property_value_string_stub,
         widget_tree_ptr: widget_tree_handle,
         dfx_handle: std::ptr::null_mut(),
         dfx_log: unsafe { std::mem::transmute(hezhou_dfx::dfx_log as *const std::ffi::c_void) },
@@ -246,6 +265,8 @@ fn main() {
         set_status_text: set_status_text_stub,
         on_hot_reload_complete: on_hot_reload_complete_stub,
         ui_debug_print_widget_tree: unsafe { std::mem::transmute(ui_ffi::ui_debug_print_widget_tree as *const std::ffi::c_void) },
+        ui_widget_set_flex_expand: unsafe { std::mem::transmute(ui_ffi::ui_widget_set_flex_expand as *const std::ffi::c_void) },
+        ui_widget_set_cross_axis_fill: unsafe { std::mem::transmute(ui_ffi::ui_widget_set_cross_axis_fill as *const std::ffi::c_void) },
     };
     hezhou_scripting::ffi_context::set_ffi_context(ffi_ctx);
     let ffi_ptr = hezhou_scripting::ffi_context::get_ffi_context_ptr();

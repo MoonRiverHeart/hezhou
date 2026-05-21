@@ -1,10 +1,15 @@
 using System;
+using System.IO;
 using System.Collections.Generic;
 
 namespace Hezhou
 {
     public static partial class EditorScript
     {
+        // =====================================================
+        // VIEW: UI Creation and Layout Methods
+        // =====================================================
+
         private static void CreateEditorLayout()
         {
             _gameScene = new Scene();
@@ -80,17 +85,6 @@ namespace Hezhou
             UI.SetGamePreviewExtent((uint)previewWindowWidth, (uint)previewWindowHeight);
             Log.Info("Editor", $"游戏预览面板创建完成: PreviewWindow={previewWindowWidth}x{previewWindowHeight}, aspect={previewWindowWidth/previewWindowHeight:F2}");
 
-            _nameInputCallback = OnNameInputChange;
-            _posXInputCallback = OnPosXInputChange;
-            _posYInputCallback = OnPosYInputChange;
-            _posZInputCallback = OnPosZInputChange;
-            _rotXInputCallback = OnRotXInputChange;
-            _rotYInputCallback = OnRotYInputChange;
-            _rotZInputCallback = OnRotZInputChange;
-            _scaleXInputCallback = OnScaleXInputChange;
-            _scaleYInputCallback = OnScaleYInputChange;
-            _scaleZInputCallback = OnScaleZInputChange;
-            
             _propertiesPanel = new Panel(rootId, _screenWidth - RIGHT_PANEL_WIDTH, mainY, RIGHT_PANEL_WIDTH, mainHeight + BOTTOM_PANEL_HEIGHT, 0.2f, 0.2f, 0.2f, 1.0f);
             UI.CreateLabel(_propertiesPanel.Id, 10f, 10f, RIGHT_PANEL_WIDTH - 20f, 25f, "属性编辑");
             
@@ -100,46 +94,7 @@ namespace Hezhou
             _propsTabWidget = new TabWidget(_propertiesPanel.Id, 10f, tabWidgetY, RIGHT_PANEL_WIDTH - 20f, tabWidgetHeight);
             
             _transformTabContentId = UI.CreateVStack(_propsTabWidget.Id, 5f);
-            UI.CreateLabel(_transformTabContentId, RIGHT_PANEL_WIDTH - 40f, 20f, "Entity:");
-            _nameInputFieldId = UI.CreateInputField(_transformTabContentId, RIGHT_PANEL_WIDTH - 40f, 25f);
-            UI.InputFieldSetPlaceholder(_nameInputFieldId, "Entity Name");
-            UI.InputFieldSetOnChange(_nameInputFieldId, _nameInputCallback);
-            
-            UI.CreateLabel(_transformTabContentId, RIGHT_PANEL_WIDTH - 40f, 20f, "Position:");
-            var posHStack = UI.CreateHStack(_transformTabContentId, 5f);
-            _posXInputFieldId = UI.CreateInputField(posHStack, 70f, 25f);
-            UI.InputFieldSetPlaceholder(_posXInputFieldId, "X");
-            UI.InputFieldSetOnChange(_posXInputFieldId, _posXInputCallback);
-            _posYInputFieldId = UI.CreateInputField(posHStack, 70f, 25f);
-            UI.InputFieldSetPlaceholder(_posYInputFieldId, "Y");
-            UI.InputFieldSetOnChange(_posYInputFieldId, _posYInputCallback);
-            _posZInputFieldId = UI.CreateInputField(posHStack, 70f, 25f);
-            UI.InputFieldSetPlaceholder(_posZInputFieldId, "Z");
-            UI.InputFieldSetOnChange(_posZInputFieldId, _posZInputCallback);
-            
-            UI.CreateLabel(_transformTabContentId, RIGHT_PANEL_WIDTH - 40f, 20f, "Rotation:");
-            var rotHStack = UI.CreateHStack(_transformTabContentId, 5f);
-            _rotXInputFieldId = UI.CreateInputField(rotHStack, 70f, 25f);
-            UI.InputFieldSetPlaceholder(_rotXInputFieldId, "X");
-            UI.InputFieldSetOnChange(_rotXInputFieldId, _rotXInputCallback);
-            _rotYInputFieldId = UI.CreateInputField(rotHStack, 70f, 25f);
-            UI.InputFieldSetPlaceholder(_rotYInputFieldId, "Y");
-            UI.InputFieldSetOnChange(_rotYInputFieldId, _rotYInputCallback);
-            _rotZInputFieldId = UI.CreateInputField(rotHStack, 70f, 25f);
-            UI.InputFieldSetPlaceholder(_rotZInputFieldId, "Z");
-            UI.InputFieldSetOnChange(_rotZInputFieldId, _rotZInputCallback);
-            
-            UI.CreateLabel(_transformTabContentId, RIGHT_PANEL_WIDTH - 40f, 20f, "Scale:");
-            var scaleHStack = UI.CreateHStack(_transformTabContentId, 5f);
-            _scaleXInputFieldId = UI.CreateInputField(scaleHStack, 70f, 25f);
-            UI.InputFieldSetPlaceholder(_scaleXInputFieldId, "X");
-            UI.InputFieldSetOnChange(_scaleXInputFieldId, _scaleXInputCallback);
-            _scaleYInputFieldId = UI.CreateInputField(scaleHStack, 70f, 25f);
-            UI.InputFieldSetPlaceholder(_scaleYInputFieldId, "Y");
-            UI.InputFieldSetOnChange(_scaleYInputFieldId, _scaleYInputCallback);
-            _scaleZInputFieldId = UI.CreateInputField(scaleHStack, 70f, 25f);
-            UI.InputFieldSetPlaceholder(_scaleZInputFieldId, "Z");
-            UI.InputFieldSetOnChange(_scaleZInputFieldId, _scaleZInputCallback);
+            BuildDynamicPropertyPanel(_transformTabContentId);
             
             _scriptsTabContentId = UI.CreateVStack(_propsTabWidget.Id, 5f);
             
@@ -298,46 +253,7 @@ namespace Hezhou
                 _propsTabWidget = new TabWidget(_propertiesPanel.Id, 10f, tabWidgetY, RIGHT_PANEL_WIDTH - 20f, tabWidgetHeight);
                 
                 _transformTabContentId = UI.CreateVStack(_propsTabWidget.Id, 5f);
-                UI.CreateLabel(_transformTabContentId, RIGHT_PANEL_WIDTH - 40f, 20f, "Entity:");
-                _nameInputFieldId = UI.CreateInputField(_transformTabContentId, RIGHT_PANEL_WIDTH - 40f, 25f);
-                UI.InputFieldSetPlaceholder(_nameInputFieldId, "Entity Name");
-                UI.InputFieldSetOnChange(_nameInputFieldId, _nameInputCallback);
-                
-                UI.CreateLabel(_transformTabContentId, RIGHT_PANEL_WIDTH - 40f, 20f, "Position:");
-                var posHStack = UI.CreateHStack(_transformTabContentId, 5f);
-                _posXInputFieldId = UI.CreateInputField(posHStack, 70f, 25f);
-                UI.InputFieldSetPlaceholder(_posXInputFieldId, "X");
-                UI.InputFieldSetOnChange(_posXInputFieldId, _posXInputCallback);
-                _posYInputFieldId = UI.CreateInputField(posHStack, 70f, 25f);
-                UI.InputFieldSetPlaceholder(_posYInputFieldId, "Y");
-                UI.InputFieldSetOnChange(_posYInputFieldId, _posYInputCallback);
-                _posZInputFieldId = UI.CreateInputField(posHStack, 70f, 25f);
-                UI.InputFieldSetPlaceholder(_posZInputFieldId, "Z");
-                UI.InputFieldSetOnChange(_posZInputFieldId, _posZInputCallback);
-                
-                UI.CreateLabel(_transformTabContentId, RIGHT_PANEL_WIDTH - 40f, 20f, "Rotation:");
-                var rotHStack = UI.CreateHStack(_transformTabContentId, 5f);
-                _rotXInputFieldId = UI.CreateInputField(rotHStack, 70f, 25f);
-                UI.InputFieldSetPlaceholder(_rotXInputFieldId, "X");
-                UI.InputFieldSetOnChange(_rotXInputFieldId, _rotXInputCallback);
-                _rotYInputFieldId = UI.CreateInputField(rotHStack, 70f, 25f);
-                UI.InputFieldSetPlaceholder(_rotYInputFieldId, "Y");
-                UI.InputFieldSetOnChange(_rotYInputFieldId, _rotYInputCallback);
-                _rotZInputFieldId = UI.CreateInputField(rotHStack, 70f, 25f);
-                UI.InputFieldSetPlaceholder(_rotZInputFieldId, "Z");
-                UI.InputFieldSetOnChange(_rotZInputFieldId, _rotZInputCallback);
-                
-                UI.CreateLabel(_transformTabContentId, RIGHT_PANEL_WIDTH - 40f, 20f, "Scale:");
-                var scaleHStack = UI.CreateHStack(_transformTabContentId, 5f);
-                _scaleXInputFieldId = UI.CreateInputField(scaleHStack, 70f, 25f);
-                UI.InputFieldSetPlaceholder(_scaleXInputFieldId, "X");
-                UI.InputFieldSetOnChange(_scaleXInputFieldId, _scaleXInputCallback);
-                _scaleYInputFieldId = UI.CreateInputField(scaleHStack, 70f, 25f);
-                UI.InputFieldSetPlaceholder(_scaleYInputFieldId, "Y");
-                UI.InputFieldSetOnChange(_scaleYInputFieldId, _scaleYInputCallback);
-                _scaleZInputFieldId = UI.CreateInputField(scaleHStack, 70f, 25f);
-                UI.InputFieldSetPlaceholder(_scaleZInputFieldId, "Z");
-                UI.InputFieldSetOnChange(_scaleZInputFieldId, _scaleZInputCallback);
+                BuildDynamicPropertyPanel(_transformTabContentId);
                 
                 _scriptsTabContentId = UI.CreateVStack(_propsTabWidget.Id, 5f);
                 
@@ -480,6 +396,288 @@ namespace Hezhou
             }
             
             Log.Info("Editor", "脚本编辑器隐藏");
+        }
+
+        // === Property Panel UI Creation ===
+
+        private static void BuildDynamicPropertyPanel(ulong parentContainerId)
+        {
+            _propertyDescriptors.Clear();
+            _propertyCallbacks.Clear();
+            _propertyInputFieldCallbacks.Clear();
+            
+            uint propCount = UI.EntityGetPropertyCount();
+            Log.Info("Editor", "Building dynamic property panel: " + propCount + " properties");
+            
+            for (uint i = 0; i < propCount; i++)
+            {
+                string name = UI.EntityGetPropertyName(i);
+                uint type = UI.EntityGetPropertyType(i);
+                string category = UI.EntityGetPropertyCategory(i);
+                bool readOnly = UI.EntityGetPropertyReadOnly(i);
+                
+                PropertyDescriptor desc = new PropertyDescriptor();
+                desc.Name = name;
+                desc.Type = type;
+                desc.Category = category;
+                desc.ReadOnly = readOnly;
+                
+                // Capitalize first letter for display
+                string displayName = name.Length > 0 ? name.Substring(0, 1).ToUpper() + name.Substring(1) : name;
+                
+                if (type == 1) // Float3
+                {
+                    desc.LabelId = UI.CreateLabel(parentContainerId, RIGHT_PANEL_WIDTH - 40f, 20f, displayName + ":");
+                    ulong hStackId = UI.CreateHStack(parentContainerId, 5f);
+                    desc.WidgetIds = new ulong[3];
+                    
+                    string[] axisLabels = new string[] { "X", "Y", "Z" };
+                    for (int j = 0; j < 3; j++)
+                    {
+                        ulong inputId = UI.CreateInputField(hStackId, 70f, 25f);
+                        UI.InputFieldSetPlaceholder(inputId, axisLabels[j]);
+                        
+                        // Capture property name and component index for callback
+                        string propName = name;
+                        int compIdx = j;
+                        
+                        PropertyChangeCallback pcb = delegate(ulong wid, string txt) {
+                            HandleFloat3ComponentChange(propName, compIdx, wid, txt);
+                        };
+                        _propertyCallbacks[inputId] = pcb;
+                        
+                        UI.InputFieldChangeCallbackDelegate ifcb = delegate(ulong wid, string txt) {
+                            HandleFloat3ComponentChange(propName, compIdx, wid, txt);
+                        };
+                        _propertyInputFieldCallbacks[inputId] = ifcb;
+                        UI.InputFieldSetOnChange(inputId, ifcb);
+                        
+                        desc.WidgetIds[j] = inputId;
+                    }
+                }
+                else if (type == 2) // String
+                {
+                    desc.LabelId = UI.CreateLabel(parentContainerId, RIGHT_PANEL_WIDTH - 40f, 20f, displayName + ":");
+                    
+                    if (readOnly)
+                    {
+                        ulong valueLabelId = UI.CreateLabel(parentContainerId, RIGHT_PANEL_WIDTH - 40f, 20f, "");
+                        desc.WidgetIds = new ulong[] { valueLabelId };
+                    }
+                    else
+                    {
+                        ulong inputId = UI.CreateInputField(parentContainerId, RIGHT_PANEL_WIDTH - 40f, 25f);
+                        UI.InputFieldSetPlaceholder(inputId, displayName);
+                        
+                        string propName = name;
+                        
+                        PropertyChangeCallback pcb = delegate(ulong wid, string txt) {
+                            HandleStringPropertyChange(propName, wid, txt);
+                        };
+                        _propertyCallbacks[inputId] = pcb;
+                        
+                        UI.InputFieldChangeCallbackDelegate ifcb = delegate(ulong wid, string txt) {
+                            pcb(wid, txt);
+                        };
+                        _propertyInputFieldCallbacks[inputId] = ifcb;
+                        UI.InputFieldSetOnChange(inputId, ifcb);
+                        
+                        desc.WidgetIds = new ulong[] { inputId };
+                    }
+                }
+                else if (type == 4) // Int
+                {
+                    desc.LabelId = UI.CreateLabel(parentContainerId, RIGHT_PANEL_WIDTH - 40f, 20f, displayName + ":");
+                    
+                    if (readOnly)
+                    {
+                        ulong valueLabelId = UI.CreateLabel(parentContainerId, RIGHT_PANEL_WIDTH - 40f, 20f, "");
+                        desc.WidgetIds = new ulong[] { valueLabelId };
+                    }
+                    else
+                    {
+                        ulong inputId = UI.CreateInputField(parentContainerId, RIGHT_PANEL_WIDTH - 40f, 25f);
+                        UI.InputFieldSetPlaceholder(inputId, displayName);
+                        
+                        string propName = name;
+                        
+                        PropertyChangeCallback pcb = delegate(ulong wid, string txt) {
+                            HandleIntPropertyChange(propName, wid, txt);
+                        };
+                        _propertyCallbacks[inputId] = pcb;
+                        
+                        UI.InputFieldChangeCallbackDelegate ifcb = delegate(ulong wid, string txt) {
+                            pcb(wid, txt);
+                        };
+                        _propertyInputFieldCallbacks[inputId] = ifcb;
+                        UI.InputFieldSetOnChange(inputId, ifcb);
+                        
+                        desc.WidgetIds = new ulong[] { inputId };
+                    }
+                }
+                else
+                {
+                    // Unsupported property type (Float=0, Bool=3, Enum=5) - skip for now
+                    desc.LabelId = 0;
+                    desc.WidgetIds = new ulong[0];
+                    Log.Info("Editor", "Skipping unsupported property type: " + name + " (type=" + type + ")");
+                }
+                
+                _propertyDescriptors.Add(desc);
+            }
+            
+            Log.Info("Editor", "Dynamic property panel built: " + _propertyDescriptors.Count + " descriptors");
+        }
+
+        // === Project Structure Tree UI Creation ===
+
+        private static void CreateProjectStructureTree()
+        {
+            float mainHeight = _screenHeight - TOOLBAR_HEIGHT - STATUS_BAR_HEIGHT - BOTTOM_PANEL_HEIGHT;
+            _projectTreeViewId = UI.CreateTreeView(_projectPanel.Id, 10, 40, LEFT_PANEL_WIDTH - 20, mainHeight - 50);
+            
+            _assetsNodeId = UI.TreeViewAddNode(_projectTreeViewId, 0, "Assets", 0, true);
+            _scenesNodeId = UI.TreeViewAddNode(_projectTreeViewId, 0, "Scenes", 0, true);
+            _scriptsNodeId = UI.TreeViewAddNode(_projectTreeViewId, 0, "Scripts", 0, true);
+            _entitiesNodeId = UI.TreeViewAddNode(_projectTreeViewId, 0, "Entities", 0, true);
+            
+            foreach (var script in _availableScripts)
+            {
+                UI.TreeViewAddNode(_projectTreeViewId, _scriptsNodeId, script, 0, false);
+            }
+            
+            if (_gameScene != null)
+            {
+                int entityCount = _gameScene.GetEntityCount();
+                for (int i = 0; i < entityCount; i++)
+                {
+                    ulong entityId = _gameScene.GetEntityId(i);
+                    string name = UI.SceneGetEntityName(_gameScene.ScenePtr, entityId);
+                    ulong nodeId = UI.TreeViewAddNode(_projectTreeViewId, _entitiesNodeId, name, entityId, false);
+                    _entityNodeMap[entityId] = nodeId;
+                }
+            }
+            
+            UI.TreeViewSetOnSelect(_projectTreeViewId, _treeNodeSelectCallback);
+            UI.TreeViewExpandNode(_projectTreeViewId, _assetsNodeId);
+            UI.TreeViewExpandNode(_projectTreeViewId, _scenesNodeId);
+            UI.TreeViewExpandNode(_projectTreeViewId, _scriptsNodeId);
+            UI.TreeViewExpandNode(_projectTreeViewId, _entitiesNodeId);
+            
+            Log.Info("Editor", $"项目结构树创建完成: entities={_entityNodeMap.Count}");
+        }
+
+        // === Asset Grid View UI Creation ===
+
+        private static void CreateAssetGridView()
+        {
+            _assetGridViewId = UI.CreateGridView(_assetPanel.Id, 10, 40, LEFT_PANEL_WIDTH - 20, BOTTOM_PANEL_HEIGHT - 50, 64);
+            RefreshAssetGridView();
+            UI.GridViewSetOnClick(_assetGridViewId, _gridViewClickCallback);
+            Log.Info("Editor", "资产GridView创建完成");
+        }
+
+        // === Toolbar Menus UI Creation ===
+
+        private static void CreateToolbarMenus()
+        {
+            _fileMenuId = UI.CreatePopupMenu(0);
+            UI.PopupMenuAddItem(_fileMenuId, "新建场景", "Ctrl+N", 1);
+            UI.PopupMenuAddItem(_fileMenuId, "新建脚本", "", 2);
+            UI.PopupMenuAddSeparator(_fileMenuId);
+            UI.PopupMenuAddItem(_fileMenuId, "退出", "", 3);
+            UI.PopupMenuSetOnClick(_fileMenuId, _fileMenuClickCallback);
+            UI.SetWidgetLayer(_fileMenuId, 2);
+            
+            _openMenuId = UI.CreatePopupMenu(0);
+            UI.PopupMenuAddItem(_openMenuId, "打开场景", "", 1);
+            UI.PopupMenuAddItem(_openMenuId, "打开项目", "", 2);
+            UI.PopupMenuAddItem(_openMenuId, "打开资源", "", 3);
+            UI.PopupMenuSetOnClick(_openMenuId, _openMenuClickCallback);
+            UI.SetWidgetLayer(_openMenuId, 2);
+            
+            _saveMenuId = UI.CreatePopupMenu(0);
+            UI.PopupMenuAddItem(_saveMenuId, "保存场景", "Ctrl+S", 1);
+            UI.PopupMenuAddItem(_saveMenuId, "保存全部", "", 2);
+            UI.PopupMenuAddItem(_saveMenuId, "另存为...", "", 3);
+            UI.PopupMenuSetOnClick(_saveMenuId, _saveMenuClickCallback);
+            UI.SetWidgetLayer(_saveMenuId, 2);
+            
+            Log.Info("Editor", "工具栏菜单创建完成 (PopupMenu)");
+        }
+
+        // === Directory Tree UI Creation ===
+
+        private static void RefreshDirectoryTree()
+        {
+            if (_projectPanel == null) return;
+            
+            if (_projectTree != null)
+            {
+                UI.RemoveWidget(_projectTree.Id);
+            }
+            
+            _fileItemPaths.Clear();
+            _dirItemPaths.Clear();
+            
+            _projectTree = new VStack(_projectPanel.Id, 5f);
+            _projectTree.SetPosition(10f, 40f);
+            
+            var openBtn = _projectTree.AddButton(LEFT_PANEL_WIDTH - 40f, 20f, "📂 打开目录");
+            UI.SetOnClick(openBtn, _openInExplorerCallback);
+            
+            try
+            {
+                if (Directory.Exists(_currentDirectory))
+                {
+                    if (_currentDirectory != "scripts" && Directory.GetParent(_currentDirectory) != null)
+                    {
+                        ulong backBtnId = _projectTree.AddButton(LEFT_PANEL_WIDTH - 40f, 20f, "⬆ 返回上级");
+                        UI.SetOnClick(backBtnId, _backClickCallback);
+                    }
+                    
+                    AddDirectoryItems(_projectTree, _currentDirectory, 0);
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Error("Editor", $"reading directory: {ex.Message}");
+            }
+            
+            Log.Info("Editor", "目录树刷新完成");
+        }
+        
+        private static void AddDirectoryItems(VStack stack, string path, int depth)
+        {
+            string prefix = new string(' ', depth * 2);
+            
+            try
+            {
+                string[] dirs = Directory.GetDirectories(path);
+                foreach (string dir in dirs)
+                {
+                    string name = Path.GetFileName(dir);
+                    ulong btnId = stack.AddButton(LEFT_PANEL_WIDTH - 40f, 20f, $"{prefix}📁 {name}/");
+                    _dirItemPaths[btnId] = dir;
+                    UI.SetOnClick(btnId, _directoryClickCallback);
+                }
+                
+                string[] files = Directory.GetFiles(path);
+                foreach (string file in files)
+                {
+                    if (file.EndsWith(".cs") || file.EndsWith(".txt") || file.EndsWith(".json"))
+                    {
+                        string name = Path.GetFileName(file);
+                        ulong btnId = stack.AddButton(LEFT_PANEL_WIDTH - 40f, 20f, $"{prefix}📄 {name}");
+                    _fileItemPaths[btnId] = file;
+                    UI.SetOnClick(btnId, _fileClickCallback);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Error("Editor", ex.Message);
+            }
         }
     }
 }

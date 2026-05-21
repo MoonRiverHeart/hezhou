@@ -9,6 +9,7 @@ pub mod renderer;
 pub mod rotation_renderer;
 pub mod ui_renderer;
 pub mod ui_vulkan_renderer;
+pub mod primitive_meshes;
 
 #[cfg(feature = "mono")]
 pub mod mono_rotation_renderer;

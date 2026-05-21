@@ -330,6 +330,33 @@ impl Scene {
         self.world.get_component::<LocalTransform>(entity).map(|t| t.scale)
     }
     
+    pub fn set_entity_position(&mut self, entity: Entity, pos: Vec3) {
+        if self.world.entity_exists(entity) {
+            if let Some(mut transform) = self.world.get_component::<LocalTransform>(entity) {
+                transform.position = pos;
+                self.world.add_component(entity, transform);
+            }
+        }
+    }
+    
+    pub fn set_entity_rotation(&mut self, entity: Entity, rotation: crate::math::Quaternion) {
+        if self.world.entity_exists(entity) {
+            if let Some(mut transform) = self.world.get_component::<LocalTransform>(entity) {
+                transform.rotation = rotation;
+                self.world.add_component(entity, transform);
+            }
+        }
+    }
+    
+    pub fn set_entity_scale(&mut self, entity: Entity, scale: Vec3) {
+        if self.world.entity_exists(entity) {
+            if let Some(mut transform) = self.world.get_component::<LocalTransform>(entity) {
+                transform.scale = scale;
+                self.world.add_component(entity, transform);
+            }
+        }
+    }
+    
     pub fn set_entity_name(&mut self, entity: Entity, name: String) {
         if self.world.entity_exists(entity) {
             self.entity_names.insert(entity.id, name);

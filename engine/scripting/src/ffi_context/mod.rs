@@ -6,6 +6,7 @@ mod widget_complex;
 mod widget_new;
 mod scene;
 mod renderer;
+mod property;
 
 pub use types::*;
 pub use ui_system::*;
@@ -15,6 +16,7 @@ pub use widget_complex::*;
 pub use widget_new::*;
 pub use scene::*;
 pub use renderer::*;
+pub use property::*;
 
 use std::ffi::c_void;
 
@@ -166,6 +168,15 @@ pub struct FfiContext {
     pub scene_get_entity_count: SceneGetEntityCountFn,
     pub scene_get_entity_id: SceneGetEntityIdFn,
     pub scene_remove_entity: SceneRemoveEntityFn,
+    pub ui_entity_get_property_count: EntityGetPropertyCountFn,
+    pub ui_entity_get_property_name: EntityGetPropertyNameFn,
+    pub ui_entity_get_property_type: EntityGetPropertyTypeFn,
+    pub ui_entity_get_property_category: EntityGetPropertyCategoryFn,
+    pub ui_entity_get_property_read_only: EntityGetPropertyReadOnlyFn,
+    pub ui_entity_get_property_value_float3: EntityGetPropertyValueFloat3Fn,
+    pub ui_entity_set_property_value_float3: EntitySetPropertyValueFloat3Fn,
+    pub ui_entity_get_property_value_string: EntityGetPropertyValueStringFn,
+    pub ui_entity_set_property_value_string: EntitySetPropertyValueStringFn,
     pub widget_tree_ptr: WidgetTreeHandle,
     pub dfx_handle: *mut c_void,
     pub dfx_log: DfxLogFn,

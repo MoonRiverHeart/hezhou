@@ -6,6 +6,10 @@ pub extern "C" fn scene_create_editor() -> *mut std::ffi::c_void {
         let scene = Box::new(hezhou_core::Scene::new());
         let ptr = Box::into_raw(scene);
         super::SCENE = Some(ptr);
+        // Wire Scene pointer to renderer for multi-entity rendering
+        if let Some(renderer_ptr) = super::RENDERER {
+            (*renderer_ptr).set_scene(ptr);
+        }
         ptr as *mut std::ffi::c_void
     }
 }
@@ -343,4 +347,113 @@ pub extern "C" fn scene_remove_entity_editor(scene: *mut std::ffi::c_void, entit
         let entity = hezhou_core::Entity::new(entity_id);
         (*scene_ptr).remove_entity(entity);
     }
+}
+
+// Property reflection FFI wrappers
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_entity_get_property_count_editor() -> u32 {
+    hezhou_core::ui_entity_get_property_count()
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_entity_get_property_name_editor(index: u32) -> *const std::ffi::c_char {
+    hezhou_core::ui_entity_get_property_name(index)
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_entity_get_property_type_editor(index: u32) -> u32 {
+    hezhou_core::ui_entity_get_property_type(index)
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_entity_get_property_category_editor(index: u32) -> *const std::ffi::c_char {
+    hezhou_core::ui_entity_get_property_category(index)
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_entity_get_property_read_only_editor(index: u32) -> bool {
+    hezhou_core::ui_entity_get_property_read_only(index)
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_entity_get_property_value_float3_editor(
+    scene: *mut std::ffi::c_void,
+    entity_id: u64,
+    property_name: *const std::ffi::c_char,
+    out_x: *mut f32,
+    out_y: *mut f32,
+    out_z: *mut f32,
+) -> bool {
+    if scene.is_null() {
+        return false;
+    }
+    hezhou_core::ui_entity_get_property_value_float3(
+        scene as *mut hezhou_core::Scene,
+        entity_id,
+        property_name,
+        out_x,
+        out_y,
+        out_z,
+    )
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_entity_get_property_value_string_editor(
+    scene: *mut std::ffi::c_void,
+    entity_id: u64,
+    property_name: *const std::ffi::c_char,
+    out_buf: *mut std::ffi::c_char,
+    buf_len: u32,
+) -> u32 {
+    if scene.is_null() {
+        return 0;
+    }
+    hezhou_core::ui_entity_get_property_value_string(
+        scene as *mut hezhou_core::Scene,
+        entity_id,
+        property_name,
+        out_buf,
+        buf_len,
+    )
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_entity_set_property_value_float3_editor(
+    scene: *mut std::ffi::c_void,
+    entity_id: u64,
+    property_name: *const std::ffi::c_char,
+    x: f32,
+    y: f32,
+    z: f32,
+) -> bool {
+    if scene.is_null() {
+        return false;
+    }
+    hezhou_core::ui_entity_set_property_value_float3(
+        scene as *mut hezhou_core::Scene,
+        entity_id,
+        property_name,
+        x,
+        y,
+        z,
+    )
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_entity_set_property_value_string_editor(
+    scene: *mut std::ffi::c_void,
+    entity_id: u64,
+    property_name: *const std::ffi::c_char,
+    value: *const std::ffi::c_char,
+) -> bool {
+    if scene.is_null() {
+        return false;
+    }
+    hezhou_core::ui_entity_set_property_value_string(
+        scene as *mut hezhou_core::Scene,
+        entity_id,
+        property_name,
+        value,
+    )
 }

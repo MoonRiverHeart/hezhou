@@ -5,11 +5,13 @@ use glfw::{Glfw, PWindow, GlfwReceiver, WindowEvent, WindowMode, Action, Key};
 use std::ffi::CString;
 use std::collections::HashMap;
 use hezhou_ui::{UISystem, UIInputHandler, Panel, Button, Label, TextEdit, Layout, DrawCommand, Widget, Style, Color, TextStyle, ffi::WidgetTreeHandle, ffi::ui_set_primary_button_id};
-use hezhou_platform::{MouseAction, MouseEvent, MouseButton, CharEvent, KeyEvent, KeyAction, KeyCode, KeyModifiers};
+use hezhou_platform::{MouseAction, MouseEvent, MouseButton, CharEvent, KeyEvent, KeyAction, KeyModifiers, KeyCode};
 use hezhou_dfx::{DfxSystem, LogLevel, dfx_info};
 use parking_lot::Mutex;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
+use hezhou_core::asset_library::MeshType;
+use crate::primitive_meshes::{self, MeshRange};
 
 pub struct CachedGlyph {
     x: f32,
@@ -151,6 +153,14 @@ pub struct UIVulkanRenderer {
     selected_entity_id: u64,
     is_entity_selected: bool,
     highlight_color: [f32; 4],  // RGBA (orange: 1.0, 0.6, 0.3, 1.0)
+    
+    // Game mesh buffer (separate from UI vertex buffer)
+    game_mesh_buffer: vk::Buffer,
+    game_mesh_buffer_memory: vk::DeviceMemory,
+    primitive_ranges: HashMap<MeshType, MeshRange>,
+    
+    // Scene pointer for multi-entity rendering
+    scene_ptr: Option<*mut hezhou_core::Scene>,
 }
 
 impl UIVulkanRenderer {
@@ -699,7 +709,7 @@ p_multisample_state: &vk::PipelineMultisampleStateCreateInfo {
                 p_push_constant_ranges: &vk::PushConstantRange {
                     stage_flags: vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT,
                     offset: 0,
-                    size: 52, // rotation + scale + color(RGBA) + width + height + yaw + pitch + x + y + z (13 floats)
+                    size: 112, // mat4(64) + outline_color(12) + is_selected(4) + viewport_size(8) + camera_pos(12) + camera_yaw(4) + camera_pitch(4) = 108, rounded to 112
                 },
                 ..Default::default()
             }, None).map_err(|e| format!("Failed to create game pipeline layout: {}", e))?;
@@ -723,6 +733,27 @@ p_multisample_state: &vk::PipelineMultisampleStateCreateInfo {
                         },
                     ] as *const _,
                     p_vertex_input_state: &vk::PipelineVertexInputStateCreateInfo {
+                        vertex_binding_description_count: 1,
+                        p_vertex_binding_descriptions: &[vk::VertexInputBindingDescription {
+                            binding: 0,
+                            stride: 24,  // sizeof(MeshVertex) = position(12) + normal(12)
+                            input_rate: vk::VertexInputRate::VERTEX,
+                        }] as *const _,
+                        vertex_attribute_description_count: 2,
+                        p_vertex_attribute_descriptions: &[
+                            vk::VertexInputAttributeDescription {
+                                binding: 0,
+                                location: 0,
+                                format: vk::Format::R32G32B32_SFLOAT,
+                                offset: 0,
+                            },
+                            vk::VertexInputAttributeDescription {
+                                binding: 0,
+                                location: 1,
+                                format: vk::Format::R32G32B32_SFLOAT,
+                                offset: 12,
+                            },
+                        ] as *const _,
                         ..Default::default()
                     },
                     p_input_assembly_state: &vk::PipelineInputAssemblyStateCreateInfo {
@@ -819,6 +850,27 @@ p_multisample_state: &vk::PipelineMultisampleStateCreateInfo {
                         },
                     ] as *const _,
                     p_vertex_input_state: &vk::PipelineVertexInputStateCreateInfo {
+                        vertex_binding_description_count: 1,
+                        p_vertex_binding_descriptions: &[vk::VertexInputBindingDescription {
+                            binding: 0,
+                            stride: 24,  // sizeof(MeshVertex) = position(12) + normal(12)
+                            input_rate: vk::VertexInputRate::VERTEX,
+                        }] as *const _,
+                        vertex_attribute_description_count: 2,
+                        p_vertex_attribute_descriptions: &[
+                            vk::VertexInputAttributeDescription {
+                                binding: 0,
+                                location: 0,
+                                format: vk::Format::R32G32B32_SFLOAT,
+                                offset: 0,
+                            },
+                            vk::VertexInputAttributeDescription {
+                                binding: 0,
+                                location: 1,
+                                format: vk::Format::R32G32B32_SFLOAT,
+                                offset: 12,
+                            },
+                        ] as *const _,
                         ..Default::default()
                     },
                     p_input_assembly_state: &vk::PipelineInputAssemblyStateCreateInfo {
@@ -1121,6 +1173,31 @@ p_multisample_state: &vk::PipelineMultisampleStateCreateInfo {
             
             logger.lock().log(LogLevel::Info, "Vulkan", "Vertex buffer created (32MB)", file!(), line!());
             
+            // Create game mesh buffer for primitive meshes
+            let primitive_meshes = primitive_meshes::get_primitive_meshes();
+            let mesh_vertex_data: &[primitive_meshes::MeshVertex] = primitive_meshes.vertices();
+            let mesh_buffer_size = (mesh_vertex_data.len() * std::mem::size_of::<primitive_meshes::MeshVertex>()) as vk::DeviceSize;
+            
+            let (game_mesh_buffer, game_mesh_buffer_memory) = Self::create_vertex_buffer(
+                &instance, &device, physical_device, mesh_buffer_size
+            )?;
+            
+            // Upload primitive mesh vertex data
+            unsafe {
+                let data_ptr = device.map_memory(game_mesh_buffer_memory, 0, mesh_buffer_size, vk::MemoryMapFlags::empty())
+                    .map_err(|e| format!("Failed to map game mesh buffer: {}", e))?;
+                std::ptr::copy_nonoverlapping(
+                    mesh_vertex_data.as_ptr() as *const u8,
+                    data_ptr as *mut u8,
+                    mesh_buffer_size as usize,
+                );
+                device.unmap_memory(game_mesh_buffer_memory);
+            }
+            
+            let primitive_ranges = primitive_meshes.ranges().clone();
+            
+            logger.lock().log(LogLevel::Info, "Vulkan", &format!("Game mesh buffer created ({}, {} vertices)", mesh_buffer_size, mesh_vertex_data.len()), file!(), line!());
+            
             let image_available_semaphores = (0..2)
                 .map(|_| device.create_semaphore(&vk::SemaphoreCreateInfo::default(), None))
                 .collect::<Result<Vec<_>, _>>()
@@ -1241,6 +1318,10 @@ p_multisample_state: &vk::PipelineMultisampleStateCreateInfo {
                 selected_entity_id: 0,
                 is_entity_selected: false,
                 highlight_color: [1.0, 0.6, 0.3, 0.3],  // orange with high transparency
+                game_mesh_buffer,
+                game_mesh_buffer_memory,
+                primitive_ranges,
+                scene_ptr: None,
             })
         }
     }
@@ -2003,66 +2084,154 @@ let font_atlas = ui.get_font_atlas();
             self.device.cmd_set_viewport(self.command_buffers[image_index_usize], 0, &[game_viewport]);
             self.device.cmd_set_scissor(self.command_buffers[image_index_usize], 0, &[game_scissor]);
             
-            dfx_info!("Vulkan", &format!("Drawing cube: extent={}x{}, aspect={:.2}", 
+            dfx_info!("Vulkan", &format!("Drawing entities: extent={}x{}, aspect={:.2}", 
                 self.offscreen_extent.width, self.offscreen_extent.height,
                 self.offscreen_extent.width as f32 / self.offscreen_extent.height as f32));
             
-            // First render normal cube (opaque)
-            let normal_push_constant_data = [
-                self.entity_angle.to_radians(),  // rotation angle
-                1.0,  // normal scale
-                0.0,  // outline R (alpha=0 means no outline)
-                0.0,  // outline G
-                0.0,  // outline B
-                0.0,  // alpha 0 - use face colors
-                self.offscreen_extent.width as f32,
-                self.offscreen_extent.height as f32,
-                self.camera_yaw,
-                self.camera_pitch,
-                self.camera_x,
-                self.camera_y,
-                self.camera_z,
-            ];
-            
-            self.device.cmd_bind_pipeline(
+            // Bind game mesh vertex buffer
+            self.device.cmd_bind_vertex_buffers(
                 self.command_buffers[image_index_usize],
-                vk::PipelineBindPoint::GRAPHICS,
-                self.game_pipeline
-            );
-            
-            self.device.cmd_push_constants(
-                self.command_buffers[image_index_usize],
-                self.game_pipeline_layout,
-                vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT,
                 0,
-                bytemuck::cast_slice(&normal_push_constant_data)
+                &[self.game_mesh_buffer],
+                &[0],
             );
             
-            self.device.cmd_draw(self.command_buffers[image_index_usize], 36, 1, 0, 0);
-            
-            // Then render outline on top if selected (transparent overlay)
-            if self.is_entity_selected {
-                let outline_scale = 1.05;  // Slightly larger
-                let outline_push_constant_data = [
-                    self.entity_angle.to_radians(),  // rotation angle
-                    outline_scale,  // scale for outline
-                    self.highlight_color[0],  // orange R
-                    self.highlight_color[1],  // orange G
-                    self.highlight_color[2],  // orange B
-                    self.highlight_color[3],  // alpha (transparent overlay)
-                    self.offscreen_extent.width as f32,
-                    self.offscreen_extent.height as f32,
-                    self.camera_yaw,
-                    self.camera_pitch,
-                    self.camera_x,
-                    self.camera_y,
-                    self.camera_z,
+            // Multi-entity rendering loop
+            if let Some(scene_ptr) = self.scene_ptr {
+                unsafe {
+                    let scene = &*scene_ptr;
+                    
+                    for entity in &scene.root_entities {
+                        // Get RenderableComponent
+                        let renderable_opt = scene.world.get_component::<hezhou_core::RenderableComponent>(*entity);
+                        if renderable_opt.is_none() { continue; }
+                        let renderable = renderable_opt.unwrap();
+                        if !renderable.visible { continue; }
+                        
+                        // Get LocalTransform
+                        let transform = scene.world.get_component::<hezhou_core::LocalTransform>(*entity);
+                        if transform.is_none() { continue; }
+                        let transform = transform.unwrap();
+                        
+                        // Parse mesh_path → MeshType → vertex range
+                        let mesh_type = primitive_meshes::mesh_type_from_path(&renderable.mesh_path);
+                        let range = self.primitive_ranges.get(&mesh_type);
+                        if range.is_none() { continue; }
+                        let range = range.unwrap();
+                        
+                        // Compute model matrix from transform
+                        let model = Self::compute_model_matrix(&transform);
+                        
+                        // Is this entity selected?
+                        let is_selected = scene.selected_entities.contains(entity);
+                        
+                        // Push constants: model(64) + outline_color(12) + is_selected(4) + viewport_size(8) + camera_pos(12) + camera_yaw(4) + camera_pitch(4) = 108 bytes
+                        // Pad to 112 bytes for alignment
+                        let outline_color = if is_selected { [1.0f32, 0.5, 0.0] } else { [0.0f32, 0.0, 0.0] };
+                        let is_selected_f = if is_selected { 1.0f32 } else { 0.0f32 };
+                        
+                        // Model matrix stored as column-major (Vulkan convention): 16 floats
+                        let push_data = [
+                            // model matrix columns (column-major)
+                            model[0][0], model[0][1], model[0][2], model[0][3],
+                            model[1][0], model[1][1], model[1][2], model[1][3],
+                            model[2][0], model[2][1], model[2][2], model[2][3],
+                            model[3][0], model[3][1], model[3][2], model[3][3],
+                            // outline_color + is_selected
+                            outline_color[0], outline_color[1], outline_color[2], is_selected_f,
+                            // viewport_size
+                            self.offscreen_extent.width as f32, self.offscreen_extent.height as f32,
+                            // camera_pos + camera_yaw + camera_pitch
+                            self.camera_x, self.camera_y, self.camera_z, self.camera_yaw, self.camera_pitch,
+                            // padding to 112 bytes (4 floats = 16 bytes padding)
+                            0.0f32, 0.0f32, 0.0f32, 0.0f32,
+                        ];
+                        
+                        // Draw normal entity
+                        self.device.cmd_bind_pipeline(
+                            self.command_buffers[image_index_usize],
+                            vk::PipelineBindPoint::GRAPHICS,
+                            self.game_pipeline
+                        );
+                        
+                        self.device.cmd_push_constants(
+                            self.command_buffers[image_index_usize],
+                            self.game_pipeline_layout,
+                            vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT,
+                            0,
+                            bytemuck::cast_slice(&push_data)
+                        );
+                        
+                        self.device.cmd_draw(
+                            self.command_buffers[image_index_usize],
+                            range.vertex_count, 1, range.vertex_offset, 0
+                        );
+                        
+                        // If selected, also draw outline (slightly scaled model matrix)
+                        if is_selected {
+                            let outline_model = Self::compute_scaled_model_matrix(&transform, 1.05);
+                            let outline_push_data = [
+                                // outline model matrix columns (column-major)
+                                outline_model[0][0], outline_model[0][1], outline_model[0][2], outline_model[0][3],
+                                outline_model[1][0], outline_model[1][1], outline_model[1][2], outline_model[1][3],
+                                outline_model[2][0], outline_model[2][1], outline_model[2][2], outline_model[2][3],
+                                outline_model[3][0], outline_model[3][1], outline_model[3][2], outline_model[3][3],
+                                // outline_color + is_selected (1.0 for outline)
+                                1.0f32, 0.5, 0.0, 1.0f32,
+                                // viewport_size
+                                self.offscreen_extent.width as f32, self.offscreen_extent.height as f32,
+                                // camera_pos + camera_yaw + camera_pitch
+                                self.camera_x, self.camera_y, self.camera_z, self.camera_yaw, self.camera_pitch,
+                                // padding
+                                0.0f32, 0.0f32, 0.0f32, 0.0f32,
+                            ];
+                            
+                            self.device.cmd_bind_pipeline(
+                                self.command_buffers[image_index_usize],
+                                vk::PipelineBindPoint::GRAPHICS,
+                                self.outline_pipeline
+                            );
+                            
+                            self.device.cmd_push_constants(
+                                self.command_buffers[image_index_usize],
+                                self.game_pipeline_layout,
+                                vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT,
+                                0,
+                                bytemuck::cast_slice(&outline_push_data)
+                            );
+                            
+                            self.device.cmd_draw(
+                                self.command_buffers[image_index_usize],
+                                range.vertex_count, 1, range.vertex_offset, 0
+                            );
+                        }
+                    }
+                }
+            } else {
+                // Fallback: draw single cube if no scene is set (legacy behavior)
+                let model = hezhou_core::Mat4::translate(hezhou_core::Vec3::new(
+                    self.entity_position[0], self.entity_position[1], self.entity_position[2]
+                )) * hezhou_core::Mat4::from_quaternion(hezhou_core::Quaternion::from_axis_angle(
+                    hezhou_core::Vec3::up(), self.entity_angle.to_radians()
+                )) * hezhou_core::Mat4::scale(hezhou_core::Vec3::new(
+                    self.entity_scale[0], self.entity_scale[1], self.entity_scale[2]
+                ));
+                
+                let push_data = [
+                    model.data[0][0], model.data[0][1], model.data[0][2], model.data[0][3],
+                    model.data[1][0], model.data[1][1], model.data[1][2], model.data[1][3],
+                    model.data[2][0], model.data[2][1], model.data[2][2], model.data[2][3],
+                    model.data[3][0], model.data[3][1], model.data[3][2], model.data[3][3],
+                    0.0f32, 0.0, 0.0, 0.0f32,
+                    self.offscreen_extent.width as f32, self.offscreen_extent.height as f32,
+                    self.camera_x, self.camera_y, self.camera_z, self.camera_yaw, self.camera_pitch,
+                    0.0f32, 0.0f32, 0.0f32, 0.0f32,
                 ];
                 
                 self.device.cmd_bind_pipeline(
                     self.command_buffers[image_index_usize],
                     vk::PipelineBindPoint::GRAPHICS,
-                    self.outline_pipeline
+                    self.game_pipeline
                 );
                 
                 self.device.cmd_push_constants(
@@ -2070,10 +2239,16 @@ let font_atlas = ui.get_font_atlas();
                     self.game_pipeline_layout,
                     vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT,
                     0,
-                    bytemuck::cast_slice(&outline_push_constant_data)
+                    bytemuck::cast_slice(&push_data)
                 );
                 
-                self.device.cmd_draw(self.command_buffers[image_index_usize], 36, 1, 0, 0);
+                // Draw cube (36 vertices at offset 0)
+                if let Some(range) = self.primitive_ranges.get(&MeshType::Cube) {
+                    self.device.cmd_draw(
+                        self.command_buffers[image_index_usize],
+                        range.vertex_count, 1, range.vertex_offset, 0
+                    );
+                }
             }
             
             // End game render pass
@@ -3588,6 +3763,30 @@ self.dfx.lock().get_logger().lock().log(
         dfx_info!("Vulkan", "Selected entity: id={}, selected={}", entity_id, selected);
     }
     
+    pub fn set_scene(&mut self, scene: *mut hezhou_core::Scene) {
+        self.scene_ptr = Some(scene);
+    }
+    
+    fn compute_model_matrix(transform: &hezhou_core::LocalTransform) -> [[f32; 4]; 4] {
+        let t = hezhou_core::Mat4::translate(transform.position);
+        let r = hezhou_core::Mat4::from_quaternion(transform.rotation);
+        let s = hezhou_core::Mat4::scale(transform.scale);
+        let model = t * r * s;
+        model.data
+    }
+    
+    fn compute_scaled_model_matrix(transform: &hezhou_core::LocalTransform, scale_factor: f32) -> [[f32; 4]; 4] {
+        let t = hezhou_core::Mat4::translate(transform.position);
+        let r = hezhou_core::Mat4::from_quaternion(transform.rotation);
+        let s = hezhou_core::Mat4::scale(hezhou_core::Vec3::new(
+            transform.scale.x * scale_factor,
+            transform.scale.y * scale_factor,
+            transform.scale.z * scale_factor,
+        ));
+        let model = t * r * s;
+        model.data
+    }
+    
     pub fn cleanup(&mut self) {
         unsafe {
             self.device.device_wait_idle().expect("Failed to wait for device idle");
@@ -3612,6 +3811,9 @@ self.dfx.lock().get_logger().lock().log(
             self.device.destroy_pipeline(self.game_pipeline, None);
             self.device.destroy_pipeline_layout(self.game_pipeline_layout, None);
             self.device.destroy_render_pass(self.game_render_pass, None);
+            
+            self.device.destroy_buffer(self.game_mesh_buffer, None);
+            self.device.free_memory(self.game_mesh_buffer_memory, None);
             
             self.device.destroy_pipeline(self.fxaa_pipeline, None);
             self.device.destroy_pipeline_layout(self.fxaa_pipeline_layout, None);

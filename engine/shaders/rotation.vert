@@ -1,122 +1,71 @@
 #version 450
 
+layout(location = 0) in vec3 inPosition;
+layout(location = 1) in vec3 inNormal;
+
 layout(push_constant) uniform PushConstants {
-    float rotation;
-    float scale;
-    float outline_r;
-    float outline_g;
-    float outline_b;
-    float outline_a;
-    float width;
-    float height;
-    float cameraYaw;
-    float cameraPitch;
-    float cameraX;
-    float cameraY;
-    float cameraZ;
+    mat4 model;           // 64 bytes - per-entity model matrix
+    vec3 outline_color;   // 12 bytes - selection highlight color
+    float is_selected;    // 4 bytes - 1.0 if selected, 0.0 if not
+    vec2 viewport_size;   // 8 bytes - game viewport dimensions
+    vec3 camera_pos;      // 12 bytes - camera position
+    float camera_yaw;     // 4 bytes
+    float camera_pitch;   // 4 bytes
+    // Total: 108 bytes, within 128-byte limit
 } pc;
 
-// Perspective projection matrix (Vulkan: flip Y axis)
-mat4 perspective(float fov, float aspect, float near, float far) {
-    float f = 1.0 / tan(fov * 0.5);
+layout(location = 0) out vec3 fragColor;
+layout(location = 1) out vec3 fragNormal;
+layout(location = 2) out float fragOutline;
+
+mat4 viewMatrix() {
+    float cy = cos(pc.camera_yaw);
+    float sy = sin(pc.camera_yaw);
+    float cp = cos(pc.camera_pitch);
+    float sp = sin(pc.camera_pitch);
+    vec3 forward = vec3(sy * cp, -sp, -cy * cp);
+    vec3 right = vec3(cy, 0, -sy);
+    vec3 up = vec3(sy * sp, cp, cy * sp);
+    vec3 eye = pc.camera_pos;
+    
     return mat4(
-        f / aspect, 0.0, 0.0, 0.0,
-        0.0, -f, 0.0, 0.0,  // -f to flip Y for Vulkan
-        0.0, 0.0, (far + near) / (near - far), -1.0,
-        0.0, 0.0, (2.0 * far * near) / (near - far), 0.0
+        right.x, up.x, forward.x, 0,
+        right.y, up.y, forward.y, 0,
+        right.z, up.z, forward.z, 0,
+        -dot(right, eye), -dot(up, eye), -dot(forward, eye), 1
     );
 }
 
-// Cube vertices (8 corners)
-vec3 positions[8] = vec3[](
-    vec3(-0.5, -0.5, -0.5),  // 0: back-bottom-left
-    vec3( 0.5, -0.5, -0.5),  // 1: back-bottom-right
-    vec3( 0.5,  0.5, -0.5),  // 2: back-top-right
-    vec3(-0.5,  0.5, -0.5),  // 3: back-top-left
-    vec3(-0.5, -0.5,  0.5),  // 4: front-bottom-left
-    vec3( 0.5, -0.5,  0.5),  // 5: front-bottom-right
-    vec3( 0.5,  0.5,  0.5),  // 6: front-top-right
-    vec3(-0.5,  0.5,  0.5)   // 7: front-top-left
-);
-
-// 36 vertices for 6 faces (2 triangles per face)
-// Physical CCW winding (normal points outward)
-int vertex_indices[36] = int[](
-    // Back face (Z-, z=-0.5) - red: normal points to -Z
-    0, 2, 1, 0, 3, 2,
-    // Front face (Z+, z=+0.5) - green: normal points to +Z
-    4, 7, 6, 4, 6, 5,
-    // Left face (X-, x=-0.5) - blue: normal points to -X
-    0, 7, 3, 0, 4, 7,
-    // Right face (X+, x=+0.5) - yellow: normal points to +X
-    1, 2, 6, 1, 6, 5,
-    // Bottom face (Y-, y=-0.5) - cyan: normal points to -Y
-    0, 1, 5, 0, 5, 4,
-    // Top face (Y+, y=+0.5) - magenta: normal points to +Y
-    3, 7, 6, 3, 6, 2
-);
-
-// Face colors
-vec3 face_colors[6] = vec3[](
-    vec3(1.0, 0.2, 0.2),  // back: red
-    vec3(0.2, 1.0, 0.2),  // front: green
-    vec3(0.2, 0.2, 1.0),  // left: blue
-    vec3(1.0, 1.0, 0.2),  // right: yellow
-    vec3(0.2, 1.0, 1.0),  // bottom: cyan
-    vec3(1.0, 0.2, 1.0)   // top: magenta
-);
-
-layout(location = 0) out vec3 fragColor;
-layout(location = 1) out vec4 outlineColor;
+mat4 projectionMatrix(float aspect) {
+    float fov = 45.0;
+    float near = 0.1;
+    float far = 100.0;
+    float f = 1.0 / tan(fov * 3.14159265 / 360.0);
+    return mat4(
+        f / aspect, 0, 0, 0,
+        0, f, 0, 0,
+        0, 0, (far + near) / (near - far), -1,
+        0, 0, 2 * far * near / (near - far), 0
+    );
+}
 
 void main() {
-    int vertex_idx = vertex_indices[gl_VertexIndex];
-    int face_idx = gl_VertexIndex / 6;
+    vec4 worldPos = pc.model * vec4(inPosition, 1.0);
+    mat4 view = viewMatrix();
+    mat4 proj = projectionMatrix(pc.viewport_size.x / pc.viewport_size.y);
     
-    vec3 pos = positions[vertex_idx];
+    gl_Position = proj * view * worldPos;
     
-    // Apply scale
-    pos = pos * pc.scale;
+    // Face colors based on normal direction
+    vec3 absN = abs(inNormal);
+    if (absN.x > absN.y && absN.x > absN.z) {
+        fragColor = inNormal.x > 0 ? vec3(0.8, 0.2, 0.2) : vec3(0.6, 0.15, 0.15);
+    } else if (absN.y > absN.z) {
+        fragColor = inNormal.y > 0 ? vec3(0.2, 0.8, 0.2) : vec3(0.15, 0.6, 0.15);
+    } else {
+        fragColor = inNormal.z > 0 ? vec3(0.2, 0.2, 0.8) : vec3(0.15, 0.15, 0.6);
+    }
     
-    // Model transform: rotate around Y (cube self-rotation)
-    float angle = pc.rotation;
-    float cosA = cos(angle);
-    float sinA = sin(angle);
-    
-    vec3 model_pos = vec3(
-        pos.x * cosA - pos.z * sinA,
-        pos.y,
-        pos.x * sinA + pos.z * cosA
-    );
-    
-    // View transform: translate to camera space then rotate
-    vec3 translated_pos = model_pos - vec3(pc.cameraX, pc.cameraY, pc.cameraZ);
-    
-    // Camera rotation: pitch (X axis) then yaw (Y axis)
-    float yaw = pc.cameraYaw;
-    float pitch = pc.cameraPitch;
-    
-    float cosP = cos(pitch);
-    float sinP = sin(pitch);
-    vec3 pitched_pos = vec3(
-        translated_pos.x,
-        translated_pos.y * cosP - translated_pos.z * sinP,
-        translated_pos.y * sinP + translated_pos.z * cosP
-    );
-    
-    float cosY = cos(yaw);
-    float sinY = sin(yaw);
-    vec3 view_pos = vec3(
-        pitched_pos.x * cosY + pitched_pos.z * sinY,
-        pitched_pos.y,
-        -pitched_pos.x * sinY + pitched_pos.z * cosY
-    );
-    
-    // Perspective projection (dynamic aspect ratio)
-    float aspect = pc.width / pc.height;
-    mat4 proj = perspective(1.0472, aspect, 0.1, 100.0); // 60° FOV
-    gl_Position = proj * vec4(view_pos, 1.0);
-    
-    fragColor = face_colors[face_idx];
-    outlineColor = vec4(pc.outline_r, pc.outline_g, pc.outline_b, pc.outline_a);
+    fragNormal = mat3(pc.model) * inNormal;
+    fragOutline = pc.is_selected;
 }
