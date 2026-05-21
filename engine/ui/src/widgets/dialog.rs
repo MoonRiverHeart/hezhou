@@ -205,7 +205,10 @@ impl Dialog {
         if index < self.buttons.len() {
             let action_value = self.buttons[index].action_value();
             self.result = Some(action_value);
-            trigger_dialog_result_callback(self.id.id, action_value);
+            crate::thunk_manager::queue_callback(crate::thunk_manager::PendingCallback::DialogResult {
+                dialog_id: self.id.id,
+                result: action_value,
+            });
             dfx_info!("Dialog", "Button clicked: id={}, index={}, action={}", 
                 self.id.id, index, action_value);
         }

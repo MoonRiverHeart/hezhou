@@ -155,11 +155,11 @@ impl TabWidget {
     }
 
     fn trigger_select_callback(&mut self, index: usize) {
-        trigger_tab_select_callback(self.id.id, index);
+        queue_callback(PendingCallback::TabSelect { widget_id: self.id.id, index });
     }
 
     fn trigger_close_callback(&mut self, index: usize) {
-        trigger_tab_close_callback(self.id.id, index);
+        queue_callback(PendingCallback::TabClose { widget_id: self.id.id, index });
     }
 }
 

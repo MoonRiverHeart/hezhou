@@ -221,11 +221,17 @@ impl FileBrowser {
     }
     
     fn trigger_select_callback(&mut self, path: &str) {
-        trigger_file_browser_select_callback(self.id.id, path);
+        crate::thunk_manager::queue_callback(crate::thunk_manager::PendingCallback::FileBrowserSelect {
+            browser_id: self.id.id,
+            path: path.to_string(),
+        });
     }
     
     fn trigger_double_click_callback(&mut self, path: &str) {
-        trigger_file_browser_double_click_callback(self.id.id, path);
+        crate::thunk_manager::queue_callback(crate::thunk_manager::PendingCallback::FileBrowserDoubleClick {
+            browser_id: self.id.id,
+            path: path.to_string(),
+        });
     }
 }
 

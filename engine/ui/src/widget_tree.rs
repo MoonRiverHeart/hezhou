@@ -394,6 +394,9 @@ pub fn perform_layout(&mut self, font_atlas: &FontAtlas) {
             "List" => {
                 self.layout_list_children(id, &children, &child_sizes);
             }
+            "TreeView" => {
+                self.layout_tree_view_children(id, font_atlas);
+            }
             _ => {}
         }
 
@@ -538,6 +541,94 @@ pub fn perform_layout(&mut self, font_atlas: &FontAtlas) {
                 }
                 
                 current_y += h + spacing;
+            }
+        }
+    }
+
+    fn layout_tree_view_children(&mut self, id: WidgetId, _font_atlas: &FontAtlas) {
+        let tree_view_info = {
+            if let Some(node) = self.nodes.get(&id) {
+                if let Some(tree_view) = node.widget.as_any().downcast_ref::<crate::widgets::TreeView>() {
+                    let root_nodes = tree_view.root_nodes().to_vec();
+                    let node_height = tree_view.node_height();
+                    let indent_width = tree_view.indent_width();
+                    let tree_layout = *tree_view.layout();
+                    (root_nodes, node_height, indent_width, tree_layout)
+                } else {
+                    return;
+                }
+            } else {
+                return;
+            }
+        };
+        
+        let (root_nodes, node_height, indent_width, tree_layout) = tree_view_info;
+        
+        let mut y_offset = 0.0f32;
+        for root_id in root_nodes {
+            self.layout_tree_nodes_recursive(root_id, &mut y_offset, node_height, indent_width, tree_layout.width, id);
+        }
+        
+        if let Some(node) = self.nodes.get_mut(&id) {
+            if let Some(tree_view) = node.widget.as_any_mut().downcast_mut::<crate::widgets::TreeView>() {
+                let current_layout = *tree_view.layout();
+                tree_view.set_layout(crate::layout::Layout::new(
+                    current_layout.x,
+                    current_layout.y,
+                    current_layout.width,
+                    y_offset.max(current_layout.height),
+                ));
+            }
+        }
+    }
+    
+    fn layout_tree_nodes_recursive(
+        &mut self,
+        node_id: WidgetId,
+        y_offset: &mut f32,
+        node_height: f32,
+        indent_width: f32,
+        container_width: f32,
+        tree_view_id: WidgetId,
+    ) {
+        let (depth, is_expanded) = {
+            if let Some(node) = self.nodes.get(&node_id) {
+                if let Some(tree_node) = node.widget.as_any().downcast_ref::<crate::widgets::TreeNode>() {
+                    (tree_node.depth(), tree_node.is_expanded())
+                } else {
+                    return;
+                }
+            } else {
+                return;
+            }
+        };
+        
+        let child_ids: Vec<WidgetId> = {
+            if let Some(node) = self.nodes.get(&tree_view_id) {
+                if let Some(tree_view) = node.widget.as_any().downcast_ref::<crate::widgets::TreeView>() {
+                    tree_view.get_node_children(node_id).to_vec()
+                } else {
+                    Vec::new()
+                }
+            } else {
+                Vec::new()
+            }
+        };
+        
+        let x = depth as f32 * indent_width;
+        let width = container_width - x;
+        
+        if let Some(node) = self.nodes.get_mut(&node_id) {
+            if let Some(tree_node) = node.widget.as_any_mut().downcast_mut::<crate::widgets::TreeNode>() {
+                tree_node.set_layout(crate::layout::Layout::new(x, *y_offset, width, node_height));
+            }
+        }
+        
+        *y_offset += node_height;
+        
+        if is_expanded {
+            for child_id in child_ids {
+                self.layout_tree_nodes_recursive(child_id, y_offset, node_height, indent_width, container_width, tree_view_id);
             }
         }
     }

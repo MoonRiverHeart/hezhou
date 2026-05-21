@@ -33,7 +33,37 @@ impl EventDispatcher {
     }
 
     pub fn dispatch_event(&mut self, event: &mut Event) {
-        // 对于 MouseMove 事件，处理 hover 状态变化
+        if event.event_type == EventType::TouchBegin {
+            let focused_id = crate::thunk_manager::ui_get_focused_input_field();
+            if focused_id != 0 {
+                let target = match &event.data {
+                    EventData::Touch(touch) => {
+                        self.widget_tree.lock().hit_test(Point::new(touch.x, touch.y))
+                    }
+                    EventData::Mouse(mouse) => {
+                        self.widget_tree.lock().hit_test(Point::new(mouse.x, mouse.y))
+                    }
+                    _ => None,
+                };
+                
+                let target_id = target.map(|t| t.id).unwrap_or(0);
+                
+                if target_id != focused_id {
+                    let mut tree = self.widget_tree.lock();
+                    let old_widget_id = crate::WidgetId::from_raw(focused_id);
+                    if let Some(widget) = tree.get_widget_mut(old_widget_id) {
+                        if widget.widget_type() == "InputField" {
+                            if let Some(input) = widget.as_any_mut().downcast_mut::<crate::widgets::InputField>() {
+                                input.blur_internal();
+                            }
+                        }
+                    }
+                    drop(tree);
+                    crate::thunk_manager::ui_clear_focused_input_field();
+                }
+            }
+        }
+        
         if event.event_type == EventType::MouseMove {
             let target = match &event.data {
                 EventData::Mouse(mouse) => {
@@ -124,7 +154,7 @@ impl EventDispatcher {
                         }
                     }
                     drop(tree);
-                    crate::thunk_manager::trigger_onclick_callback(g.target.id);
+                    crate::thunk_manager::queue_callback(crate::thunk_manager::PendingCallback::ButtonClick { widget_id: g.target.id });
                 } else {
                     crate::thunk_manager::ui_trigger_global_click(click_point.x, click_point.y);
                 }

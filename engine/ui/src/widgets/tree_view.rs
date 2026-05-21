@@ -22,6 +22,7 @@ pub struct TreeView {
     content_scale: f32,
     scroll_offset: f32,
     node_parent_map: std::collections::HashMap<WidgetId, WidgetId>,
+    node_children: std::collections::HashMap<WidgetId, Vec<WidgetId>>,
 }
 
 impl TreeView {
@@ -41,6 +42,7 @@ impl TreeView {
             content_scale: 1.0,
             scroll_offset: 0.0,
             node_parent_map: std::collections::HashMap::new(),
+            node_children: std::collections::HashMap::new(),
         }
     }
 
@@ -74,6 +76,7 @@ impl TreeView {
     pub fn add_child_node(&mut self, parent_id: WidgetId, child_id: WidgetId) {
         self.node_parent_map.insert(child_id, parent_id);
         self.children.push(child_id);
+        self.node_children.entry(parent_id).or_default().push(child_id);
         self.flags.dirty_layout = true;
         self.flags.dirty_render = true;
     }
@@ -82,6 +85,11 @@ impl TreeView {
         self.root_nodes.retain(|&id| id != node_id);
         self.children.retain(|&id| id != node_id);
         self.node_parent_map.remove(&node_id);
+        
+        for children in self.node_children.values_mut() {
+            children.retain(|&id| id != node_id);
+        }
+        self.node_children.remove(&node_id);
         
         if self.selected_node == Some(node_id) {
             self.selected_node = None;
@@ -119,6 +127,33 @@ impl TreeView {
         &self.root_nodes
     }
 
+    pub fn node_height(&self) -> f32 {
+        self.node_height
+    }
+
+    pub fn indent_width(&self) -> f32 {
+        self.indent_width
+    }
+
+    pub fn get_node_children(&self, node_id: WidgetId) -> &[WidgetId] {
+        self.node_children.get(&node_id).map(|v| v.as_slice()).unwrap_or(&[])
+    }
+
+    pub fn get_visible_nodes(&self) -> Vec<WidgetId> {
+        let mut result = Vec::new();
+        self.collect_visible_nodes_from_tree(&self.root_nodes, &mut result);
+        result
+    }
+
+    fn collect_visible_nodes_from_tree(&self, nodes: &[WidgetId], result: &mut Vec<WidgetId>) {
+        for &node_id in nodes {
+            result.push(node_id);
+            if let Some(children) = self.node_children.get(&node_id) {
+                self.collect_visible_nodes_from_tree(children, result);
+            }
+        }
+    }
+
     pub fn get_parent_node(&self, node_id: WidgetId) -> Option<WidgetId> {
         self.node_parent_map.get(&node_id).copied()
     }
@@ -148,8 +183,11 @@ impl TreeView {
                 *current_y += self.node_height;
 
                 if node.is_expanded() {
-                    for child_id in node.children() {
-                        self.collect_visible_nodes_recursive(*child_id, tree, result, current_y, depth + 1);
+                    let children = self.node_children.get(&node_id)
+                        .cloned()
+                        .unwrap_or_default();
+                    for child_id in children {
+                        self.collect_visible_nodes_recursive(child_id, tree, result, current_y, depth + 1);
                     }
                 }
             }

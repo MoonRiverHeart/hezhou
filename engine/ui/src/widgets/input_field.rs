@@ -134,6 +134,11 @@ impl InputField {
         self.flags.dirty_render = true;
     }
     
+    pub fn blur_internal(&mut self) {
+        self.is_focused = false;
+        self.flags.dirty_render = true;
+    }
+    
     pub fn is_focused(&self) -> bool {
         self.is_focused
     }
@@ -164,6 +169,10 @@ impl InputField {
     }
     
     fn trigger_on_change(&mut self) {
+        crate::thunk_manager::queue_callback(crate::thunk_manager::PendingCallback::InputFieldChange {
+            widget_id: self.id.id,
+            text: self.text.clone(),
+        });
         if let Some(callback) = &mut self.on_change {
             callback(&self.text);
         }
@@ -257,6 +266,9 @@ impl Widget for InputField {
     }
     
     fn draw(&mut self, canvas: &mut Canvas) {
+        let global_focused = crate::thunk_manager::ui_get_focused_input_field();
+        self.is_focused = global_focused == self.id.id;
+        
         let current_style = if self.is_focused {
             Style::new()
                 .with_background(Color::new(0.18, 0.18, 0.18, 1.0))
@@ -279,7 +291,7 @@ impl Widget for InputField {
             let start = self.selection_start.min(self.selection_end);
             let end = self.selection_start.max(self.selection_end);
             
-            let font_atlas = crate::font_atlas::create_font_atlas();
+            let font_atlas = crate::font_atlas::get_font_atlas();
             let chars_before_start: String = self.text.chars().take(start).collect();
             let (start_x, _) = font_atlas.measure_text(0, &chars_before_start, font_size);
             
@@ -321,7 +333,7 @@ impl Widget for InputField {
         canvas.draw_text(text_rect, display_text, &text_style);
         
         if self.is_focused {
-            let font_atlas = crate::font_atlas::create_font_atlas();
+            let font_atlas = crate::font_atlas::get_font_atlas();
             let text_width = if self.text.is_empty() {
                 0.0
             } else {

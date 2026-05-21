@@ -4,7 +4,7 @@ use crate::layout::*;
 use crate::style::*;
 use crate::types::*;
 use crate::widget::*;
-use crate::thunk_manager::{trigger_tree_node_select_callback, trigger_tree_node_toggle_callback};
+use crate::thunk_manager::{queue_callback, PendingCallback};
 
 pub struct TreeNode {
     id: WidgetId,
@@ -167,14 +167,14 @@ impl TreeNode {
         if self.has_children {
             self.is_expanded = !self.is_expanded;
             self.flags.dirty_render = true;
-            trigger_tree_node_toggle_callback(self.id.id);
+            queue_callback(PendingCallback::TreeNodeToggle { widget_id: self.id.id });
         }
     }
 
     pub fn select(&mut self) {
         self.is_selected = true;
         self.flags.dirty_render = true;
-        trigger_tree_node_select_callback(self.id.id, self.user_data);
+        queue_callback(PendingCallback::TreeNodeSelect { widget_id: self.id.id, user_data: self.user_data });
     }
 
     fn draw_expand_icon(&self, canvas: &mut Canvas, x: f32, y: f32, size: f32) {

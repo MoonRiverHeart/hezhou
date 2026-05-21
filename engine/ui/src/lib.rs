@@ -46,7 +46,7 @@ pub struct UISystem {
     event_dispatcher: Arc<parking_lot::Mutex<EventDispatcher>>,
     gesture_recognizer: Arc<parking_lot::Mutex<GestureRecognizer>>,
     animation_engine: Arc<parking_lot::Mutex<AnimationEngine>>,
-    font_atlas: FontAtlas,
+    font_atlas: &'static FontAtlas,
     dfx: Arc<parking_lot::Mutex<DfxSystem>>,
     status_widget_id: Option<WidgetId>,
 }
@@ -54,7 +54,7 @@ pub struct UISystem {
 impl UISystem {
     pub fn new() -> Self {
         let dfx = Arc::new(parking_lot::Mutex::new(DfxSystem::new()));
-        let font_atlas = create_font_atlas();
+        let font_atlas = get_font_atlas();
         
         Self {
             widget_tree: Arc::new(parking_lot::Mutex::new(WidgetTree::new())),
@@ -73,6 +73,8 @@ impl UISystem {
         
         self.animation_engine.lock().update(delta_time);
         self.widget_tree.lock().update_layout();
+        
+        flush_pending_callbacks();
         
         perf_monitor.lock().end_frame();
     }
@@ -101,8 +103,8 @@ impl UISystem {
         Arc::clone(&self.widget_tree)
     }
     
-    pub fn get_font_atlas(&self) -> &FontAtlas {
-        &self.font_atlas
+    pub fn get_font_atlas(&self) -> &'static FontAtlas {
+        self.font_atlas
     }
     
     pub fn get_dfx(&self) -> Arc<parking_lot::Mutex<DfxSystem>> {

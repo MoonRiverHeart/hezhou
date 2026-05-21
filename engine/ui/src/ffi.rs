@@ -473,7 +473,7 @@ pub extern "C" fn ui_get_text_width(
     }
     unsafe {
         let text_str = CStr::from_ptr(text).to_string_lossy().into_owned();
-        let font_atlas = create_font_atlas();
+        let font_atlas = crate::font_atlas::get_font_atlas();
         let (width, _) = font_atlas.measure_text(0, &text_str, font_size);
         width + 40.0
     }

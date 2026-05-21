@@ -98,7 +98,7 @@ impl PopupMenu {
     
     pub fn add_item(&mut self, text: String, shortcut: Option<String>, action_id: usize) {
         self.items.push(MenuItem::new(text, shortcut, action_id));
-        self.calculate_size();
+        self.flags.dirty_layout = true;
         self.flags.dirty_render = true;
     }
     
@@ -153,10 +153,10 @@ impl PopupMenu {
         let mut max_shortcut_width: f32 = 0.0;
         let font_size = 14.0 * self.content_scale;
         let shortcut_font_size = 12.0 * self.content_scale;
+        let font_atlas = crate::font_atlas::get_font_atlas();
         
         for item in &self.items {
             if !item.is_separator {
-                let font_atlas = crate::font_atlas::create_font_atlas();
                 let (tw, _) = font_atlas.measure_text(0, &item.text, font_size);
                 max_text_width = max_text_width.max(tw);
                 if let Some(shortcut) = &item.shortcut {
@@ -381,7 +381,7 @@ impl Widget for PopupMenu {
                         }
                     } else {
                         self.hide();
-                        crate::thunk_manager::trigger_popup_menu_close_callback(self.id.id);
+                        crate::thunk_manager::queue_callback(crate::thunk_manager::PendingCallback::PopupMenuClose { widget_id: self.id.id });
                         return EventResult::Stopped;
                     }
                 }
@@ -393,7 +393,10 @@ impl Widget for PopupMenu {
                         let action_id = self.items[index].action_id;
                         dfx_info!("PopupMenu", "Item clicked: index={}, action_id={}", index, action_id);
                         
-                        crate::thunk_manager::trigger_popup_menu_click_callback(self.id.id, action_id);
+                        crate::thunk_manager::queue_callback(crate::thunk_manager::PendingCallback::PopupMenuClick {
+                            widget_id: self.id.id,
+                            action_id,
+                        });
                         
                         if let Some(callback) = &mut self.on_item_click {
                             callback(action_id);
