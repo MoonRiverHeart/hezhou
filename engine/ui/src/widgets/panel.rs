@@ -106,6 +106,14 @@ impl Widget for Panel {
         self
     }
 
+    fn flags(&self) -> WidgetFlags {
+        self.flags
+    }
+
+    fn set_flags(&mut self, flags: WidgetFlags) {
+        self.flags = flags;
+    }
+
     fn draw(&mut self, canvas: &mut Canvas) {
         let width = self.layout.width;
         let height = self.layout.height;

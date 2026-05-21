@@ -197,3 +197,23 @@ pub fn trigger_file_browser_double_click_callback(browser_id: u64, path: &str) {
         cb(browser_id, path_cstr.as_ptr());
     }
 }
+
+pub fn trigger_focus_change_callback(widget_id: u64, is_focused: bool) {
+    let callback = {
+        let callbacks = UI_CALLBACKS.lock();
+        callbacks.on_focus_change
+    };
+    if let Some(cb) = callback {
+        cb(widget_id, is_focused);
+    }
+}
+
+pub fn trigger_entity_selected_callback(entity_id: u64, is_selected: bool) {
+    let callback = {
+        let callbacks = UI_CALLBACKS.lock();
+        callbacks.on_entity_selected
+    };
+    if let Some(cb) = callback {
+        cb(entity_id, is_selected);
+    }
+}

@@ -2469,8 +2469,8 @@ let font_atlas = self.ui_system.lock().get_font_atlas();
                                 0,
                                 text_str,
                                 *font_size,
-                                bounds.x.round(),
-                                bounds.y.round(),
+                                bounds.x,
+                                bounds.y,
                                 *height,
                                 vertical_center,
                             )
@@ -2479,8 +2479,8 @@ let font_atlas = self.ui_system.lock().get_font_atlas();
                                 0,
                                 text_str,
                                 *font_size,
-                                bounds.x.round(),
-                                bounds.y.round(),
+                                bounds.x,
+                                bounds.y,
                                 *width,
                                 *height,
                             )
@@ -2494,8 +2494,8 @@ let font_atlas = self.ui_system.lock().get_font_atlas();
                                 continue;
                             }
                             
-                            let x = gx.round();
-                            let y = gy.round();
+                            let x = gx;
+                            let y = gy;
                             let u0 = uv_x;
                             let v0 = uv_y;
                             let u1 = uv_x + uv_w;
@@ -2507,11 +2507,11 @@ let font_atlas = self.ui_system.lock().get_font_atlas();
                             
                             current_vertices.extend_from_slice(&[
                                 x, y, r, g, b, a, u0, v0,
-                                x + w.round(), y, r, g, b, a, u1, v0,
-                                x, y + h.round(), r, g, b, a, u0, v1,
-                                x + w.round(), y, r, g, b, a, u1, v0,
-                                x + w.round(), y + h.round(), r, g, b, a, u1, v1,
-                                x, y + h.round(), r, g, b, a, u0, v1,
+                                x + w, y, r, g, b, a, u1, v0,
+                                x, y + h, r, g, b, a, u0, v1,
+                                x + w, y, r, g, b, a, u1, v0,
+                                x + w, y + h, r, g, b, a, u1, v1,
+                                x, y + h, r, g, b, a, u0, v1,
                             ]);
                         }
                         

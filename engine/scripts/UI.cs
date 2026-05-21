@@ -132,6 +132,12 @@ namespace Hezhou
         public delegate void DebugPrintWidgetTreeDelegate(IntPtr handle);
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void SetFlexExpandDelegate(IntPtr handle, ulong widgetId, uint expand);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void SetCrossAxisFillDelegate(IntPtr handle, ulong widgetId, uint fill);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public delegate void RegisterHotReloadCompleteCallbackDelegate(IntPtr callbackPtr);
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
@@ -748,6 +754,8 @@ namespace Hezhou
             public IntPtr project_add_entity;
             public IntPtr project_remove_entity;
             public IntPtr ui_debug_print_widget_tree;
+            public IntPtr ui_widget_set_flex_expand;
+            public IntPtr ui_widget_set_cross_axis_fill;
         }
 
         public static void InitFromContext(IntPtr contextPtr)

@@ -41,32 +41,36 @@ pub struct UICallbacks {
     pub on_dialog_result: HashMap<u64, DialogResultCallback>,
     pub on_file_browser_select: HashMap<u64, FileBrowserSelectCallback>,
     pub on_file_browser_double_click: HashMap<u64, FileBrowserDoubleClickCallback>,
+    pub on_focus_change: Option<FocusChangeCallback>,
+    pub on_entity_selected: Option<EntitySelectedCallback>,
 }
 
 impl UICallbacks {
-    pub fn new() -> Self {
-        Self {
-            update: None,
-            onclicks: HashMap::new(),
-            on_init: None,
-            on_resize: None,
-            on_global_click: None,
-            on_key: None,
-            on_mouse_move: None,
-            on_dropdown_select: HashMap::new(),
-            on_input_field_change: HashMap::new(),
-            on_tab_select: HashMap::new(),
-            on_tab_close: HashMap::new(),
-            on_tree_node_select: HashMap::new(),
-            on_tree_node_toggle: HashMap::new(),
-            on_popup_menu_click: HashMap::new(),
-            on_popup_menu_close: HashMap::new(),
-            on_grid_view_click: HashMap::new(),
-            on_dialog_result: HashMap::new(),
-            on_file_browser_select: HashMap::new(),
-            on_file_browser_double_click: HashMap::new(),
+pub fn new() -> Self {
+            Self {
+                update: None,
+                onclicks: HashMap::new(),
+                on_init: None,
+                on_resize: None,
+                on_global_click: None,
+                on_key: None,
+                on_mouse_move: None,
+                on_dropdown_select: HashMap::new(),
+                on_input_field_change: HashMap::new(),
+                on_tab_select: HashMap::new(),
+                on_tab_close: HashMap::new(),
+                on_tree_node_select: HashMap::new(),
+                on_tree_node_toggle: HashMap::new(),
+                on_popup_menu_click: HashMap::new(),
+                on_popup_menu_close: HashMap::new(),
+                on_grid_view_click: HashMap::new(),
+                on_dialog_result: HashMap::new(),
+                on_file_browser_select: HashMap::new(),
+                on_file_browser_double_click: HashMap::new(),
+                on_focus_change: None,
+                on_entity_selected: None,
+            }
         }
-    }
 
     pub fn clear(&mut self) {
         self.update = None;
@@ -88,6 +92,8 @@ impl UICallbacks {
         self.on_dialog_result.clear();
         self.on_file_browser_select.clear();
         self.on_file_browser_double_click.clear();
+        self.on_focus_change = None;
+        self.on_entity_selected = None;
     }
 }
 

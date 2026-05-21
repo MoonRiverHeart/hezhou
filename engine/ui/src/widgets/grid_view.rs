@@ -289,6 +289,14 @@ impl Widget for GridView {
         self
     }
     
+    fn flags(&self) -> WidgetFlags {
+        self.flags
+    }
+
+    fn set_flags(&mut self, flags: WidgetFlags) {
+        self.flags = flags;
+    }
+    
     fn measure(&self, _font_atlas: &FontAtlas) -> (f32, f32) {
         (self.layout.width, self.layout.height)
     }

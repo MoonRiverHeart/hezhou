@@ -174,6 +174,8 @@ pub struct FfiContext {
     pub set_status_text: SetStatusTextFn,
     pub on_hot_reload_complete: OnHotReloadCompleteFn,
     pub ui_debug_print_widget_tree: DebugPrintWidgetTreeFn,
+    pub ui_widget_set_flex_expand: SetFlexExpandFn,
+    pub ui_widget_set_cross_axis_fill: SetCrossAxisFillFn,
 }
 
 static mut FFI_CONTEXT: Option<Box<FfiContext>> = None;

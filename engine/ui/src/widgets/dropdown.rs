@@ -18,6 +18,7 @@ pub struct Dropdown {
     is_open: bool,
     on_select: Option<Box<dyn FnMut(usize) + Send + Sync>>,
     content_scale: f32,
+    flags: WidgetFlags,
 }
 
 impl Dropdown {
@@ -36,6 +37,7 @@ impl Dropdown {
             is_open: false,
             on_select: None,
             content_scale: 1.0,
+            flags: WidgetFlags::default(),
         }
     }
     
@@ -160,6 +162,14 @@ impl Widget for Dropdown {
     
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
         self
+    }
+    
+    fn flags(&self) -> WidgetFlags {
+        self.flags
+    }
+
+    fn set_flags(&mut self, flags: WidgetFlags) {
+        self.flags = flags;
     }
     
     fn draw(&mut self, canvas: &mut Canvas) {

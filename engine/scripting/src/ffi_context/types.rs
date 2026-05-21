@@ -21,3 +21,5 @@ pub type DfxTraceEndFn = extern "C" fn(*mut c_void, *const c_char, *const c_char
 pub type SetStatusTextFn = extern "C" fn(*const c_char);
 pub type OnHotReloadCompleteFn = extern "C" fn();
 pub type DebugPrintWidgetTreeFn = extern "C" fn(WidgetTreeHandle);
+pub type SetFlexExpandFn = extern "C" fn(WidgetTreeHandle, u64, u32);
+pub type SetCrossAxisFillFn = extern "C" fn(WidgetTreeHandle, u64, u32);

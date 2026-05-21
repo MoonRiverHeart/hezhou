@@ -429,24 +429,83 @@ pub fn perform_layout(&mut self, font_atlas: &FontAtlas) {
             })
             .unwrap_or((8.0, crate::types::EdgeInsets::zero()));
 
-        let mut current_x = padding.left;
+        let parent_width = self.nodes.get(&parent_id)
+            .map(|n| n.widget.layout().width)
+            .unwrap_or(0.0);
+        let parent_height = self.nodes.get(&parent_id)
+            .map(|n| n.widget.layout().height)
+            .unwrap_or(0.0);
+        
+        let content_width = parent_width - padding.left - padding.right;
+        let content_height = parent_height - padding.top - padding.bottom;
 
-        for (i, &child_id) in children.iter().enumerate() {
-            let (w, h) = child_sizes[i];
+        // Collect flex_expand flags
+        let flex_flags: Vec<bool> = children.iter().map(|&child_id| {
+            self.nodes.get(&child_id)
+                .map(|n| n.widget.flags().flex_expand)
+                .unwrap_or(false)
+        }).collect();
+        let cross_flags: Vec<bool> = children.iter().map(|&child_id| {
+            self.nodes.get(&child_id)
+                .map(|n| n.widget.flags().cross_axis_fill)
+                .unwrap_or(false)
+        }).collect();
 
-            if let Some(node) = self.nodes.get_mut(&child_id) {
-                let child_layout = *node.widget.layout();
-                let y = padding.top;
-
-                node.widget.set_layout(crate::layout::Layout::new(
-                    current_x,
-                    y,
-                    w.max(child_layout.width),
-                    h.max(child_layout.height),
-                ));
+        // Calculate fixed children total width + spacing
+        let flex_count = flex_flags.iter().filter(|&f| *f).count();
+        let mut fixed_total: f32 = 0.0;
+        for (i, (w, _)) in child_sizes.iter().enumerate() {
+            if !flex_flags[i] {
+                fixed_total += *w;
+                if i < children.len() - 1 {
+                    fixed_total += spacing;
+                }
             }
-
-            current_x += w + spacing;
+        }
+        // flex children also need spacing between them and fixed children
+        if flex_count > 0 && children.len() > 1 {
+            // total spacing = (children.len() - 1) * spacing, already accounted in fixed_total for non-flex gaps
+            // add spacing for flex children positions
+            let total_spacing = (children.len() - 1) as f32 * spacing;
+            let remaining = content_width - fixed_total - total_spacing;
+            let flex_extra = if flex_count > 0 { remaining / flex_count as f32 } else { 0.0 };
+            
+            let mut current_x = padding.left;
+            for (i, &child_id) in children.iter().enumerate() {
+                let (w, h) = child_sizes[i];
+                let child_width = if flex_flags[i] { w + flex_extra } else { w };
+                let child_height = if cross_flags[i] { content_height } else { h };
+                
+                if let Some(node) = self.nodes.get_mut(&child_id) {
+                    node.widget.set_layout(crate::layout::Layout::new(
+                        current_x,
+                        padding.top,
+                        child_width,
+                        child_height,
+                    ));
+                }
+                
+                current_x += child_width + spacing;
+            }
+        } else {
+            // No flex children — use original logic
+            let mut current_x = padding.left;
+            for (i, &child_id) in children.iter().enumerate() {
+                let (w, h) = child_sizes[i];
+                let child_height = if cross_flags[i] { content_height } else { h };
+                
+                if let Some(node) = self.nodes.get_mut(&child_id) {
+                    let child_layout = *node.widget.layout();
+                    node.widget.set_layout(crate::layout::Layout::new(
+                        current_x,
+                        padding.top,
+                        w.max(child_layout.width),
+                        child_height,
+                    ));
+                }
+                
+                current_x += w + spacing;
+            }
         }
     }
 
@@ -468,24 +527,81 @@ pub fn perform_layout(&mut self, font_atlas: &FontAtlas) {
             })
             .unwrap_or((8.0, crate::types::EdgeInsets::zero()));
         
-        let mut current_y = padding.top;
+        let parent_width = self.nodes.get(&parent_id)
+            .map(|n| n.widget.layout().width)
+            .unwrap_or(0.0);
+        let parent_height = self.nodes.get(&parent_id)
+            .map(|n| n.widget.layout().height)
+            .unwrap_or(0.0);
+        
+        let content_width = parent_width - padding.left - padding.right;
+        let content_height = parent_height - padding.top - padding.bottom;
 
-        for (i, &child_id) in children.iter().enumerate() {
-            let (w, h) = child_sizes[i];
+        // Collect flex_expand and cross_axis_fill flags
+        let flex_flags: Vec<bool> = children.iter().map(|&child_id| {
+            self.nodes.get(&child_id)
+                .map(|n| n.widget.flags().flex_expand)
+                .unwrap_or(false)
+        }).collect();
+        let cross_flags: Vec<bool> = children.iter().map(|&child_id| {
+            self.nodes.get(&child_id)
+                .map(|n| n.widget.flags().cross_axis_fill)
+                .unwrap_or(false)
+        }).collect();
 
-            if let Some(node) = self.nodes.get_mut(&child_id) {
-                let child_layout = *node.widget.layout();
-                let x = padding.left;
-
-                node.widget.set_layout(crate::layout::Layout::new(
-                    x,
-                    current_y,
-                    w.max(child_layout.width),
-                    h.max(child_layout.height),
-                ));
+        let flex_count = flex_flags.iter().filter(|&f| *f).count();
+        
+        if flex_count > 0 {
+            // Calculate remaining space for flex_expand children
+            let mut fixed_total: f32 = 0.0;
+            for (i, (_, h)) in child_sizes.iter().enumerate() {
+                if !flex_flags[i] {
+                    fixed_total += *h;
+                    if i < children.len() - 1 {
+                        fixed_total += spacing;
+                    }
+                }
             }
-
-            current_y += h + spacing;
+            let total_spacing = (children.len() - 1) as f32 * spacing;
+            let remaining = content_height - fixed_total - total_spacing;
+            let flex_extra = remaining / flex_count as f32;
+            
+            let mut current_y = padding.top;
+            for (i, &child_id) in children.iter().enumerate() {
+                let (w, h) = child_sizes[i];
+                let child_width = if cross_flags[i] { content_width } else { w };
+                let child_height = if flex_flags[i] { h + flex_extra } else { h };
+                
+                if let Some(node) = self.nodes.get_mut(&child_id) {
+                    node.widget.set_layout(crate::layout::Layout::new(
+                        padding.left,
+                        current_y,
+                        child_width,
+                        child_height,
+                    ));
+                }
+                
+                current_y += child_height + spacing;
+            }
+        } else {
+            // No flex children — use original logic with cross_axis_fill support
+            let mut current_y = padding.top;
+            for (i, &child_id) in children.iter().enumerate() {
+                let (w, h) = child_sizes[i];
+                let child_width = if cross_flags[i] { content_width } else { w };
+                
+                if let Some(node) = self.nodes.get_mut(&child_id) {
+                    let child_layout = *node.widget.layout();
+                    node.widget.set_layout(crate::layout::Layout::new(
+                        padding.left,
+                        current_y,
+                        child_width.max(child_layout.width),
+                        h.max(child_layout.height),
+                    ));
+                }
+                
+                current_y += h + spacing;
+            }
         }
     }
 

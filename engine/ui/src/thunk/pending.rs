@@ -17,6 +17,8 @@ pub enum PendingCallback {
     DialogResult { dialog_id: u64, result: i32 },
     FileBrowserSelect { browser_id: u64, path: String },
     FileBrowserDoubleClick { browser_id: u64, path: String },
+    FocusChange { widget_id: u64, is_focused: bool },
+    EntitySelected { entity_id: u64, is_selected: bool },
 }
 
 static PENDING_CALLBACKS: LazyLock<Mutex<Vec<PendingCallback>>> =
@@ -68,6 +70,12 @@ pub fn flush_pending_callbacks() {
             }
             PendingCallback::FileBrowserDoubleClick { browser_id, path } => {
                 trigger_file_browser_double_click_callback(browser_id, &path);
+            }
+            PendingCallback::FocusChange { widget_id, is_focused } => {
+                trigger_focus_change_callback(widget_id, is_focused);
+            }
+            PendingCallback::EntitySelected { entity_id, is_selected } => {
+                trigger_entity_selected_callback(entity_id, is_selected);
             }
         }
     }

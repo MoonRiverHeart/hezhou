@@ -23,6 +23,9 @@ pub trait Widget: Send + Sync {
     fn state(&self) -> WidgetState;
     fn set_state(&mut self, state: WidgetState);
 
+    fn flags(&self) -> WidgetFlags;
+    fn set_flags(&mut self, flags: WidgetFlags);
+
     fn widget_type(&self) -> &'static str;
 
     fn as_any(&self) -> &dyn Any;
@@ -73,6 +76,10 @@ pub struct WidgetFlags {
     pub visible: bool,
     pub enabled: bool,
     pub clip_children: bool,
+    /// Expand to fill remaining space along parent's main axis (flex-grow)
+    pub flex_expand: bool,
+    /// Stretch to fill parent's cross axis width/height
+    pub cross_axis_fill: bool,
 }
 
 impl Default for WidgetFlags {
@@ -85,6 +92,8 @@ impl Default for WidgetFlags {
             visible: true,
             enabled: true,
             clip_children: false,
+            flex_expand: false,
+            cross_axis_fill: false,
         }
     }
 }

@@ -1,4 +1,4 @@
-use crate::{Widget, WidgetId, Layout, Style, Color, Canvas, Rect, Event, EventResult, DrawCommand, WidgetState, EventType};
+use crate::{Widget, WidgetId, Layout, Style, Color, Canvas, Rect, Event, EventResult, DrawCommand, WidgetState, EventType, WidgetFlags};
 
 pub struct PreviewWindow {
     id: WidgetId,
@@ -10,6 +10,7 @@ pub struct PreviewWindow {
     texture_id: u64,
     selected: bool,
     edit_mode: bool,  // true=Editing(橙色边框), false=Running(蓝色边框)
+    flags: WidgetFlags,
 }
 
 impl PreviewWindow {
@@ -24,6 +25,7 @@ impl PreviewWindow {
             texture_id,
             selected: false,
             edit_mode: true,  // 默认Editing模式
+            flags: WidgetFlags::default(),
         }
     }
     
@@ -142,6 +144,14 @@ impl Widget for PreviewWindow {
     
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
         self
+    }
+    
+    fn flags(&self) -> WidgetFlags {
+        self.flags
+    }
+
+    fn set_flags(&mut self, flags: WidgetFlags) {
+        self.flags = flags;
     }
 }
 

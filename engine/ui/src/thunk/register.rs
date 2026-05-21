@@ -135,3 +135,17 @@ pub extern "C" fn ui_register_file_browser_double_click_callback(widget_id: u64,
     callbacks.on_file_browser_double_click.insert(widget_id, callback);
     dfx_info!("UI", "注册FileBrowserDoubleClick回调: widget={} callback={:?}", widget_id, callback);
 }
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_register_focus_change_callback(callback: FocusChangeCallback) {
+    let mut callbacks = UI_CALLBACKS.lock();
+    callbacks.on_focus_change = Some(callback);
+    dfx_info!("UI", "注册FocusChange回调: {:?}", callback);
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_register_entity_selected_callback(callback: EntitySelectedCallback) {
+    let mut callbacks = UI_CALLBACKS.lock();
+    callbacks.on_entity_selected = Some(callback);
+    dfx_info!("UI", "注册EntitySelected回调: {:?}", callback);
+}

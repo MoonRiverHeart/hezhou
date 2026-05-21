@@ -265,6 +265,14 @@ impl Widget for InputField {
         self
     }
     
+    fn flags(&self) -> WidgetFlags {
+        self.flags
+    }
+
+    fn set_flags(&mut self, flags: WidgetFlags) {
+        self.flags = flags;
+    }
+    
     fn draw(&mut self, canvas: &mut Canvas) {
         let global_focused = crate::thunk::ui_get_focused_input_field();
         self.is_focused = global_focused == self.id.id;

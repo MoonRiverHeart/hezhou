@@ -279,6 +279,28 @@ public static ulong GetRootId()
             func(_widgetTree, widgetId, layer);
         }
 
+        public static void SetFlexExpand(ulong widgetId, bool expand)
+        {
+            if (_ffi.ui_widget_set_flex_expand == IntPtr.Zero)
+            {
+                Log.Error("C#", "SetFlexExpand函数指针为空");
+                return;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<SetFlexExpandDelegate>(_ffi.ui_widget_set_flex_expand);
+            func(_widgetTree, widgetId, expand ? 1u : 0u);
+        }
+
+        public static void SetCrossAxisFill(ulong widgetId, bool fill)
+        {
+            if (_ffi.ui_widget_set_cross_axis_fill == IntPtr.Zero)
+            {
+                Log.Error("C#", "SetCrossAxisFill函数指针为空");
+                return;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<SetCrossAxisFillDelegate>(_ffi.ui_widget_set_cross_axis_fill);
+            func(_widgetTree, widgetId, fill ? 1u : 0u);
+        }
+
         public static void DebugPrintUITree()
         {
             if (_ffi.ui_debug_print_widget_tree == IntPtr.Zero)

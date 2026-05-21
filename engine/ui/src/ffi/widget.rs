@@ -615,3 +615,45 @@ pub extern "C" fn ui_list_item_set_font_size(
         }
     }
 }
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_widget_set_flex_expand(
+    handle: WidgetTreeHandle,
+    widget_id: u64,
+    expand: u32,
+) {
+    if handle.is_null() {
+        return;
+    }
+    unsafe {
+        let arc = &*(handle as *const Arc<Mutex<WidgetTree>>);
+        let mut tree = arc.lock();
+        let id = WidgetId::from_raw(widget_id);
+        if let Some(widget) = tree.get_widget_mut(id) {
+            let mut flags = widget.flags();
+            flags.flex_expand = expand != 0;
+            widget.set_flags(flags);
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_widget_set_cross_axis_fill(
+    handle: WidgetTreeHandle,
+    widget_id: u64,
+    fill: u32,
+) {
+    if handle.is_null() {
+        return;
+    }
+    unsafe {
+        let arc = &*(handle as *const Arc<Mutex<WidgetTree>>);
+        let mut tree = arc.lock();
+        let id = WidgetId::from_raw(widget_id);
+        if let Some(widget) = tree.get_widget_mut(id) {
+            let mut flags = widget.flags();
+            flags.cross_axis_fill = fill != 0;
+            widget.set_flags(flags);
+        }
+    }
+}
