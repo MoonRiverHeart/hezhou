@@ -3160,3 +3160,13 @@ pub extern "C" fn ui_file_browser_set_on_double_click_thunk_ptr(
     crate::thunk_manager::ui_register_file_browser_double_click_callback(browser_id, callback);
     dfx_info!("FFI", "FileBrowserSetOnDoubleClickThunkPtr: browser_id={}", browser_id);
 }
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_debug_print_widget_tree(handle: WidgetTreeHandle) {
+    if handle.is_null() { return; }
+    unsafe {
+        let arc = &*(handle as *const Arc<Mutex<WidgetTree>>);
+        let tree = arc.lock();
+        tree.debug_print_tree();
+    }
+}

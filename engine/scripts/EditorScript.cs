@@ -63,9 +63,6 @@ namespace Hezhou
         
         private static ulong _runButtonId;  // 运行/编辑按钮ID
         
-        private static Panel _dropdownMenu;
-        private static VStack _menuItems;
-        
         private static ulong _fileMenuId;
         private static ulong _openMenuId;
         private static ulong _saveMenuId;
@@ -278,6 +275,17 @@ _hotReloadCompleteCallback = OnHotReloadComplete;
             const uint KEY_RIGHT = 46;
             const uint KEY_UP = 47;
             const uint KEY_DOWN = 48;
+            const uint KEY_D = 4;
+
+            bool ctrl = (modifiers & 2) != 0;
+            bool shift = (modifiers & 1) != 0;
+
+            if (keycode == KEY_D && pressed && ctrl && shift)
+            {
+                UI.DebugPrintUITree();
+                Log.Info("Editor", "Ctrl+Shift+D: UI tree printed");
+                return;
+            }
             
             bool selected = UI.IsPreviewWindowSelected(_previewWindowId);
             GameState currentState = _gameScene != null ? _gameScene.GetGameState() : GameState.Editing;
@@ -362,17 +370,17 @@ _hotReloadCompleteCallback = OnHotReloadComplete;
             
             var newBtn = _toolbarButtons.AddButton(100f, 30f, "新建");
             newBtn.SetOnClick((id) => {
-                UI.PopupMenuShow(_fileMenuId, 10, 45);
+                UI.PopupMenuShow(_fileMenuId, 10f * _contentScale, TOOLBAR_HEIGHT * _contentScale);
             });
             
             var openBtn = _toolbarButtons.AddButton(100f, 30f, "打开");
             openBtn.SetOnClick((id) => {
-                UI.PopupMenuShow(_openMenuId, 100, 45);
+                UI.PopupMenuShow(_openMenuId, 110f * _contentScale, TOOLBAR_HEIGHT * _contentScale);
             });
             
             var saveBtn = _toolbarButtons.AddButton(100f, 30f, "保存");
             saveBtn.SetOnClick((id) => {
-                UI.PopupMenuShow(_saveMenuId, 190, 45);
+                UI.PopupMenuShow(_saveMenuId, 210f * _contentScale, TOOLBAR_HEIGHT * _contentScale);
             });
             
             var runBtn = _toolbarButtons.AddButton(100f, 30f, "运行");

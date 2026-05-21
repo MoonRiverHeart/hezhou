@@ -170,6 +170,7 @@ pub type DfxTraceBeginFn = extern "C" fn(*mut c_void, *const c_char, *const c_ch
 pub type DfxTraceEndFn = extern "C" fn(*mut c_void, *const c_char, *const c_char);
 pub type SetStatusTextFn = extern "C" fn(*const c_char);
 pub type OnHotReloadCompleteFn = extern "C" fn();
+pub type DebugPrintWidgetTreeFn = extern "C" fn(WidgetTreeHandle);
 
 #[repr(C)]
 pub struct FfiContext {
@@ -326,6 +327,7 @@ pub struct FfiContext {
     pub dfx_trace_end: DfxTraceEndFn,
     pub set_status_text: SetStatusTextFn,
     pub on_hot_reload_complete: OnHotReloadCompleteFn,
+    pub ui_debug_print_widget_tree: DebugPrintWidgetTreeFn,
 }
 
 static mut FFI_CONTEXT: Option<Box<FfiContext>> = None;

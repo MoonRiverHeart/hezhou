@@ -2,6 +2,7 @@ use crate::canvas::*;
 use crate::font_atlas::FontAtlas;
 use crate::types::*;
 use crate::widget::*;
+use hezhou_dfx::*;
 use std::collections::HashMap;
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
@@ -764,6 +765,31 @@ pub fn perform_layout(&mut self, font_atlas: &FontAtlas) {
                     stroke_width: *stroke_width,
                 }
             }
+        }
+    }
+    
+    pub fn debug_print_tree(&self) {
+        if let Some(root) = self.root {
+            self.print_node(root, 0);
+        }
+    }
+
+    fn print_node(&self, id: WidgetId, depth: usize) {
+        let indent = "  ".repeat(depth);
+        if let Some(node) = self.nodes.get(&id) {
+            let layout = node.widget.layout();
+            let widget_type = node.widget.widget_type();
+            let layer = node.layer;
+            dfx_info!("UITree", "{}[{}] id={} pos=({:.0},{:.0}) size=({:.0},{:.0}) layer={}", 
+                indent, widget_type, id.id, layout.x, layout.y, layout.width, layout.height, layer as i32);
+            
+            if let Some(children) = self.children_map.get(&id) {
+                for &child_id in children {
+                    self.print_node(child_id, depth + 1);
+                }
+            }
+        } else {
+            dfx_info!("UITree", "{}[UNKNOWN] id={}", indent, id.id);
         }
     }
 }

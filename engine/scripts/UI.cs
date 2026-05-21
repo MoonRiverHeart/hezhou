@@ -129,6 +129,9 @@ namespace Hezhou
         public delegate void OnHotReloadCompleteDelegate();
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void DebugPrintWidgetTreeDelegate(IntPtr handle);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public delegate void RegisterHotReloadCompleteCallbackDelegate(IntPtr callbackPtr);
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
@@ -724,6 +727,7 @@ namespace Hezhou
             public IntPtr project_get_entity_info;
             public IntPtr project_add_entity;
             public IntPtr project_remove_entity;
+            public IntPtr ui_debug_print_widget_tree;
         }
 
         public static void InitFromContext(IntPtr contextPtr)
@@ -1120,6 +1124,17 @@ public static ulong GetRootId()
             }
             var func = Marshal.GetDelegateForFunctionPointer<SetWidgetLayerDelegate>(_ffi.ui_widget_set_layer);
             func(_widgetTree, widgetId, layer);
+        }
+
+        public static void DebugPrintUITree()
+        {
+            if (_ffi.ui_debug_print_widget_tree == IntPtr.Zero)
+            {
+                Log.Error("C#", "DebugPrintUITree函数指针为空");
+                return;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<DebugPrintWidgetTreeDelegate>(_ffi.ui_debug_print_widget_tree);
+            func(_widgetTree);
         }
         
         public static uint GetWidgetLayer(ulong widgetId)
