@@ -34,7 +34,7 @@ impl EventDispatcher {
 
     pub fn dispatch_event(&mut self, event: &mut Event) {
         if event.event_type == EventType::TouchBegin {
-            let focused_id = crate::thunk_manager::ui_get_focused_input_field();
+            let focused_id = crate::thunk::ui_get_focused_input_field();
             if focused_id != 0 {
                 let target = match &event.data {
                     EventData::Touch(touch) => {
@@ -59,7 +59,7 @@ impl EventDispatcher {
                         }
                     }
                     drop(tree);
-                    crate::thunk_manager::ui_clear_focused_input_field();
+                    crate::thunk::ui_clear_focused_input_field();
                 }
             }
         }
@@ -154,13 +154,13 @@ impl EventDispatcher {
                         }
                     }
                     drop(tree);
-                    crate::thunk_manager::queue_callback(crate::thunk_manager::PendingCallback::ButtonClick { widget_id: g.target.id });
+                    crate::thunk::queue_callback(crate::thunk::PendingCallback::ButtonClick { widget_id: g.target.id });
                 } else {
-                    crate::thunk_manager::ui_trigger_global_click(click_point.x, click_point.y);
+                    crate::thunk::ui_trigger_global_click(click_point.x, click_point.y);
                 }
             }
         } else if event.event_type == EventType::TouchEnd {
-            crate::thunk_manager::ui_trigger_global_click(click_point.x, click_point.y);
+            crate::thunk::ui_trigger_global_click(click_point.x, click_point.y);
         }
     }
     

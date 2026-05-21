@@ -381,7 +381,7 @@ impl Widget for PopupMenu {
                         }
                     } else {
                         self.hide();
-                        crate::thunk_manager::queue_callback(crate::thunk_manager::PendingCallback::PopupMenuClose { widget_id: self.id.id });
+                        crate::thunk::queue_callback(crate::thunk::PendingCallback::PopupMenuClose { widget_id: self.id.id });
                         return EventResult::Stopped;
                     }
                 }
@@ -393,7 +393,7 @@ impl Widget for PopupMenu {
                         let action_id = self.items[index].action_id;
                         dfx_info!("PopupMenu", "Item clicked: index={}, action_id={}", index, action_id);
                         
-                        crate::thunk_manager::queue_callback(crate::thunk_manager::PendingCallback::PopupMenuClick {
+                        crate::thunk::queue_callback(crate::thunk::PendingCallback::PopupMenuClick {
                             widget_id: self.id.id,
                             action_id,
                         });

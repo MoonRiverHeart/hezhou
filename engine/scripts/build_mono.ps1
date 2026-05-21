@@ -23,33 +23,43 @@ if (-not (Test-Path $McsPath)) {
 
 $SourceFile = "$ScriptsDir/RotationScript.cs"
 $UiFile = "$ScriptsDir/UI.cs"
+$UiWidgetsFile = "$ScriptsDir/UI.Widgets.cs"
+$UiComplexWidgetsFile = "$ScriptsDir/UI.ComplexWidgets.cs"
+$UiNewWidgetsFile = "$ScriptsDir/UI.NewWidgets.cs"
+$UiSceneFile = "$ScriptsDir/UI.Scene.cs"
+$UiAssetProjectFile = "$ScriptsDir/UI.AssetProject.cs"
 $DfxFile = "$ScriptsDir/DFX.cs"
 $EditorFile = "$ScriptsDir/EditorScript.cs"
+$EditorLayoutFile = "$ScriptsDir/EditorScript.Layout.cs"
+$EditorPropertiesFile = "$ScriptsDir/EditorScript.Properties.cs"
+$EditorEventsFile = "$ScriptsDir/EditorScript.Events.cs"
+$EditorEntityFile = "$ScriptsDir/EditorScript.Entity.cs"
+$EditorScriptFile = "$ScriptsDir/EditorScript.Script.cs"
+$EditorMenusFile = "$ScriptsDir/EditorScript.Menus.cs"
 $TestFile = "$ScriptsDir/AssetProjectTest.cs"
 Write-Host "[Info] Compiling: $SourceFile"
 Write-Host "[Info] Including: $UiFile"
+Write-Host "[Info] Including: $UiWidgetsFile"
+Write-Host "[Info] Including: $UiComplexWidgetsFile"
+Write-Host "[Info] Including: $UiNewWidgetsFile"
+Write-Host "[Info] Including: $UiSceneFile"
+Write-Host "[Info] Including: $UiAssetProjectFile"
 Write-Host "[Info] Including: $DfxFile"
 Write-Host "[Info] Including: $EditorFile"
+Write-Host "[Info] Including: $EditorLayoutFile"
+Write-Host "[Info] Including: $EditorPropertiesFile"
+Write-Host "[Info] Including: $EditorEventsFile"
+Write-Host "[Info] Including: $EditorEntityFile"
+Write-Host "[Info] Including: $EditorScriptFile"
+Write-Host "[Info] Including: $EditorMenusFile"
 Write-Host "[Info] Including: $TestFile"
 
-if (-not (Test-Path $SourceFile)) {
-    Write-Host "[Error] Source file not found: $SourceFile" -ForegroundColor Red
-    exit 1
-}
-
-if (-not (Test-Path $UiFile)) {
-    Write-Host "[Error] UI file not found: $UiFile" -ForegroundColor Red
-    exit 1
-}
-
-if (-not (Test-Path $DfxFile)) {
-    Write-Host "[Error] DFX file not found: $DfxFile" -ForegroundColor Red
-    exit 1
-}
-
-if (-not (Test-Path $EditorFile)) {
-    Write-Host "[Error] Editor file not found: $EditorFile" -ForegroundColor Red
-    exit 1
+$SourceFiles = @($SourceFile, $UiFile, $UiWidgetsFile, $UiComplexWidgetsFile, $UiNewWidgetsFile, $UiSceneFile, $UiAssetProjectFile, $DfxFile, $EditorFile, $EditorLayoutFile, $EditorPropertiesFile, $EditorEventsFile, $EditorEntityFile, $EditorScriptFile, $EditorMenusFile, $TestFile)
+foreach ($file in $SourceFiles) {
+    if (-not (Test-Path $file)) {
+        Write-Host "[Error] Source file not found: $file" -ForegroundColor Red
+        exit 1
+    }
 }
 
 # Generate unique assembly name to bypass Mono's cache
@@ -61,11 +71,7 @@ $OutputDll = "$OutputDir/$AssemblyName.dll"
 $Output = & $McsPath `
     -target:library `
     -out:"$OutputDll" `
-    $SourceFile `
-    $UiFile `
-    $DfxFile `
-    $EditorFile `
-    $TestFile `
+    $SourceFiles `
     -define:MONO `
     2>&1
 

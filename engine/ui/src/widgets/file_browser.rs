@@ -221,14 +221,14 @@ impl FileBrowser {
     }
     
     fn trigger_select_callback(&mut self, path: &str) {
-        crate::thunk_manager::queue_callback(crate::thunk_manager::PendingCallback::FileBrowserSelect {
+        crate::thunk::queue_callback(crate::thunk::PendingCallback::FileBrowserSelect {
             browser_id: self.id.id,
             path: path.to_string(),
         });
     }
     
     fn trigger_double_click_callback(&mut self, path: &str) {
-        crate::thunk_manager::queue_callback(crate::thunk_manager::PendingCallback::FileBrowserDoubleClick {
+        crate::thunk::queue_callback(crate::thunk::PendingCallback::FileBrowserDoubleClick {
             browser_id: self.id.id,
             path: path.to_string(),
         });
@@ -534,9 +534,9 @@ pub type FileBrowserSelectCallback = extern "C" fn(u64, *const std::ffi::c_char)
 pub type FileBrowserDoubleClickCallback = extern "C" fn(u64, *const std::ffi::c_char);
 
 pub fn trigger_file_browser_select_callback(browser_id: u64, path: &str) {
-    crate::thunk_manager::trigger_file_browser_select_callback(browser_id, path);
+    crate::thunk::trigger_file_browser_select_callback(browser_id, path);
 }
 
 pub fn trigger_file_browser_double_click_callback(browser_id: u64, path: &str) {
-    crate::thunk_manager::trigger_file_browser_double_click_callback(browser_id, path);
+    crate::thunk::trigger_file_browser_double_click_callback(browser_id, path);
 }

@@ -143,13 +143,13 @@ impl UIInputHandler {
                     let mut event = Event::new(EventType::TouchMove, timestamp)
                         .with_data(EventData::Touch(TouchData::new(x, y, 0)));
                     self.event_dispatcher.lock().dispatch_event(&mut event);
-                    crate::thunk_manager::ui_trigger_mouse_move_event(x, y, true);
+                    crate::thunk::ui_trigger_mouse_move_event(x, y, true);
                 } else {
                     let mut event = Event::new(EventType::MouseMove, timestamp).with_data(
                         EventData::Mouse(MouseData::new(x, y, ui_button)),
                     );
                     self.event_dispatcher.lock().dispatch_event(&mut event);
-                    crate::thunk_manager::ui_trigger_mouse_move_event(x, y, false);
+                    crate::thunk::ui_trigger_mouse_move_event(x, y, false);
                 }
             }
             MouseAction::Scroll => {
@@ -181,7 +181,7 @@ impl UIInputHandler {
 
         // 触发C#键盘回调 - 使用 volatile read 的值
         let pressed = action_val == 0 || action_val == 2;  // Press=0, Repeat=2
-        crate::thunk_manager::ui_trigger_key_event(key.keycode as u32, pressed, modifiers);
+        crate::thunk::ui_trigger_key_event(key.keycode as u32, pressed, modifiers);
 
         let mut event = if action_val == 0 || action_val == 2 {
             Event::new(EventType::KeyDown, timestamp)

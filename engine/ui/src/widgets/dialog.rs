@@ -100,8 +100,8 @@ impl Dialog {
     
     pub fn with_size(mut self, width: f32, height: f32) -> Self {
         self.layout = Layout::new(
-            (crate::thunk_manager::ui_get_screen_size().0 - width) / 2.0,
-            (crate::thunk_manager::ui_get_screen_size().1 - height) / 2.0,
+            (crate::thunk::ui_get_screen_size().0 - width) / 2.0,
+            (crate::thunk::ui_get_screen_size().1 - height) / 2.0,
             width,
             height,
         );
@@ -205,7 +205,7 @@ impl Dialog {
         if index < self.buttons.len() {
             let action_value = self.buttons[index].action_value();
             self.result = Some(action_value);
-            crate::thunk_manager::queue_callback(crate::thunk_manager::PendingCallback::DialogResult {
+            crate::thunk::queue_callback(crate::thunk::PendingCallback::DialogResult {
                 dialog_id: self.id.id,
                 result: action_value,
             });
@@ -441,5 +441,5 @@ impl Default for Dialog {
 pub type DialogResultCallback = extern "C" fn(u64, i32);
 
 pub fn trigger_dialog_result_callback(dialog_id: u64, result: i32) {
-    crate::thunk_manager::trigger_dialog_result_callback(dialog_id, result);
+    crate::thunk::trigger_dialog_result_callback(dialog_id, result);
 }

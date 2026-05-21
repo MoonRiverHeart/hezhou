@@ -124,13 +124,13 @@ impl InputField {
     
     pub fn focus(&mut self) {
         self.is_focused = true;
-        crate::thunk_manager::ui_set_focused_input_field(self.id.id);
+        crate::thunk::ui_set_focused_input_field(self.id.id);
         self.flags.dirty_render = true;
     }
     
     pub fn blur(&mut self) {
         self.is_focused = false;
-        crate::thunk_manager::ui_clear_focused_input_field();
+        crate::thunk::ui_clear_focused_input_field();
         self.flags.dirty_render = true;
     }
     
@@ -169,7 +169,7 @@ impl InputField {
     }
     
     fn trigger_on_change(&mut self) {
-        crate::thunk_manager::queue_callback(crate::thunk_manager::PendingCallback::InputFieldChange {
+        crate::thunk::queue_callback(crate::thunk::PendingCallback::InputFieldChange {
             widget_id: self.id.id,
             text: self.text.clone(),
         });
@@ -266,7 +266,7 @@ impl Widget for InputField {
     }
     
     fn draw(&mut self, canvas: &mut Canvas) {
-        let global_focused = crate::thunk_manager::ui_get_focused_input_field();
+        let global_focused = crate::thunk::ui_get_focused_input_field();
         self.is_focused = global_focused == self.id.id;
         
         let current_style = if self.is_focused {
@@ -390,7 +390,7 @@ impl Widget for InputField {
             }
             
             EventType::KeyDown => {
-                let focused_id = crate::thunk_manager::ui_get_focused_input_field();
+                let focused_id = crate::thunk::ui_get_focused_input_field();
                 if focused_id != self.id.id {
                     return EventResult::Ignored;
                 }

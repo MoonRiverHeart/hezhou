@@ -3086,7 +3086,7 @@ self.dfx.lock().get_logger().lock().log(
             }
         }
         
-        hezhou_ui::thunk_manager::flush_pending_callbacks();
+        hezhou_ui::thunk::flush_pending_callbacks();
     }
     
     pub fn get_frame_count(&self) -> u64 {

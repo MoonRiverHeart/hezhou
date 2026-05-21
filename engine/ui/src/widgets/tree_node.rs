@@ -4,7 +4,7 @@ use crate::layout::*;
 use crate::style::*;
 use crate::types::*;
 use crate::widget::*;
-use crate::thunk_manager::{queue_callback, PendingCallback};
+use crate::thunk::{queue_callback, PendingCallback};
 
 pub struct TreeNode {
     id: WidgetId,

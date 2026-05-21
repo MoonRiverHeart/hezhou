@@ -4,7 +4,7 @@ use crate::layout::*;
 use crate::style::*;
 use crate::types::*;
 use crate::widget::*;
-use crate::thunk_manager::*;
+use crate::thunk::*;
 use hezhou_dfx::*;
 
 pub struct Tab {

@@ -30,7 +30,12 @@ try {
 $scriptsToCompile = @(
     "$ScriptDir/$ScriptName.cs",
     "$ScriptDir/DFX.cs",
-    "$ScriptDir/UI.cs"
+    "$ScriptDir/UI.cs",
+    "$ScriptDir/UI.Widgets.cs",
+    "$ScriptDir/UI.ComplexWidgets.cs",
+    "$ScriptDir/UI.NewWidgets.cs",
+    "$ScriptDir/UI.Scene.cs",
+    "$ScriptDir/UI.AssetProject.cs"
 )
 
 foreach ($script in $scriptsToCompile) {

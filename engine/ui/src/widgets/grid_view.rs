@@ -387,7 +387,7 @@ impl Widget for GridView {
                         
                         self.set_selected(index);
                         
-                        crate::thunk_manager::queue_callback(crate::thunk_manager::PendingCallback::GridViewClick {
+                        crate::thunk::queue_callback(crate::thunk::PendingCallback::GridViewClick {
                             widget_id: self.id.id,
                             index,
                             user_data,
