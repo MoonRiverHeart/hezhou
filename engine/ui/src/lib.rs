@@ -46,7 +46,7 @@ pub struct UISystem {
     event_dispatcher: Arc<parking_lot::Mutex<EventDispatcher>>,
     gesture_recognizer: Arc<parking_lot::Mutex<GestureRecognizer>>,
     animation_engine: Arc<parking_lot::Mutex<AnimationEngine>>,
-    font_atlas: &'static FontAtlas,
+    font_atlas: &'static parking_lot::Mutex<FontAtlas>,
     dfx: Arc<parking_lot::Mutex<DfxSystem>>,
     status_widget_id: Option<WidgetId>,
 }
@@ -103,7 +103,7 @@ impl UISystem {
         Arc::clone(&self.widget_tree)
     }
     
-    pub fn get_font_atlas(&self) -> &'static FontAtlas {
+pub fn get_font_atlas(&self) -> &'static parking_lot::Mutex<FontAtlas> {
         self.font_atlas
     }
     

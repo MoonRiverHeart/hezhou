@@ -35,6 +35,7 @@ pub struct FontAtlas {
     current_y: u32,
     row_height: u32,
     cached_font_sizes: Vec<u32>,
+    atlas_dirty: bool,
 }
 
 const PREDEFINED_FONT_SIZES: [u32; 13] = [48, 36, 32, 28, 24, 22, 20, 18, 16, 15, 14, 13, 12];
@@ -52,6 +53,7 @@ impl FontAtlas {
             current_y: 0,
             row_height: 0,
             cached_font_sizes: PREDEFINED_FONT_SIZES.to_vec(),
+            atlas_dirty: true, // dirty on init so initial texture upload happens
         }
     }
     
@@ -133,7 +135,8 @@ impl FontAtlas {
         }
     }
     
-    fn rasterize_char_direct(&mut self, font_index: usize, character: char, font_size: f32) {
+    pub fn rasterize_char_direct(&mut self, font_index: usize, character: char, font_size: f32) {
+        self.atlas_dirty = true;
         if character == ' ' || character == '\t' || character == '\n' || character == '\r' {
             let key = CharacterKey {
                 font_index,
@@ -362,6 +365,14 @@ impl FontAtlas {
         &self.atlas_texture
     }
     
+    pub fn is_atlas_dirty(&self) -> bool {
+        self.atlas_dirty
+    }
+    
+    pub fn clear_atlas_dirty(&mut self) {
+        self.atlas_dirty = false;
+    }
+    
     pub fn get_atlas_dimensions(&self) -> (u32, u32) {
         (self.atlas_width, self.atlas_height)
     }
@@ -502,9 +513,9 @@ impl Default for FontAtlas {
     }
 }
 
-static GLOBAL_FONT_ATLAS: OnceLock<FontAtlas> = OnceLock::new();
+static GLOBAL_FONT_ATLAS: OnceLock<parking_lot::Mutex<FontAtlas>> = OnceLock::new();
 
-pub fn get_font_atlas() -> &'static FontAtlas {
+pub fn get_font_atlas() -> &'static parking_lot::Mutex<FontAtlas> {
     GLOBAL_FONT_ATLAS.get_or_init(|| {
         let mut atlas = FontAtlas::new();
         
@@ -522,23 +533,46 @@ pub fn get_font_atlas() -> &'static FontAtlas {
             std::path::PathBuf::from(dev_font_path)
         } else {
             Arc::new(Mutex::new(DfxSystem::new())).lock().get_logger().lock().log(LogLevel::Warn, "FontAtlas", &format!("Font file not found (checked {} and {})", local_font.display(), dev_font_path), file!(), line!());
-            return atlas;
+            return parking_lot::Mutex::new(atlas);
         };
         
         let font_data = std::fs::read(font_path).expect("Failed to read font file");
         let font_index = atlas.add_font(&font_data);
         
-        let test_chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()-_+=[]{}|;:,.<>?/~ Click Me Welcome to Hezhou UI Press SPACE to change text hello 新建打开保存运行项目结构资产管理游戏预览属性编辑选中位置大小状态FPS脚本场景模型纹理新建场景新建脚本新建材质新建文件夹打开场景打开项目打开资源保存场景保存全部另存为就绪未命名缩放旋转TexturesModels // NewScript.cs using System Hezhou public class void Start Console WriteLine Update deltaTime logic here script file content read text edit panel button label stack panel rect layout style color background Hot Reload Trigger function method return float int string bool true false null this static private protected public override virtual abstract async await foreach while for if else switch case break continue try catch finally throw new out in ref params get set value object var const readonly namespace import using partial where select from group order by into join let on equals ascend descending take skip distinct aggregate sum count min max average first last single any all contains except intersect union concat reverse zip sequence element at range index substring length trim split join replace contains starts ends index of remove insert pad format parse convert to string int double bool datetime timespan guid guid new guid empty null try parse parse exact compare equals gethashcode tostring from binary to base64 stream reader writer file path directory info drive exception stack trace inner message source data code detail fault invalid operation argument null range type unsupported not implemented object disposed thread state timeout deadlock monitor lock mutex semaphore concurrent queue stack dictionary list array hash set sorted linked observable binding is enabled disabled visible collapsed hidden margin padding width height min max actual desired horizontal vertical alignment center left right top bottom stretch wrap wrap text clip overflow scroll auto fit fill uniform aspect ratio scale transform rotate translate skew matrix vector point size rect bounds location corner edge border corner radius thickness brush solid linear radial gradient color image tile stretch fill uniform aspect ratio opacity visibility hit test visible collapsed hidden render transform layout clip effect drop shadow blur glow outer inner noise mask opacity filter level radius direction offset angle distance spread source destination blend mode mix copy clear source over in out atop xor add saturate multiply screen overlay darken lighten color dodge burn soft hard difference exclusion hue saturation luminosity component mask unmask isolate isolate group knockout luma rgb alpha premultiplied straight apply save restore reset clear fill stroke clip path transform begin end close move line curve quadratic bezier smooth arc rect circle ellipse text font family style weight italic bold normal regular medium light extralight extrabold thin black condensed extended oblique underline strikethrough baseline subscript superscript small caps letter spacing word spacing kerning tracking leading line height paragraph indent hanging first left right tab stop decimal alignment keep together break before after around avoid orphans widows hyphenate minimum maximum consecutive limit zone threshold characters spaces auto manual none column row gap rule style width color span balance fill empty auto balanced consume flexible remaining fit fill proportionally distribute space stretch grow shrink basis direction wrap reverse main start end center justify between around evenly cross start end center stretch baseline content start end center between around evenly even odd stretch auto min max fit fill none collapse separate border box content box padding box margin box fixed sticky relative absolute static transform style flat preserve 3d perspective backface visible hidden translate Z scale Z rotate X Y Z perspective origin flat preserve 3d backface visible hidden pointer events auto none visible painted fill stroke all bounding clip path mask filter opacity transition animation timing function ease linear ease in ease out ease in out step start step end cubic bezier spring frames delay duration iteration count infinite alternate reverse both normal running paused fill mode forwards backwards both none keyframes block from to 0% 100% important media screen print handheld projection tv color monochrome resolution dpi dpcm scan progressive interlace grid width height orientation aspect ratio pixel index color monotone grayscale hue saturation lightness red green blue alpha cyan magenta yellow black cielab hcl hsv hwb named transparent current system accent dark light appearance theme media feature prefers reduced motion data save forced colors dynamic range contrast high standard none active hover focus enabled disabled read only checked indeterminate placeholder value empty valid invalid in range out of range required optional autofill autofilled modal open default placeholder marker selection caret match parent always never internal external global local inherit initial unset revert layer cascade scope container query selector type universal class id attribute pseudo element child descendant sibling adjacent general namespace combinator grouping nesting at rule declaration property value important syntax vendor extension hack prefix moz webkit o ms khtml apple official";
+        // Only pre-cache ASCII + basic symbols for fast startup.
+        // All other characters (including CJK) will be rasterized on-demand.
+        let ascii_chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()-_+=[]{}|;:,.<>?/~ _\"'\\";
         let sizes = [48.0, 36.0, 32.0, 28.0, 24.0, 22.0, 20.0, 18.0, 16.0, 15.0, 14.0, 13.0, 12.0];
         
-        atlas.prerasterize_chars(font_index, test_chars, &sizes);
+        atlas.prerasterize_chars(font_index, ascii_chars, &sizes);
         
-        Arc::new(Mutex::new(DfxSystem::new())).lock().get_logger().lock().log(LogLevel::Info, "FontAtlas", &format!("Pre-rasterized {} chars at sizes {:?}", test_chars.len(), sizes), file!(), line!());
+        Arc::new(Mutex::new(DfxSystem::new())).lock().get_logger().lock().log(LogLevel::Info, "FontAtlas", &format!("Pre-rasterized {} ASCII chars at sizes {:?}", ascii_chars.len(), sizes), file!(), line!());
         
-        atlas
+        parking_lot::Mutex::new(atlas)
     })
 }
 
-pub fn create_font_atlas() -> &'static FontAtlas {
-    get_font_atlas()
+/// Ensure all characters in `text` at `font_size` are rasterized in the atlas cache.
+/// Call this before rendering text to guarantee all glyphs are available.
+/// This is the key function that enables on-demand rasterization of any character,
+/// including CJK characters that were not in the startup precache list.
+pub fn ensure_chars_rasterized(font_index: usize, text: &str, font_size: f32) {
+    let atlas = get_font_atlas();
+    let mut atlas_guard = atlas.lock();
+    
+    let cached_size = atlas_guard.get_nearest_cached_font_size(font_size) as u32;
+    
+    for character in text.chars() {
+        let key = CharacterKey {
+            font_index,
+            character,
+            font_size: cached_size,
+        };
+        
+        // Only rasterize if not already cached
+        if !atlas_guard.character_cache.contains_key(&key) {
+            atlas_guard.rasterize_char_direct(font_index, character, cached_size as f32);
+        }
+    }
 }
+

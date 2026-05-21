@@ -48,6 +48,9 @@ pub trait Widget: Send + Sync {
 
     fn draw(&mut self, canvas: &mut Canvas);
     fn on_event(&mut self, event: &Event) -> EventResult;
+    
+    /// Return the widget's display text, if any. Used for on-demand font rasterization.
+    fn get_text(&self) -> Option<&str> { None }
 }
 
 #[repr(C)]

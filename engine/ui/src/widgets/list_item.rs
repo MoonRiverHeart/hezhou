@@ -132,6 +132,10 @@ impl Widget for ListItem {
         self.flags = flags;
     }
 
+    fn get_text(&self) -> Option<&str> {
+        Some(&self.text)
+    }
+
 fn draw(&mut self, canvas: &mut Canvas) {
         let width = self.layout.width;
         let height = self.layout.height;

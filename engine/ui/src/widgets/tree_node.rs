@@ -281,10 +281,14 @@ impl Widget for TreeNode {
         self.flags = flags;
     }
 
+    fn get_text(&self) -> Option<&str> {
+        Some(&self.text)
+    }
+
     fn draw(&mut self, canvas: &mut Canvas) {
         let width = self.layout.width;
         let height = self.layout.height;
-        let indent = self.depth as f32 * self.indent_width;
+        // Layout x already accounts for depth indent, so draw at local origin
         let icon_size = self.indent_width * 0.6;
 
         // 绘制背景
@@ -303,13 +307,13 @@ impl Widget for TreeNode {
 
         // 绘制展开/折叠图标
         if self.has_children {
-            let icon_x = indent + (self.indent_width - icon_size) / 2.0;
+            let icon_x = (self.indent_width - icon_size) / 2.0;
             let icon_y = (height - icon_size) / 2.0;
             self.draw_expand_icon(canvas, icon_x, icon_y, icon_size);
         }
 
         // 绘制文本
-        let text_x = indent + self.indent_width + 4.0 * self.content_scale;
+        let text_x = self.indent_width + 4.0 * self.content_scale;
         let text_style = TextStyle::new()
             .with_size(self.font_size)
             .with_color(self.text_color)
@@ -340,16 +344,17 @@ impl Widget for TreeNode {
             EventType::TouchBegin => {
                 match &event.data {
                     EventData::Touch(touch) => {
-                        let indent = self.depth as f32 * self.indent_width;
+                        // Layout x already accounts for depth indent, so touch coordinates
+                        // are relative to the node's own origin (no double-indent)
                         
                         // 点击展开图标区域
-                        if touch.x >= indent && touch.x < indent + self.indent_width && self.has_children {
+                        if touch.x >= 0.0 && touch.x < self.indent_width && self.has_children {
                             self.toggle();
                             return EventResult::Handled;
                         }
                         
                         // 点击文本区域
-                        if touch.x >= indent + self.indent_width {
+                        if touch.x >= self.indent_width {
                             self.select();
                             return EventResult::Handled;
                         }

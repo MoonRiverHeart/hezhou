@@ -158,13 +158,10 @@ pub fn handle_hot_reload(widget_tree_handle: WidgetTreeHandle) -> bool {
             let saved_bindings = save_scene_bindings();
             super::SAVED_BINDINGS = saved_bindings;
             
-            dfx_info!("HotReload", "[2] 清理旧的UI widgets...");
-            ui_ffi::ui_clear_widget_tree(widget_tree_handle as ui_ffi::WidgetTreeHandle);
-            
-            dfx_info!("HotReload", "[3] 卸载当前assembly...");
+            dfx_info!("HotReload", "[2] 卸载当前assembly (保留UI widgets)...");
             executor.shutdown();
             
-            dfx_info!("HotReload", "[4] 重新编译C#脚本...");
+            dfx_info!("HotReload", "[3] 重新编译C#脚本...");
             let compile_result = recompile_editor_script();
             
             if !compile_result {
@@ -181,19 +178,19 @@ pub fn handle_hot_reload(widget_tree_handle: WidgetTreeHandle) -> bool {
                 dfx_trace_end!("HotReload", "reload");
                 true
             } else {
-                dfx_info!("HotReload", "[5] 加载新assembly...");
+                dfx_info!("HotReload", "[4] 加载新assembly...");
                 match executor.reload() {
                     Ok(_) => {
                         dfx_info!("HotReload", "Assembly reload成功!");
                         
-                        dfx_info!("HotReload", "[6] 调用Initialize重建UI...");
+                        dfx_info!("HotReload", "[5] 调用Initialize重建UI...");
                         executor.call_static_with_ptr_namespace("Hezhou", "EditorScript", "Initialize", ffi_ptr_val as usize)
                             .expect("Initialize failed");
                         
-                        dfx_info!("HotReload", "[7] 恢复Entity-Script绑定数据...");
+                        dfx_info!("HotReload", "[6] 恢复Entity-Script绑定数据...");
                         restore_scene_bindings(&super::SAVED_BINDINGS);
                         
-                        dfx_info!("HotReload", "[8] 调用OnHotReloadComplete回调...");
+                        dfx_info!("HotReload", "[7] 调用OnHotReloadComplete回调...");
                         if let Some(callback) = super::HOT_RELOAD_COMPLETE_CALLBACK {
                             callback();
                         }

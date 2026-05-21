@@ -10,6 +10,36 @@ namespace Hezhou
         // VIEW: UI Creation and Layout Methods
         // =====================================================
 
+        private static void ShowWorkingDirectoryDialog()
+        {
+            Log.Info("Editor", "显示工作目录选择对话框...");
+            
+            ulong rootId = UI.GetRootId();
+            
+            float dialogWidth = 500f * _contentScale;
+            float dialogHeight = 400f * _contentScale;
+            float dialogX = (_screenWidth - dialogWidth) / 2f;
+            float dialogY = (_screenHeight - dialogHeight) / 2f;
+            
+            _workingDirectoryDialogId = UI.CreateDialog(rootId, "选择工作目录", dialogWidth, dialogHeight);
+            UI.DialogSetOnResult(_workingDirectoryDialogId, _workingDirectoryDialogResultCallback);
+            
+            ulong contentId = UI.CreateVStack(_workingDirectoryDialogId, 10f);
+            
+            UI.CreateLabel(contentId, dialogWidth - 40f, 30f, "请选择项目工作目录:");
+            
+            _workingDirectoryFileBrowserId = UI.CreateFileBrowser(contentId, 10f, 10f, dialogWidth - 60f, dialogHeight - 120f, "scripts");
+            UI.FileBrowserSetFilter(_workingDirectoryFileBrowserId, "*.cs;*.json;*.txt");
+            UI.FileBrowserSetOnSelect(_workingDirectoryFileBrowserId, _fileBrowserSelectCallback);
+            
+            UI.DialogSetContent(_workingDirectoryDialogId, contentId);
+            UI.DialogAddButton(_workingDirectoryDialogId, "确认", 1);
+            UI.DialogAddButton(_workingDirectoryDialogId, "使用默认目录", 2);
+            UI.DialogShow(_workingDirectoryDialogId);
+            
+            Log.Info("Editor", "工作目录对话框创建完成");
+        }
+
         private static void CreateEditorLayout()
         {
             _gameScene = new Scene();
@@ -39,20 +69,18 @@ namespace Hezhou
             
             CreateToolbarMenus();
             
-            var newBtn = _toolbarButtons.AddButton(100f, 30f, "新建");
-            newBtn.SetOnClick((id) => {
-                UI.PopupMenuShow(_fileMenuId, 10f * _contentScale, TOOLBAR_HEIGHT * _contentScale);
-            });
+            // Menu bar items: styled Labels instead of Buttons
+            var fileMenuLabel = _toolbarButtons.AddLabel(80f, 30f, "文件");
+            UI.SetOnClick(fileMenuLabel, _newClickCallback);
+            _menuBarLabelIds[0] = fileMenuLabel;
             
-            var openBtn = _toolbarButtons.AddButton(100f, 30f, "打开");
-            openBtn.SetOnClick((id) => {
-                UI.PopupMenuShow(_openMenuId, 110f * _contentScale, TOOLBAR_HEIGHT * _contentScale);
-            });
+            var openMenuLabel = _toolbarButtons.AddLabel(80f, 30f, "打开");
+            UI.SetOnClick(openMenuLabel, _openClickCallback);
+            _menuBarLabelIds[1] = openMenuLabel;
             
-            var saveBtn = _toolbarButtons.AddButton(100f, 30f, "保存");
-            saveBtn.SetOnClick((id) => {
-                UI.PopupMenuShow(_saveMenuId, 210f * _contentScale, TOOLBAR_HEIGHT * _contentScale);
-            });
+            var saveMenuLabel = _toolbarButtons.AddLabel(80f, 30f, "保存");
+            UI.SetOnClick(saveMenuLabel, _saveClickCallback);
+            _menuBarLabelIds[2] = saveMenuLabel;
             
             var runBtn = _toolbarButtons.AddButton(100f, 30f, "运行");
             _runButtonId = runBtn.Id;
@@ -612,31 +640,31 @@ namespace Hezhou
         {
             if (_projectPanel == null) return;
             
-            if (_projectTree != null)
+            if (_directoryTreeViewId != 0)
             {
-                UI.RemoveWidget(_projectTree.Id);
+                UI.RemoveWidget(_directoryTreeViewId);
+                _directoryTreeViewId = 0;
             }
             
             _fileItemPaths.Clear();
             _dirItemPaths.Clear();
             
-            _projectTree = new VStack(_projectPanel.Id, 5f);
-            _projectTree.SetPosition(10f, 40f);
+            float mainHeight = _screenHeight - TOOLBAR_HEIGHT - STATUS_BAR_HEIGHT - BOTTOM_PANEL_HEIGHT;
+            _directoryTreeViewId = UI.CreateTreeView(_projectPanel.Id, 10, 40, LEFT_PANEL_WIDTH - 20, mainHeight - 50);
             
-            var openBtn = _projectTree.AddButton(LEFT_PANEL_WIDTH - 40f, 20f, "📂 打开目录");
-            UI.SetOnClick(openBtn, _openInExplorerCallback);
+            _directoryRootNodeId = UI.TreeViewAddNode(_directoryTreeViewId, 0, "📂 " + _currentDirectory, 0, true);
+            
+            if (_currentDirectory != "scripts" && Directory.GetParent(_currentDirectory) != null)
+            {
+                _directoryBackNodeId = UI.TreeViewAddNode(_directoryTreeViewId, _directoryRootNodeId, "⬆ 返回上级", 0, false);
+                _dirItemPaths[_directoryBackNodeId] = Directory.GetParent(_currentDirectory).FullName;
+            }
             
             try
             {
                 if (Directory.Exists(_currentDirectory))
                 {
-                    if (_currentDirectory != "scripts" && Directory.GetParent(_currentDirectory) != null)
-                    {
-                        ulong backBtnId = _projectTree.AddButton(LEFT_PANEL_WIDTH - 40f, 20f, "⬆ 返回上级");
-                        UI.SetOnClick(backBtnId, _backClickCallback);
-                    }
-                    
-                    AddDirectoryItems(_projectTree, _currentDirectory, 0);
+                    AddDirectoryItems(_directoryTreeViewId, _directoryRootNodeId, _currentDirectory);
                 }
             }
             catch (Exception ex)
@@ -644,22 +672,24 @@ namespace Hezhou
                 Log.Error("Editor", $"reading directory: {ex.Message}");
             }
             
-            Log.Info("Editor", "目录树刷新完成");
+            UI.TreeViewSetOnSelect(_directoryTreeViewId, _treeNodeSelectCallback);
+            UI.TreeViewExpandNode(_directoryTreeViewId, _directoryRootNodeId);
+            
+            Log.Info("Editor", "目录树刷新完成 (TreeView)");
         }
         
-        private static void AddDirectoryItems(VStack stack, string path, int depth)
+        private static void AddDirectoryItems(ulong treeViewId, ulong parentNodeId, string path)
         {
-            string prefix = new string(' ', depth * 2);
-            
             try
             {
                 string[] dirs = Directory.GetDirectories(path);
                 foreach (string dir in dirs)
                 {
                     string name = Path.GetFileName(dir);
-                    ulong btnId = stack.AddButton(LEFT_PANEL_WIDTH - 40f, 20f, $"{prefix}📁 {name}/");
-                    _dirItemPaths[btnId] = dir;
-                    UI.SetOnClick(btnId, _directoryClickCallback);
+                    ulong nodeId = UI.TreeViewAddNode(treeViewId, parentNodeId, "📁 " + name, 0, true);
+                    _dirItemPaths[nodeId] = dir;
+                    
+                    AddDirectoryItems(treeViewId, nodeId, dir);
                 }
                 
                 string[] files = Directory.GetFiles(path);
@@ -668,9 +698,8 @@ namespace Hezhou
                     if (file.EndsWith(".cs") || file.EndsWith(".txt") || file.EndsWith(".json"))
                     {
                         string name = Path.GetFileName(file);
-                        ulong btnId = stack.AddButton(LEFT_PANEL_WIDTH - 40f, 20f, $"{prefix}📄 {name}");
-                    _fileItemPaths[btnId] = file;
-                    UI.SetOnClick(btnId, _fileClickCallback);
+                        ulong nodeId = UI.TreeViewAddNode(treeViewId, parentNodeId, "📄 " + name, 0, false);
+                        _fileItemPaths[nodeId] = file;
                     }
                 }
             }

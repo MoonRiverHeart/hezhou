@@ -232,6 +232,20 @@ impl WidgetTree {
         }
     }
 
+    /// Ensure all text from widgets is rasterized in the font atlas cache.
+    /// This must be called BEFORE perform_layout/generate_render_data to guarantee
+    /// all glyphs (including CJK characters not in the startup precache) are available.
+    pub fn ensure_text_rasterized(&self, font_atlas: &mut FontAtlas) {
+        let font_index = 0; // Default font index
+        let sizes: [f32; 13] = [48.0, 36.0, 32.0, 28.0, 24.0, 22.0, 20.0, 18.0, 16.0, 15.0, 14.0, 13.0, 12.0];
+        
+        for node in self.nodes.values() {
+            if let Some(text) = node.widget.as_ref().get_text() {
+                font_atlas.prerasterize_chars(font_index, text, &sizes);
+            }
+        }
+    }
+
 pub fn perform_layout(&mut self, font_atlas: &FontAtlas) {
         if let Some(root_id) = self.root {
             let _ = self.measure_and_layout(root_id, font_atlas);

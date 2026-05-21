@@ -16,7 +16,6 @@ namespace Hezhou
         private static Panel _toolbar;
         private static HStack _toolbarButtons;
         private static Panel _projectPanel;
-        private static VStack _projectTree;
         private static Panel _assetPanel;
         private static VStack _assetList;
         private static Panel _previewPanel;
@@ -58,6 +57,7 @@ namespace Hezhou
         private static ulong _fileMenuId;
         private static ulong _openMenuId;
         private static ulong _saveMenuId;
+        private static ulong[] _menuBarLabelIds = new ulong[3];
 
         // === Project Tree State ===
         private static ulong _projectTreeViewId;
@@ -76,6 +76,8 @@ namespace Hezhou
         private static UI.PopupMenuClickCallbackDelegate _saveMenuClickCallback;
         private static UI.TreeNodeSelectCallbackDelegate _treeNodeSelectCallback;
         private static UI.GridViewClickCallbackDelegate _gridViewClickCallback;
+        private static UI.FileBrowserSelectCallbackDelegate _fileBrowserSelectCallback;
+        private static UI.DialogResultCallbackDelegate _workingDirectoryDialogResultCallback;
 
         // === Script Editor State ===
         private static Panel _scriptEditorPanel;
@@ -94,6 +96,16 @@ namespace Hezhou
         private static Dictionary<ulong, string> _fileItemPaths = new Dictionary<ulong, string>();
         private static Dictionary<ulong, string> _dirItemPaths = new Dictionary<ulong, string>();
         private static bool _previewSelected = false;
+
+        // === Directory TreeView State ===
+        private static ulong _directoryTreeViewId;
+        private static ulong _directoryRootNodeId;
+        private static ulong _directoryBackNodeId;
+
+        // === Working Directory Dialog State ===
+        private static bool _workingDirectorySet = false;
+        private static ulong _workingDirectoryDialogId;
+        private static ulong _workingDirectoryFileBrowserId;
 
         // === Camera State ===
         private static float _savedCameraX = 0f;

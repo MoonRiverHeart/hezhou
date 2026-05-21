@@ -153,14 +153,14 @@ impl PopupMenu {
         let mut max_shortcut_width: f32 = 0.0;
         let font_size = 14.0 * self.content_scale;
         let shortcut_font_size = 12.0 * self.content_scale;
-        let font_atlas = crate::font_atlas::get_font_atlas();
+        let font_atlas_guard = crate::font_atlas::get_font_atlas().lock();
         
         for item in &self.items {
             if !item.is_separator {
-                let (tw, _) = font_atlas.measure_text(0, &item.text, font_size);
+                let (tw, _) = font_atlas_guard.measure_text(0, &item.text, font_size);
                 max_text_width = max_text_width.max(tw);
                 if let Some(shortcut) = &item.shortcut {
-                    let (sw, _) = font_atlas.measure_text(0, shortcut, shortcut_font_size);
+                    let (sw, _) = font_atlas_guard.measure_text(0, shortcut, shortcut_font_size);
                     max_shortcut_width = max_shortcut_width.max(sw);
                 }
             }

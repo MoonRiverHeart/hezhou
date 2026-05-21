@@ -11,6 +11,60 @@ namespace Hezhou
         // PRESENTER: Event Handlers and Business Logic
         // =====================================================
 
+        // === Working Directory Dialog Handlers ===
+
+        private static void OnWorkingDirectoryDialogResult(ulong dialogId, int result)
+        {
+            Log.Info("Editor", $"工作目录对话框结果: result={result}");
+            
+            if (result == 1)
+            {
+                string selectedPath = UI.FileBrowserGetSelectedPath(_workingDirectoryFileBrowserId);
+                if (!string.IsNullOrEmpty(selectedPath) && Directory.Exists(selectedPath))
+                {
+                    _currentDirectory = selectedPath;
+                    _workingDirectorySet = true;
+                    Log.Info("Editor", $"工作目录已设置: {_currentDirectory}");
+                }
+                else
+                {
+                    string currentPath = UI.FileBrowserGetCurrentPath(_workingDirectoryFileBrowserId);
+                    if (!string.IsNullOrEmpty(currentPath) && Directory.Exists(currentPath))
+                    {
+                        _currentDirectory = currentPath;
+                        _workingDirectorySet = true;
+                        Log.Info("Editor", $"工作目录已设置(使用当前路径): {_currentDirectory}");
+                    }
+                    else
+                    {
+                        _currentDirectory = "scripts";
+                        _workingDirectorySet = true;
+                        Log.Info("Editor", "使用默认工作目录: scripts");
+                    }
+                }
+            }
+            else if (result == 2)
+            {
+                _currentDirectory = "scripts";
+                _workingDirectorySet = true;
+                Log.Info("Editor", "使用默认工作目录: scripts");
+            }
+            
+            UI.DialogHide(_workingDirectoryDialogId);
+            
+            if (_workingDirectorySet)
+            {
+                CreateEditorLayout();
+                ScanScripts();
+                Log.Info("Editor", "编辑器初始化完成");
+            }
+        }
+        
+        private static void OnFileBrowserSelect(ulong browserId, string path)
+        {
+            Log.Info("Editor", $"文件浏览器选择: {path}");
+        }
+
         // === Input Event Handlers ===
 
         private static void OnMouseMove(float x, float y, bool dragging)
@@ -434,6 +488,26 @@ namespace Hezhou
 
         private static void OnTreeNodeSelect(ulong widgetId, ulong userData)
         {
+            // Check if this is a directory tree node selection
+            if (_dirItemPaths.TryGetValue(widgetId, out string dirPath))
+            {
+                if (dirPath != null && Directory.Exists(dirPath))
+                {
+                    _currentDirectory = dirPath;
+                    RefreshDirectoryTree();
+                    Log.Info("Editor", $"进入目录: {dirPath}");
+                }
+                return;
+            }
+            
+            if (_fileItemPaths.TryGetValue(widgetId, out string filePath))
+            {
+                Log.Info("Editor", $"点击文件: {filePath}");
+                LoadFileToEditor(filePath);
+                return;
+            }
+            
+            // Project tree entity selection
             if (userData != 0)
             {
                 SelectEntity(userData);
@@ -474,17 +548,20 @@ namespace Hezhou
 
         private static void OnNewClick(ulong widgetId)
         {
-            Log.Info("Editor", $"点击\"新建\"按钮, id={widgetId}");
+            Log.Info("Editor", $"点击\"文件\"菜单项, id={widgetId}");
+            UI.PopupMenuShow(_fileMenuId, 10f * _contentScale, TOOLBAR_HEIGHT * _contentScale);
         }
         
         private static void OnOpenClick(ulong widgetId)
         {
-            Log.Info("Editor", $"点击\"打开\"按钮, id={widgetId}");
+            Log.Info("Editor", $"点击\"打开\"菜单项, id={widgetId}");
+            UI.PopupMenuShow(_openMenuId, 90f * _contentScale, TOOLBAR_HEIGHT * _contentScale);
         }
         
         private static void OnSaveClick(ulong widgetId)
         {
-            Log.Info("Editor", $"点击\"保存\"按钮, id={widgetId}");
+            Log.Info("Editor", $"点击\"保存\"菜单项, id={widgetId}");
+            UI.PopupMenuShow(_saveMenuId, 170f * _contentScale, TOOLBAR_HEIGHT * _contentScale);
         }
         
         private static void OnRunClick(ulong widgetId)

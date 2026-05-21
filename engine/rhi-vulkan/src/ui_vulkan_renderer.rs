@@ -1590,19 +1590,19 @@ pub fn setup_ui(&mut self) {
             
             self.dfx.lock().get_logger().lock().log(LogLevel::Info, "UI", "VStack created with Button and Label", file!(), line!());
             
-let font_atlas = ui.get_font_atlas();
-            tree_guard.perform_layout(font_atlas);
+let font_atlas_guard = ui.get_font_atlas().lock();
+            tree_guard.perform_layout(&*font_atlas_guard);
             
             tree_guard.recenter_widget(vstack_id, self.extent.width as f32, self.extent.height as f32);
-            tree_guard.perform_layout(font_atlas);
+            tree_guard.perform_layout(&*font_atlas_guard);
             
             self.dfx.lock().get_logger().lock().log(LogLevel::Info, "UI", "VStack created with Button and Label", file!(), line!());
         }
         
         drop(tree_guard);
         
-        let font_atlas = ui.get_font_atlas();
-        let texture_data = font_atlas.get_atlas_texture().to_vec();
+        let font_atlas_guard = ui.get_font_atlas().lock();
+        let texture_data = font_atlas_guard.get_atlas_texture().to_vec();
         
         drop(ui);
         
@@ -1692,8 +1692,8 @@ let font_atlas = ui.get_font_atlas();
         
         drop(tree_guard);
         
-        let font_atlas = ui.get_font_atlas();
-        let texture_data = font_atlas.get_atlas_texture().to_vec();
+        let font_atlas_guard = ui.get_font_atlas().lock();
+        let texture_data = font_atlas_guard.get_atlas_texture().to_vec();
         
         drop(ui);
         
@@ -1893,7 +1893,7 @@ let font_atlas = ui.get_font_atlas();
         let ui = self.ui_system.lock();
         let tree = ui.get_widget_tree();
         let mut tree_guard = tree.lock();
-        let font_atlas = ui.get_font_atlas();
+        let font_atlas_guard = ui.get_font_atlas().lock();
         
         if let Some(root_id) = tree_guard.root {
             if let Some(root_widget) = tree_guard.get_widget_mut(root_id) {
@@ -1911,7 +1911,7 @@ let font_atlas = ui.get_font_atlas();
             
             if vstack_id.is_valid() {
                 tree_guard.recenter_widget(vstack_id, self.extent.width as f32, self.extent.height as f32);
-                tree_guard.perform_layout(font_atlas);
+                tree_guard.perform_layout(&*font_atlas_guard);
             }
         }
         
@@ -2469,7 +2469,6 @@ let font_atlas = ui.get_font_atlas();
             self.device.cmd_set_viewport(self.command_buffers[image_index_usize], 0, &[viewport]);
             self.device.cmd_set_scissor(self.command_buffers[image_index_usize], 0, &[scissor]);
             
-let font_atlas = self.ui_system.lock().get_font_atlas();
             let px_range = 4.0;
             
             let push_constants = [
@@ -2492,9 +2491,38 @@ let font_atlas = self.ui_system.lock().get_font_atlas();
                 let ui = self.ui_system.lock();
                 let tree = ui.get_widget_tree();
                 let mut tree_guard = tree.lock();
-                let font_atlas = ui.get_font_atlas();
-                tree_guard.perform_layout(font_atlas);
-                tree_guard.generate_render_data(font_atlas)
+                let font_atlas_mutex = ui.get_font_atlas();
+                
+                // Step 1: Ensure all text is rasterized on-demand (handles CJK etc.)
+                {
+                    let mut font_atlas_guard = font_atlas_mutex.lock();
+                    tree_guard.ensure_text_rasterized(&mut *font_atlas_guard);
+                    
+                    // If new characters were rasterized, re-upload font texture to GPU
+                    if font_atlas_guard.is_atlas_dirty() {
+                        let texture_data = font_atlas_guard.get_atlas_texture().to_vec();
+                        font_atlas_guard.clear_atlas_dirty();
+                        
+                        // Upload updated font atlas texture
+                        unsafe {
+                            let mem_requirements = self.device.get_image_memory_requirements(self.font_texture);
+                            let data_ptr = self.device.map_memory(
+                                self.font_texture_memory,
+                                0,
+                                mem_requirements.size,
+                                vk::MemoryMapFlags::empty(),
+                            ).expect("Failed to map font texture memory");
+                            
+                            std::ptr::copy_nonoverlapping(texture_data.as_ptr(), data_ptr as *mut u8, texture_data.len());
+                            self.device.unmap_memory(self.font_texture_memory);
+                        }
+                    }
+                }
+                
+                // Step 2: Now all glyphs are cached, use &FontAtlas for layout/render
+                let font_atlas_guard = font_atlas_mutex.lock();
+                tree_guard.perform_layout(&*font_atlas_guard);
+                tree_guard.generate_render_data(&*font_atlas_guard)
             };
             
             struct RenderBatch {
@@ -2636,11 +2664,11 @@ let font_atlas = self.ui_system.lock().get_font_atlas();
                         };
                         
                         let ui_lock = self.ui_system.lock();
-                        let font_atlas = ui_lock.get_font_atlas();
+                        let font_atlas_guard = ui_lock.get_font_atlas().lock();
                         
                         let glyphs = if alignment.horizontal == hezhou_ui::HorizontalAlignment::Left {
                             let vertical_center = alignment.vertical == hezhou_ui::VerticalAlignment::Center;
-                            font_atlas.layout_text_left(
+                            font_atlas_guard.layout_text_left(
                                 0,
                                 text_str,
                                 *font_size,
@@ -2650,7 +2678,7 @@ let font_atlas = self.ui_system.lock().get_font_atlas();
                                 vertical_center,
                             )
                         } else {
-                            font_atlas.layout_text_centered(
+                            font_atlas_guard.layout_text_centered(
                                 0,
                                 text_str,
                                 *font_size,

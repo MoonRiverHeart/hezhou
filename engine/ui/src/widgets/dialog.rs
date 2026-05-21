@@ -294,6 +294,10 @@ impl Widget for Dialog {
     fn set_flags(&mut self, flags: WidgetFlags) {
         self.flags = flags;
     }
+
+    fn get_text(&self) -> Option<&str> {
+        Some(&self.title)
+    }
     
     fn draw(&mut self, canvas: &mut Canvas) {
         if !self.is_visible {

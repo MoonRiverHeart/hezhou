@@ -51,19 +51,19 @@ _hotReloadCompleteCallback = OnHotReloadComplete;
             _saveMenuClickCallback = OnSaveMenuClick;
             _treeNodeSelectCallback = OnTreeNodeSelect;
             _gridViewClickCallback = OnGridViewClick;
+            _fileBrowserSelectCallback = OnFileBrowserSelect;
+            _workingDirectoryDialogResultCallback = OnWorkingDirectoryDialogResult;
             
             UI.RegisterUpdateCallback(_updateCallback);
             
-            CreateEditorLayout();
+            ShowWorkingDirectoryDialog();
             
             UI.RegisterResizeCallback(_resizeCallback);
             UI.RegisterGlobalClickCallback(_globalClickCallback);
             UI.RegisterKeyCallback(_keyCallback);
             UI.RegisterMouseMoveCallback(_mouseMoveCallback);
             
-            ScanScripts();
-            
-            Log.Info("Editor", "编辑器初始化完成");
+            Log.Info("Editor", "编辑器初始化完成 (等待选择工作目录)");
         }
         
         public static void Update(float deltaTime)
