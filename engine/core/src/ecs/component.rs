@@ -26,6 +26,7 @@ macro_rules! define_component {
     };
 }
 
+#[derive(Clone, Copy, Debug)]
 pub struct TransformComponent {
     pub position: crate::math::Vec3,
     pub rotation: crate::math::Quaternion,
@@ -44,12 +45,14 @@ impl Default for TransformComponent {
     }
 }
 
+#[derive(Clone, Debug, Default)]
 pub struct NameComponent {
     pub name: String,
 }
 
 define_component!(NameComponent, 2);
 
+#[derive(Clone, Copy, Debug, Default)]
 pub struct TagComponent {
     pub tag: u64,
 }

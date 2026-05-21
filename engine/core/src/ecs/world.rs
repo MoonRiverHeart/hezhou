@@ -62,7 +62,7 @@ impl World {
             .insert(entity.id, component_data.to_vec());
     }
 
-    pub fn get_component<T: Component>(&self, entity: Entity) -> Option<T> {
+    pub fn get_component<T: Component + Clone>(&self, entity: Entity) -> Option<T> {
         let type_id = T::type_id();
 
         self.components
@@ -70,7 +70,7 @@ impl World {
             .and_then(|map| map.get(&entity.id))
             .map(|data| unsafe {
                 let ptr = data.as_ptr() as *const T;
-                std::ptr::read(ptr)
+                (*ptr).clone()
             })
     }
 
