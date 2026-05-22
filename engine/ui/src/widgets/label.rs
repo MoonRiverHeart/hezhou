@@ -166,6 +166,29 @@ fn draw(&mut self, canvas: &mut Canvas) {
     }
 
     fn on_event(&mut self, event: &Event) -> EventResult {
+        match event.event_type {
+            EventType::TouchBegin => {
+                self.set_state(WidgetState::Pressed);
+                return EventResult::Handled;
+            }
+            EventType::TouchEnd => {
+                if self.state == WidgetState::Pressed {
+                    self.set_state(WidgetState::Normal);
+                    return EventResult::Handled;
+                }
+            }
+            EventType::MouseEnter => {
+                self.set_state(WidgetState::Hovered);
+                return EventResult::Handled;
+            }
+            EventType::MouseLeave => {
+                if self.state != WidgetState::Pressed {
+                    self.set_state(WidgetState::Normal);
+                }
+                return EventResult::Handled;
+            }
+            _ => {}
+        }
         EventResult::Ignored
     }
 }
