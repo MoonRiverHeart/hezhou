@@ -200,9 +200,35 @@ impl Widget for Dropdown {
                 vertical: VerticalAlignment::Center,
             });
         
-        let text_rect = Rect::new(10.0, 0.0, self.layout.width - 20.0, self.layout.height);
-        let display_text = format!("{} v", selected_text);
-        canvas.draw_text(text_rect, &display_text, &text_style);
+        let text_rect = Rect::new(10.0, 0.0, self.layout.width - 30.0, self.layout.height);
+        canvas.draw_text(text_rect, &selected_text, &text_style);
+        
+        // Draw dropdown arrow (▼) on the right side
+        let arrow_size = 10.0 * self.content_scale;
+        let arrow_x = self.layout.width - arrow_size - 8.0;
+        let arrow_y_center = self.layout.height / 2.0;
+        let arrow_half = arrow_size / 2.0;
+        
+        // ▼ triangle using 3 lines
+        let arrow_style = Style::new().with_background(Color::new(0.7, 0.7, 0.7, 1.0));
+        canvas.draw_line(
+            Point::new(arrow_x, arrow_y_center - arrow_half * 0.4),
+            Point::new(arrow_x + arrow_size, arrow_y_center - arrow_half * 0.4),
+            Color::new(0.7, 0.7, 0.7, 1.0),
+            1.5 * self.content_scale,
+        );
+        canvas.draw_line(
+            Point::new(arrow_x + arrow_size, arrow_y_center - arrow_half * 0.4),
+            Point::new(arrow_x + arrow_half, arrow_y_center + arrow_half * 0.6),
+            Color::new(0.7, 0.7, 0.7, 1.0),
+            1.5 * self.content_scale,
+        );
+        canvas.draw_line(
+            Point::new(arrow_x + arrow_half, arrow_y_center + arrow_half * 0.6),
+            Point::new(arrow_x, arrow_y_center - arrow_half * 0.4),
+            Color::new(0.7, 0.7, 0.7, 1.0),
+            1.5 * self.content_scale,
+        );
     }
     
     fn on_event(&mut self, event: &Event) -> EventResult {
