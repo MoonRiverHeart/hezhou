@@ -43,7 +43,7 @@ pub extern "C" fn ui_create_text_edit_in_parent(
         
         let content_scale = crate::thunk::ui_get_content_scale();
         let font_size = 16.0 * content_scale;
-        dfx_info!("FFI", "CreateTextEdit: content_scale={}, font_size={}", content_scale, font_size);
+        dfx_debug!("FFI", "CreateTextEdit: content_scale={}, font_size={}", content_scale, font_size);
         text_edit.set_font_size(font_size);
         
         let id = text_edit.id();
@@ -85,27 +85,27 @@ pub extern "C" fn ui_text_edit_set_text(
     text: *const std::ffi::c_char,
 ) {
     if handle.is_null() || text.is_null() {
-        dfx_info!("FFI", "ui_text_edit_set_text: handle or text is null");
+        dfx_debug!("FFI", "ui_text_edit_set_text: handle or text is null");
         return;
     }
     unsafe {
         let arc = &*(handle as *const Arc<Mutex<WidgetTree>>);
         let mut tree = arc.lock();
         let id = WidgetId::from_raw(widget_id);
-        dfx_info!("FFI", "ui_text_edit_set_text: widget_id={}, looking for widget", widget_id);
+        dfx_debug!("FFI", "ui_text_edit_set_text: widget_id={}, looking for widget", widget_id);
         if let Some(widget) = tree.get_widget_mut(id) {
-            dfx_info!("FFI", "Found widget, type={}", widget.widget_type());
+            dfx_debug!("FFI", "Found widget, type={}", widget.widget_type());
             if widget.widget_type() == "TextEdit" {
                 use crate::widgets::TextEdit;
                 if let Some(text_edit) = widget.as_any_mut().downcast_mut::<TextEdit>() {
                     let text_str = std::ffi::CStr::from_ptr(text).to_string_lossy();
-                    dfx_info!("FFI", "Setting text: {} chars, font_size={}", text_str.len(), text_edit.get_text_style().font_size);
+                    dfx_debug!("FFI", "Setting text: {} chars, font_size={}", text_str.len(), text_edit.get_text_style().font_size);
                     text_edit.set_text(&text_str);
-                    dfx_info!("FFI", "✓ Text set successfully");
+                    dfx_debug!("FFI", "✓ Text set successfully");
                 }
             }
         } else {
-            dfx_info!("FFI", "Widget not found for id={}", widget_id);
+            dfx_debug!("FFI", "Widget not found for id={}", widget_id);
         }
     }
 }

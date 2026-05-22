@@ -39,7 +39,7 @@ pub extern "C" fn ui_create_grid_view(
         };
         
         tree.add_widget(Box::new(grid_view), parent);
-        dfx_info!("FFI", "CreateGridView: id={}, parent={}, cell_size={}, scale={}", id.id, parent_id, cell_size, content_scale);
+        dfx_debug!("FFI", "CreateGridView: id={}, parent={}, cell_size={}, scale={}", id.id, parent_id, cell_size, content_scale);
         id.id
     }
 }
@@ -65,7 +65,7 @@ pub extern "C" fn ui_grid_view_add_item(
                 use crate::widgets::GridView;
                 if let Some(grid_view) = widget.as_any_mut().downcast_mut::<GridView>() {
                     let index = grid_view.add_item(label_str.clone(), user_data);
-                    dfx_info!("FFI", "GridViewAddItem: grid_id={}, label={}, user_data={}, index={}", grid_id, label_str, user_data, index);
+                    dfx_debug!("FFI", "GridViewAddItem: grid_id={}, label={}, user_data={}, index={}", grid_id, label_str, user_data, index);
                     return index as u32;
                 }
             }
@@ -93,7 +93,7 @@ pub extern "C" fn ui_grid_view_remove_item(
                 use crate::widgets::GridView;
                 if let Some(grid_view) = widget.as_any_mut().downcast_mut::<GridView>() {
                     grid_view.remove_item(index);
-                    dfx_info!("FFI", "GridViewRemoveItem: grid_id={}, index={}", grid_id, index);
+                    dfx_debug!("FFI", "GridViewRemoveItem: grid_id={}, index={}", grid_id, index);
                 }
             }
         }
@@ -119,7 +119,7 @@ pub extern "C" fn ui_grid_view_set_selected(
                 use crate::widgets::GridView;
                 if let Some(grid_view) = widget.as_any_mut().downcast_mut::<GridView>() {
                     grid_view.set_selected(index);
-                    dfx_info!("FFI", "GridViewSetSelected: grid_id={}, index={}", grid_id, index);
+                    dfx_debug!("FFI", "GridViewSetSelected: grid_id={}, index={}", grid_id, index);
                 }
             }
         }
@@ -194,7 +194,7 @@ pub extern "C" fn ui_grid_view_clear(
                 use crate::widgets::GridView;
                 if let Some(grid_view) = widget.as_any_mut().downcast_mut::<GridView>() {
                     grid_view.clear();
-                    dfx_info!("FFI", "GridViewClear: grid_id={}", grid_id);
+                    dfx_debug!("FFI", "GridViewClear: grid_id={}", grid_id);
                 }
             }
         }
@@ -237,5 +237,5 @@ pub extern "C" fn ui_grid_view_set_on_click_thunk_ptr(
     }
     let callback: crate::thunk::GridViewClickCallback = unsafe { std::mem::transmute(callback_ptr) };
     crate::thunk::ui_register_grid_view_click_callback(grid_id, callback);
-    dfx_info!("FFI", "GridViewSetOnClickThunkPtr: grid_id={}", grid_id);
+    dfx_debug!("FFI", "GridViewSetOnClickThunkPtr: grid_id={}", grid_id);
 }

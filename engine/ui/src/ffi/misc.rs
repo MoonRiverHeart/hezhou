@@ -349,7 +349,7 @@ pub extern "C" fn ui_widget_set_layer(
             _ => crate::widget_tree::RenderLayer::Content,
         };
         tree.set_widget_layer(id, render_layer);
-        dfx_info!("FFI", "WidgetSetLayer: widget_id={}, layer={}", widget_id, layer);
+        dfx_debug!("FFI", "WidgetSetLayer: widget_id={}, layer={}", widget_id, layer);
     }
 }
 

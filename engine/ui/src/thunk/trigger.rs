@@ -161,14 +161,14 @@ pub fn trigger_grid_view_click_callback(widget_id: u64, index: usize, user_data:
     let callback = {
         let callbacks = UI_CALLBACKS.lock();
         let cb = callbacks.on_grid_view_click.get(&widget_id).copied();
-        dfx_info!("Thunk", "GridViewClick dispatch: widget_id={} index={} user_data={} callback_found={}", 
+        dfx_debug!("Thunk", "GridViewClick dispatch: widget_id={} index={} user_data={} callback_found={}", 
             widget_id, index, user_data, cb.is_some());
         cb
     };
     if let Some(cb) = callback {
-        dfx_info!("Thunk", "GridViewClick invoking C# callback");
+        dfx_debug!("Thunk", "GridViewClick invoking C# callback");
         cb(widget_id, index, user_data);
-        dfx_info!("Thunk", "GridViewClick C# callback returned");
+        dfx_debug!("Thunk", "GridViewClick C# callback returned");
     } else {
         dfx_warn!("Thunk", "GridViewClick: NO callback registered for widget_id={}", widget_id);
     }

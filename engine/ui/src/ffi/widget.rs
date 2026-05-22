@@ -210,7 +210,7 @@ pub extern "C" fn ui_create_button_in_parent(
         
         let content_scale = crate::thunk::ui_get_content_scale();
         let font_size = 16.0 * content_scale;
-        dfx_info!("FFI", "CreateButton: content_scale={}, font_size={}", content_scale, font_size);
+        dfx_debug!("FFI", "CreateButton: content_scale={}, font_size={}", content_scale, font_size);
         button.set_font_size(font_size);
         
         let id = button.id();
@@ -287,7 +287,7 @@ pub extern "C" fn ui_create_label_in_parent(
         
         let content_scale = crate::thunk::ui_get_content_scale();
         let font_size = 16.0 * content_scale;
-        dfx_info!("FFI", "CreateLabel: content_scale={}, font_size={}", content_scale, font_size);
+        dfx_debug!("FFI", "CreateLabel: content_scale={}, font_size={}", content_scale, font_size);
         label.set_font_size(font_size);
         
         let id = label.id();

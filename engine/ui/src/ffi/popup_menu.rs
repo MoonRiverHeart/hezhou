@@ -32,7 +32,7 @@ pub extern "C" fn ui_create_popup_menu(
         
         tree.add_widget(Box::new(popup_menu), parent);
         tree.set_widget_layer(id, crate::widget_tree::RenderLayer::Popup);
-        dfx_info!("FFI", "CreatePopupMenu: id={}, parent={}, scale={}", id.id, parent_id, content_scale);
+        dfx_debug!("FFI", "CreatePopupMenu: id={}, parent={}, scale={}", id.id, parent_id, content_scale);
         id.id
     }
 }
@@ -65,7 +65,7 @@ pub extern "C" fn ui_popup_menu_add_item(
                 use crate::widgets::PopupMenu;
                 if let Some(popup_menu) = widget.as_any_mut().downcast_mut::<PopupMenu>() {
                     popup_menu.add_item(text_str.clone(), shortcut_str, action_id);
-                    dfx_info!("FFI", "PopupMenuAddItem: menu_id={}, text={}, action_id={}", menu_id, text_str, action_id);
+                    dfx_debug!("FFI", "PopupMenuAddItem: menu_id={}, text={}, action_id={}", menu_id, text_str, action_id);
                 }
             }
         }
@@ -90,7 +90,7 @@ pub extern "C" fn ui_popup_menu_add_separator(
                 use crate::widgets::PopupMenu;
                 if let Some(popup_menu) = widget.as_any_mut().downcast_mut::<PopupMenu>() {
                     popup_menu.add_separator();
-                    dfx_info!("FFI", "PopupMenuAddSeparator: menu_id={}", menu_id);
+                    dfx_debug!("FFI", "PopupMenuAddSeparator: menu_id={}", menu_id);
                 }
             }
         }
@@ -117,7 +117,7 @@ pub extern "C" fn ui_popup_menu_show(
                 use crate::widgets::PopupMenu;
                 if let Some(popup_menu) = widget.as_any_mut().downcast_mut::<PopupMenu>() {
                     popup_menu.show(x, y);
-                    dfx_info!("FFI", "PopupMenuShow: menu_id={}, x={}, y={}", menu_id, x, y);
+                    dfx_debug!("FFI", "PopupMenuShow: menu_id={}, x={}, y={}", menu_id, x, y);
                 }
             }
         }
@@ -142,7 +142,7 @@ pub extern "C" fn ui_popup_menu_hide(
                 use crate::widgets::PopupMenu;
                 if let Some(popup_menu) = widget.as_any_mut().downcast_mut::<PopupMenu>() {
                     popup_menu.hide();
-                    dfx_info!("FFI", "PopupMenuHide: menu_id={}", menu_id);
+                    dfx_debug!("FFI", "PopupMenuHide: menu_id={}", menu_id);
                 }
             }
         }
@@ -185,5 +185,5 @@ pub extern "C" fn ui_popup_menu_set_on_click_thunk_ptr(
     }
     let callback: crate::thunk::PopupMenuClickCallback = unsafe { std::mem::transmute(callback_ptr) };
     crate::thunk::ui_register_popup_menu_click_callback(menu_id, callback);
-    dfx_info!("FFI", "PopupMenuSetOnClickThunkPtr: menu_id={}", menu_id);
+    dfx_debug!("FFI", "PopupMenuSetOnClickThunkPtr: menu_id={}", menu_id);
 }

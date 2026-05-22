@@ -34,7 +34,7 @@ pub extern "C" fn ui_create_preview_window(
         };
         
         tree.add_widget(Box::new(preview), parent);
-        dfx_info!("FFI", "CreatePreviewWindow: id={}, texture_id={}", id.id, texture_id);
+        dfx_debug!("FFI", "CreatePreviewWindow: id={}, texture_id={}", id.id, texture_id);
         id.id
     }
 }
@@ -118,7 +118,7 @@ pub extern "C" fn ui_set_preview_window_edit_mode(
         if let Some(widget) = tree.get_widget_mut(id) {
             if let Some(preview) = widget.as_any_mut().downcast_mut::<crate::widgets::PreviewWindow>() {
                 preview.set_edit_mode(edit_mode);
-                dfx_info!("FFI", "PreviewWindow edit_mode set to: {}", edit_mode);
+                dfx_debug!("FFI", "PreviewWindow edit_mode set to: {}", edit_mode);
             }
         }
     }

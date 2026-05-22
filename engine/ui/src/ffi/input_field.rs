@@ -34,7 +34,7 @@ pub extern "C" fn ui_create_input_field(
         };
         
         tree.add_widget(Box::new(input_field), parent);
-        dfx_info!("FFI", "CreateInputField: id={}, parent={}", id.id, parent_id);
+        dfx_debug!("FFI", "CreateInputField: id={}, parent={}", id.id, parent_id);
         id.id
     }
 }
@@ -58,7 +58,7 @@ pub extern "C" fn ui_input_field_set_text(
                 if let Some(input_field) = widget.as_any_mut().downcast_mut::<InputField>() {
                     let text_str = CStr::from_ptr(text).to_string_lossy();
                     input_field.set_text(&text_str);
-                    dfx_info!("FFI", "InputFieldSetText: widget_id={}, text_len={}", widget_id, text_str.len());
+                    dfx_debug!("FFI", "InputFieldSetText: widget_id={}, text_len={}", widget_id, text_str.len());
                 }
             }
         }
@@ -110,7 +110,7 @@ pub extern "C" fn ui_input_field_set_on_change_thunk_ptr(
     }
     let callback: crate::thunk::InputFieldChangeCallback = unsafe { std::mem::transmute(callback_ptr) };
     crate::thunk::ui_register_input_field_change_callback(widget_id, callback);
-    dfx_info!("FFI", "InputFieldSetOnChangeThunkPtr: widget_id={}", widget_id);
+    dfx_debug!("FFI", "InputFieldSetOnChangeThunkPtr: widget_id={}", widget_id);
 }
 
 #[unsafe(no_mangle)]

@@ -43,7 +43,7 @@ pub extern "C" fn ui_create_dialog(
         
         tree.add_widget(Box::new(dialog), parent);
         tree.set_widget_layer(id, crate::widget_tree::RenderLayer::Overlay);
-        dfx_info!("FFI", "CreateDialog: id={}, title={}, size={}x{}, scale={}", id.id, title_str, width, height, content_scale);
+        dfx_debug!("FFI", "CreateDialog: id={}, title={}, size={}x{}, scale={}", id.id, title_str, width, height, content_scale);
         id.id
     }
 }
@@ -67,7 +67,7 @@ pub extern "C" fn ui_dialog_set_content(
                 use crate::widgets::Dialog;
                 if let Some(dialog) = widget.as_any_mut().downcast_mut::<Dialog>() {
                     dialog.set_content(WidgetId::from_raw(content_id));
-                    dfx_info!("FFI", "DialogSetContent: dialog_id={}, content_id={}", dialog_id, content_id);
+                    dfx_debug!("FFI", "DialogSetContent: dialog_id={}, content_id={}", dialog_id, content_id);
                 }
             }
         }
@@ -103,7 +103,7 @@ pub extern "C" fn ui_dialog_add_button(
                         _ => DialogAction::Custom,
                     };
                     dialog.add_button(&text_str, dialog_action);
-                    dfx_info!("FFI", "DialogAddButton: dialog_id={}, text={}, action={}", dialog_id, text_str, action);
+                    dfx_debug!("FFI", "DialogAddButton: dialog_id={}, text={}, action={}", dialog_id, text_str, action);
                 }
             }
         }
@@ -219,5 +219,5 @@ pub extern "C" fn ui_dialog_set_on_result_thunk_ptr(
     }
     let callback: crate::thunk::DialogResultCallback = unsafe { std::mem::transmute(callback_ptr) };
     crate::thunk::ui_register_dialog_result_callback(dialog_id, callback);
-    dfx_info!("FFI", "DialogSetOnResultThunkPtr: dialog_id={}", dialog_id);
+    dfx_debug!("FFI", "DialogSetOnResultThunkPtr: dialog_id={}", dialog_id);
 }

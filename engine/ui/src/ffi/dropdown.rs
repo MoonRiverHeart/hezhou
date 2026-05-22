@@ -34,7 +34,7 @@ pub extern "C" fn ui_create_dropdown(
         };
         
         tree.add_widget(Box::new(dropdown), parent);
-        dfx_info!("FFI", "CreateDropdown: id={}, parent={}", id.id, parent_id);
+        dfx_debug!("FFI", "CreateDropdown: id={}, parent={}", id.id, parent_id);
         id.id
     }
 }
@@ -65,7 +65,7 @@ pub extern "C" fn ui_dropdown_set_options(
                         .collect();
                     let count = options.len();
                     dropdown.set_options(options);
-                    dfx_info!("FFI", "DropdownSetOptions: widget_id={}, count={}", widget_id, count);
+                    dfx_debug!("FFI", "DropdownSetOptions: widget_id={}, count={}", widget_id, count);
                 }
             }
         }
@@ -90,7 +90,7 @@ pub extern "C" fn ui_dropdown_set_selected(
                 use crate::widgets::Dropdown;
                 if let Some(dropdown) = widget.as_any_mut().downcast_mut::<Dropdown>() {
                     dropdown.set_selected(index);
-                    dfx_info!("FFI", "DropdownSetSelected: widget_id={}, index={}", widget_id, index);
+                    dfx_debug!("FFI", "DropdownSetSelected: widget_id={}, index={}", widget_id, index);
                 }
             }
         }
@@ -132,5 +132,5 @@ pub extern "C" fn ui_dropdown_set_on_select_thunk_ptr(
     }
     let callback: crate::thunk::DropdownSelectCallback = unsafe { std::mem::transmute(callback_ptr) };
     crate::thunk::ui_register_dropdown_select_callback(widget_id, callback);
-    dfx_info!("FFI", "DropdownSetOnSelectThunkPtr: widget_id={}", widget_id);
+    dfx_debug!("FFI", "DropdownSetOnSelectThunkPtr: widget_id={}", widget_id);
 }

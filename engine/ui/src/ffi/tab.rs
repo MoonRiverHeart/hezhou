@@ -37,7 +37,7 @@ pub extern "C" fn ui_create_tab_widget(
         };
         
         tree.add_widget(Box::new(tab_widget), parent);
-        dfx_info!("FFI", "CreateTabWidget: id={}, parent={}, scale={}", id.id, parent_id, content_scale);
+        dfx_debug!("FFI", "CreateTabWidget: id={}, parent={}, scale={}", id.id, parent_id, content_scale);
         id.id
     }
 }
@@ -65,7 +65,7 @@ pub extern "C" fn ui_tab_widget_add_tab(
                 if let Some(tab_widget) = widget.as_any_mut().downcast_mut::<TabWidget>() {
                     let content_id = WidgetId::from_raw(content_widget_id);
                     let index = tab_widget.add_tab(&title_str, content_id, closable);
-                    dfx_info!("FFI", "TabWidgetAddTab: widget_id={}, title={}, content={}, closable={}, index={}", 
+                    dfx_debug!("FFI", "TabWidgetAddTab: widget_id={}, title={}, content={}, closable={}, index={}", 
                         tab_widget_id, title_str, content_widget_id, closable, index);
                     return index as u32;
                 }
@@ -94,7 +94,7 @@ pub extern "C" fn ui_tab_widget_set_active(
                 use crate::widgets::TabWidget;
                 if let Some(tab_widget) = widget.as_any_mut().downcast_mut::<TabWidget>() {
                     tab_widget.set_active(index);
-                    dfx_info!("FFI", "TabWidgetSetActive: widget_id={}, index={}", tab_widget_id, index);
+                    dfx_debug!("FFI", "TabWidgetSetActive: widget_id={}, index={}", tab_widget_id, index);
                 }
             }
         }
@@ -145,7 +145,7 @@ pub extern "C" fn ui_tab_widget_remove_tab(
                 use crate::widgets::TabWidget;
                 if let Some(tab_widget) = widget.as_any_mut().downcast_mut::<TabWidget>() {
                     tab_widget.remove_tab(index);
-                    dfx_info!("FFI", "TabWidgetRemoveTab: widget_id={}, index={}", tab_widget_id, index);
+                    dfx_debug!("FFI", "TabWidgetRemoveTab: widget_id={}, index={}", tab_widget_id, index);
                 }
             }
         }
@@ -163,7 +163,7 @@ pub extern "C" fn ui_tab_widget_set_on_select_thunk_ptr(
     }
     let callback: crate::thunk::TabSelectCallback = unsafe { std::mem::transmute(callback_ptr) };
     crate::thunk::ui_register_tab_select_callback(tab_widget_id, callback);
-    dfx_info!("FFI", "TabWidgetSetOnSelectThunkPtr: widget_id={}", tab_widget_id);
+    dfx_debug!("FFI", "TabWidgetSetOnSelectThunkPtr: widget_id={}", tab_widget_id);
 }
 
 #[unsafe(no_mangle)]
@@ -177,7 +177,7 @@ pub extern "C" fn ui_tab_widget_set_on_close_thunk_ptr(
     }
     let callback: crate::thunk::TabCloseCallback = unsafe { std::mem::transmute(callback_ptr) };
     crate::thunk::ui_register_tab_close_callback(tab_widget_id, callback);
-    dfx_info!("FFI", "TabWidgetSetOnCloseThunkPtr: widget_id={}", tab_widget_id);
+    dfx_debug!("FFI", "TabWidgetSetOnCloseThunkPtr: widget_id={}", tab_widget_id);
 }
 
 #[unsafe(no_mangle)]

@@ -38,7 +38,7 @@ pub fn ui_get_content_scale() -> f32 {
 pub fn ui_set_primary_button_id(id: u64) {
     let mut primary_id = PRIMARY_BUTTON_ID.lock();
     *primary_id = Some(id);
-    dfx_info!("UI", "设置主按钮ID: {}", id);
+    dfx_debug!("UI", "设置主按钮ID: {}", id);
 }
 
 pub fn ui_get_primary_button_id() -> u64 {
@@ -57,7 +57,7 @@ pub extern "C" fn ui_set_focused_input_field(widget_id: u64) {
 pub extern "C" fn ui_clear_focused_input_field() {
     let mut focused = FOCUSED_INPUT_FIELD.lock();
     *focused = None;
-    dfx_info!("UI", "清除focus InputField");
+    dfx_debug!("UI", "清除focus InputField");
 }
 
 #[unsafe(no_mangle)]

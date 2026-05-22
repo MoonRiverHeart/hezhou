@@ -44,7 +44,7 @@ pub extern "C" fn ui_create_file_browser(
         };
         
         tree.add_widget(Box::new(file_browser), parent);
-        dfx_info!("FFI", "CreateFileBrowser: id={}, parent={}, path={}, scale={}", id.id, parent_id, initial_path_str, content_scale);
+        dfx_debug!("FFI", "CreateFileBrowser: id={}, parent={}, path={}, scale={}", id.id, parent_id, initial_path_str, content_scale);
         id.id
     }
 }
@@ -231,7 +231,7 @@ pub extern "C" fn ui_file_browser_set_on_select_thunk_ptr(
     }
     let callback: crate::thunk::FileBrowserSelectCallback = unsafe { std::mem::transmute(callback_ptr) };
     crate::thunk::ui_register_file_browser_select_callback(browser_id, callback);
-    dfx_info!("FFI", "FileBrowserSetOnSelectThunkPtr: browser_id={}", browser_id);
+    dfx_debug!("FFI", "FileBrowserSetOnSelectThunkPtr: browser_id={}", browser_id);
 }
 
 #[unsafe(no_mangle)]
@@ -245,5 +245,5 @@ pub extern "C" fn ui_file_browser_set_on_double_click_thunk_ptr(
     }
     let callback: crate::thunk::FileBrowserDoubleClickCallback = unsafe { std::mem::transmute(callback_ptr) };
     crate::thunk::ui_register_file_browser_double_click_callback(browser_id, callback);
-    dfx_info!("FFI", "FileBrowserSetOnDoubleClickThunkPtr: browser_id={}", browser_id);
+    dfx_debug!("FFI", "FileBrowserSetOnDoubleClickThunkPtr: browser_id={}", browser_id);
 }

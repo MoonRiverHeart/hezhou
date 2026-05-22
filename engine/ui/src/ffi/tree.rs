@@ -36,7 +36,7 @@ pub extern "C" fn ui_create_tree_view(
         };
         
         tree.add_widget(Box::new(tree_view), parent);
-        dfx_info!("FFI", "CreateTreeView: id={}, parent={}, scale={}", id.id, parent_id, content_scale);
+        dfx_debug!("FFI", "CreateTreeView: id={}, parent={}, scale={}", id.id, parent_id, content_scale);
         id.id
     }
 }
@@ -100,7 +100,7 @@ pub extern "C" fn ui_tree_view_add_node(
         }
         
         tree.add_widget(Box::new(node), tree_view_widget_id);
-        dfx_info!("FFI", "TreeViewAddNode: node_id={}, parent={}, text={}, user_data={}, has_children={}", 
+        dfx_debug!("FFI", "TreeViewAddNode: node_id={}, parent={}, text={}, user_data={}, has_children={}", 
             node_id.id, parent_node_id, text_str, user_data, has_children);
         node_id.id
     }
@@ -132,7 +132,7 @@ pub extern "C" fn ui_tree_view_remove_node(
         }
         
         tree.remove_widget(node_widget_id);
-        dfx_info!("FFI", "TreeViewRemoveNode: tree_view_id={}, node_id={}", tree_view_id, node_id);
+        dfx_debug!("FFI", "TreeViewRemoveNode: tree_view_id={}, node_id={}", tree_view_id, node_id);
     }
 }
 
@@ -170,7 +170,7 @@ pub extern "C" fn ui_tree_view_set_selected(
             }
         }
         
-        dfx_info!("FFI", "TreeViewSetSelected: tree_view_id={}, node_id={}", tree_view_id, node_id);
+        dfx_debug!("FFI", "TreeViewSetSelected: tree_view_id={}, node_id={}", tree_view_id, node_id);
     }
 }
 
@@ -224,7 +224,7 @@ pub extern "C" fn ui_tree_view_expand_node(
             }
         }
         
-        dfx_info!("FFI", "TreeViewExpandNode: tree_view_id={}, node_id={}", tree_view_id, node_id);
+        dfx_debug!("FFI", "TreeViewExpandNode: tree_view_id={}, node_id={}", tree_view_id, node_id);
     }
 }
 
@@ -252,7 +252,7 @@ pub extern "C" fn ui_tree_view_collapse_node(
             }
         }
         
-        dfx_info!("FFI", "TreeViewCollapseNode: tree_view_id={}, node_id={}", tree_view_id, node_id);
+        dfx_debug!("FFI", "TreeViewCollapseNode: tree_view_id={}, node_id={}", tree_view_id, node_id);
     }
 }
 
@@ -267,7 +267,7 @@ pub extern "C" fn ui_tree_view_set_on_select_thunk_ptr(
     }
     let callback: crate::thunk::TreeNodeSelectCallback = unsafe { std::mem::transmute(callback_ptr) };
     crate::thunk::ui_register_tree_node_select_callback(tree_view_id, callback);
-    dfx_info!("FFI", "TreeViewSetOnSelectThunkPtr: tree_view_id={}", tree_view_id);
+    dfx_debug!("FFI", "TreeViewSetOnSelectThunkPtr: tree_view_id={}", tree_view_id);
 }
 
 #[unsafe(no_mangle)]
@@ -281,7 +281,7 @@ pub extern "C" fn ui_tree_view_set_on_toggle_thunk_ptr(
     }
     let callback: crate::thunk::TreeNodeToggleCallback = unsafe { std::mem::transmute(callback_ptr) };
     crate::thunk::ui_register_tree_node_toggle_callback(tree_view_id, callback);
-    dfx_info!("FFI", "TreeViewSetOnToggleThunkPtr: tree_view_id={}", tree_view_id);
+    dfx_debug!("FFI", "TreeViewSetOnToggleThunkPtr: tree_view_id={}", tree_view_id);
 }
 
 #[unsafe(no_mangle)]
@@ -397,6 +397,6 @@ pub extern "C" fn ui_tree_view_clear_selection(
             }
         }
         
-        dfx_info!("FFI", "TreeViewClearSelection: tree_view_id={}", tree_view_id);
+        dfx_debug!("FFI", "TreeViewClearSelection: tree_view_id={}", tree_view_id);
     }
 }
