@@ -13,6 +13,8 @@ pub extern "C" fn set_preview_window_edit_mode_stub(_handle: WidgetTreeHandle, _
 pub extern "C" fn scene_create_stub() -> *mut std::ffi::c_void { std::ptr::null_mut() }
 pub extern "C" fn scene_destroy_stub(_scene: *mut std::ffi::c_void) {}
 pub extern "C" fn scene_create_cube_stub(_scene: *mut std::ffi::c_void) -> u64 { 0 }
+pub extern "C" fn scene_create_plane_stub(_scene: *mut std::ffi::c_void) -> u64 { 0 }
+pub extern "C" fn scene_create_directional_light_stub(_scene: *mut std::ffi::c_void) -> u64 { 0 }
 pub extern "C" fn scene_attach_script_stub(_scene: *mut std::ffi::c_void, _id: u64, _path: *const i8, _class: *const i8) {}
 pub extern "C" fn scene_set_game_state_stub(_scene: *mut std::ffi::c_void, _state: i32) {}
 pub extern "C" fn scene_get_game_state_stub(_scene: *mut std::ffi::c_void) -> i32 { 0 }
@@ -58,8 +60,13 @@ pub extern "C" fn ui_entity_get_property_value_float3_stub(_scene: *mut std::ffi
 pub extern "C" fn ui_entity_set_property_value_float3_stub(_scene: *mut std::ffi::c_void, _id: u64, _name: *const std::ffi::c_char, _x: f32, _y: f32, _z: f32) -> bool { false }
 pub extern "C" fn ui_entity_get_property_value_string_stub(_scene: *mut std::ffi::c_void, _id: u64, _name: *const std::ffi::c_char, _buf: *mut std::ffi::c_char, _len: u32) -> u32 { 0 }
 pub extern "C" fn ui_entity_set_property_value_string_stub(_scene: *mut std::ffi::c_void, _id: u64, _name: *const std::ffi::c_char, _val: *const std::ffi::c_char) -> bool { false }
+pub extern "C" fn ui_entity_get_property_value_float_stub(_scene: *mut std::ffi::c_void, _id: u64, _name: *const std::ffi::c_char, _out: *mut f32) -> bool { false }
+pub extern "C" fn ui_entity_set_property_value_float_stub(_scene: *mut std::ffi::c_void, _id: u64, _name: *const std::ffi::c_char, _val: f32) -> bool { false }
 pub extern "C" fn set_status_text_stub(_text: *const i8) {}
 pub extern "C" fn on_hot_reload_complete_stub() {}
+pub extern "C" fn dfx_set_counter_stub(_system: *mut std::ffi::c_void, _name: *const i8, _category: *const i8, _value: i64) {}
+pub extern "C" fn dfx_perf_begin_frame_stub(_system: *mut std::ffi::c_void) {}
+pub extern "C" fn dfx_perf_end_frame_stub(_system: *mut std::ffi::c_void) {}
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
@@ -180,6 +187,8 @@ fn main() {
         ui_tree_view_expand_node: unsafe { std::mem::transmute(ui_ffi::ui_tree_view_expand_node as *const std::ffi::c_void) },
         ui_tree_view_collapse_node: unsafe { std::mem::transmute(ui_ffi::ui_tree_view_collapse_node as *const std::ffi::c_void) },
         ui_tree_view_set_on_select_thunk_ptr: unsafe { std::mem::transmute(ui_ffi::ui_tree_view_set_on_select_thunk_ptr as *const std::ffi::c_void) },
+        ui_tree_view_set_on_toggle_thunk_ptr: unsafe { std::mem::transmute(ui_ffi::ui_tree_view_set_on_toggle_thunk_ptr as *const std::ffi::c_void) },
+        ui_tree_view_is_node_expanded: unsafe { std::mem::transmute(ui_ffi::ui_tree_view_is_node_expanded as *const std::ffi::c_void) },
         ui_tree_node_set_text: unsafe { std::mem::transmute(ui_ffi::ui_tree_node_set_text as *const std::ffi::c_void) },
         ui_tree_node_get_user_data: unsafe { std::mem::transmute(ui_ffi::ui_tree_node_get_user_data as *const std::ffi::c_void) },
         ui_tree_view_clear_selection: unsafe { std::mem::transmute(ui_ffi::ui_tree_view_clear_selection as *const std::ffi::c_void) },
@@ -219,6 +228,8 @@ fn main() {
         scene_create: scene_create_stub,
         scene_destroy: scene_destroy_stub,
         scene_create_cube: scene_create_cube_stub,
+        scene_create_plane: scene_create_plane_stub,
+        scene_create_directional_light: scene_create_directional_light_stub,
         scene_attach_script: scene_attach_script_stub,
         scene_set_game_state: scene_set_game_state_stub,
         scene_get_game_state: scene_get_game_state_stub,
@@ -257,16 +268,43 @@ fn main() {
         ui_entity_set_property_value_float3: ui_entity_set_property_value_float3_stub,
         ui_entity_get_property_value_string: ui_entity_get_property_value_string_stub,
         ui_entity_set_property_value_string: ui_entity_set_property_value_string_stub,
+        ui_entity_get_property_value_float: ui_entity_get_property_value_float_stub,
+        ui_entity_set_property_value_float: ui_entity_set_property_value_float_stub,
         widget_tree_ptr: widget_tree_handle,
         dfx_handle: std::ptr::null_mut(),
         dfx_log: unsafe { std::mem::transmute(hezhou_dfx::dfx_log as *const std::ffi::c_void) },
         dfx_trace_begin: unsafe { std::mem::transmute(hezhou_dfx::dfx_trace_begin as *const std::ffi::c_void) },
         dfx_trace_end: unsafe { std::mem::transmute(hezhou_dfx::dfx_trace_end as *const std::ffi::c_void) },
+        dfx_set_counter: dfx_set_counter_stub,
+        dfx_perf_begin_frame: dfx_perf_begin_frame_stub,
+        dfx_perf_end_frame: dfx_perf_end_frame_stub,
         set_status_text: set_status_text_stub,
         on_hot_reload_complete: on_hot_reload_complete_stub,
         ui_debug_print_widget_tree: unsafe { std::mem::transmute(ui_ffi::ui_debug_print_widget_tree as *const std::ffi::c_void) },
         ui_widget_set_flex_expand: unsafe { std::mem::transmute(ui_ffi::ui_widget_set_flex_expand as *const std::ffi::c_void) },
         ui_widget_set_cross_axis_fill: unsafe { std::mem::transmute(ui_ffi::ui_widget_set_cross_axis_fill as *const std::ffi::c_void) },
+        // Asset library stubs (not used in this demo)
+        asset_library_get_category_count: stub_asset_library_get_category_count,
+        asset_library_get_category_name: stub_asset_library_get_category_name,
+        asset_library_get_asset_count: stub_asset_library_get_asset_count,
+        asset_library_get_asset_info: stub_asset_library_get_asset_info,
+        asset_library_create_entity_from_template: stub_asset_library_create_entity_from_template,
+        asset_library_create_mesh_entity: stub_asset_library_create_mesh_entity,
+        // Project stubs (not used in this demo)
+        project_create_new: stub_project_create_new,
+        project_load: stub_project_load,
+        project_save: stub_project_save,
+        project_get_name: stub_project_get_name,
+        project_get_path: stub_project_get_path,
+        project_get_entity_count: stub_project_get_entity_count,
+        project_is_loaded: stub_project_is_loaded,
+        project_sync_to_scene: stub_project_sync_to_scene,
+        project_sync_from_scene: stub_project_sync_from_scene,
+        project_get_settings: stub_project_get_settings,
+        project_set_settings: stub_project_set_settings,
+        project_get_entity_info: stub_project_get_entity_info,
+        project_add_entity: stub_project_add_entity,
+        project_remove_entity: stub_project_remove_entity,
     };
     hezhou_scripting::ffi_context::set_ffi_context(ffi_ctx);
     let ffi_ptr = hezhou_scripting::ffi_context::get_ffi_context_ptr();
@@ -329,6 +367,50 @@ fn main() {
     }
     dfx_info!("Demo", "=== Demo Complete ===");
 }
+
+// Asset library stubs (not used in this demo)
+#[unsafe(no_mangle)]
+extern "C" fn stub_asset_library_get_category_count() -> usize { 0 }
+#[unsafe(no_mangle)]
+extern "C" fn stub_asset_library_get_category_name(_: usize, _: *mut std::ffi::c_char, _: usize) -> bool { false }
+#[unsafe(no_mangle)]
+extern "C" fn stub_asset_library_get_asset_count(_: usize) -> usize { 0 }
+#[unsafe(no_mangle)]
+extern "C" fn stub_asset_library_get_asset_info(_: usize, _: usize, _: *mut u64, _: *mut std::ffi::c_char, _: usize, _: *mut u32, _: *mut std::ffi::c_char, _: usize) -> bool { false }
+#[unsafe(no_mangle)]
+extern "C" fn stub_asset_library_create_entity_from_template(_: *mut std::ffi::c_void, _: u64) -> u64 { 0 }
+#[unsafe(no_mangle)]
+extern "C" fn stub_asset_library_create_mesh_entity(_: *mut std::ffi::c_void, _: u32) -> u64 { 0 }
+
+// Project stubs (not used in this demo)
+#[unsafe(no_mangle)]
+extern "C" fn stub_project_create_new(_: *const std::ffi::c_char, _: *const std::ffi::c_char) -> bool { false }
+#[unsafe(no_mangle)]
+extern "C" fn stub_project_load(_: *const std::ffi::c_char) -> bool { false }
+#[unsafe(no_mangle)]
+extern "C" fn stub_project_save() -> bool { false }
+#[unsafe(no_mangle)]
+extern "C" fn stub_project_get_name(_: *mut std::ffi::c_char, _: usize) -> bool { false }
+#[unsafe(no_mangle)]
+extern "C" fn stub_project_get_path(_: *mut std::ffi::c_char, _: usize) -> bool { false }
+#[unsafe(no_mangle)]
+extern "C" fn stub_project_get_entity_count() -> usize { 0 }
+#[unsafe(no_mangle)]
+extern "C" fn stub_project_is_loaded() -> bool { false }
+#[unsafe(no_mangle)]
+extern "C" fn stub_project_sync_to_scene(_: *mut std::ffi::c_void) {}
+#[unsafe(no_mangle)]
+extern "C" fn stub_project_sync_from_scene(_: *const std::ffi::c_void) {}
+#[unsafe(no_mangle)]
+extern "C" fn stub_project_get_settings(_: *mut u32, _: *mut u32, _: *mut u32) -> bool { false }
+#[unsafe(no_mangle)]
+extern "C" fn stub_project_set_settings(_: u32, _: u32, _: u32) -> bool { false }
+#[unsafe(no_mangle)]
+extern "C" fn stub_project_get_entity_info(_: u64, _: *mut std::ffi::c_char, _: usize, _: *mut f32, _: *mut f32, _: *mut f32, _: *mut std::ffi::c_char, _: usize) -> bool { false }
+#[unsafe(no_mangle)]
+extern "C" fn stub_project_add_entity(_: u64, _: *const std::ffi::c_char, _: f32, _: f32, _: f32, _: f32, _: f32, _: f32, _: f32, _: f32, _: f32, _: *const std::ffi::c_char) -> bool { false }
+#[unsafe(no_mangle)]
+extern "C" fn stub_project_remove_entity(_: u64) -> bool { false }
 
 fn compile_csharp_script() {
     use std::process::Command;
