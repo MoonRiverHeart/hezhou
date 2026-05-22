@@ -9,3 +9,5 @@ pub type EntityGetPropertyValueFloat3Fn = extern "C" fn(*mut c_void, u64, *const
 pub type EntitySetPropertyValueFloat3Fn = extern "C" fn(*mut c_void, u64, *const c_char, f32, f32, f32) -> bool;
 pub type EntityGetPropertyValueStringFn = extern "C" fn(*mut c_void, u64, *const c_char, *mut c_char, u32) -> u32;
 pub type EntitySetPropertyValueStringFn = extern "C" fn(*mut c_void, u64, *const c_char, *const c_char) -> bool;
+pub type EntityGetPropertyValueFloatFn = extern "C" fn(*mut c_void, u64, *const c_char, *mut f32) -> bool;
+pub type EntitySetPropertyValueFloatFn = extern "C" fn(*mut c_void, u64, *const c_char, f32) -> bool;

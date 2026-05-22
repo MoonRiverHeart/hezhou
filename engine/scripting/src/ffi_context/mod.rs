@@ -7,6 +7,7 @@ mod widget_new;
 mod scene;
 mod renderer;
 mod property;
+mod asset_project;
 
 pub use types::*;
 pub use ui_system::*;
@@ -17,6 +18,7 @@ pub use widget_new::*;
 pub use scene::*;
 pub use renderer::*;
 pub use property::*;
+pub use asset_project::*;
 
 use std::ffi::c_void;
 
@@ -100,6 +102,8 @@ pub struct FfiContext {
     pub ui_tree_view_expand_node: TreeViewExpandNodeFn,
     pub ui_tree_view_collapse_node: TreeViewCollapseNodeFn,
     pub ui_tree_view_set_on_select_thunk_ptr: TreeViewSetOnSelectThunkPtrFn,
+    pub ui_tree_view_set_on_toggle_thunk_ptr: TreeViewSetOnToggleThunkPtrFn,
+    pub ui_tree_view_is_node_expanded: TreeViewIsNodeExpandedFn,
     pub ui_tree_node_set_text: TreeNodeSetTextFn,
     pub ui_tree_node_get_user_data: TreeNodeGetUserDataFn,
     pub ui_tree_view_clear_selection: TreeViewClearSelectionFn,
@@ -139,6 +143,8 @@ pub struct FfiContext {
     pub scene_create: SceneCreateFn,
     pub scene_destroy: SceneDestroyFn,
     pub scene_create_cube: SceneCreateCubeFn,
+    pub scene_create_plane: SceneCreatePlaneFn,
+    pub scene_create_directional_light: SceneCreateDirectionalLightFn,
     pub scene_attach_script: SceneAttachScriptFn,
     pub scene_set_game_state: SceneSetGameStateFn,
     pub scene_get_game_state: SceneGetGameStateFn,
@@ -177,16 +183,41 @@ pub struct FfiContext {
     pub ui_entity_set_property_value_float3: EntitySetPropertyValueFloat3Fn,
     pub ui_entity_get_property_value_string: EntityGetPropertyValueStringFn,
     pub ui_entity_set_property_value_string: EntitySetPropertyValueStringFn,
+    pub ui_entity_get_property_value_float: EntityGetPropertyValueFloatFn,
+    pub ui_entity_set_property_value_float: EntitySetPropertyValueFloatFn,
     pub widget_tree_ptr: WidgetTreeHandle,
     pub dfx_handle: *mut c_void,
     pub dfx_log: DfxLogFn,
     pub dfx_trace_begin: DfxTraceBeginFn,
     pub dfx_trace_end: DfxTraceEndFn,
+    pub dfx_set_counter: DfxSetCounterFn,
+    pub dfx_perf_begin_frame: DfxPerfBeginFrameFn,
+    pub dfx_perf_end_frame: DfxPerfEndFrameFn,
     pub set_status_text: SetStatusTextFn,
     pub on_hot_reload_complete: OnHotReloadCompleteFn,
     pub ui_debug_print_widget_tree: DebugPrintWidgetTreeFn,
     pub ui_widget_set_flex_expand: SetFlexExpandFn,
     pub ui_widget_set_cross_axis_fill: SetCrossAxisFillFn,
+    pub asset_library_get_category_count: AssetLibraryGetCategoryCountFn,
+    pub asset_library_get_category_name: AssetLibraryGetCategoryNameFn,
+    pub asset_library_get_asset_count: AssetLibraryGetAssetCountFn,
+    pub asset_library_get_asset_info: AssetLibraryGetAssetInfoFn,
+    pub asset_library_create_entity_from_template: AssetLibraryCreateEntityFromTemplateFn,
+    pub asset_library_create_mesh_entity: AssetLibraryCreateMeshEntityFn,
+    pub project_create_new: ProjectCreateNewFn,
+    pub project_load: ProjectLoadFn,
+    pub project_save: ProjectSaveFn,
+    pub project_get_name: ProjectGetNameFn,
+    pub project_get_path: ProjectGetPathFn,
+    pub project_get_entity_count: ProjectGetEntityCountFn,
+    pub project_is_loaded: ProjectIsLoadedFn,
+    pub project_sync_to_scene: ProjectSyncToSceneFn,
+    pub project_sync_from_scene: ProjectSyncFromSceneFn,
+    pub project_get_settings: ProjectGetSettingsFn,
+    pub project_set_settings: ProjectSetSettingsFn,
+    pub project_get_entity_info: ProjectGetEntityInfoFn,
+    pub project_add_entity: ProjectAddEntityFn,
+    pub project_remove_entity: ProjectRemoveEntityFn,
 }
 
 static mut FFI_CONTEXT: Option<Box<FfiContext>> = None;
