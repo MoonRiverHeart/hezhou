@@ -15,7 +15,7 @@ chrono = "0.4"
 backtrace = "0.3"
 
 [target.'cfg(windows)'.dependencies]
-winapi = { version = "0.3", features = ["processthreadsapi", "psapi", "memoryapi"] }
+winapi = { version = "0.3", features = ["processthreadsapi", "psapi", "memoryapi", "sysinfoapi"] }
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"

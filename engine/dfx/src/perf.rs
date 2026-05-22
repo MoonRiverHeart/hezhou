@@ -24,6 +24,15 @@ pub struct PerformanceMonitor {
     fps_frame_count: u32,
     current_fps: f32,
     enabled: bool,
+    // CPU tracking state (FILETIME 100ns units)
+    prev_process_kernel_time: u64,
+    prev_process_user_time: u64,
+    prev_system_kernel_time: u64,
+    prev_system_user_time: u64,
+    has_prev_cpu_times: bool,
+    // Pending renderer stats (set before end_frame)
+    pending_draw_calls: u32,
+    pending_triangle_count: u32,
 }
 
 impl PerformanceMonitor {
@@ -37,6 +46,13 @@ impl PerformanceMonitor {
             fps_frame_count: 0,
             current_fps: 0.0,
             enabled: false,
+            prev_process_kernel_time: 0,
+            prev_process_user_time: 0,
+            prev_system_kernel_time: 0,
+            prev_system_user_time: 0,
+            has_prev_cpu_times: false,
+            pending_draw_calls: 0,
+            pending_triangle_count: 0,
         }
     }
 
@@ -80,7 +96,7 @@ impl PerformanceMonitor {
                 self.last_fps_time = end_time;
             }
 
-            let cpu_usage = Self::get_cpu_usage();
+            let cpu_usage = self.get_cpu_usage();
             let (memory_used, memory_available) = Self::get_memory_info();
 
             let snapshot = PerformanceSnapshot {
@@ -90,9 +106,13 @@ impl PerformanceMonitor {
                 cpu_usage_percent: cpu_usage,
                 memory_used_mb: memory_used,
                 memory_available_mb: memory_available,
-                draw_calls: 0,
-                triangle_count: 0,
+                draw_calls: self.pending_draw_calls,
+                triangle_count: self.pending_triangle_count,
             };
+
+            // Reset pending renderer stats
+            self.pending_draw_calls = 0;
+            self.pending_triangle_count = 0;
 
             {
                 let mut snapshots = self.snapshots.lock();
@@ -106,6 +126,14 @@ impl PerformanceMonitor {
         self.frame_start_time = None;
     }
 
+    pub fn set_draw_calls(&mut self, count: u32) {
+        self.pending_draw_calls = count;
+    }
+
+    pub fn set_triangle_count(&mut self, count: u32) {
+        self.pending_triangle_count = count;
+    }
+
     fn get_timestamp_ms() -> u64 {
         use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -115,14 +143,68 @@ impl PerformanceMonitor {
             .as_millis() as u64
     }
 
-    fn get_cpu_usage() -> f32 {
+    fn get_cpu_usage(&mut self) -> f32 {
         #[cfg(windows)]
         {
-            0.0
+            use winapi::um::processthreadsapi::{GetCurrentProcess, GetProcessTimes, GetSystemTimes};
+            use winapi::shared::minwindef::FILETIME;
+
+            let mut process_creation = FILETIME { dwLowDateTime: 0, dwHighDateTime: 0 };
+            let mut process_exit = FILETIME { dwLowDateTime: 0, dwHighDateTime: 0 };
+            let mut process_kernel = FILETIME { dwLowDateTime: 0, dwHighDateTime: 0 };
+            let mut process_user = FILETIME { dwLowDateTime: 0, dwHighDateTime: 0 };
+
+            let mut system_idle = FILETIME { dwLowDateTime: 0, dwHighDateTime: 0 };
+            let mut system_kernel = FILETIME { dwLowDateTime: 0, dwHighDateTime: 0 };
+            let mut system_user = FILETIME { dwLowDateTime: 0, dwHighDateTime: 0 };
+
+            unsafe {
+                GetProcessTimes(
+                    GetCurrentProcess(),
+                    &mut process_creation,
+                    &mut process_exit,
+                    &mut process_kernel,
+                    &mut process_user,
+                );
+                GetSystemTimes(&mut system_idle, &mut system_kernel, &mut system_user);
+            }
+
+            let process_kernel_100ns = Self::filetime_to_u64(&process_kernel);
+            let process_user_100ns = Self::filetime_to_u64(&process_user);
+            let system_kernel_100ns = Self::filetime_to_u64(&system_kernel);
+            let system_user_100ns = Self::filetime_to_u64(&system_user);
+
+            if !self.has_prev_cpu_times {
+                self.prev_process_kernel_time = process_kernel_100ns;
+                self.prev_process_user_time = process_user_100ns;
+                self.prev_system_kernel_time = system_kernel_100ns;
+                self.prev_system_user_time = system_user_100ns;
+                self.has_prev_cpu_times = true;
+                return 0.0; // No delta on first frame
+            }
+
+            let process_delta = (process_kernel_100ns - self.prev_process_kernel_time)
+                + (process_user_100ns - self.prev_process_user_time);
+            let system_delta = (system_kernel_100ns - self.prev_system_kernel_time)
+                + (system_user_100ns - self.prev_system_user_time);
+
+            self.prev_process_kernel_time = process_kernel_100ns;
+            self.prev_process_user_time = process_user_100ns;
+            self.prev_system_kernel_time = system_kernel_100ns;
+            self.prev_system_user_time = system_user_100ns;
+
+            if system_delta == 0 {
+                return 0.0;
+            }
+
+            // Process CPU time / Total system CPU time * 100
+            // On multi-core: 100% = all cores used by this process
+            (process_delta as f32 / system_delta as f32) * 100.0
         }
 
         #[cfg(unix)]
         {
+            // TODO: implement via /proc/self/stat for Linux
             0.0
         }
 
@@ -135,11 +217,59 @@ impl PerformanceMonitor {
     fn get_memory_info() -> (f32, f32) {
         #[cfg(windows)]
         {
-            (0.0, 0.0)
+            use winapi::um::sysinfoapi::{GlobalMemoryStatusEx, MEMORYSTATUSEX};
+            use winapi::um::psapi::{GetProcessMemoryInfo, PROCESS_MEMORY_COUNTERS};
+            use winapi::um::processthreadsapi::GetCurrentProcess;
+
+            // System memory (available physical RAM)
+            let mut mem_status = MEMORYSTATUSEX {
+                dwLength: std::mem::size_of::<MEMORYSTATUSEX>() as u32,
+                dwMemoryLoad: 0,
+                ullTotalPhys: 0,
+                ullAvailPhys: 0,
+                ullTotalPageFile: 0,
+                ullAvailPageFile: 0,
+                ullTotalVirtual: 0,
+                ullAvailVirtual: 0,
+                ullAvailExtendedVirtual: 0,
+            };
+
+            unsafe {
+                GlobalMemoryStatusEx(&mut mem_status);
+            }
+
+            let avail_phys_mb = mem_status.ullAvailPhys as f32 / (1024.0 * 1024.0);
+
+            // Process memory (working set = physical pages used by this process)
+            let mut counters = PROCESS_MEMORY_COUNTERS {
+                cb: std::mem::size_of::<PROCESS_MEMORY_COUNTERS>() as u32,
+                PageFaultCount: 0,
+                PeakWorkingSetSize: 0,
+                WorkingSetSize: 0,
+                QuotaPeakPagedPoolUsage: 0,
+                QuotaPagedPoolUsage: 0,
+                QuotaPeakNonPagedPoolUsage: 0,
+                QuotaNonPagedPoolUsage: 0,
+                PagefileUsage: 0,
+                PeakPagefileUsage: 0,
+            };
+
+            unsafe {
+                GetProcessMemoryInfo(
+                    GetCurrentProcess(),
+                    &mut counters,
+                    std::mem::size_of::<PROCESS_MEMORY_COUNTERS>() as u32,
+                );
+            }
+
+            let process_used_mb = counters.WorkingSetSize as f32 / (1024.0 * 1024.0);
+
+            (process_used_mb, avail_phys_mb)
         }
 
         #[cfg(unix)]
         {
+            // TODO: implement via /proc/self/status for Linux
             (0.0, 0.0)
         }
 
@@ -147,6 +277,11 @@ impl PerformanceMonitor {
         {
             (0.0, 0.0)
         }
+    }
+
+    #[cfg(windows)]
+    fn filetime_to_u64(ft: &winapi::shared::minwindef::FILETIME) -> u64 {
+        (ft.dwHighDateTime as u64) << 32 | (ft.dwLowDateTime as u64)
     }
 
     pub fn get_fps(&self) -> f32 {
@@ -179,6 +314,7 @@ impl PerformanceMonitor {
         self.frame_count = 0;
         self.fps_frame_count = 0;
         self.current_fps = 0.0;
+        self.has_prev_cpu_times = false;
     }
 
     pub fn get_average_fps(&self) -> f32 {

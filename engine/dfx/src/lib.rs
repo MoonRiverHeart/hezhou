@@ -488,6 +488,46 @@ pub extern "C" fn dfx_clear_perf(system: *mut DfxSystem) {
 }
 
 #[unsafe(no_mangle)]
+pub extern "C" fn dfx_set_counter(
+    system: *mut DfxSystem,
+    name: *const std::os::raw::c_char,
+    category: *const std::os::raw::c_char,
+    value: i64,
+) {
+    if system.is_null() || name.is_null() || category.is_null() {
+        return;
+    }
+
+    unsafe {
+        let name_str = std::ffi::CStr::from_ptr(name).to_str().unwrap_or("");
+        let category_str = std::ffi::CStr::from_ptr(category).to_str().unwrap_or("");
+
+        (*system)
+            .trace_analyzer
+            .lock()
+            .set_counter(name_str, category_str, value);
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn dfx_set_draw_calls(system: *mut DfxSystem, count: u32) {
+    if !system.is_null() {
+        unsafe {
+            (*system).perf_monitor.lock().set_draw_calls(count);
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn dfx_set_triangle_count(system: *mut DfxSystem, count: u32) {
+    if !system.is_null() {
+        unsafe {
+            (*system).perf_monitor.lock().set_triangle_count(count);
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
 pub extern "C" fn dfx_enable_file_output(system: *mut DfxSystem, path: *const std::os::raw::c_char) -> i32 {
     if system.is_null() || path.is_null() {
         return -1;
