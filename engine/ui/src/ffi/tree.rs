@@ -271,6 +271,47 @@ pub extern "C" fn ui_tree_view_set_on_select_thunk_ptr(
 }
 
 #[unsafe(no_mangle)]
+pub extern "C" fn ui_tree_view_set_on_toggle_thunk_ptr(
+    handle: WidgetTreeHandle,
+    tree_view_id: u64,
+    callback_ptr: *const std::ffi::c_void,
+) {
+    if callback_ptr.is_null() {
+        return;
+    }
+    let callback: crate::thunk::TreeNodeToggleCallback = unsafe { std::mem::transmute(callback_ptr) };
+    crate::thunk::ui_register_tree_node_toggle_callback(tree_view_id, callback);
+    dfx_info!("FFI", "TreeViewSetOnToggleThunkPtr: tree_view_id={}", tree_view_id);
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_tree_view_is_node_expanded(
+    handle: WidgetTreeHandle,
+    tree_view_id: u64,
+    node_id: u64,
+) -> bool {
+    if handle.is_null() {
+        return false;
+    }
+    unsafe {
+        let arc = &*(handle as *const Arc<Mutex<WidgetTree>>);
+        let tree = arc.lock();
+        
+        let node_widget_id = WidgetId::from_raw(node_id);
+        
+        if let Some(widget) = tree.get_widget(node_widget_id) {
+            if widget.widget_type() == "TreeNode" {
+                use crate::widgets::TreeNode;
+                if let Some(node) = widget.as_any().downcast_ref::<TreeNode>() {
+                    return node.is_expanded();
+                }
+            }
+        }
+        false
+    }
+}
+
+#[unsafe(no_mangle)]
 pub extern "C" fn ui_tree_node_set_text(
     handle: WidgetTreeHandle,
     node_id: u64,

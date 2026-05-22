@@ -1,6 +1,7 @@
 use super::types::*;
 use super::global::SCREEN_SIZE;
 use super::UI_CALLBACKS;
+use hezhou_dfx::*;
 
 pub fn trigger_update_callback(delta_time: f32) {
     let callback = {
@@ -159,10 +160,17 @@ pub fn trigger_popup_menu_close_callback(widget_id: u64) {
 pub fn trigger_grid_view_click_callback(widget_id: u64, index: usize, user_data: u64) {
     let callback = {
         let callbacks = UI_CALLBACKS.lock();
-        callbacks.on_grid_view_click.get(&widget_id).copied()
+        let cb = callbacks.on_grid_view_click.get(&widget_id).copied();
+        dfx_info!("Thunk", "GridViewClick dispatch: widget_id={} index={} user_data={} callback_found={}", 
+            widget_id, index, user_data, cb.is_some());
+        cb
     };
     if let Some(cb) = callback {
+        dfx_info!("Thunk", "GridViewClick invoking C# callback");
         cb(widget_id, index, user_data);
+        dfx_info!("Thunk", "GridViewClick C# callback returned");
+    } else {
+        dfx_warn!("Thunk", "GridViewClick: NO callback registered for widget_id={}", widget_id);
     }
 }
 
