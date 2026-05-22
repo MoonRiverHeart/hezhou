@@ -139,17 +139,25 @@ impl TreeView {
         self.node_children.get(&node_id).map(|v| v.as_slice()).unwrap_or(&[])
     }
 
-    pub fn get_visible_nodes(&self) -> Vec<WidgetId> {
+    pub fn get_visible_nodes(&self, tree: &crate::WidgetTree) -> Vec<WidgetId> {
         let mut result = Vec::new();
-        self.collect_visible_nodes_from_tree(&self.root_nodes, &mut result);
+        self.collect_visible_nodes_from_tree(&self.root_nodes, &mut result, tree);
         result
     }
 
-    fn collect_visible_nodes_from_tree(&self, nodes: &[WidgetId], result: &mut Vec<WidgetId>) {
+    fn collect_visible_nodes_from_tree(&self, nodes: &[WidgetId], result: &mut Vec<WidgetId>, tree: &crate::WidgetTree) {
         for &node_id in nodes {
             result.push(node_id);
-            if let Some(children) = self.node_children.get(&node_id) {
-                self.collect_visible_nodes_from_tree(children, result);
+            // Only recurse into children if this node is expanded
+            let is_expanded = tree.get_widget(node_id)
+                .and_then(|w| w.as_any().downcast_ref::<TreeNode>())
+                .map(|n| n.is_expanded())
+                .unwrap_or(false);
+            
+            if is_expanded {
+                if let Some(children) = self.node_children.get(&node_id) {
+                    self.collect_visible_nodes_from_tree(children, result, tree);
+                }
             }
         }
     }
@@ -194,8 +202,16 @@ impl TreeView {
         }
     }
 
-    fn update_node_positions(&mut self, tree: &mut crate::WidgetTree) {
+fn update_node_positions(&mut self, tree: &mut crate::WidgetTree) {
         let visible_nodes = self.collect_visible_nodes(tree);
+        
+        // Check if the selected node is still visible; if not, clear selection
+        if let Some(selected_id) = self.selected_node {
+            let is_still_visible = visible_nodes.iter().any(|(id, _)| *id == selected_id);
+            if !is_still_visible {
+                self.selected_node = None;
+            }
+        }
 
         for (node_id, y) in visible_nodes {
             if let Some(widget) = tree.get_widget_mut(node_id) {

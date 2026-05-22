@@ -49,8 +49,8 @@ impl TreeNode {
             indent_width: 20.0,
             user_data: 0,
             content_scale: 1.0,
-            hover_color: Color::new(0.18, 0.18, 0.18, 1.0),
-            selected_color: Color::new(0.1, 0.3, 0.5, 1.0),
+            hover_color: Color::new(0.22, 0.26, 0.30, 1.0),
+            selected_color: Color::new(0.18, 0.22, 0.28, 1.0),
             text_color: Color::white(),
             icon_color: Color::white(),
             font_size: 14.0,
@@ -291,11 +291,13 @@ impl Widget for TreeNode {
         // Layout x already accounts for depth indent, so draw at local origin
         let icon_size = self.indent_width * 0.6;
 
-        // 绘制背景
-        let bg_color = if self.is_selected {
-            self.selected_color
+        // 绘制背景: hover=淡蓝, pressed=蓝, selected=淡蓝, normal=透明
+        let bg_color = if self.state == WidgetState::Pressed {
+            Color::new(0.15, 0.35, 0.55, 1.0)  // 蓝色(点击时)
+        } else if self.is_selected {
+            self.selected_color  // 淡蓝(选中)
         } else if self.state == WidgetState::Hovered {
-            self.hover_color
+            self.hover_color  // 淡蓝(hover)
         } else {
             Color::transparent()
         };
@@ -349,12 +351,14 @@ impl Widget for TreeNode {
                         
                         // 点击展开图标区域
                         if touch.x >= 0.0 && touch.x < self.indent_width && self.has_children {
+                            self.set_state(WidgetState::Pressed);
                             self.toggle();
                             return EventResult::Handled;
                         }
                         
                         // 点击文本区域
                         if touch.x >= self.indent_width {
+                            self.set_state(WidgetState::Pressed);
                             self.select();
                             return EventResult::Handled;
                         }
@@ -363,8 +367,17 @@ impl Widget for TreeNode {
                 }
             }
 
+            EventType::TouchEnd => {
+                if self.state == WidgetState::Pressed {
+                    self.set_state(WidgetState::Hovered);
+                    return EventResult::Handled;
+                }
+            }
+
             EventType::MouseEnter => {
-                self.set_state(WidgetState::Hovered);
+                if self.state != WidgetState::Pressed {
+                    self.set_state(WidgetState::Hovered);
+                }
                 return EventResult::Handled;
             }
 
