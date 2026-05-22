@@ -61,6 +61,39 @@ namespace Hezhou
         {
             return UI.SceneCreateCube(_scenePtr);
         }
+
+        public ulong CreatePlane()
+        {
+            ulong entityId = UI.SceneCreatePlane(_scenePtr);
+            if (entityId != 0)
+            {
+                var entity = new Entity { Id = entityId, Name = "Plane" };
+                _entities[entityId] = entity;
+            }
+            return entityId;
+        }
+
+        public ulong CreateDirectionalLight()
+        {
+            ulong entityId = UI.SceneCreateDirectionalLight(_scenePtr);
+            if (entityId != 0)
+            {
+                var entity = new Entity { Id = entityId, Name = "DirectionalLight" };
+                _entities[entityId] = entity;
+            }
+            return entityId;
+        }
+        
+        public ulong CreateMeshEntity(int meshType)
+        {
+            ulong entityId = UI.AssetLibraryCreateMeshEntity(_scenePtr, meshType);
+            if (entityId != 0)
+            {
+                var entity = new Entity { Id = entityId, Name = $"Mesh_{entityId}" };
+                _entities[entityId] = entity;
+            }
+            return entityId;
+        }
         
         public ulong CreateEntity()
         {
@@ -191,15 +224,13 @@ namespace Hezhou
 
         public void SelectEntity(ulong entityId)
         {
-            UI.SceneSelectEntity(_scenePtr, entityId);
+UI.SceneSelectEntity(_scenePtr, entityId);
             UI.SetSelectedEntity(entityId, true);
-            Log.Info("Scene", $"Entity {entityId} selected with highlight");
         }
 
         public void ClearSelection()
         {
             UI.SetSelectedEntity(0, false);
-            Log.Info("Scene", "Selection cleared, highlight removed");
         }
 
         public void Update(float deltaTime)
@@ -240,6 +271,28 @@ namespace Hezhou
                 return 0;
             }
             var func = Marshal.GetDelegateForFunctionPointer<SceneCreateCubeDelegate>(_ffi.scene_create_cube);
+            return func(scene);
+        }
+
+        public static ulong SceneCreatePlane(IntPtr scene)
+        {
+            if (_ffi.scene_create_plane == IntPtr.Zero)
+            {
+                Log.Error("C#", "SceneCreatePlane函数指针为空");
+                return 0;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<SceneCreatePlaneDelegate>(_ffi.scene_create_plane);
+            return func(scene);
+        }
+
+        public static ulong SceneCreateDirectionalLight(IntPtr scene)
+        {
+            if (_ffi.scene_create_directional_light == IntPtr.Zero)
+            {
+                Log.Error("C#", "SceneCreateDirectionalLight函数指针为空");
+                return 0;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<SceneCreateDirectionalLightDelegate>(_ffi.scene_create_directional_light);
             return func(scene);
         }
 

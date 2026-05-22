@@ -187,7 +187,6 @@ namespace Hezhou
             }
             var func = Marshal.GetDelegateForFunctionPointer<SetGamePreviewExtentDelegate>(_ffi.ui_set_game_preview_extent);
             func(width, height);
-            Log.Info("C#", $"Game preview extent set to {width}x{height}");
         }
 
         public static void SetCameraParams(float yaw, float pitch, float x, float y, float z)
@@ -199,7 +198,6 @@ namespace Hezhou
             }
             var func = Marshal.GetDelegateForFunctionPointer<SetCameraParamsDelegate>(_ffi.ui_set_camera_params);
             func(yaw, pitch, x, y, z);
-            Log.Info("C#", $"Camera params set: yaw={yaw}, pitch={pitch}, pos=({x}, {y}, {z})");
         }
 
         public static bool IsPreviewWindowSelected(ulong widgetId)
@@ -232,7 +230,6 @@ public static void SetPreviewWindowSelected(ulong widgetId, bool selected)
             }
             var func = Marshal.GetDelegateForFunctionPointer<SetPreviewWindowEditModeDelegate>(_ffi.ui_set_preview_window_edit_mode);
             func(_widgetTree, widgetId, editMode);
-            Log.Info("C#", $"PreviewWindow editMode set to: {editMode}");
         }
         
 public static ulong GetRootId()
@@ -366,7 +363,6 @@ public static ulong GetRootId()
         public VStack(ulong parentId, float spacing = 8f)
         {
             Id = UI.CreateVStack(parentId, spacing);
-            Log.Info("C#", $"VStack创建成功: id={Id}, parent={parentId}");
         }
         
         public ulong AddButton(float width, float height, string text)
@@ -392,7 +388,6 @@ public static ulong GetRootId()
         public HStack(ulong parentId, float spacing = 8f)
         {
             Id = UI.CreateHStack(parentId, spacing);
-            Log.Info("C#", $"HStack created: id={Id}, parent={parentId}");
         }
         
         public Button AddButton(float width, float height, string text)
@@ -421,7 +416,6 @@ public static ulong GetRootId()
         {
             _text = text;
             Id = UI.CreateButton(parentId, width, height, text);
-            Log.Info("C#", $"Button created: id={Id}, text=\"{text}\"");
         }
         
         public string Text
@@ -446,7 +440,6 @@ public static ulong GetRootId()
         {
             _text = text;
             Id = UI.CreateLabel(parentId, width, height, text);
-            Log.Info("C#", $"Label创建成功: id={Id}, text=\"{text}\"");
         }
         
         public string Text
@@ -463,7 +456,6 @@ public static ulong GetRootId()
         public Panel(ulong parentId, float x, float y, float width, float height, float r = 0.2f, float g = 0.2f, float b = 0.2f, float a = 1.0f)
         {
             Id = UI.CreatePanel(parentId, x, y, width, height, r, g, b, a);
-            Log.Info("Editor", $"Panel创建成功: id={Id}");
         }
         
         public ulong AddButton(float width, float height, string text)

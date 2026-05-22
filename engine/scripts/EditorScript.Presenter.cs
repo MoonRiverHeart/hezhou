@@ -15,8 +15,6 @@ namespace Hezhou
 
         private static void OnWorkingDirectoryDialogResult(ulong dialogId, int result)
         {
-            Log.Info("Editor", $"工作目录对话框结果: result={result}");
-            
             if (result == 1)
             {
                 string selectedPath = UI.FileBrowserGetSelectedPath(_workingDirectoryFileBrowserId);
@@ -24,7 +22,6 @@ namespace Hezhou
                 {
                     _currentDirectory = selectedPath;
                     _workingDirectorySet = true;
-                    Log.Info("Editor", $"工作目录已设置: {_currentDirectory}");
                 }
                 else
                 {
@@ -33,13 +30,11 @@ namespace Hezhou
                     {
                         _currentDirectory = currentPath;
                         _workingDirectorySet = true;
-                        Log.Info("Editor", $"工作目录已设置(使用当前路径): {_currentDirectory}");
                     }
                     else
                     {
                         _currentDirectory = "scripts";
                         _workingDirectorySet = true;
-                        Log.Info("Editor", "使用默认工作目录: scripts");
                     }
                 }
             }
@@ -47,7 +42,6 @@ namespace Hezhou
             {
                 _currentDirectory = "scripts";
                 _workingDirectorySet = true;
-                Log.Info("Editor", "使用默认工作目录: scripts");
             }
             
             UI.DialogHide(_workingDirectoryDialogId);
@@ -56,13 +50,12 @@ namespace Hezhou
             {
                 CreateEditorLayout();
                 ScanScripts();
-                Log.Info("Editor", "编辑器初始化完成");
             }
         }
         
         private static void OnFileBrowserSelect(ulong browserId, string path)
         {
-            Log.Info("Editor", $"文件浏览器选择: {path}");
+            // File browser selection — UI feedback only, no log needed
         }
 
         // === Input Event Handlers ===
@@ -113,7 +106,6 @@ namespace Hezhou
             if (keycode == KEY_D && pressed && ctrl && shift)
             {
                 UI.DebugPrintUITree();
-                Log.Info("Editor", "Ctrl+Shift+D: UI tree printed");
                 return;
             }
             
@@ -165,16 +157,12 @@ namespace Hezhou
         
         private static void OnGlobalClick(float x, float y)
         {
-            Log.Info("Editor", $"GlobalClick at ({x}, {y})");
-            
             if (_previewWindowId != 0 && UI.IsPreviewWindowSelected(_previewWindowId))
             {
                 GameState currentState = _gameScene != null ? _gameScene.GetGameState() : GameState.Editing;
                 
                 if (currentState == GameState.Editing && _gameScene != null)
                 {
-                    Log.Info("Editor", "Editing mode - attempting entity pick");
-                    
                     float previewX = LEFT_PANEL_WIDTH + 10f * _contentScale;
                     float previewY = TOOLBAR_HEIGHT + 40f * _contentScale;
                     float previewWidth = _screenWidth - LEFT_PANEL_WIDTH - RIGHT_PANEL_WIDTH - 20f * _contentScale;
@@ -182,8 +170,6 @@ namespace Hezhou
                     
                     float relX = (x - previewX) / previewWidth;
                     float relY = (y - previewY) / previewHeight;
-                    
-                    Log.Info("Editor", $"PreviewWindow relative click: ({relX}, {relY})");
                     
                     float ndcX = (relX - 0.5f) * 2.0f;
                     float ndcY = (0.5f - relY) * 2.0f;
@@ -200,28 +186,20 @@ namespace Hezhou
                     float originY = _cameraY;
                     float originZ = _cameraZ;
                     
-                    Log.Info("Editor", $"Ray: origin=({originX}, {originY}, {originZ}), dir=({dirX}, {dirY}, {dirZ})");
-                    
                     ulong hitEntity = _gameScene.PickEntity(originX, originY, originZ, dirX, dirY, dirZ);
                     
                     if (hitEntity != 0)
                     {
-                        Log.Info("Editor", $"Entity picked: id={hitEntity}");
                         _gameScene.SelectEntity(hitEntity);
                         _statusItem.Text = $"选中Entity: {hitEntity}";
                         UpdatePropertiesPanel(hitEntity);
                     }
                     else
                     {
-                        Log.Info("Editor", "No entity hit");
                         _gameScene.ClearSelection();
                         _statusItem.Text = "状态: 就绪";
                         ClearPropertiesPanel();
                     }
-                }
-                else
-                {
-                    Log.Info("Editor", "Running mode - camera control");
                 }
             }
         }
@@ -230,7 +208,7 @@ namespace Hezhou
 
         private static void UpdatePropertiesPanel(ulong entityId)
         {
-            if (_propsList == null || _gameScene == null) return;
+            if (_propsTabWidget == null || _gameScene == null) return;
             
             if (!_propertiesDirty && _lastPropertiesEntityId == entityId)
             {
@@ -257,6 +235,21 @@ namespace Hezhou
                         UI.InputFieldSetText(desc.WidgetIds[2], z.ToString(format));
                     }
                 }
+                else if (desc.Type == 0) // Float
+                {
+                    float value;
+                    if (UI.EntityGetPropertyValueFloat(_gameScene.ScenePtr, entityId, desc.Name, out value))
+                    {
+                        if (desc.ReadOnly)
+                        {
+                            UI.SetText(desc.WidgetIds[0], value.ToString("F2"));
+                        }
+                        else
+                        {
+                            UI.InputFieldSetText(desc.WidgetIds[0], value.ToString("F2"));
+                        }
+                    }
+                }
                 else if (desc.Type == 2) // String
                 {
                     string value = UI.EntityGetPropertyValueString(_gameScene.ScenePtr, entityId, desc.Name);
@@ -281,16 +274,26 @@ namespace Hezhou
                         UI.InputFieldSetText(desc.WidgetIds[0], value);
                     }
                 }
+                else if (desc.Type == 3) // Bool
+                {
+                    string value = UI.EntityGetPropertyValueString(_gameScene.ScenePtr, entityId, desc.Name);
+                    if (desc.ReadOnly)
+                    {
+                        UI.SetText(desc.WidgetIds[0], value);
+                    }
+                    else
+                    {
+                        UI.InputFieldSetText(desc.WidgetIds[0], value);
+                    }
+                }
             }
             
             UpdateScriptBindingsList(entityId);
-            
-            Log.Info("Editor", "Properties panel updated for entity " + entityId + " (dynamic)");
         }
         
         private static void ClearPropertiesPanel()
         {
-            if (_propsList == null) return;
+            if (_propsTabWidget == null) return;
             
             _selectedEntityId = 0;
             
@@ -307,6 +310,17 @@ namespace Hezhou
                         UI.InputFieldSetText(desc.WidgetIds[j], defaultVal);
                     }
                 }
+                else if (desc.Type == 0) // Float
+                {
+                    if (desc.ReadOnly)
+                    {
+                        UI.SetText(desc.WidgetIds[0], "0.00");
+                    }
+                    else
+                    {
+                        UI.InputFieldSetText(desc.WidgetIds[0], "0.00");
+                    }
+                }
                 else if (desc.Type == 2) // String
                 {
                     if (desc.ReadOnly)
@@ -329,9 +343,18 @@ namespace Hezhou
                         UI.InputFieldSetText(desc.WidgetIds[0], "");
                     }
                 }
+                else if (desc.Type == 3) // Bool
+                {
+                    if (desc.ReadOnly)
+                    {
+                        UI.SetText(desc.WidgetIds[0], "false");
+                    }
+                    else
+                    {
+                        UI.InputFieldSetText(desc.WidgetIds[0], "false");
+                    }
+                }
             }
-            
-            Log.Info("Editor", "Properties panel cleared (dynamic)");
         }
         
         private static void HandleFloat3ComponentChange(string propertyName, int componentIndex, ulong widgetId, string text)
@@ -349,7 +372,6 @@ namespace Hezhou
                 }
                 UI.EntitySetPropertyValueFloat3(_gameScene.ScenePtr, _selectedEntityId, propertyName, x, y, z);
                 _propertiesDirty = true;
-                Log.Info("Editor", "Property " + propertyName + " component " + componentIndex + " changed to: " + value);
             }
         }
         
@@ -364,7 +386,6 @@ namespace Hezhou
             }
             
             _propertiesDirty = true;
-            Log.Info("Editor", "Property " + propertyName + " changed to: " + text);
         }
         
         private static void HandleIntPropertyChange(string propertyName, ulong widgetId, string text)
@@ -374,7 +395,32 @@ namespace Hezhou
             {
                 UI.EntitySetPropertyValueString(_gameScene.ScenePtr, _selectedEntityId, propertyName, value.ToString());
                 _propertiesDirty = true;
-                Log.Info("Editor", "Property " + propertyName + " changed to: " + value);
+            }
+        }
+
+        private static void HandleFloatPropertyChange(string propertyName, ulong widgetId, string text)
+        {
+            if (_selectedEntityId == 0 || _gameScene == null) return;
+            if (float.TryParse(text, out float value))
+            {
+                UI.EntitySetPropertyValueFloat(_gameScene.ScenePtr, _selectedEntityId, propertyName, value);
+                _propertiesDirty = true;
+            }
+        }
+
+        private static void HandleBoolPropertyChange(string propertyName, ulong widgetId, string text)
+        {
+            if (_selectedEntityId == 0 || _gameScene == null) return;
+            string lowerText = text.ToLower();
+            if (lowerText == "true" || lowerText == "1")
+            {
+                UI.EntitySetPropertyValueString(_gameScene.ScenePtr, _selectedEntityId, propertyName, "true");
+                _propertiesDirty = true;
+            }
+            else if (lowerText == "false" || lowerText == "0")
+            {
+                UI.EntitySetPropertyValueString(_gameScene.ScenePtr, _selectedEntityId, propertyName, "false");
+                _propertiesDirty = true;
             }
         }
         
@@ -392,37 +438,71 @@ namespace Hezhou
             _lastScriptBindingCount = scriptCount;
             _removeScriptBtnIndices.Clear();
             
+            // Clear existing script rows before rebuilding
+            for (int r = 0; r < _scriptRowIds.Count; r++)
+            {
+                UI.RemoveWidget(_scriptRowIds[r]);
+            }
+            _scriptRowIds.Clear();
+            
             if (scriptCount == 0)
             {
-                Log.Info("Editor", "UpdateScriptBindingsList: no scripts attached");
                 return;
             }
-            
-            Log.Info("Editor", "UpdateScriptBindingsList: entityId=" + entityId + ", count=" + scriptCount);
             
             for (int i = 0; i < scriptCount; i++)
             {
                 var info = _gameScene.GetScriptBindingInfo(entityId, i);
-                Log.Info("Editor", "  Script[" + i + "]: path=" + info.ScriptPath + ", class=" + info.ClassName + ", enabled=" + info.Enabled);
                 
                 string scriptName = Path.GetFileName(info.ScriptPath);
                 string labelText = scriptName + " (" + info.ClassName + ") [" + (info.Enabled ? "ON" : "OFF") + "]";
                 
-                var scriptRow = UI.CreateHStack(_scriptsListContainerId, 5f);
+                ulong scriptRow = UI.CreateHStack(_scriptsListContainerId, 5f);
                 UI.CreateLabel(scriptRow, RIGHT_PANEL_WIDTH - 90f, 20f, labelText);
                 
                 ulong removeBtnId = UI.CreateButton(scriptRow, 40f, 20f, "X");
                 UI.SetOnClick(removeBtnId, _removeScriptClickCallback);
                 _removeScriptBtnIndices[removeBtnId] = i;
+                _scriptRowIds.Add(scriptRow);
             }
         }
 
         // === Entity Event Handlers ===
 
+        private static void SaveTreeExpandState()
+        {
+            _expandedNodeNames.Clear();
+            if (_projectTreeViewId != 0)
+            {
+                // Query actual expand state from Rust side for the 4 category nodes
+                if (_assetsNodeId != 0 && UI.TreeViewIsNodeExpanded(_projectTreeViewId, _assetsNodeId))
+                    _expandedNodeNames.Add("Assets");
+                if (_scenesNodeId != 0 && UI.TreeViewIsNodeExpanded(_projectTreeViewId, _scenesNodeId))
+                    _expandedNodeNames.Add("Scenes");
+                if (_scriptsNodeId != 0 && UI.TreeViewIsNodeExpanded(_projectTreeViewId, _scriptsNodeId))
+                    _expandedNodeNames.Add("Scripts");
+                if (_entitiesNodeId != 0 && UI.TreeViewIsNodeExpanded(_projectTreeViewId, _entitiesNodeId))
+                    _expandedNodeNames.Add("Entities");
+            }
+        }
+
+        private static void OnTreeNodeToggle(ulong nodeId)
+        {
+            if (_nodeIdToName.TryGetValue(nodeId, out string name))
+            {
+                if (_expandedNodeNames.Contains(name))
+                {
+                    _expandedNodeNames.Remove(name);
+                }
+                else
+                {
+                    _expandedNodeNames.Add(name);
+                }
+            }
+        }
+
         private static void OnCreateEntityClick(ulong widgetId)
         {
-            Log.Info("Editor", "点击\"创建Entity\"按钮");
-            
             if (_gameScene == null)
             {
                 Log.Error("Editor", "Scene未创建!");
@@ -463,7 +543,6 @@ namespace Hezhou
             {
                 ulong nodeId = UI.TreeViewAddNode(_projectTreeViewId, _entitiesNodeId, name, entityId, false);
                 _entityNodeMap[entityId] = nodeId;
-                Log.Info("Editor", $"添加Entity到树: entityId={entityId}, name={name}");
             }
         }
         
@@ -472,7 +551,6 @@ namespace Hezhou
             if (_entityNodeMap.TryGetValue(entityId, out var nodeId))
             {
                 UI.TreeNodeSetText(nodeId, newName);
-                Log.Info("Editor", $"更新Entity名称: entityId={entityId}, name={newName}");
             }
         }
         
@@ -482,7 +560,6 @@ namespace Hezhou
             {
                 UI.TreeViewRemoveNode(_projectTreeViewId, nodeId);
                 _entityNodeMap.Remove(entityId);
-                Log.Info("Editor", $"从树移除Entity: entityId={entityId}");
             }
         }
 
@@ -495,14 +572,12 @@ namespace Hezhou
                 {
                     _currentDirectory = dirPath;
                     RefreshDirectoryTree();
-                    Log.Info("Editor", $"进入目录: {dirPath}");
                 }
                 return;
             }
             
             if (_fileItemPaths.TryGetValue(widgetId, out string filePath))
             {
-                Log.Info("Editor", $"点击文件: {filePath}");
                 LoadFileToEditor(filePath);
                 return;
             }
@@ -511,7 +586,6 @@ namespace Hezhou
             if (userData != 0)
             {
                 SelectEntity(userData);
-                Log.Info("Editor", $"TreeView选中Entity: entityId={userData}");
             }
         }
 
@@ -523,23 +597,24 @@ namespace Hezhou
             UI.GridViewAddItem(_assetGridViewId, "Sphere", 2);
             UI.GridViewAddItem(_assetGridViewId, "Plane", 3);
             UI.GridViewAddItem(_assetGridViewId, "Cylinder", 4);
-            
-            Log.Info("Editor", $"资产GridView刷新完成: {UI.GridViewItemCount(_assetGridViewId)}项");
         }
         
-        private static void OnGridViewClick(ulong widgetId, int index, ulong userData)
+private static void OnGridViewClick(ulong widgetId, int index, ulong userData)
         {
             if (_gameScene != null && userData != 0)
             {
-                ulong entityId = _gameScene.CreateEntity();
+                // userData: 1=Cube, 2=Sphere, 3=Plane, 4=Cylinder
+                // MeshType index: 0=Cube, 1=Sphere, 2=Plane, 3=Cylinder
+                int meshType = (int)userData - 1;
+                ulong entityId = _gameScene.CreateMeshEntity(meshType);
                 if (entityId != 0)
                 {
-                    string name = $"Asset_{userData}";
+                    string[] meshNames = { "Cube", "Sphere", "Plane", "Cylinder" };
+                    string name = meshNames[meshType];
                     UI.SceneSetEntityName(_gameScene.ScenePtr, entityId, name);
                     AddEntityToTree(entityId, name);
-                    SelectEntity(entityId);
-                    _statusItem.Text = $"从资产库创建Entity: {entityId}";
-                    Log.Info("Editor", $"从资产GridView创建Entity: index={index}, userData={userData}, entityId={entityId}");
+SelectEntity(entityId);
+                    _statusItem.Text = $"从资产库创建{name}: {entityId}";
                 }
             }
         }
@@ -548,26 +623,21 @@ namespace Hezhou
 
         private static void OnNewClick(ulong widgetId)
         {
-            Log.Info("Editor", $"点击\"文件\"菜单项, id={widgetId}");
             UI.PopupMenuShow(_fileMenuId, 10f * _contentScale, TOOLBAR_HEIGHT * _contentScale);
         }
         
         private static void OnOpenClick(ulong widgetId)
         {
-            Log.Info("Editor", $"点击\"打开\"菜单项, id={widgetId}");
             UI.PopupMenuShow(_openMenuId, 90f * _contentScale, TOOLBAR_HEIGHT * _contentScale);
         }
         
         private static void OnSaveClick(ulong widgetId)
         {
-            Log.Info("Editor", $"点击\"保存\"菜单项, id={widgetId}");
             UI.PopupMenuShow(_saveMenuId, 170f * _contentScale, TOOLBAR_HEIGHT * _contentScale);
         }
         
         private static void OnRunClick(ulong widgetId)
         {
-            Log.Info("Editor", $"点击\"运行\"按钮, id={widgetId}");
-            
             if (_gameScene == null)
             {
                 Log.Error("Editor", "Scene未创建!");
@@ -581,7 +651,6 @@ namespace Hezhou
                 UI.SetRendererGameState(1);
                 UI.SetPreviewWindowEditMode(_previewWindowId, false);
                 UI.SetText(_runButtonId, "编辑");
-                Log.Info("Editor", "Scene和Renderer切换到Running状态");
                 _statusItem.Text = "状态: 运行中";
             }
             else
@@ -590,7 +659,6 @@ namespace Hezhou
                 UI.SetRendererGameState(0);
                 UI.SetPreviewWindowEditMode(_previewWindowId, true);
                 UI.SetText(_runButtonId, "运行");
-                Log.Info("Editor", "Scene和Renderer切换到Editing状态");
                 _statusItem.Text = "状态: 就绪";
             }
         }
@@ -599,7 +667,6 @@ namespace Hezhou
         {
             if (_isTransitioning) return;
             
-            Log.Info("Editor", $"点击\"编辑器\"切换按钮, id={widgetId}");
             _isTransitioning = true;
             
             try
@@ -623,7 +690,6 @@ namespace Hezhou
 
         private static void OpenInExplorer(ulong widgetId)
         {
-            Log.Info("Editor", "打开文件管理器...");
             try
             {
                 Process.Start("explorer.exe", _currentDirectory);
@@ -640,7 +706,6 @@ namespace Hezhou
             if (parent != null)
             {
                 _currentDirectory = parent.FullName;
-                Log.Info("Editor", $"返回上级目录: {_currentDirectory}");
                 RefreshDirectoryTree();
             }
         }
@@ -651,7 +716,6 @@ namespace Hezhou
             {
                 _currentDirectory = path;
                 RefreshDirectoryTree();
-                Log.Info("Editor", $"进入目录: {path}");
             }
         }
         
@@ -659,7 +723,6 @@ namespace Hezhou
         {
             if (_fileItemPaths.TryGetValue(widgetId, out string path))
             {
-                Log.Info("Editor", $"点击文件: {path}");
                 LoadFileToEditor(path);
             }
         }
@@ -671,12 +734,8 @@ namespace Hezhou
                 string content = File.ReadAllText(filePath);
                 string fileName = Path.GetFileName(filePath);
                 
-                Log.Info("Editor", $"读取文件: {fileName} ({content.Length} chars)");
-                
                 if (!_scriptEditorVisible)
                 {
-                    Log.Info("Editor", "编辑器未显示，先显示编辑器...");
-                    
                     ulong rootId = UI.GetRootId();
                     float editorX = LEFT_PANEL_WIDTH;
                     float editorY = TOOLBAR_HEIGHT;
@@ -713,16 +772,13 @@ namespace Hezhou
             UI.SetWidgetLayout(_scriptTextEditId, 10f, 50f, editorWidth - 20f, editorHeight - 50f);
                     
                     _scriptEditorVisible = true;
-                    Log.Info("Editor", "编辑器面板创建完成");
                     
                     RefreshDirectoryTree();
                 }
                 
                 if (_scriptTextEditId != 0)
                 {
-                    Log.Info("Editor", $"设置TextEdit内容，id={_scriptTextEditId}");
                     UI.TextEditSetText(_scriptTextEditId, content);
-                    Log.Info("Editor", $"✓ 文件已加载: {fileName}");
                     
                     if (_scriptEditorLabel != null)
                     {
@@ -746,7 +802,6 @@ namespace Hezhou
             if (actionId == 1) OnNewClick(0);
             else if (actionId == 2) OnNewScriptClick(0);
             else if (actionId == 3) { }
-            Log.Info("Editor", $"文件菜单点击: actionId={actionId}");
         }
         
         private static void OnOpenMenuClick(ulong widgetId, int actionId)
@@ -755,7 +810,6 @@ namespace Hezhou
             if (actionId == 1) { }
             else if (actionId == 2) OnOpenClick(0);
             else if (actionId == 3) { }
-            Log.Info("Editor", $"打开菜单点击: actionId={actionId}");
         }
         
         private static void OnSaveMenuClick(ulong widgetId, int actionId)
@@ -764,7 +818,6 @@ namespace Hezhou
             if (actionId == 1) OnSaveClick(0);
             else if (actionId == 2) { }
             else if (actionId == 3) { }
-            Log.Info("Editor", $"保存菜单点击: actionId={actionId}");
         }
 
         // === Script Event Handlers ===
@@ -786,12 +839,6 @@ namespace Hezhou
                             _availableScripts.Add(fileName);
                         }
                     }
-                    
-                    Log.Info("Editor", $"扫描scripts目录: 找到 {_availableScripts.Count} 个可用脚本");
-                    foreach (var script in _availableScripts)
-                    {
-                        Log.Info("Editor", $"  - {script}");
-                    }
                 }
             }
             catch (Exception ex)
@@ -803,14 +850,10 @@ namespace Hezhou
         private static void OnScriptDropdownSelect(ulong widgetId, ulong index)
         {
             _selectedScriptIndex = (int)index;
-            int idx = (int)index;
-            Log.Info("Editor", $"选择脚本: index={index}, script={(idx < _availableScripts.Count ? _availableScripts[idx] : "none")}");
         }
         
         private static void OnAddScriptClick(ulong widgetId)
         {
-            Log.Info("Editor", "点击\"Add Script\"按钮");
-            
             if (_selectedEntityId == 0 || _gameScene == null)
             {
                 Log.Error("Editor", "未选中Entity!");
@@ -828,15 +871,12 @@ namespace Hezhou
             string className = Path.GetFileNameWithoutExtension(scriptName);
             
             _gameScene.AttachScriptBinding(_selectedEntityId, scriptPath, className);
-            Log.Info("Editor", $"添加脚本绑定: entityId={_selectedEntityId}, script={scriptPath}, class={className}");
             
             UpdatePropertiesPanel(_selectedEntityId);
         }
         
         private static void OnRemoveScriptClick(ulong widgetId)
         {
-            Log.Info("Editor", $"点击\"Remove Script\"按钮: widgetId={widgetId}");
-            
             if (_selectedEntityId == 0 || _gameScene == null)
             {
                 Log.Error("Editor", "未选中Entity!");
@@ -846,7 +886,6 @@ namespace Hezhou
             if (_removeScriptBtnIndices.TryGetValue(widgetId, out int index))
             {
                 _gameScene.RemoveScriptBinding(_selectedEntityId, index);
-                Log.Info("Editor", $"移除脚本绑定: entityId={_selectedEntityId}, index={index}");
                 
                 UpdatePropertiesPanel(_selectedEntityId);
             }
@@ -854,43 +893,33 @@ namespace Hezhou
         
         private static void OnHotReloadComplete()
         {
-            Log.Info("Editor", "=== OnHotReloadComplete回调 ===");
-            
             ScanScripts();
-            Log.Info("Editor", $"脚本扫描完成: {_availableScripts.Count} 个脚本");
             
             if (_scriptDropdownId != 0)
             {
                 string[] scriptOptions = _availableScripts.Count > 0 ? _availableScripts.ToArray() : new string[] { "无可用脚本" };
                 UI.DropdownSetOptions(_scriptDropdownId, scriptOptions);
-                Log.Info("Editor", "脚本下拉菜单已刷新");
             }
             
             if (_statusItem != null)
             {
                 _statusItem.Text = "状态: 就绪";
             }
-            
-            Log.Info("Editor", "OnHotReloadComplete完成");
         }
         
         private static void OnTabSelect(ulong widgetId, ulong index)
         {
-            Log.Info("Editor", $"TabWidget选择: widgetId={widgetId}, index={index}");
             string tabName = index == 0 ? "Transform" : "Scripts";
             _statusItem.Text = $"属性页: {tabName}";
         }
         
         private static void OnNewScriptClick(ulong widgetId)
         {
-            Log.Info("Editor", "创建新脚本...");
             ShowScriptEditor();
         }
 
         private static void OnHotReloadClick(ulong widgetId)
         {
-            Log.Info("Editor", "=== Hot Reload按钮点击 ===");
-            
             if (_statusItem != null)
             {
                 _statusItem.Text = "正在保存脚本...";
@@ -905,12 +934,9 @@ namespace Hezhou
                     
                     System.IO.Directory.CreateDirectory("scripts/bin/Mono");
                     System.IO.File.WriteAllText(scriptPath, scriptContent);
-                    Log.Info("Editor", $"✓ 脚本已保存: {scriptPath} ({scriptContent.Length} chars)");
                     
                     UI.SetStatusText("正在热更新脚本...");
                     UI.TriggerHotReload();
-                    
-                    Log.Info("Editor", "已触发Rust端HotReload流程");
                 }
                 catch (Exception ex)
                 {

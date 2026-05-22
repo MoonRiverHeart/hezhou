@@ -15,12 +15,11 @@ namespace Hezhou
         public static void Initialize(IntPtr contextPtr)
         {
             UI.InitFromContext(contextPtr);
-            Log.Info("Editor", "编辑器初始化开始");
             
             UI.GetScreenSize(out _screenWidth, out _screenHeight);
             _contentScale = UI.GetContentScale();
             
-            Log.Info("Editor", $"屏幕尺寸: {_screenWidth}x{_screenHeight}, DPI缩放: {_contentScale}");
+            Log.Info("Editor", $"编辑器初始化: {_screenWidth}x{_screenHeight}, DPI={_contentScale}");
             
             _updateCallback = Update;
             _resizeCallback = OnResize;
@@ -45,6 +44,7 @@ _addScriptClickCallback = OnAddScriptClick;
             _scriptDropdownSelectCallback = OnScriptDropdownSelect;
 _hotReloadCompleteCallback = OnHotReloadComplete;
             _tabSelectCallback = OnTabSelect;
+            _treeNodeToggleCallback = OnTreeNodeToggle;
             
             _fileMenuClickCallback = OnFileMenuClick;
             _openMenuClickCallback = OnOpenMenuClick;
@@ -62,8 +62,6 @@ _hotReloadCompleteCallback = OnHotReloadComplete;
             UI.RegisterGlobalClickCallback(_globalClickCallback);
             UI.RegisterKeyCallback(_keyCallback);
             UI.RegisterMouseMoveCallback(_mouseMoveCallback);
-            
-            Log.Info("Editor", "编辑器初始化完成 (等待选择工作目录)");
         }
         
         public static void Update(float deltaTime)

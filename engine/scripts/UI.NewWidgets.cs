@@ -187,6 +187,30 @@ namespace Hezhou
             func(_widgetTree, treeViewId, callbackPtr);
         }
         
+        public static void TreeViewSetOnToggle(ulong treeViewId, TreeNodeToggleCallbackDelegate callback)
+        {
+            if (_ffi.ui_tree_view_set_on_toggle_thunk_ptr == IntPtr.Zero)
+            {
+                Log.Error("C#", "TreeViewSetOnToggleThunkPtr函数指针为空");
+                return;
+            }
+            _treeNodeToggleCallbacks[treeViewId] = callback;
+            IntPtr callbackPtr = Marshal.GetFunctionPointerForDelegate(callback);
+            var func = Marshal.GetDelegateForFunctionPointer<TreeViewSetOnToggleThunkPtrDelegate>(_ffi.ui_tree_view_set_on_toggle_thunk_ptr);
+            func(_widgetTree, treeViewId, callbackPtr);
+        }
+        
+        public static bool TreeViewIsNodeExpanded(ulong treeViewId, ulong nodeId)
+        {
+            if (_ffi.ui_tree_view_is_node_expanded == IntPtr.Zero)
+            {
+                Log.Error("C#", "TreeViewIsNodeExpanded函数指针为空");
+                return false;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<TreeViewIsNodeExpandedDelegate>(_ffi.ui_tree_view_is_node_expanded);
+            return func(_widgetTree, treeViewId, nodeId);
+        }
+        
         public static void TreeNodeSetText(ulong nodeId, string text)
         {
             if (_ffi.ui_tree_node_set_text == IntPtr.Zero)
@@ -607,7 +631,6 @@ namespace Hezhou
         public TabWidget(ulong parentId, float x, float y, float width, float height)
         {
             Id = UI.CreateTabWidget(parentId, x, y, width, height);
-            Log.Info("Editor", $"TabWidget创建成功: id={Id}");
         }
         
         public uint AddTab(string title, ulong contentId, bool closable = false)
@@ -661,7 +684,6 @@ namespace Hezhou
         public TreeView(ulong parentId, float x, float y, float width, float height)
         {
             Id = UI.CreateTreeView(parentId, x, y, width, height);
-            Log.Info("Editor", $"TreeView创建成功: id={Id}");
         }
         
         public TreeNode AddRootNode(string text, ulong userData = 0, bool hasChildren = false)
@@ -756,7 +778,6 @@ namespace Hezhou
         public PopupMenu(ulong parentId)
         {
             Id = UI.CreatePopupMenu(parentId);
-            Log.Info("Editor", $"PopupMenu创建成功: id={Id}");
         }
         
         public void AddItem(string text, string shortcut, int actionId)
@@ -803,7 +824,6 @@ namespace Hezhou
         {
             _cellSize = cellSize;
             Id = UI.CreateGridView(parentId, x, y, width, height, cellSize);
-            Log.Info("Editor", $"GridView创建成功: id={Id}, cellSize={cellSize}");
         }
         
         public uint AddItem(string label, ulong userData)

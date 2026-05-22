@@ -224,7 +224,6 @@ namespace Hezhou
             {
                 UI.DropdownSetOptions(Id, _options);
             }
-            Log.Info("C#", $"Dropdown created: id={Id}, options={_options.Length}");
         }
         
         public string[] Options
@@ -269,7 +268,6 @@ namespace Hezhou
             {
                 UI.InputFieldSetPlaceholder(Id, placeholder);
             }
-            Log.Info("C#", $"InputField created: id={Id}, placeholder=\"{placeholder}\"");
         }
         
         public string Text

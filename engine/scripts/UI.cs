@@ -20,6 +20,7 @@ namespace Hezhou
         private static Dictionary<ulong, TabSelectCallbackDelegate> _tabSelectCallbacks = new Dictionary<ulong, TabSelectCallbackDelegate>();
         private static Dictionary<ulong, TabCloseCallbackDelegate> _tabCloseCallbacks = new Dictionary<ulong, TabCloseCallbackDelegate>();
         private static Dictionary<ulong, TreeNodeSelectCallbackDelegate> _treeNodeSelectCallbacks = new Dictionary<ulong, TreeNodeSelectCallbackDelegate>();
+        private static Dictionary<ulong, TreeNodeToggleCallbackDelegate> _treeNodeToggleCallbacks = new Dictionary<ulong, TreeNodeToggleCallbackDelegate>();
         private static Dictionary<ulong, PopupMenuClickCallbackDelegate> _popupMenuCallbacks = new Dictionary<ulong, PopupMenuClickCallbackDelegate>();
         private static Dictionary<ulong, GridViewClickCallbackDelegate> _gridViewCallbacks = new Dictionary<ulong, GridViewClickCallbackDelegate>();
         private static Dictionary<ulong, DialogResultCallbackDelegate> _dialogCallbacks = new Dictionary<ulong, DialogResultCallbackDelegate>();
@@ -267,6 +268,15 @@ namespace Hezhou
         public delegate void TreeNodeSelectCallbackDelegate(ulong widgetId, ulong userData);
         
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void TreeViewSetOnToggleThunkPtrDelegate(IntPtr handle, ulong treeViewId, IntPtr callbackPtr);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void TreeNodeToggleCallbackDelegate(ulong nodeId);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate bool TreeViewIsNodeExpandedDelegate(IntPtr handle, ulong treeViewId, ulong nodeId);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public delegate void PopupMenuClickCallbackDelegate(ulong widgetId, int actionId);
         
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
@@ -405,6 +415,12 @@ namespace Hezhou
         public delegate ulong SceneCreateCubeDelegate(IntPtr scene);
         
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate ulong SceneCreatePlaneDelegate(IntPtr scene);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate ulong SceneCreateDirectionalLightDelegate(IntPtr scene);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public delegate void SceneAttachScriptDelegate(IntPtr scene, ulong entityId, string scriptPath, string className);
         
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
@@ -513,6 +529,12 @@ namespace Hezhou
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public delegate bool EntitySetPropertyValueFloat3Delegate(IntPtr scene, ulong entityId, IntPtr propertyName, float x, float y, float z);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate bool EntityGetPropertyValueFloatDelegate(IntPtr scene, ulong entityId, IntPtr propertyName, out float value);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate bool EntitySetPropertyValueFloatDelegate(IntPtr scene, ulong entityId, IntPtr propertyName, float value);
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public delegate uint EntityGetPropertyValueStringDelegate(IntPtr scene, ulong entityId, IntPtr propertyName, IntPtr outBuf, uint bufLen);
@@ -685,6 +707,8 @@ namespace Hezhou
             public IntPtr ui_tree_view_expand_node;
             public IntPtr ui_tree_view_collapse_node;
             public IntPtr ui_tree_view_set_on_select_thunk_ptr;
+            public IntPtr ui_tree_view_set_on_toggle_thunk_ptr;
+            public IntPtr ui_tree_view_is_node_expanded;
             public IntPtr ui_tree_node_set_text;
             public IntPtr ui_tree_node_get_user_data;
             public IntPtr ui_tree_view_clear_selection;
@@ -724,6 +748,8 @@ namespace Hezhou
             public IntPtr scene_create;
             public IntPtr scene_destroy;
             public IntPtr scene_create_cube;
+            public IntPtr scene_create_plane;
+            public IntPtr scene_create_directional_light;
             public IntPtr scene_attach_script;
             public IntPtr scene_set_game_state;
             public IntPtr scene_get_game_state;
@@ -760,6 +786,8 @@ namespace Hezhou
             public IntPtr ui_entity_get_property_read_only;
             public IntPtr ui_entity_get_property_value_float3;
             public IntPtr ui_entity_set_property_value_float3;
+            public IntPtr ui_entity_get_property_value_float;
+            public IntPtr ui_entity_set_property_value_float;
             public IntPtr ui_entity_get_property_value_string;
             public IntPtr ui_entity_set_property_value_string;
             public IntPtr widget_tree_ptr;
@@ -767,6 +795,9 @@ namespace Hezhou
             public IntPtr dfx_log;
             public IntPtr dfx_trace_begin;
             public IntPtr dfx_trace_end;
+            public IntPtr dfx_set_counter;
+            public IntPtr dfx_perf_begin_frame;
+            public IntPtr dfx_perf_end_frame;
             public IntPtr set_status_text;
             public IntPtr on_hot_reload_complete;
             public IntPtr asset_library_get_category_count;
@@ -803,9 +834,8 @@ namespace Hezhou
             {
                 Log.Init(_ffi.dfx_handle);
                 Log.SetFunctionPointers(_ffi.dfx_log, _ffi.dfx_trace_begin, _ffi.dfx_trace_end);
+                Log.SetPerfFunctionPointers(_ffi.dfx_set_counter, _ffi.dfx_perf_begin_frame, _ffi.dfx_perf_end_frame);
             }
-            
-            Log.Info("C#", "FfiContext初始化成功");
         }
 
         public static void GetScreenSize(out float width, out float height)
@@ -903,15 +933,6 @@ public static void RegisterResizeCallback(ResizeCallbackDelegate callback)
         {
             _savedHotReloadCompleteCallback = callback;
             IntPtr callbackPtr = Marshal.GetFunctionPointerForDelegate(callback);
-            
-            try
-            {
-                Log.Info("C#", "Registering hot reload complete callback");
-            }
-            catch (Exception ex)
-            {
-                Log.Error("C#", $"RegisterHotReloadCompleteCallback error: {ex.Message}");
-            }
         }
 
         public static void RegisterUpdateCallback(UpdateCallbackDelegate callback)
@@ -1012,6 +1033,35 @@ public static void RegisterResizeCallback(ResizeCallbackDelegate callback)
             IntPtr namePtr = Marshal.StringToHGlobalAnsi(propertyName);
             var func = Marshal.GetDelegateForFunctionPointer<EntitySetPropertyValueFloat3Delegate>(_ffi.ui_entity_set_property_value_float3);
             bool result = func(scene, entityId, namePtr, x, y, z);
+            Marshal.FreeHGlobal(namePtr);
+            return result;
+        }
+
+        public static bool EntityGetPropertyValueFloat(IntPtr scene, ulong entityId, string propertyName, out float value)
+        {
+            if (_ffi.ui_entity_get_property_value_float == IntPtr.Zero)
+            {
+                Log.Error("C#", "EntityGetPropertyValueFloat函数指针为空");
+                value = 0;
+                return false;
+            }
+            IntPtr namePtr = Marshal.StringToHGlobalAnsi(propertyName);
+            var func = Marshal.GetDelegateForFunctionPointer<EntityGetPropertyValueFloatDelegate>(_ffi.ui_entity_get_property_value_float);
+            bool result = func(scene, entityId, namePtr, out value);
+            Marshal.FreeHGlobal(namePtr);
+            return result;
+        }
+
+        public static bool EntitySetPropertyValueFloat(IntPtr scene, ulong entityId, string propertyName, float value)
+        {
+            if (_ffi.ui_entity_set_property_value_float == IntPtr.Zero)
+            {
+                Log.Error("C#", "EntitySetPropertyValueFloat函数指针为空");
+                return false;
+            }
+            IntPtr namePtr = Marshal.StringToHGlobalAnsi(propertyName);
+            var func = Marshal.GetDelegateForFunctionPointer<EntitySetPropertyValueFloatDelegate>(_ffi.ui_entity_set_property_value_float);
+            bool result = func(scene, entityId, namePtr, value);
             Marshal.FreeHGlobal(namePtr);
             return result;
         }

@@ -12,8 +12,6 @@ namespace Hezhou
 
         private static void ShowWorkingDirectoryDialog()
         {
-            Log.Info("Editor", "显示工作目录选择对话框...");
-            
             ulong rootId = UI.GetRootId();
             
             float dialogWidth = 500f * _contentScale;
@@ -36,20 +34,22 @@ namespace Hezhou
             UI.DialogAddButton(_workingDirectoryDialogId, "确认", 1);
             UI.DialogAddButton(_workingDirectoryDialogId, "使用默认目录", 2);
             UI.DialogShow(_workingDirectoryDialogId);
-            
-            Log.Info("Editor", "工作目录对话框创建完成");
         }
 
         private static void CreateEditorLayout()
         {
             _gameScene = new Scene();
-            Log.Info("Editor", $"Scene created: ptr={_gameScene.ScenePtr}");
             
             _testCubeId = _gameScene.CreateCube();
-            Log.Info("Editor", $"Test cube created: entityId={_testCubeId}");
+            UI.SceneSetEntityName(_gameScene.ScenePtr, _testCubeId, "Cube");
+            
+            ulong planeId = _gameScene.CreatePlane();
+            UI.SceneSetEntityName(_gameScene.ScenePtr, planeId, "Plane");
+            
+            ulong lightId = _gameScene.CreateDirectionalLight();
+            UI.SceneSetEntityName(_gameScene.ScenePtr, lightId, "DirectionalLight");
             
             _gameScene.SetGameState(GameState.Editing);
-            Log.Info("Editor", $"Scene state: {_gameScene.GetGameState()}");
             
             float toolbarY = 0f;
             float mainY = TOOLBAR_HEIGHT;
@@ -61,7 +61,6 @@ namespace Hezhou
             float previewX = LEFT_PANEL_WIDTH;
 
             ulong rootId = UI.GetRootId();
-            Log.Info("Editor", $"RootId={rootId}");
 
             _toolbar = new Panel(rootId, 0, toolbarY, _screenWidth, TOOLBAR_HEIGHT, 0.15f, 0.15f, 0.15f, 1.0f);
             _toolbarButtons = new HStack(_toolbar.Id, 10f);
@@ -89,18 +88,14 @@ namespace Hezhou
             _toggleEditorBtn = new Button(_toolbar.Id, 100f, 30f, "编辑器");
             UI.SetWidgetLayout(_toggleEditorBtn.Id, _screenWidth - 120f, 5f, 100f, 30f);
             _toggleEditorBtn.SetOnClick(_toggleEditorClickCallback);
-            
-            Log.Info("Editor", "工具栏创建完成");
 
             _projectPanel = new Panel(rootId, 0, mainY, LEFT_PANEL_WIDTH, mainHeight, 0.2f, 0.2f, 0.2f, 1.0f);
             UI.CreateLabel(_projectPanel.Id, 10f, 10f, LEFT_PANEL_WIDTH - 20f, 25f, "项目结构");
             CreateProjectStructureTree();
-            Log.Info("Editor", "项目结构面板创建完成 (TreeView)");
 
             _assetPanel = new Panel(rootId, 0, bottomY, LEFT_PANEL_WIDTH, BOTTOM_PANEL_HEIGHT, 0.2f, 0.2f, 0.2f, 1.0f);
             UI.CreateLabel(_assetPanel.Id, 10f, 10f, LEFT_PANEL_WIDTH - 20f, 25f, "资产管理");
             CreateAssetGridView();
-            Log.Info("Editor", "资产管理面板创建完成 (GridView)");
 
             _previewPanel = new Panel(rootId, previewX, mainY, previewWidth, mainHeight + BOTTOM_PANEL_HEIGHT, 0.08f, 0.08f, 0.08f, 0.3f);
             UI.CreateLabel(_previewPanel.Id, 10f, 10f, previewWidth - 20f, 25f, "游戏预览");
@@ -111,7 +106,6 @@ namespace Hezhou
             UI.SetWidgetLayer(_previewWindowId, 0);
             
             UI.SetGamePreviewExtent((uint)previewWindowWidth, (uint)previewWindowHeight);
-            Log.Info("Editor", $"游戏预览面板创建完成: PreviewWindow={previewWindowWidth}x{previewWindowHeight}, aspect={previewWindowWidth/previewWindowHeight:F2}");
 
             _propertiesPanel = new Panel(rootId, _screenWidth - RIGHT_PANEL_WIDTH, mainY, RIGHT_PANEL_WIDTH, mainHeight + BOTTOM_PANEL_HEIGHT, 0.2f, 0.2f, 0.2f, 1.0f);
             UI.CreateLabel(_propertiesPanel.Id, 10f, 10f, RIGHT_PANEL_WIDTH - 20f, 25f, "属性编辑");
@@ -141,8 +135,6 @@ namespace Hezhou
             _propsTabWidget.AddTab("Scripts", _scriptsTabContentId, false);
             _propsTabWidget.SetOnSelect(_tabSelectCallback);
             
-            Log.Info("Editor", "属性面板创建完成 (TabWidget)");
-
             _statusBar = new Panel(rootId, 0, statusY, _screenWidth, STATUS_BAR_HEIGHT, 0.12f, 0.12f, 0.12f, 1.0f);
             _statusItems = new List(_statusBar.Id, 0f, true);
             UI.SetWidgetLayout(_statusItems.Id, 10f * _contentScale, 0f, _screenWidth - 20f * _contentScale, STATUS_BAR_HEIGHT);
@@ -161,15 +153,12 @@ namespace Hezhou
             _projectItem = _statusItems.AddItem("项目: 未命名", true);
             UI.SetWidgetLayout(_projectItem.Id, 290f * _contentScale, 2f * _contentScale, 150f * _contentScale, itemHeight);
             UI.SetListItemFontSize(_projectItem.Id, fontSize);
-            
-            Log.Info("Editor", "状态栏创建完成");
         }
 
         private static void OnResize(float width, float height)
         {
             _screenWidth = width;
             _screenHeight = height;
-            Log.Info("Editor", $"窗口resize: {width}x{height}");
             
             UpdateLayout();
         }
@@ -202,7 +191,6 @@ namespace Hezhou
                 float previewWindowHeight = mainHeight - 20f;
                 UI.SetWidgetLayout(_previewWindowId, 10f, 40f, previewWindowWidth, previewWindowHeight);
                 UI.SetGamePreviewExtent((uint)previewWindowWidth, (uint)previewWindowHeight);
-                Log.Info("Editor", $"PreviewWindow resize: {previewWindowWidth}x{previewWindowHeight}");
             }
             
             if (_propertiesPanel != null)
@@ -218,14 +206,10 @@ namespace Hezhou
                 if (_scriptTextEditId != 0)
                     UI.SetWidgetLayout(_scriptTextEditId, 10f, 50f, editorWidth - 20f, editorHeight - 50f);
             }
-            
-            Log.Info("Editor", "布局更新完成");
         }
 
         private static void ShowMainLayout()
         {
-            Log.Info("Editor", "显示主界面...");
-            
             ulong rootId = UI.GetRootId();
             float mainY = TOOLBAR_HEIGHT;
             float mainHeight = _screenHeight - TOOLBAR_HEIGHT - STATUS_BAR_HEIGHT - BOTTOM_PANEL_HEIGHT;
@@ -235,12 +219,16 @@ namespace Hezhou
             
             if (_projectPanel != null)
             {
+                // Only recreate tree if it was destroyed
                 if (_projectTreeViewId != 0)
                 {
-                    UI.RemoveWidget(_projectTreeViewId);
+                    // Tree still exists — keep it, no need to recreate
                 }
-                _entityNodeMap.Clear();
-                CreateProjectStructureTree();
+                else
+                {
+                    // Tree was destroyed — recreate with saved expand state
+                    CreateProjectStructureTree();
+                }
             }
             
             if (_previewPanel == null)
@@ -253,7 +241,6 @@ namespace Hezhou
                 _previewWindowId = UI.CreatePreviewWindow(_previewPanel.Id, 10f, 40f, previewWindowWidth, previewWindowHeight, 1);
                 UI.SetWidgetLayer(_previewWindowId, 0);
                 UI.SetGamePreviewExtent((uint)previewWindowWidth, (uint)previewWindowHeight);
-                Log.Info("Editor", $"PreviewWindow创建完成 (ShowMainLayout): {previewWindowWidth}x{previewWindowHeight}");
             }
             else
             {
@@ -267,7 +254,6 @@ namespace Hezhou
                 _assetPanel = new Panel(rootId, 0, bottomY, LEFT_PANEL_WIDTH, BOTTOM_PANEL_HEIGHT, 0.2f, 0.2f, 0.2f, 1.0f);
                 UI.CreateLabel(_assetPanel.Id, 10f, 10f, LEFT_PANEL_WIDTH - 20f, 25f, "资产管理");
                 CreateAssetGridView();
-                Log.Info("Editor", "assetPanel重建完成 (GridView)");
             }
             
             if (_propertiesPanel == null)
@@ -300,7 +286,6 @@ namespace Hezhou
                 _propsTabWidget.AddTab("Scripts", _scriptsTabContentId, false);
                 _propsTabWidget.SetOnSelect(_tabSelectCallback);
                 
-                Log.Info("Editor", "propertiesPanel重建完成 (TabWidget + InputFields)");
             }
             
             if (_toggleEditorBtn != null)
@@ -312,13 +297,12 @@ namespace Hezhou
             {
                 UpdatePropertiesPanel(_selectedEntityId);
             }
-            
-            Log.Info("Editor", "主界面显示完成");
         }
         
         private static void HideMainLayout()
         {
-            Log.Info("Editor", "隐藏主界面...");
+            // Save expansion state before destroying
+            SaveTreeExpandState();
             
             if (_previewPanel != null)
             {
@@ -343,37 +327,31 @@ namespace Hezhou
                 UI.RemoveWidget(_projectTreeViewId);
                 _projectTreeViewId = 0;
                 _entityNodeMap.Clear();
+                _nodeIdToName.Clear();
             }
             
             if (_toggleEditorBtn != null)
             {
                 _toggleEditorBtn.Text = "预览";
             }
-            
-            Log.Info("Editor", "主界面隐藏完成");
         }
 
         private static void ShowScriptEditor()
         {
             if (_scriptEditorVisible) return;
             
-            Log.Info("Editor", "ShowScriptEditor开始...");
-            
             if (_previewPanel != null)
             {
-                Log.Info("Editor", "移除previewPanel...");
                 UI.RemoveWidget(_previewPanel.Id);
                 _previewPanel = null;
             }
             if (_assetPanel != null)
             {
-                Log.Info("Editor", "移除assetPanel...");
                 UI.RemoveWidget(_assetPanel.Id);
                 _assetPanel = null;
             }
             if (_propertiesPanel != null)
             {
-                Log.Info("Editor", "移除propertiesPanel...");
                 UI.RemoveWidget(_propertiesPanel.Id);
                 _propertiesPanel = null;
             }
@@ -387,7 +365,6 @@ namespace Hezhou
             float editorHeight = _screenHeight - TOOLBAR_HEIGHT - STATUS_BAR_HEIGHT;
             
             RefreshDirectoryTree();
-            Log.Info("Editor", "左侧目录树已刷新");
             
             _scriptEditorPanel = new Panel(rootId, editorX, editorY, editorWidth, editorHeight, 0.12f, 0.12f, 0.14f, 1.0f);
             
@@ -404,7 +381,6 @@ namespace Hezhou
             UI.TextEditSetText(_scriptTextEditId, "// NewScript.cs\nusing System;\nusing Hezhou;\n\npublic class NewScript\n{\n    public void Start()\n    {\n        Console.WriteLine(\"NewScript started!\");\n    }\n    \n    public void Update(float deltaTime)\n    {\n        // Update logic here\n    }\n}");
             
             _scriptEditorVisible = true;
-            Log.Info("Editor", "Script Editor显示成功");
         }
         
         private static void HideScriptEditor()
@@ -422,8 +398,6 @@ namespace Hezhou
             {
                 _toggleEditorBtn.Text = "编辑器";
             }
-            
-            Log.Info("Editor", "脚本编辑器隐藏");
         }
 
         // === Property Panel UI Creation ===
@@ -435,7 +409,6 @@ namespace Hezhou
             _propertyInputFieldCallbacks.Clear();
             
             uint propCount = UI.EntityGetPropertyCount();
-            Log.Info("Editor", "Building dynamic property panel: " + propCount + " properties");
             
             for (uint i = 0; i < propCount; i++)
             {
@@ -543,18 +516,75 @@ namespace Hezhou
                         desc.WidgetIds = new ulong[] { inputId };
                     }
                 }
+                else if (type == 0) // Float
+                {
+                    desc.LabelId = UI.CreateLabel(parentContainerId, RIGHT_PANEL_WIDTH - 40f, 20f, displayName + ":");
+                    
+                    if (readOnly)
+                    {
+                        ulong valueLabelId = UI.CreateLabel(parentContainerId, RIGHT_PANEL_WIDTH - 40f, 20f, "");
+                        desc.WidgetIds = new ulong[] { valueLabelId };
+                    }
+                    else
+                    {
+                        ulong inputId = UI.CreateInputField(parentContainerId, RIGHT_PANEL_WIDTH - 40f, 25f);
+                        UI.InputFieldSetPlaceholder(inputId, displayName);
+                        
+                        string propName = name;
+                        
+                        PropertyChangeCallback pcb = delegate(ulong wid, string txt) {
+                            HandleFloatPropertyChange(propName, wid, txt);
+                        };
+                        _propertyCallbacks[inputId] = pcb;
+                        
+                        UI.InputFieldChangeCallbackDelegate ifcb = delegate(ulong wid, string txt) {
+                            pcb(wid, txt);
+                        };
+                        _propertyInputFieldCallbacks[inputId] = ifcb;
+                        UI.InputFieldSetOnChange(inputId, ifcb);
+                        
+                        desc.WidgetIds = new ulong[] { inputId };
+                    }
+                }
+                else if (type == 3) // Bool
+                {
+                    desc.LabelId = UI.CreateLabel(parentContainerId, RIGHT_PANEL_WIDTH - 40f, 20f, displayName + ":");
+                    
+                    if (readOnly)
+                    {
+                        ulong valueLabelId = UI.CreateLabel(parentContainerId, RIGHT_PANEL_WIDTH - 40f, 20f, "");
+                        desc.WidgetIds = new ulong[] { valueLabelId };
+                    }
+                    else
+                    {
+                        ulong inputId = UI.CreateInputField(parentContainerId, RIGHT_PANEL_WIDTH - 40f, 25f);
+                        UI.InputFieldSetPlaceholder(inputId, "true/false");
+                        
+                        string propName = name;
+                        
+                        PropertyChangeCallback pcb = delegate(ulong wid, string txt) {
+                            HandleBoolPropertyChange(propName, wid, txt);
+                        };
+                        _propertyCallbacks[inputId] = pcb;
+                        
+                        UI.InputFieldChangeCallbackDelegate ifcb = delegate(ulong wid, string txt) {
+                            pcb(wid, txt);
+                        };
+                        _propertyInputFieldCallbacks[inputId] = ifcb;
+                        UI.InputFieldSetOnChange(inputId, ifcb);
+                        
+                        desc.WidgetIds = new ulong[] { inputId };
+                    }
+                }
                 else
                 {
-                    // Unsupported property type (Float=0, Bool=3, Enum=5) - skip for now
+                    // Unsupported property type (Enum=5) - skip for now
                     desc.LabelId = 0;
                     desc.WidgetIds = new ulong[0];
-                    Log.Info("Editor", "Skipping unsupported property type: " + name + " (type=" + type + ")");
                 }
                 
                 _propertyDescriptors.Add(desc);
             }
-            
-            Log.Info("Editor", "Dynamic property panel built: " + _propertyDescriptors.Count + " descriptors");
         }
 
         // === Project Structure Tree UI Creation ===
@@ -569,9 +599,16 @@ namespace Hezhou
             _scriptsNodeId = UI.TreeViewAddNode(_projectTreeViewId, 0, "Scripts", 0, true);
             _entitiesNodeId = UI.TreeViewAddNode(_projectTreeViewId, 0, "Entities", 0, true);
             
+            // Track category node names for expand/collapse state persistence
+            _nodeIdToName[_assetsNodeId] = "Assets";
+            _nodeIdToName[_scenesNodeId] = "Scenes";
+            _nodeIdToName[_scriptsNodeId] = "Scripts";
+            _nodeIdToName[_entitiesNodeId] = "Entities";
+            
             foreach (var script in _availableScripts)
             {
-                UI.TreeViewAddNode(_projectTreeViewId, _scriptsNodeId, script, 0, false);
+                ulong scriptNodeId = UI.TreeViewAddNode(_projectTreeViewId, _scriptsNodeId, script, 0, false);
+                _nodeIdToName[scriptNodeId] = script;
             }
             
             if (_gameScene != null)
@@ -583,16 +620,37 @@ namespace Hezhou
                     string name = UI.SceneGetEntityName(_gameScene.ScenePtr, entityId);
                     ulong nodeId = UI.TreeViewAddNode(_projectTreeViewId, _entitiesNodeId, name, entityId, false);
                     _entityNodeMap[entityId] = nodeId;
+                    _nodeIdToName[nodeId] = name;
                 }
             }
             
             UI.TreeViewSetOnSelect(_projectTreeViewId, _treeNodeSelectCallback);
-            UI.TreeViewExpandNode(_projectTreeViewId, _assetsNodeId);
-            UI.TreeViewExpandNode(_projectTreeViewId, _scenesNodeId);
-            UI.TreeViewExpandNode(_projectTreeViewId, _scriptsNodeId);
-            UI.TreeViewExpandNode(_projectTreeViewId, _entitiesNodeId);
+            UI.TreeViewSetOnToggle(_projectTreeViewId, _treeNodeToggleCallback);
             
-            Log.Info("Editor", $"项目结构树创建完成: entities={_entityNodeMap.Count}");
+            // Restore expansion state
+            if (_expandedNodeNames.Count > 0)
+            {
+                if (_expandedNodeNames.Contains("Assets")) UI.TreeViewExpandNode(_projectTreeViewId, _assetsNodeId);
+                else UI.TreeViewCollapseNode(_projectTreeViewId, _assetsNodeId);
+                if (_expandedNodeNames.Contains("Scenes")) UI.TreeViewExpandNode(_projectTreeViewId, _scenesNodeId);
+                else UI.TreeViewCollapseNode(_projectTreeViewId, _scenesNodeId);
+                if (_expandedNodeNames.Contains("Scripts")) UI.TreeViewExpandNode(_projectTreeViewId, _scriptsNodeId);
+                else UI.TreeViewCollapseNode(_projectTreeViewId, _scriptsNodeId);
+                if (_expandedNodeNames.Contains("Entities")) UI.TreeViewExpandNode(_projectTreeViewId, _entitiesNodeId);
+                else UI.TreeViewCollapseNode(_projectTreeViewId, _entitiesNodeId);
+            }
+            else
+            {
+                // Default: all category nodes expanded
+                UI.TreeViewExpandNode(_projectTreeViewId, _assetsNodeId);
+                UI.TreeViewExpandNode(_projectTreeViewId, _scenesNodeId);
+                UI.TreeViewExpandNode(_projectTreeViewId, _scriptsNodeId);
+                UI.TreeViewExpandNode(_projectTreeViewId, _entitiesNodeId);
+                _expandedNodeNames.Add("Assets");
+                _expandedNodeNames.Add("Scenes");
+                _expandedNodeNames.Add("Scripts");
+                _expandedNodeNames.Add("Entities");
+            }
         }
 
         // === Asset Grid View UI Creation ===
@@ -602,7 +660,6 @@ namespace Hezhou
             _assetGridViewId = UI.CreateGridView(_assetPanel.Id, 10, 40, LEFT_PANEL_WIDTH - 20, BOTTOM_PANEL_HEIGHT - 50, 64);
             RefreshAssetGridView();
             UI.GridViewSetOnClick(_assetGridViewId, _gridViewClickCallback);
-            Log.Info("Editor", "资产GridView创建完成");
         }
 
         // === Toolbar Menus UI Creation ===
@@ -630,8 +687,6 @@ namespace Hezhou
             UI.PopupMenuAddItem(_saveMenuId, "另存为...", "", 3);
             UI.PopupMenuSetOnClick(_saveMenuId, _saveMenuClickCallback);
             UI.SetWidgetLayer(_saveMenuId, 2);
-            
-            Log.Info("Editor", "工具栏菜单创建完成 (PopupMenu)");
         }
 
         // === Directory Tree UI Creation ===
@@ -674,8 +729,6 @@ namespace Hezhou
             
             UI.TreeViewSetOnSelect(_directoryTreeViewId, _treeNodeSelectCallback);
             UI.TreeViewExpandNode(_directoryTreeViewId, _directoryRootNodeId);
-            
-            Log.Info("Editor", "目录树刷新完成 (TreeView)");
         }
         
         private static void AddDirectoryItems(ulong treeViewId, ulong parentNodeId, string path)

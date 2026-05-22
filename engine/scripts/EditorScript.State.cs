@@ -42,6 +42,7 @@ namespace Hezhou
         private static ulong _scriptDropdownId;
         private static ulong _addScriptBtnId;
         private static ulong _scriptsListContainerId;
+        private static List<ulong> _scriptRowIds = new List<ulong>();
         private static ulong _createEntityBtnId;
         private static Dictionary<ulong, int> _removeScriptBtnIndices = new Dictionary<ulong, int>();
 
@@ -66,6 +67,8 @@ namespace Hezhou
         private static ulong _scriptsNodeId;
         private static ulong _entitiesNodeId;
         private static Dictionary<ulong, ulong> _entityNodeMap = new Dictionary<ulong, ulong>();
+        private static HashSet<string> _expandedNodeNames = new HashSet<string>();
+        private static Dictionary<ulong, string> _nodeIdToName = new Dictionary<ulong, string>();
 
         // === Asset Grid State ===
         private static ulong _assetGridViewId;
@@ -157,6 +160,9 @@ private static float _cameraYaw = 0f;
         private static UI.DropdownSelectCallbackDelegate _scriptDropdownSelectCallback;
         private static UI.OnHotReloadCompleteDelegate _hotReloadCompleteCallback;
         private static UI.TabSelectCallbackDelegate _tabSelectCallback;
+
+        // === Tree Toggle Callback ===
+        private static UI.TreeNodeToggleCallbackDelegate _treeNodeToggleCallback;
 
         // === Transition State ===
         private static bool _isTransitioning = false;
