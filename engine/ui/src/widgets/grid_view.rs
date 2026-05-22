@@ -372,14 +372,13 @@ impl Widget for GridView {
     
     fn on_event(&mut self, event: &Event) -> EventResult {
         match event.event_type {
-            EventType::TouchBegin => {
+EventType::TouchBegin => {
                 if let EventData::Touch(touch) = &event.data {
-                    let local_x = touch.x - self.layout.x;
-                    let local_y = touch.y - self.layout.y;
-                    
-                    if local_x >= 0.0 && local_x <= self.layout.width &&
-                       local_y >= 0.0 && local_y <= self.layout.height {
-                        if let Some(index) = self.get_item_at_position(local_x, local_y) {
+                    // touch coordinates are already relative to this widget
+                    // (EventDispatcher converts window coords to local coords in both capturing+bubbling)
+                    if touch.x >= 0.0 && touch.x <= self.layout.width &&
+                       touch.y >= 0.0 && touch.y <= self.layout.height {
+                        if let Some(index) = self.get_item_at_position(touch.x, touch.y) {
                             self.hovered_index = Some(index);
                             return EventResult::Handled;
                         }
@@ -425,10 +424,8 @@ impl Widget for GridView {
             
             EventType::MouseMove => {
                 if let EventData::Touch(touch) = &event.data {
-                    let local_x = touch.x - self.layout.x;
-                    let local_y = touch.y - self.layout.y;
-                    
-                    let new_hovered = self.get_item_at_position(local_x, local_y);
+                    // touch coordinates are already relative to this widget
+                    let new_hovered = self.get_item_at_position(touch.x, touch.y);
                     if new_hovered != self.hovered_index {
                         self.hovered_index = new_hovered;
                         self.flags.dirty_render = true;

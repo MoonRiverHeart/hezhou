@@ -66,6 +66,7 @@ pub struct Dialog {
     hovered_button_index: Option<usize>,
     pressed_button_index: Option<usize>,
     content_scale: f32,
+    all_text: String,
 }
 
 impl Dialog {
@@ -90,11 +91,21 @@ impl Dialog {
             hovered_button_index: None,
             pressed_button_index: None,
             content_scale: 1.0,
+            all_text: String::new(),
+        }
+    }
+    
+    fn rebuild_all_text(&mut self) {
+        self.all_text.clear();
+        self.all_text.push_str(&self.title);
+        for button in &self.buttons {
+            self.all_text.push_str(&button.text);
         }
     }
     
     pub fn with_title(mut self, title: &str) -> Self {
         self.title = title.to_string();
+        self.rebuild_all_text();
         self
     }
     
@@ -110,6 +121,7 @@ impl Dialog {
     
     pub fn set_title(&mut self, title: &str) {
         self.title = title.to_string();
+        self.rebuild_all_text();
         self.flags.dirty_render = true;
     }
     
@@ -124,6 +136,7 @@ impl Dialog {
         let button = DialogButton::new(text, action);
         let id = button.id;
         self.buttons.push(button);
+        self.rebuild_all_text();
         id
     }
     
@@ -170,16 +183,35 @@ impl Dialog {
             return Rect::new(0.0, 0.0, 0.0, 0.0);
         }
         
-        let button_width = 80.0 * self.content_scale;
+        let font_size = 14.0 * self.content_scale;
+        let min_button_width = 80.0 * self.content_scale;
+        let padding = 20.0 * self.content_scale;
         let spacing = 10.0 * self.content_scale;
-        let total_width = button_count as f32 * button_width + (button_count - 1) as f32 * spacing;
+        
+        // Compute per-button widths based on text content
+        let button_widths: Vec<f32> = self.buttons.iter().map(|b| {
+            let char_width: f32 = b.text.chars().map(|c| {
+                if c.is_ascii() { font_size * 0.6 } else { font_size }
+            }).sum();
+            let text_width = char_width;
+            f32::max(text_width + padding, min_button_width)
+        }).collect();
+        
+        let total_width = button_widths.iter().sum::<f32>() + (button_count - 1) as f32 * spacing;
         let start_x = (self.layout.width - total_width) / 2.0;
         let y = self.layout.height - scaled_button_height - 10.0 * self.content_scale;
         
+        // Compute x offset by summing widths of previous buttons
+        let x_offset = if index == 0 {
+            0.0
+        } else {
+            button_widths[..index].iter().sum::<f32>() + index as f32 * spacing
+        };
+        
         Rect::new(
-            start_x + index as f32 * (button_width + spacing),
+            start_x + x_offset,
             y,
-            button_width,
+            button_widths[index],
             scaled_button_height,
         )
     }
@@ -296,7 +328,7 @@ impl Widget for Dialog {
     }
 
     fn get_text(&self) -> Option<&str> {
-        Some(&self.title)
+        Some(&self.all_text)
     }
     
     fn draw(&mut self, canvas: &mut Canvas) {
@@ -401,10 +433,12 @@ impl Widget for Dialog {
                             if index == pressed_index {
                                 self.trigger_button_callback(index);
                             }
+                            self.pressed_button_index = None;
+                            self.set_state(WidgetState::Normal);
+                            return EventResult::Stopped;
                         }
-                        self.pressed_button_index = None;
-                        self.set_state(WidgetState::Normal);
-                        return EventResult::Stopped;
+                        // hit_test failed (capturing phase with raw coords) — 
+                        // don't reset pressed_button_index, let bubbling phase handle it
                     }
                 }
             }
@@ -428,7 +462,7 @@ impl Widget for Dialog {
                 return EventResult::Handled;
             }
             
-            EventType::TouchMove => {
+            EventType::MouseMove => {
                 if let EventData::Touch(touch) = &event.data {
                     let local_x = touch.x;
                     let local_y = touch.y;

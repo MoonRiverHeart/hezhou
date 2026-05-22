@@ -34,6 +34,7 @@ pub struct FileBrowser {
     pressed_item_index: Option<usize>,
     scroll_offset: f32,
     content_scale: f32,
+    all_text: String,
 }
 
 impl FileBrowser {
@@ -64,6 +65,16 @@ impl FileBrowser {
             pressed_item_index: None,
             scroll_offset: 0.0,
             content_scale: 1.0,
+            all_text: String::new(),
+        }
+    }
+    
+    fn rebuild_all_text(&mut self) {
+        self.all_text.clear();
+        self.all_text.push_str(&self.current_path);
+        self.all_text.push('↑');
+        for item in &self.items {
+            self.all_text.push_str(&item.name);
         }
     }
     
@@ -144,6 +155,7 @@ impl FileBrowser {
         }
         
         self.flags.dirty_render = true;
+        self.rebuild_all_text();
         dfx_info!("FileBrowser", "Refresh: id={}, items={}", self.id.id, self.items.len());
     }
     
@@ -306,6 +318,8 @@ impl Widget for FileBrowser {
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
         self
     }
+    
+    fn get_text(&self) -> Option<&str> { Some(&self.all_text) }
     
     fn flags(&self) -> WidgetFlags {
         self.flags
