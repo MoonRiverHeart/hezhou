@@ -8,10 +8,13 @@ layout(push_constant) uniform PushConstants {
     vec3 outline_color;   // 12 bytes - selection highlight color
     float is_selected;    // 4 bytes - 1.0 if selected, 0.0 if not
     vec2 viewport_size;   // 8 bytes - game viewport dimensions
-    vec3 camera_pos;      // 12 bytes - camera position
+    float _pad0;          // 4 bytes - padding for vec3 alignment
+    float _pad1;          // 4 bytes - padding for vec3 alignment
+    vec3 camera_pos;      // 12 bytes - camera position (at offset 96, 16-byte aligned)
     float camera_yaw;     // 4 bytes
     float camera_pitch;   // 4 bytes
-    // Total: 108 bytes, within 128-byte limit
+    float _pad2;          // 4 bytes - padding to round struct size
+    // Total: 128 bytes, within 128-byte limit
 } pc;
 
 layout(location = 0) out vec3 fragColor;

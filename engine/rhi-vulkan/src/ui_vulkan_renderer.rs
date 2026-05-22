@@ -6,7 +6,7 @@ use std::ffi::CString;
 use std::collections::HashMap;
 use hezhou_ui::{UISystem, UIInputHandler, Panel, Button, Label, TextEdit, Layout, DrawCommand, Widget, Style, Color, TextStyle, ffi::WidgetTreeHandle, ffi::ui_set_primary_button_id};
 use hezhou_platform::{MouseAction, MouseEvent, MouseButton, CharEvent, KeyEvent, KeyAction, KeyModifiers, KeyCode};
-use hezhou_dfx::{DfxSystem, LogLevel, dfx_info};
+use hezhou_dfx::{DfxSystem, LogLevel, dfx_info, dfx_debug};
 use parking_lot::Mutex;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -161,6 +161,13 @@ pub struct UIVulkanRenderer {
     
     // Scene pointer for multi-entity rendering
     scene_ptr: Option<*mut hezhou_core::Scene>,
+    
+    // Light UBO (directional light data for fragment shader)
+    light_ubo: vk::Buffer,
+    light_ubo_memory: vk::DeviceMemory,
+    light_descriptor_set_layout: vk::DescriptorSetLayout,
+    light_descriptor_pool: vk::DescriptorPool,
+    light_descriptor_set: vk::DescriptorSet,
 }
 
 impl UIVulkanRenderer {
@@ -704,12 +711,28 @@ p_multisample_state: &vk::PipelineMultisampleStateCreateInfo {
             let game_vert_shader = Self::create_shader_module(&device, game_vert_code)?;
             let game_frag_shader = Self::create_shader_module(&device, game_frag_code)?;
             
+            // Light UBO descriptor set layout (for directional light data in fragment shader)
+            let light_descriptor_set_layout = device.create_descriptor_set_layout(&vk::DescriptorSetLayoutCreateInfo {
+                binding_count: 1,
+                p_bindings: &vk::DescriptorSetLayoutBinding {
+                    binding: 0,
+                    descriptor_type: vk::DescriptorType::UNIFORM_BUFFER,
+                    descriptor_count: 1,
+                    stage_flags: vk::ShaderStageFlags::FRAGMENT,
+                    p_immutable_samplers: std::ptr::null(),
+                    ..Default::default()
+                },
+                ..Default::default()
+            }, None).map_err(|e| format!("Failed to create light descriptor set layout: {}", e))?;
+            
             let game_pipeline_layout = device.create_pipeline_layout(&vk::PipelineLayoutCreateInfo {
+                set_layout_count: 1,
+                p_set_layouts: &light_descriptor_set_layout,
                 push_constant_range_count: 1,
                 p_push_constant_ranges: &vk::PushConstantRange {
                     stage_flags: vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT,
                     offset: 0,
-                    size: 112, // mat4(64) + outline_color(12) + is_selected(4) + viewport_size(8) + camera_pos(12) + camera_yaw(4) + camera_pitch(4) = 108, rounded to 112
+                    size: 128, // mat4(64) + outline_color(12) + is_selected(4) + viewport_size(8) + _pad(8) + camera_pos(12) + camera_yaw(4) + camera_pitch(4) + _pad(4) = 128
                 },
                 ..Default::default()
             }, None).map_err(|e| format!("Failed to create game pipeline layout: {}", e))?;
@@ -944,6 +967,87 @@ p_multisample_state: &vk::PipelineMultisampleStateCreateInfo {
             
             device.destroy_shader_module(outline_vert_shader, None);
             device.destroy_shader_module(outline_frag_shader, None);
+            
+            // Light UBO buffer (48 bytes: direction(3+pad=16) + color(3+pad=16) + intensity(1+pad=12) = 48 bytes, std140 layout)
+            // std140: vec3 has alignment 16, each vec3 occupies 16 bytes. float has alignment 4.
+            // direction at offset 0 (16 bytes), color at offset 16 (16 bytes), intensity at offset 32 (4 bytes)
+            // Struct size rounded to multiple of largest alignment (16) = 48 bytes
+            let light_ubo_size: vk::DeviceSize = 48;
+            let light_ubo = device.create_buffer(&vk::BufferCreateInfo {
+                size: light_ubo_size,
+                usage: vk::BufferUsageFlags::UNIFORM_BUFFER,
+                sharing_mode: vk::SharingMode::EXCLUSIVE,
+                ..Default::default()
+            }, None).map_err(|e| format!("Failed to create light UBO buffer: {}", e))?;
+            
+            let light_ubo_mem_requirements = device.get_buffer_memory_requirements(light_ubo);
+            let light_ubo_mem_properties = instance.get_physical_device_memory_properties(physical_device);
+            let light_ubo_memory_type_index = Self::find_memory_type(
+                light_ubo_mem_requirements.memory_type_bits,
+                vk::MemoryPropertyFlags::HOST_VISIBLE | vk::MemoryPropertyFlags::HOST_COHERENT,
+                &light_ubo_mem_properties
+            );
+            
+            let light_ubo_memory = device.allocate_memory(&vk::MemoryAllocateInfo {
+                allocation_size: light_ubo_mem_requirements.size,
+                memory_type_index: light_ubo_memory_type_index,
+                ..Default::default()
+            }, None).map_err(|e| format!("Failed to allocate light UBO memory: {}", e))?;
+            
+            device.bind_buffer_memory(light_ubo, light_ubo_memory, 0)
+                .map_err(|e| format!("Failed to bind light UBO memory: {}", e))?;
+            
+            // Write default light data to UBO: direction=(-0.5,-1.0,-0.5), color=(1,1,1), intensity=1.0
+            // std140 layout: [dir.x, dir.y, dir.z, 0(pad), color.x, color.y, color.z, 0(pad), intensity, 0(pad), 0(pad), 0(pad)] = 12 floats = 48 bytes
+            {
+                let default_light_data: [f32; 12] = [-0.5, -1.0, -0.5, 0.0, 1.0, 1.0, 1.0, 0.0, 1.0, 0.0, 0.0, 0.0];
+                let data_ptr = device.map_memory(light_ubo_memory, 0, light_ubo_size, vk::MemoryMapFlags::empty())
+                    .map_err(|e| format!("Failed to map light UBO memory: {}", e))?;
+                std::ptr::copy_nonoverlapping(
+                    default_light_data.as_ptr() as *const u8,
+                    data_ptr as *mut u8,
+                    48,
+                );
+                device.unmap_memory(light_ubo_memory);
+            }
+            
+            // Light descriptor pool and set
+            let light_descriptor_pool = device.create_descriptor_pool(&vk::DescriptorPoolCreateInfo {
+                max_sets: 1,
+                pool_size_count: 1,
+                p_pool_sizes: &vk::DescriptorPoolSize {
+                    ty: vk::DescriptorType::UNIFORM_BUFFER,
+                    descriptor_count: 1,
+                },
+                ..Default::default()
+            }, None).map_err(|e| format!("Failed to create light descriptor pool: {}", e))?;
+            
+            let light_descriptor_set = device.allocate_descriptor_sets(&vk::DescriptorSetAllocateInfo {
+                descriptor_pool: light_descriptor_pool,
+                descriptor_set_count: 1,
+                p_set_layouts: &light_descriptor_set_layout,
+                ..Default::default()
+            }).map_err(|e| format!("Failed to allocate light descriptor set: {}", e))?[0];
+            
+            // Update light descriptor set with UBO buffer info
+            device.update_descriptor_sets(
+                &[vk::WriteDescriptorSet {
+                    dst_set: light_descriptor_set,
+                    dst_binding: 0,
+                    dst_array_element: 0,
+                    descriptor_count: 1,
+                    descriptor_type: vk::DescriptorType::UNIFORM_BUFFER,
+                    p_buffer_info: &vk::DescriptorBufferInfo {
+                        buffer: light_ubo,
+                        offset: 0,
+                        range: light_ubo_size,
+                    },
+                    ..Default::default()
+                }],
+                &[]
+            );
+            
+            logger.lock().log(LogLevel::Info, "Vulkan", "Light UBO and descriptor set created", file!(), line!());
             
             // Preview texture sampler (for UI to sample offscreen image)
             let preview_sampler = device.create_sampler(&vk::SamplerCreateInfo {
@@ -1322,6 +1426,12 @@ p_multisample_state: &vk::PipelineMultisampleStateCreateInfo {
                 game_mesh_buffer_memory,
                 primitive_ranges,
                 scene_ptr: None,
+                
+                light_ubo,
+                light_ubo_memory,
+                light_descriptor_set_layout,
+                light_descriptor_pool,
+                light_descriptor_set,
             })
         }
     }
@@ -2084,9 +2194,7 @@ let font_atlas_guard = ui.get_font_atlas().lock();
             self.device.cmd_set_viewport(self.command_buffers[image_index_usize], 0, &[game_viewport]);
             self.device.cmd_set_scissor(self.command_buffers[image_index_usize], 0, &[game_scissor]);
             
-            dfx_info!("Vulkan", &format!("Drawing entities: extent={}x{}, aspect={:.2}", 
-                self.offscreen_extent.width, self.offscreen_extent.height,
-                self.offscreen_extent.width as f32 / self.offscreen_extent.height as f32));
+            // Per-frame rendering — skip log
             
             // Bind game mesh vertex buffer
             self.device.cmd_bind_vertex_buffers(
@@ -2094,6 +2202,54 @@ let font_atlas_guard = ui.get_font_atlas().lock();
                 0,
                 &[self.game_mesh_buffer],
                 &[0],
+            );
+            
+            // Extract directional light data from Scene ECS and upload to UBO
+            // std140 layout: [dir.x, dir.y, dir.z, 0(pad), color.x, color.y, color.z, 0(pad), intensity, 0(pad), 0(pad), 0(pad)] = 12 floats = 48 bytes
+            let light_data: [f32; 12] = if let Some(scene_ptr) = self.scene_ptr {
+                unsafe {
+                    let scene = &*scene_ptr;
+                    let mut found_light = None;
+                    for entity in &scene.root_entities {
+                        if let Some(light_comp) = scene.world.get_component::<hezhou_core::DirectionalLightComponent>(*entity) {
+                            found_light = Some(light_comp);
+                            break;
+                        }
+                    }
+                    if let Some(light_comp) = found_light {
+                        [light_comp.direction.x, light_comp.direction.y, light_comp.direction.z, 0.0,
+                         light_comp.color.x, light_comp.color.y, light_comp.color.z, 0.0,
+                         light_comp.intensity, 0.0, 0.0, 0.0]
+                    } else {
+                        // Default fallback: direction=(-0.5,-1.0,-0.5), color=(1,1,1), intensity=1.0
+                        [-0.5, -1.0, -0.5, 0.0, 1.0, 1.0, 1.0, 0.0, 1.0, 0.0, 0.0, 0.0]
+                    }
+                }
+            } else {
+                // Default fallback when no scene exists
+                [-0.5, -1.0, -0.5, 0.0, 1.0, 1.0, 1.0, 0.0, 1.0, 0.0, 0.0, 0.0]
+            };
+            
+            // Upload light data to UBO
+            unsafe {
+                let data_ptr = self.device.map_memory(self.light_ubo_memory, 0, 48, vk::MemoryMapFlags::empty())
+                    .expect("Failed to map light UBO memory");
+                std::ptr::copy_nonoverlapping(
+                    light_data.as_ptr() as *const u8,
+                    data_ptr as *mut u8,
+                    48,
+                );
+                self.device.unmap_memory(self.light_ubo_memory);
+            }
+            
+            // Bind light descriptor set (set 0) for game pipeline
+            self.device.cmd_bind_descriptor_sets(
+                self.command_buffers[image_index_usize],
+                vk::PipelineBindPoint::GRAPHICS,
+                self.game_pipeline_layout,
+                0,
+                &[self.light_descriptor_set],
+                &[],
             );
             
             // Multi-entity rendering loop
@@ -2137,14 +2293,15 @@ let font_atlas_guard = ui.get_font_atlas().lock();
                             model[1][0], model[1][1], model[1][2], model[1][3],
                             model[2][0], model[2][1], model[2][2], model[2][3],
                             model[3][0], model[3][1], model[3][2], model[3][3],
-                            // outline_color + is_selected
+                            // outline_color + is_selected (16 bytes at offset 64)
                             outline_color[0], outline_color[1], outline_color[2], is_selected_f,
-                            // viewport_size
+                            // viewport_size (8 bytes at offset 80) + padding (8 bytes at offset 88)
                             self.offscreen_extent.width as f32, self.offscreen_extent.height as f32,
-                            // camera_pos + camera_yaw + camera_pitch
-                            self.camera_x, self.camera_y, self.camera_z, self.camera_yaw, self.camera_pitch,
-                            // padding to 112 bytes (4 floats = 16 bytes padding)
-                            0.0f32, 0.0f32, 0.0f32, 0.0f32,
+                            0.0f32, 0.0f32,  // pad to align camera_pos to 16-byte boundary (offset 96)
+                            // camera_pos (12 bytes at offset 96) + camera_yaw (4 bytes at offset 108) + camera_pitch (4 bytes at offset 112)
+                            self.camera_x, self.camera_y, self.camera_z, self.camera_yaw,
+                            self.camera_pitch,
+                            0.0f32, 0.0f32, 0.0f32,  // padding to 128 bytes
                         ];
                         
                         // Draw normal entity
@@ -2176,14 +2333,15 @@ let font_atlas_guard = ui.get_font_atlas().lock();
                                 outline_model[1][0], outline_model[1][1], outline_model[1][2], outline_model[1][3],
                                 outline_model[2][0], outline_model[2][1], outline_model[2][2], outline_model[2][3],
                                 outline_model[3][0], outline_model[3][1], outline_model[3][2], outline_model[3][3],
-                                // outline_color + is_selected (1.0 for outline)
+                                // outline_color + is_selected (1.0 for outline) at offset 64
                                 1.0f32, 0.5, 0.0, 1.0f32,
-                                // viewport_size
+                                // viewport_size (8 bytes) + padding (8 bytes) at offset 80
                                 self.offscreen_extent.width as f32, self.offscreen_extent.height as f32,
-                                // camera_pos + camera_yaw + camera_pitch
-                                self.camera_x, self.camera_y, self.camera_z, self.camera_yaw, self.camera_pitch,
-                                // padding
-                                0.0f32, 0.0f32, 0.0f32, 0.0f32,
+                                0.0f32, 0.0f32,  // pad to align camera_pos to 16-byte boundary
+                                // camera_pos + camera_yaw at offset 96
+                                self.camera_x, self.camera_y, self.camera_z, self.camera_yaw,
+                                self.camera_pitch,
+                                0.0f32, 0.0f32, 0.0f32,  // padding to 128 bytes
                             ];
                             
                             self.device.cmd_bind_pipeline(
@@ -2222,10 +2380,12 @@ let font_atlas_guard = ui.get_font_atlas().lock();
                     model.data[1][0], model.data[1][1], model.data[1][2], model.data[1][3],
                     model.data[2][0], model.data[2][1], model.data[2][2], model.data[2][3],
                     model.data[3][0], model.data[3][1], model.data[3][2], model.data[3][3],
-                    0.0f32, 0.0, 0.0, 0.0f32,
+                    0.0f32, 0.0, 0.0, 0.0f32,  // outline_color + is_selected (unused in fallback)
                     self.offscreen_extent.width as f32, self.offscreen_extent.height as f32,
-                    self.camera_x, self.camera_y, self.camera_z, self.camera_yaw, self.camera_pitch,
-                    0.0f32, 0.0f32, 0.0f32, 0.0f32,
+                    0.0f32, 0.0f32,  // padding to align camera_pos
+                    self.camera_x, self.camera_y, self.camera_z, self.camera_yaw,
+                    self.camera_pitch,
+                    0.0f32, 0.0f32, 0.0f32,  // padding to 128 bytes
                 ];
                 
                 self.device.cmd_bind_pipeline(
@@ -3005,42 +3165,12 @@ let font_atlas_guard = ui.get_font_atlas().lock();
         self.glfw.poll_events();
         
         let events: Vec<_> = glfw::flush_messages(&self.event_receiver).collect();
-        if !events.is_empty() {
-            self.dfx.lock().get_logger().lock().log(
-                LogLevel::Info, 
-                "GLFW", 
-                &format!("process_events: {} events received", events.len()), 
-                file!(), 
-                line!()
-            );
-        }
         
         for (_, event) in events {
             match event {
                 WindowEvent::MouseButton(button, action, _) => {
                     let x = self.window.get_cursor_pos().0 as f32;
                     let y = self.window.get_cursor_pos().1 as f32;
-                    
-self.dfx.lock().get_logger().lock().log(
-                        LogLevel::Info, 
-                        "GLFW", 
-                        &format!("MouseButton: {} {} at ({}, {})", 
-                            match button {
-                                glfw::MouseButtonLeft => "Left",
-                                glfw::MouseButtonRight => "Right",
-                                glfw::MouseButtonMiddle => "Middle",
-                                _ => "Other",
-                            },
-                            match action {
-                                glfw::Action::Press => "Press",
-                                glfw::Action::Release => "Release",
-                                glfw::Action::Repeat => "Repeat",
-                            },
-                            x, y
-                        ), 
-                        file!(), 
-                        line!()
-                    );
                     
                     let ui_button = match button {
                         glfw::MouseButtonLeft => MouseButton::Left,
@@ -3065,13 +3195,6 @@ self.dfx.lock().get_logger().lock().log(
                     };
                     
                     self.input_handler.lock().on_mouse_event(&mouse_event, self.frame_count);
-                    self.dfx.lock().get_logger().lock().log(
-                        LogLevel::Debug, 
-                        "GLFW", 
-                        "MouseEvent dispatched to input_handler", 
-                        file!(), 
-                        line!()
-                    );
                 }
                 WindowEvent::CursorPos(x, y) => {
                     let mouse_event = MouseEvent {
@@ -3086,10 +3209,11 @@ self.dfx.lock().get_logger().lock().log(
                     self.input_handler.lock().on_mouse_event(&mouse_event, self.frame_count);
                 }
                 WindowEvent::Key(key, _, action, mods) => {
-                    // volatile read + log 强制使用 action_raw 防止编译器优化
-                    let action_ptr = &action as *const Action as *const i32;
-                    let action_raw = unsafe { std::ptr::read_volatile(action_ptr) };
-                    dfx_info!("GLFWKey", "action={}", action_raw);
+                    let action_raw = match action {
+                        glfw::Action::Press => 1,
+                        glfw::Action::Release => 0,
+                        glfw::Action::Repeat => 2,
+                    };
                     
                     // Space 和 S 只在 Press 时处理
                     if action_raw == 1 {  // GLFW Press
@@ -3263,7 +3387,6 @@ self.dfx.lock().get_logger().lock().log(
                         self.input_handler.lock().on_char_event(&CharEvent {
                             codepoint: codepoint as u32,
                         }, self.frame_count);
-                        self.dfx.lock().get_logger().lock().log(LogLevel::Info, "GLFW", &format!("Char input: {} ({})", codepoint, codepoint as u32), file!(), line!());
                     }
                 }
                 WindowEvent::Close => {
@@ -3788,7 +3911,7 @@ self.dfx.lock().get_logger().lock().log(
     pub fn set_selected_entity(&mut self, entity_id: u64, selected: bool) {
         self.selected_entity_id = entity_id;
         self.is_entity_selected = selected;
-        dfx_info!("Vulkan", "Selected entity: id={}, selected={}", entity_id, selected);
+        dfx_debug!("Vulkan", "Selected entity: id={}, selected={}", entity_id, selected);
     }
     
     pub fn set_scene(&mut self, scene: *mut hezhou_core::Scene) {
@@ -3839,6 +3962,12 @@ self.dfx.lock().get_logger().lock().log(
             self.device.destroy_pipeline(self.game_pipeline, None);
             self.device.destroy_pipeline_layout(self.game_pipeline_layout, None);
             self.device.destroy_render_pass(self.game_render_pass, None);
+            
+            // Cleanup light UBO resources
+            self.device.destroy_descriptor_pool(self.light_descriptor_pool, None);
+            self.device.destroy_descriptor_set_layout(self.light_descriptor_set_layout, None);
+            self.device.destroy_buffer(self.light_ubo, None);
+            self.device.free_memory(self.light_ubo_memory, None);
             
             self.device.destroy_buffer(self.game_mesh_buffer, None);
             self.device.free_memory(self.game_mesh_buffer_memory, None);
