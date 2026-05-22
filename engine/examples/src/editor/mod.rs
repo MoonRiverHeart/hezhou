@@ -47,36 +47,30 @@ pub fn run() {
     let (dfx, log_path) = dfx_init::setup_dfx();
     
     dfx_info!("Demo", "=== Hezhou Game Editor ===");
-    dfx_info!("Demo", "Log file: {}", log_path);
+    dfx_info!("Demo", "Log: {}", log_path);
     if screenshot_mode {
         dfx_info!("Demo", "Screenshot mode: delay={}s", screenshot_delay);
     }
     
     dfx_trace_begin!("Startup", "editor");
-    dfx_info!("Demo", "[1] 创建编辑器窗口 (1280x720)...");
     
     dfx_trace_begin!("Window", "create");
     let mut renderer = UIVulkanRenderer::new(1280, 720, "Hezhou Game Editor")
         .expect("Failed to create renderer");
     unsafe { RENDERER = Some(&mut renderer as *mut UIVulkanRenderer); }
     dfx_trace_end!("Window", "create");
-    dfx_info!("Demo", "窗口创建成功!");
 
-    dfx_info!("Demo", "[2] 设置UI Root Panel...");
     dfx_trace_begin!("UI", "setup");
     renderer.setup_ui_for_script();
     ui_ffi::ui_set_screen_size(1280.0, 720.0);
     let content_scale = renderer.get_content_scale();
     ui_ffi::ui_set_content_scale(content_scale);
     dfx_trace_end!("UI", "setup");
-    dfx_info!("Demo", "Content scale: {} (DPI: {})", content_scale, content_scale * 96.0);
 
-    dfx_info!("Demo", "[3] 编译C#编辑器脚本...");
     dfx_trace_begin!("Script", "compile");
     hot_reload::compile_editor_script();
     dfx_trace_end!("Script", "compile");
 
-    dfx_info!("Demo", "[4] 设置FFI Context...");
     let widget_tree_handle: WidgetTreeHandle = renderer.get_widget_tree_handle() as WidgetTreeHandle;
     
     let dfx_for_csharp = hezhou_dfx::dfx_create();
@@ -163,8 +157,10 @@ pub fn run() {
         ui_tree_view_get_selected: unsafe { std::mem::transmute(ui_ffi::ui_tree_view_get_selected as *const std::ffi::c_void) },
         ui_tree_view_expand_node: unsafe { std::mem::transmute(ui_ffi::ui_tree_view_expand_node as *const std::ffi::c_void) },
         ui_tree_view_collapse_node: unsafe { std::mem::transmute(ui_ffi::ui_tree_view_collapse_node as *const std::ffi::c_void) },
-        ui_tree_view_set_on_select_thunk_ptr: unsafe { std::mem::transmute(ui_ffi::ui_tree_view_set_on_select_thunk_ptr as *const std::ffi::c_void) },
-        ui_tree_node_set_text: unsafe { std::mem::transmute(ui_ffi::ui_tree_node_set_text as *const std::ffi::c_void) },
+ui_tree_view_set_on_select_thunk_ptr: unsafe { std::mem::transmute(ui_ffi::ui_tree_view_set_on_select_thunk_ptr as *const std::ffi::c_void) },
+            ui_tree_view_set_on_toggle_thunk_ptr: unsafe { std::mem::transmute(ui_ffi::ui_tree_view_set_on_toggle_thunk_ptr as *const std::ffi::c_void) },
+            ui_tree_view_is_node_expanded: unsafe { std::mem::transmute(ui_ffi::ui_tree_view_is_node_expanded as *const std::ffi::c_void) },
+            ui_tree_node_set_text: unsafe { std::mem::transmute(ui_ffi::ui_tree_node_set_text as *const std::ffi::c_void) },
         ui_tree_node_get_user_data: unsafe { std::mem::transmute(ui_ffi::ui_tree_node_get_user_data as *const std::ffi::c_void) },
         ui_tree_view_clear_selection: unsafe { std::mem::transmute(ui_ffi::ui_tree_view_clear_selection as *const std::ffi::c_void) },
         ui_create_popup_menu: unsafe { std::mem::transmute(ui_ffi::ui_create_popup_menu as *const std::ffi::c_void) },
@@ -203,6 +199,8 @@ pub fn run() {
         scene_create: scene_ffi_impl::scene_create_editor,
         scene_destroy: scene_ffi_impl::scene_destroy_editor,
         scene_create_cube: scene_ffi_impl::scene_create_cube_editor,
+            scene_create_plane: scene_ffi_impl::scene_create_plane_editor,
+            scene_create_directional_light: scene_ffi_impl::scene_create_directional_light_editor,
         scene_attach_script: scene_ffi_impl::scene_attach_script_editor,
         scene_set_game_state: scene_ffi_impl::scene_set_game_state_editor,
         scene_get_game_state: scene_ffi_impl::scene_get_game_state_editor,
@@ -241,23 +239,46 @@ pub fn run() {
         ui_entity_set_property_value_float3: scene_ffi_impl::ui_entity_set_property_value_float3_editor,
         ui_entity_get_property_value_string: scene_ffi_impl::ui_entity_get_property_value_string_editor,
         ui_entity_set_property_value_string: scene_ffi_impl::ui_entity_set_property_value_string_editor,
+        ui_entity_get_property_value_float: scene_ffi_impl::ui_entity_get_property_value_float_editor,
+        ui_entity_set_property_value_float: scene_ffi_impl::ui_entity_set_property_value_float_editor,
         widget_tree_ptr: widget_tree_handle,
         dfx_handle: dfx_for_csharp as *mut std::ffi::c_void,
         dfx_log: unsafe { std::mem::transmute(hezhou_dfx::dfx_log as *const std::ffi::c_void) },
         dfx_trace_begin: unsafe { std::mem::transmute(hezhou_dfx::dfx_trace_begin as *const std::ffi::c_void) },
         dfx_trace_end: unsafe { std::mem::transmute(hezhou_dfx::dfx_trace_end as *const std::ffi::c_void) },
+        dfx_set_counter: unsafe { std::mem::transmute(hezhou_dfx::dfx_set_counter as *const std::ffi::c_void) },
+        dfx_perf_begin_frame: unsafe { std::mem::transmute(hezhou_dfx::dfx_perf_begin_frame as *const std::ffi::c_void) },
+        dfx_perf_end_frame: unsafe { std::mem::transmute(hezhou_dfx::dfx_perf_end_frame as *const std::ffi::c_void) },
         set_status_text: ffi_impl::set_status_text,
         on_hot_reload_complete: ffi_impl::on_hot_reload_complete_placeholder,
         ui_debug_print_widget_tree: unsafe { std::mem::transmute(ui_ffi::ui_debug_print_widget_tree as *const std::ffi::c_void) },
         ui_widget_set_flex_expand: unsafe { std::mem::transmute(ui_ffi::ui_widget_set_flex_expand as *const std::ffi::c_void) },
         ui_widget_set_cross_axis_fill: unsafe { std::mem::transmute(ui_ffi::ui_widget_set_cross_axis_fill as *const std::ffi::c_void) },
+        asset_library_get_category_count: hezhou_core::asset_library_get_category_count,
+        asset_library_get_category_name: hezhou_core::asset_library_get_category_name,
+        asset_library_get_asset_count: hezhou_core::asset_library_get_asset_count,
+        asset_library_get_asset_info: hezhou_core::asset_library_get_asset_info,
+        asset_library_create_entity_from_template: unsafe { std::mem::transmute(hezhou_core::asset_library_create_entity_from_template as *const std::ffi::c_void) },
+        asset_library_create_mesh_entity: scene_ffi_impl::asset_library_create_mesh_entity_editor,
+        project_create_new: hezhou_core::project_create_new,
+        project_load: hezhou_core::project_load,
+        project_save: hezhou_core::project_save,
+        project_get_name: hezhou_core::project_get_name,
+        project_get_path: hezhou_core::project_get_path,
+        project_get_entity_count: hezhou_core::project_get_entity_count,
+        project_is_loaded: hezhou_core::project_is_loaded,
+        project_sync_to_scene: unsafe { std::mem::transmute(hezhou_core::project_sync_to_scene as *const std::ffi::c_void) },
+        project_sync_from_scene: unsafe { std::mem::transmute(hezhou_core::project_sync_from_scene as *const std::ffi::c_void) },
+        project_get_settings: hezhou_core::project_get_settings,
+        project_set_settings: hezhou_core::project_set_settings,
+        project_get_entity_info: hezhou_core::project_get_entity_info,
+        project_add_entity: hezhou_core::project_add_entity,
+        project_remove_entity: hezhou_core::project_remove_entity,
     };
     hezhou_scripting::ffi_context::set_ffi_context(ffi_ctx);
     let ffi_ptr = hezhou_scripting::ffi_context::get_ffi_context_ptr();
     unsafe { FFI_PTR = Some(ffi_ptr); }
-    dfx_info!("Demo", "FfiContext已设置, ptr={:?}", ffi_ptr);
 
-    dfx_info!("Demo", "[5] 加载Mono DLL...");
     dfx_trace_begin!("Mono", "load");
     let dll_path = "scripts/bin/Mono/EditorScript.dll";
     let executor = MonoUIExecutor::new(dll_path)
@@ -267,9 +288,7 @@ pub fn run() {
     unsafe {
         EXECUTOR = Some(executor);
     }
-    dfx_info!("Demo", "加载成功!");
 
-    dfx_info!("Demo", "[6] 调用EditorScript.Initialize...");
     dfx_trace_begin!("Mono", "initialize");
     unsafe {
         if let Some(ref executor) = EXECUTOR {
@@ -279,13 +298,11 @@ pub fn run() {
     }
     dfx_trace_end!("Mono", "initialize");
     dfx_trace_end!("Startup", "editor");
-    dfx_info!("Demo", "编辑器UI创建成功!");
     
     // Connect Scene to renderer for multi-entity rendering
     unsafe {
         if let Some(scene_ptr) = SCENE {
             renderer.set_scene(scene_ptr);
-            dfx_info!("Demo", "Scene connected to renderer: ptr={:?}", scene_ptr);
         }
     }
 
@@ -300,8 +317,8 @@ pub fn run() {
         std::fs::create_dir_all("screenshots").ok();
     }
     
-    dfx_info!("Demo", "[7] 开始主循环...");
-    dfx_info!("Demo", "Trace will be saved to traces/trace_latest.json on exit");
+    dfx_info!("Demo", "Editor started");
+    dfx_info!("Demo", "Trace → traces/trace_latest.json");
 
     let mut frame_count = 0u64;
     let start_time = Instant::now();
@@ -310,8 +327,11 @@ pub fn run() {
     loop {
         frame_count += 1;
         dfx_trace_begin!("Frame", "render");
+        dfx.lock().get_perf_monitor().lock().begin_frame();
         
+        dfx_trace_begin!("ProcessEvents", "ui");
         renderer.process_events();
+        dfx_trace_end!("ProcessEvents", "ui");
         
         if screenshot_mode && !screenshot_taken {
             let elapsed = start_time.elapsed().as_secs_f32();
@@ -321,6 +341,7 @@ pub fn run() {
                     Ok(_) => {
                         dfx_trace_end!("DrawFrame", "render");
                         dfx_trace_end!("Frame", "render");
+                        dfx.lock().get_perf_monitor().lock().end_frame();
                         dfx_info!("Screenshot", "Taking screenshot after {:.1}s...", elapsed);
                         if let Err(e) = renderer.capture_screenshot(&screenshot_path) {
                             dfx_error!("Screenshot", "Failed: {}", e);
@@ -333,6 +354,7 @@ pub fn run() {
                     Err(e) => {
                         dfx_trace_end!("DrawFrame", "render");
                         dfx_trace_end!("Frame", "render");
+                        dfx.lock().get_perf_monitor().lock().end_frame();
                         dfx_error!("Demo", "Draw error: {}", e);
                         break;
                     }
@@ -351,20 +373,40 @@ pub fn run() {
         match renderer.draw_frame() {
             Ok(running) => {
                 dfx_trace_end!("DrawFrame", "render");
+                dfx_trace_end!("Frame", "render");
+                
+                // End perf frame and record counter points
+                {
+                    let dfx_guard = dfx.lock();
+                    let perf_monitor = dfx_guard.get_perf_monitor();
+                    let mut perf = perf_monitor.lock();
+                    perf.end_frame();
+                    let snapshot_opt = perf.get_latest_snapshot();
+                    drop(perf); // Release perf lock before acquiring trace lock
+                    
+                    if let Some(snapshot) = snapshot_opt {
+                        let trace_analyzer = dfx_guard.get_trace_analyzer();
+                        let mut trace = trace_analyzer.lock();
+                        trace.set_counter("FPS", "perf", snapshot.fps as i64);
+                        trace.set_counter("CPU%", "perf", snapshot.cpu_usage_percent as i64);
+                        trace.set_counter("MemUsedMB", "memory", snapshot.memory_used_mb as i64);
+                        trace.set_counter("MemAvailMB", "memory", snapshot.memory_available_mb as i64);
+                        trace.set_counter("FrameMs", "perf", snapshot.frame_time_ms as i64);
+                    }
+                }
                 
                 if !running {
-                    dfx_trace_end!("Frame", "render");
                     break;
                 }
             }
             Err(e) => {
                 dfx_trace_end!("DrawFrame", "render");
+                dfx_trace_end!("Frame", "render");
+                dfx.lock().get_perf_monitor().lock().end_frame();
                 dfx_error!("Demo", "{}", e);
                 break;
             }
         }
-
-        dfx_trace_end!("Frame", "render");
         
         if frame_count % 300 == 0 {
             std::fs::create_dir_all("traces").ok();
@@ -378,21 +420,18 @@ pub fn run() {
         std::thread::sleep(Duration::from_millis(16));
     }
 
-    dfx_info!("Demo", "[8] 清理资源...");
+    dfx_info!("Demo", "Shutting down...");
     
     unsafe {
         if let Some(ref mut executor) = EXECUTOR {
-            dfx_info!("Demo", "先卸载Mono assembly...");
             executor.shutdown();
         }
         EXECUTOR = None;
     }
     
-    dfx_info!("Demo", "清理UI widgets...");
     ui_ffi::ui_clear_widget_tree(widget_tree_handle as ui_ffi::WidgetTreeHandle);
-    dfx_info!("Demo", "UI widgets清理完成");
     
-    dfx_info!("Demo", "保存trace...");
+    dfx_info!("Demo", "Saving trace...");
     std::fs::create_dir_all("traces").ok();
     let trace_path = format!("traces/trace_{}.json", chrono::Local::now().format("%Y%m%d_%H%M%S"));
     {
@@ -403,11 +442,10 @@ pub fn run() {
         drop(trace_analyzer);
         drop(dfx_guard);
         match result {
-            Ok(_) => dfx_info!("Demo", "Trace saved to {}", trace_path),
+            Ok(_) => dfx_info!("Demo", "Trace saved: {}", trace_path),
             Err(e) => dfx_error!("Demo", "Failed to save trace: {}", e),
         }
     }
-    dfx_info!("Demo", "Trace保存完成");
     
     dfx_info!("Demo", "=== Editor Closed ===");
     std::process::exit(0);

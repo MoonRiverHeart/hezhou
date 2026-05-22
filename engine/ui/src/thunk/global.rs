@@ -50,7 +50,7 @@ pub fn ui_get_primary_button_id() -> u64 {
 pub extern "C" fn ui_set_focused_input_field(widget_id: u64) {
     let mut focused = FOCUSED_INPUT_FIELD.lock();
     *focused = Some(widget_id);
-    dfx_info!("UI", "设置focus InputField: {}", widget_id);
+    // Focus set — no log needed (not a user-initiated action)
 }
 
 #[unsafe(no_mangle)]
