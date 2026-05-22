@@ -6,7 +6,7 @@ use std::ffi::CString;
 use std::collections::HashMap;
 use hezhou_ui::{UISystem, UIInputHandler, Panel, Button, Label, TextEdit, Layout, DrawCommand, Widget, Style, Color, TextStyle, ffi::WidgetTreeHandle, ffi::ui_set_primary_button_id};
 use hezhou_platform::{MouseAction, MouseEvent, MouseButton, CharEvent, KeyEvent, KeyAction, KeyModifiers, KeyCode};
-use hezhou_dfx::{DfxSystem, LogLevel, dfx_info, dfx_debug};
+use hezhou_dfx::{DfxSystem, LogLevel, dfx_debug};
 use parking_lot::Mutex;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -2256,11 +2256,12 @@ let font_atlas_guard = ui.get_font_atlas().lock();
             if let Some(scene_ptr) = self.scene_ptr {
                 unsafe {
                     let scene = &*scene_ptr;
-                    
                     for entity in &scene.root_entities {
                         // Get RenderableComponent
                         let renderable_opt = scene.world.get_component::<hezhou_core::RenderableComponent>(*entity);
-                        if renderable_opt.is_none() { continue; }
+                        if renderable_opt.is_none() {
+                            continue;
+                        }
                         let renderable = renderable_opt.unwrap();
                         if !renderable.visible { continue; }
                         
@@ -2272,7 +2273,9 @@ let font_atlas_guard = ui.get_font_atlas().lock();
                         // Parse mesh_path → MeshType → vertex range
                         let mesh_type = primitive_meshes::mesh_type_from_path(&renderable.mesh_path);
                         let range = self.primitive_ranges.get(&mesh_type);
-                        if range.is_none() { continue; }
+                        if range.is_none() {
+                            continue;
+                        }
                         let range = range.unwrap();
                         
                         // Compute model matrix from transform

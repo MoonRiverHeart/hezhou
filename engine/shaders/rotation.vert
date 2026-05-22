@@ -31,11 +31,12 @@ mat4 viewMatrix() {
     vec3 up = vec3(sy * sp, cp, cy * sp);
     vec3 eye = pc.camera_pos;
     
+    // OpenGL/Vulkan convention: camera looks along -Z, so negate forward in view matrix
     return mat4(
-        right.x, up.x, forward.x, 0,
-        right.y, up.y, forward.y, 0,
-        right.z, up.z, forward.z, 0,
-        -dot(right, eye), -dot(up, eye), -dot(forward, eye), 1
+        right.x, up.x, -forward.x, 0,
+        right.y, up.y, -forward.y, 0,
+        right.z, up.z, -forward.z, 0,
+        -dot(right, eye), -dot(up, eye), dot(forward, eye), 1
     );
 }
 

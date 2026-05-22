@@ -70,7 +70,8 @@ fn main() {
     let root_id = ui_ffi::ui_get_root_id(handle);
     
     dfx_info!("TraceViewer", "Building UI...");
-    build_trace_ui(handle, root_id, &trace, &stats, &counter_stats);
+    let (initial_w, initial_h) = renderer.get_extent();
+    build_trace_ui(handle, root_id, &trace, &stats, &counter_stats, initial_w as f32, initial_h as f32);
     
     if screenshot_mode {
         std::fs::create_dir_all("screenshots").ok();
@@ -83,9 +84,21 @@ fn main() {
     
     let start_time = Instant::now();
     let mut screenshot_taken = false;
+    let mut last_width = initial_w;
+    let mut last_height = initial_h;
 
     loop {
         renderer.process_events();
+        
+        // Check for window resize and rebuild UI
+        let (current_w, current_h) = renderer.get_extent();
+        if current_w != last_width || current_h != last_height {
+            dfx_info!("TraceViewer", "Window resized: {}x{} -> {}x{}", last_width, last_height, current_w, current_h);
+            ui_ffi::ui_clear_widget_tree(handle);
+            build_trace_ui(handle, root_id, &trace, &stats, &counter_stats, current_w as f32, current_h as f32);
+            last_width = current_w;
+            last_height = current_h;
+        }
         
         if screenshot_mode && !screenshot_taken {
             let elapsed = start_time.elapsed().as_secs_f32();
@@ -352,8 +365,17 @@ fn build_trace_ui(
     trace: &TraceData,
     stats: &TraceStats,
     counter_stats: &Vec<(String, CounterStat)>,
+    window_width: f32,
+    window_height: f32,
 ) {
     let content_scale = 1.0;
+    
+    // Dynamic layout dimensions based on window size
+    let left_margin = 10.0;
+    let lane_label_width = 150.0;
+    let swimlane_left = lane_label_width + left_margin;
+    let swimlane_width = window_width - swimlane_left - 10.0;
+    let swimlane_width = swimlane_width.max(200.0); // minimum usable width
     
     // === Title ===
     let title_text = CString::new("Trace Viewer - Performance Analysis").unwrap();
@@ -438,7 +460,7 @@ fn build_trace_ui(
     
     // === Time Axis ===
     let time_axis_y = legend_y + 25.0;
-    ui_ffi::ui_create_panel_in_parent(handle, root_id, 160.0, time_axis_y, 1100.0, 20.0, 0.15, 0.15, 0.2, 1.0);
+    ui_ffi::ui_create_panel_in_parent(handle, root_id, swimlane_left, time_axis_y, swimlane_width, 20.0, 0.15, 0.15, 0.2, 1.0);
     
     let time_range_ns = trace.max_time.saturating_sub(trace.min_time);
     let time_range_ms = time_range_ns as f32 / 1_000_000.0;
@@ -447,7 +469,7 @@ fn build_trace_ui(
     let tick_interval_ms = time_range_ms / num_ticks as f32;
     
     for i in 0..=num_ticks {
-        let tick_x = 160.0 + (i as f32 / num_ticks as f32) * 1100.0;
+        let tick_x = swimlane_left + (i as f32 / num_ticks as f32) * swimlane_width;
         let tick_ms = i as f32 * tick_interval_ms;
         
         ui_ffi::ui_create_panel_in_parent(handle, root_id, tick_x, time_axis_y + 15.0, 2.0, 5.0, 0.4, 0.4, 0.4, 1.0);
@@ -462,9 +484,8 @@ fn build_trace_ui(
     // === Thread Swimlanes ===
     let swimlane_height = 40.0;
     let swimlane_start_y = time_axis_y + 40.0;
-    let lane_label_width = 150.0;
     
-    let scale = if time_range_ns > 0 { 1100.0 / time_range_ns as f32 } else { 1.0 };
+    let scale = if time_range_ns > 0 { swimlane_width / time_range_ns as f32 } else { 1.0 };
     
     for (i, thread_id) in trace.threads.iter().enumerate() {
         let lane_y = swimlane_start_y + i as f32 * swimlane_height;
@@ -489,9 +510,9 @@ fn build_trace_ui(
         ui_ffi::ui_create_panel_in_parent(
             handle,
             root_id,
-            160.0,
+            swimlane_left,
             lane_y,
-            1100.0,
+            swimlane_width,
             swimlane_height - 2.0,
             0.18,
             0.18,
@@ -504,7 +525,7 @@ fn build_trace_ui(
             .collect();
         
         for event in thread_events {
-            let event_x = 160.0 + (event.timestamp.saturating_sub(trace.min_time)) as f32 * scale;
+            let event_x = swimlane_left + (event.timestamp.saturating_sub(trace.min_time)) as f32 * scale;
             let event_width = (event.duration as f32 * scale).max(3.0);
             
             let (r, g, b) = get_category_color(&event.category);
@@ -595,9 +616,9 @@ fn build_trace_ui(
             ui_ffi::ui_create_panel_in_parent(
                 handle,
                 root_id,
-                160.0,
+                swimlane_left,
                 lane_y,
-                1100.0,
+                swimlane_width,
                 counter_lane_height - 2.0,
                 0.18,
                 0.18,
@@ -615,7 +636,7 @@ fn build_trace_ui(
             let max_bar_height = counter_lane_height - 6.0;
             
             for ce in counter_values.iter() {
-                let ce_x = 160.0 + (ce.timestamp.saturating_sub(trace.min_time)) as f32 * scale;
+                let ce_x = swimlane_left + (ce.timestamp.saturating_sub(trace.min_time)) as f32 * scale;
                 
                 // Normalize value to bar height
                 let normalized = if val_range > 0.0 {
