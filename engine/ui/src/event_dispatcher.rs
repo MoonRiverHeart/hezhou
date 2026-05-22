@@ -155,6 +155,9 @@ impl EventDispatcher {
                     }
                     drop(tree);
                     crate::thunk::queue_callback(crate::thunk::PendingCallback::ButtonClick { widget_id: g.target.id });
+                } else if widget_type == "Label" {
+                    // Labels with SetOnClick should trigger click callbacks
+                    crate::thunk::queue_callback(crate::thunk::PendingCallback::ButtonClick { widget_id: g.target.id });
                 } else {
                     crate::thunk::ui_trigger_global_click(click_point.x, click_point.y);
                 }
@@ -186,15 +189,52 @@ impl EventDispatcher {
         }
     }
 
-    fn dispatch_capturing(&mut self, path: &[WidgetId], event: &mut Event) {
-        for widget_id in path {
+fn dispatch_capturing(&mut self, path: &[WidgetId], event: &mut Event) {
+        // Capturing phase: iterate from root to target's PARENT (skip target itself).
+        // Target widget only receives events in the bubbling phase.
+        // This follows W3C DOM event model: capture → target → bubble.
+        let capture_path = if path.len() > 1 {
+            &path[..path.len() - 1]
+        } else {
+            // Single-element path (target is root): no capturing phase needed
+            &path[..0]
+        };
+        
+        for widget_id in capture_path {
             if event.immediate_stopped {
                 break;
             }
 
+            let abs_layout = {
+                let tree = self.widget_tree.lock();
+                tree.get_absolute_layout(*widget_id)
+            };
+            
+            // Convert Touch coordinates to local coords for capturing phase (same as bubbling)
+            let converted_event = if let Some(abs_layout) = abs_layout {
+                if let EventData::Touch(touch_data) = &event.data {
+                    let window_x = touch_data.x;
+                    let window_y = touch_data.y;
+                    let relative_x = window_x - abs_layout.x;
+                    let relative_y = window_y - abs_layout.y;
+                    
+                    let mut converted = event.clone();
+                    converted.data = EventData::Touch(TouchData::new(relative_x, relative_y, touch_data.pointer_id));
+                    Some(converted)
+                } else {
+                    None
+                }
+            } else {
+                None
+            };
+
             let mut tree = self.widget_tree.lock();
             if let Some(widget) = tree.get_widget_mut(*widget_id) {
-                let result = widget.as_mut().on_event(event);
+                let result = if let Some(converted) = converted_event {
+                    widget.as_mut().on_event(&converted)
+                } else {
+                    widget.as_mut().on_event(event)
+                };
                 match result {
                     EventResult::ImmediateStop => {
                         event.immediate_stopped = true;

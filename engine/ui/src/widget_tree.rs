@@ -181,14 +181,57 @@ impl WidgetTree {
 
     fn hit_test_recursive(&self, id: WidgetId, point: Point, parent_abs_x: f32, parent_abs_y: f32) -> Option<WidgetId> {
         if let Some(node) = self.nodes.get(&id) {
+            // Skip hidden Dialog and its children
+            if node.widget.as_ref().widget_type() == "Dialog" {
+                if let Some(dialog) = node.widget.as_ref().as_any().downcast_ref::<crate::widgets::Dialog>() {
+                    if !dialog.is_visible() {
+                        return None;
+                    }
+                }
+            }
+            
             let layout = *node.widget.as_ref().layout();
             let abs_x = parent_abs_x + layout.x;
             let abs_y = parent_abs_y + layout.y;
             
             let abs_bounds = Rect::new(abs_x, abs_y, layout.width, layout.height);
             if abs_bounds.contains(&point) {
-                let children = self.get_children(id);
-                for child in children.iter().rev() {
+                // For TreeView widgets, only hit-test visible (expanded) nodes
+                let children: Vec<WidgetId> = {
+                    if node.widget.as_ref().widget_type() == "TreeView" {
+                        if let Some(tree_view) = node.widget.as_ref().as_any().downcast_ref::<crate::widgets::TreeView>() {
+                            tree_view.get_visible_nodes(self)
+                        } else {
+                            self.get_children(id).to_vec()
+                        }
+                    } else {
+                        self.get_children(id).to_vec()
+                    }
+                };
+                
+                // Sort children by render layer (highest first: Overlay→Popup→Content→Background)
+                // so that Popup layer widgets are hit-tested before Content layer widgets
+                // covering the same screen area. This ensures menus and dialogs are clickable
+                // even when content widgets overlap them.
+                let mut sorted_children: Vec<WidgetId> = children;
+                sorted_children.sort_by(|a, b| {
+                    let layer_a = self.get_widget_layer(*a) as i32;
+                    let layer_b = self.get_widget_layer(*b) as i32;
+                    layer_b.cmp(&layer_a) // Higher layer first
+                });
+                
+                // Skip invisible PopupMenu in hit_test
+                for child in sorted_children.iter() {
+                    let child_node = self.nodes.get(child);
+                    if let Some(cn) = child_node {
+                        if cn.widget.as_ref().widget_type() == "PopupMenu" {
+                            if let Some(popup) = cn.widget.as_ref().as_any().downcast_ref::<crate::widgets::PopupMenu>() {
+                                if !popup.is_visible() {
+                                    continue; // Skip hidden popup menus
+                                }
+                            }
+                        }
+                    }
                     if let Some(hit) = self.hit_test_recursive(*child, point, abs_x, abs_y) {
                         return Some(hit);
                     }
@@ -784,6 +827,15 @@ pub fn perform_layout(&mut self, font_atlas: &FontAtlas) {
         font_atlas: &FontAtlas,
     ) {
         if let Some(node) = self.nodes.get_mut(&id) {
+            // Skip hidden Dialog and its children entirely
+            if node.widget.as_ref().widget_type() == "Dialog" {
+                if let Some(dialog) = node.widget.as_ref().as_any().downcast_ref::<crate::widgets::Dialog>() {
+                    if !dialog.is_visible() {
+                        return;
+                    }
+                }
+            }
+            
             if node.widget.as_ref().state() != WidgetState::Disabled {
                 let layout = *node.widget.as_ref().layout();
                 let abs_x = parent_abs_x + layout.x;
@@ -815,7 +867,24 @@ pub fn perform_layout(&mut self, font_atlas: &FontAtlas) {
         let abs_x = parent_abs_x + layout.x;
         let abs_y = parent_abs_y + layout.y;
         
-        let children = self.get_children(id).to_vec();
+        // For TreeView widgets, only render visible (expanded) nodes
+        let children: Vec<WidgetId> = {
+            let node = self.nodes.get(&id);
+            if let Some(n) = node {
+                if n.widget.as_ref().widget_type() == "TreeView" {
+                    if let Some(tree_view) = n.widget.as_ref().as_any().downcast_ref::<crate::widgets::TreeView>() {
+                        tree_view.get_visible_nodes(self)
+                    } else {
+                        self.get_children(id).to_vec()
+                    }
+                } else {
+                    self.get_children(id).to_vec()
+                }
+            } else {
+                Vec::new()
+            }
+        };
+        
         for child in children {
             self.generate_render_data_recursive(child, abs_x, abs_y, render_data, font_atlas);
         }
