@@ -66,7 +66,7 @@ impl TabWidget {
         if !self.children.contains(&content_id) {
             self.children.push(content_id);
         }
-        dfx_info!("TabWidget", "AddTab: index={}, title={}, content_id={}, closable={}", 
+        dfx_debug!("TabWidget", "AddTab: index={}, title={}, content_id={}, closable={}", 
             index, title, content_id.id, closable);
         index
     }
@@ -78,14 +78,14 @@ impl TabWidget {
             if self.active_index >= self.tabs.len() && !self.tabs.is_empty() {
                 self.active_index = self.tabs.len() - 1;
             }
-            dfx_info!("TabWidget", "RemoveTab: index={}, removed title={}", index, tab.title);
+            dfx_debug!("TabWidget", "RemoveTab: index={}, removed title={}", index, tab.title);
         }
     }
 
     pub fn set_active(&mut self, index: usize) {
         if index < self.tabs.len() {
             self.active_index = index;
-            dfx_info!("TabWidget", "SetActive: index={}", index);
+            dfx_debug!("TabWidget", "SetActive: index={}", index);
         }
     }
 
@@ -329,11 +329,11 @@ impl Widget for TabWidget {
                     if let Some(index) = self.hit_test_tab(local_x, local_y) {
                         if self.hit_test_close_button(index, local_x, local_y) {
                             self.pressed_tab_index = Some(index);
-                            dfx_info!("TabWidget", "TouchBegin on close button: index={}", index);
+                            dfx_debug!("TabWidget", "TouchBegin on close button: index={}", index);
                         } else {
                             self.pressed_tab_index = Some(index);
                             self.set_state(WidgetState::Pressed);
-                            dfx_info!("TabWidget", "TouchBegin on tab: index={}", index);
+                            dfx_debug!("TabWidget", "TouchBegin on tab: index={}", index);
                         }
                         return EventResult::Handled;
                     }
@@ -350,11 +350,11 @@ impl Widget for TabWidget {
                             if index == pressed_index {
                                 if self.hit_test_close_button(index, local_x, local_y) {
                                     self.trigger_close_callback(index);
-                                    dfx_info!("TabWidget", "TouchEnd close button clicked: index={}", index);
+                                    dfx_debug!("TabWidget", "TouchEnd close button clicked: index={}", index);
                                 } else if index != self.active_index {
                                     self.set_active(index);
                                     self.trigger_select_callback(index);
-                                    dfx_info!("TabWidget", "TouchEnd tab selected: index={}", index);
+                                    dfx_debug!("TabWidget", "TouchEnd tab selected: index={}", index);
                                 }
                             }
                         }
