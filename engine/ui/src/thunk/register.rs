@@ -149,3 +149,10 @@ pub extern "C" fn ui_register_entity_selected_callback(callback: EntitySelectedC
     callbacks.on_entity_selected = Some(callback);
     dfx_info!("UI", "注册EntitySelected回调: {:?}", callback);
 }
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_register_checkbox_change_callback(widget_id: u64, callback: CheckboxChangeCallback) {
+    let mut callbacks = UI_CALLBACKS.lock();
+    callbacks.on_checkbox_change.insert(widget_id, callback);
+    dfx_info!("UI", "注册CheckboxChange回调: widget={} callback={:?}", widget_id, callback);
+}

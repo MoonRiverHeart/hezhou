@@ -85,6 +85,12 @@ namespace Hezhou
             _runButtonId = runBtn.Id;
             runBtn.SetOnClick(_runClickCallback);
             
+            var pauseBtn = _toolbarButtons.AddButton(80f, 30f, "暂停");
+            _pauseButtonId = pauseBtn.Id;
+            pauseBtn.SetOnClick(_pauseClickCallback);
+            // Initially hidden (Editing state) — set width to 0
+            UI.SetWidgetLayout(_pauseButtonId, 0f, 0f, 0f, 0f);
+            
             _toggleEditorBtn = new Button(_toolbar.Id, 100f, 30f, "编辑器");
             UI.SetWidgetLayout(_toggleEditorBtn.Id, _screenWidth - 120f, 5f, 100f, 30f);
             _toggleEditorBtn.SetOnClick(_toggleEditorClickCallback);

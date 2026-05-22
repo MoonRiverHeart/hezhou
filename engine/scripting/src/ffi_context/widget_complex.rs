@@ -21,3 +21,10 @@ pub type InputFieldSetTextFn = extern "C" fn(WidgetTreeHandle, u64, *const c_cha
 pub type InputFieldGetTextFn = extern "C" fn(WidgetTreeHandle, u64, *mut c_char, usize) -> usize;
 pub type InputFieldSetOnChangeThunkPtrFn = extern "C" fn(WidgetTreeHandle, u64, *const c_void);
 pub type InputFieldSetPlaceholderFn = extern "C" fn(WidgetTreeHandle, u64, *const c_char);
+
+pub type CreateCheckboxFn = extern "C" fn(WidgetTreeHandle, u64, f32, f32) -> u64;
+pub type CreateCheckboxInParentFn = extern "C" fn(WidgetTreeHandle, u64, f32, f32, f32, f32, *const c_char) -> u64;
+pub type CheckboxSetCheckedFn = extern "C" fn(WidgetTreeHandle, u64, u32);
+pub type CheckboxGetCheckedFn = extern "C" fn(WidgetTreeHandle, u64) -> u32;
+pub type CheckboxSetOnChangeThunkPtrFn = extern "C" fn(WidgetTreeHandle, u64, *const c_void);
+pub type CheckboxSetTextFn = extern "C" fn(WidgetTreeHandle, u64, *const c_char);

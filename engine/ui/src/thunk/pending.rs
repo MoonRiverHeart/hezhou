@@ -19,6 +19,7 @@ pub enum PendingCallback {
     FileBrowserDoubleClick { browser_id: u64, path: String },
     FocusChange { widget_id: u64, is_focused: bool },
     EntitySelected { entity_id: u64, is_selected: bool },
+    CheckboxChange { widget_id: u64, checked: bool },
 }
 
 static PENDING_CALLBACKS: LazyLock<Mutex<Vec<PendingCallback>>> =
@@ -76,6 +77,9 @@ pub fn flush_pending_callbacks() {
             }
             PendingCallback::EntitySelected { entity_id, is_selected } => {
                 trigger_entity_selected_callback(entity_id, is_selected);
+            }
+            PendingCallback::CheckboxChange { widget_id, checked } => {
+                trigger_checkbox_change_callback(widget_id, checked);
             }
         }
     }

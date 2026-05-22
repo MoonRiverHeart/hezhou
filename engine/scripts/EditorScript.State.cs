@@ -45,6 +45,7 @@ namespace Hezhou
         private static List<ulong> _scriptRowIds = new List<ulong>();
         private static ulong _createEntityBtnId;
         private static Dictionary<ulong, int> _removeScriptBtnIndices = new Dictionary<ulong, int>();
+        private static Dictionary<ulong, int> _scriptToggleBtnIndices = new Dictionary<ulong, int>();
 
         // === Status Bar State ===
         private static Panel _statusBar;
@@ -55,6 +56,7 @@ namespace Hezhou
 
         // === Toolbar State ===
         private static ulong _runButtonId;
+        private static ulong _pauseButtonId;
         private static ulong _fileMenuId;
         private static ulong _openMenuId;
         private static ulong _saveMenuId;
@@ -81,6 +83,21 @@ namespace Hezhou
         private static UI.GridViewClickCallbackDelegate _gridViewClickCallback;
         private static UI.FileBrowserSelectCallbackDelegate _fileBrowserSelectCallback;
         private static UI.DialogResultCallbackDelegate _workingDirectoryDialogResultCallback;
+        
+        // === Delete Confirmation Dialog State ===
+        private static ulong _deleteConfirmDialogId;
+        private static UI.DialogResultCallbackDelegate _deleteConfirmDialogResultCallback;
+        
+        // === Open/Save Dialog State ===
+        private static ulong _openSceneDialogId;
+        private static ulong _openSceneFileBrowserId;
+        private static UI.DialogResultCallbackDelegate _openSceneDialogResultCallback;
+        private static ulong _openProjectDialogId;
+        private static ulong _openProjectFileBrowserId;
+        private static UI.DialogResultCallbackDelegate _openProjectDialogResultCallback;
+        private static ulong _saveAsDialogId;
+        private static ulong _saveAsFileBrowserId;
+        private static UI.DialogResultCallbackDelegate _saveAsDialogResultCallback;
 
         // === Script Editor State ===
         private static Panel _scriptEditorPanel;
@@ -157,6 +174,8 @@ private static float _cameraYaw = 0f;
         private static UI.WidgetCallbackDelegate _addScriptClickCallback;
         private static UI.WidgetCallbackDelegate _removeScriptClickCallback;
         private static UI.WidgetCallbackDelegate _createEntityClickCallback;
+        private static UI.WidgetCallbackDelegate _pauseClickCallback;
+        private static UI.WidgetCallbackDelegate _scriptToggleClickCallback;
         private static UI.DropdownSelectCallbackDelegate _scriptDropdownSelectCallback;
         private static UI.OnHotReloadCompleteDelegate _hotReloadCompleteCallback;
         private static UI.TabSelectCallbackDelegate _tabSelectCallback;

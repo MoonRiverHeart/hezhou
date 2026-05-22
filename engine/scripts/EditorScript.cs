@@ -41,6 +41,8 @@ namespace Hezhou
 _addScriptClickCallback = OnAddScriptClick;
             _removeScriptClickCallback = OnRemoveScriptClick;
             _createEntityClickCallback = OnCreateEntityClick;
+            _pauseClickCallback = OnPauseClick;
+            _scriptToggleClickCallback = OnScriptToggleClick;
             _scriptDropdownSelectCallback = OnScriptDropdownSelect;
 _hotReloadCompleteCallback = OnHotReloadComplete;
             _tabSelectCallback = OnTabSelect;
@@ -53,6 +55,10 @@ _hotReloadCompleteCallback = OnHotReloadComplete;
             _gridViewClickCallback = OnGridViewClick;
             _fileBrowserSelectCallback = OnFileBrowserSelect;
             _workingDirectoryDialogResultCallback = OnWorkingDirectoryDialogResult;
+            _deleteConfirmDialogResultCallback = OnDeleteConfirmDialogResult;
+            _openSceneDialogResultCallback = OnOpenSceneDialogResult;
+            _openProjectDialogResultCallback = OnOpenProjectDialogResult;
+            _saveAsDialogResultCallback = OnSaveAsDialogResult;
             
             UI.RegisterUpdateCallback(_updateCallback);
             
@@ -125,6 +131,11 @@ _hotReloadCompleteCallback = OnHotReloadComplete;
                         UI.SetCameraParams(_cameraYaw, _cameraPitch, _cameraX, _cameraY, _cameraZ);
                         
                         _gameScene.Update(deltaTime / 1000f);
+                    }
+                    else if (_gameScene != null && _gameScene.GetGameState() == GameState.Paused)
+                    {
+                        // Paused: keep camera params but don't update scene
+                        UI.SetCameraParams(_cameraYaw, _cameraPitch, _cameraX, _cameraY, _cameraZ);
                     }
                     else
                     {

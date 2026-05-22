@@ -19,3 +19,4 @@ pub type FileBrowserSelectCallback = extern "C" fn(u64, *const std::ffi::c_char)
 pub type FileBrowserDoubleClickCallback = extern "C" fn(u64, *const std::ffi::c_char);
 pub type FocusChangeCallback = extern "C" fn(u64, bool);
 pub type EntitySelectedCallback = extern "C" fn(u64, bool);
+pub type CheckboxChangeCallback = extern "C" fn(u64, bool);

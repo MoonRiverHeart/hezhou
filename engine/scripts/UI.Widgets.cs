@@ -298,6 +298,17 @@ public static ulong GetRootId()
             func(_widgetTree, widgetId, fill ? 1u : 0u);
         }
 
+        public static void SetWidgetBackgroundColor(ulong widgetId, float r, float g, float b, float a)
+        {
+            if (_ffi.ui_widget_set_background_color == IntPtr.Zero)
+            {
+                Log.Error("C#", "SetWidgetBackgroundColor函数指针为空");
+                return;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<SetWidgetBackgroundColorDelegate>(_ffi.ui_widget_set_background_color);
+            func(_widgetTree, widgetId, r, g, b, a);
+        }
+
         public static void DebugPrintUITree()
         {
             if (_ffi.ui_debug_print_widget_tree == IntPtr.Zero)

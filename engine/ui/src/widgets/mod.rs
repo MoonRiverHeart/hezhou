@@ -1,4 +1,5 @@
 pub mod button;
+pub mod checkbox;
 pub mod dialog;
 pub mod dropdown;
 pub mod file_browser;
@@ -18,6 +19,7 @@ pub mod tree_view;
 pub mod vstack;
 
 pub use button::Button;
+pub use checkbox::Checkbox;
 pub use dialog::Dialog;
 pub use dialog::DialogAction;
 pub use dialog::DialogButton;

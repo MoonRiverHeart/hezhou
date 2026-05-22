@@ -59,3 +59,8 @@ pub fn has_file_browser_double_click_callback(widget_id: u64) -> bool {
     let callbacks = UI_CALLBACKS.lock();
     callbacks.on_file_browser_double_click.contains_key(&widget_id)
 }
+
+pub fn has_checkbox_change_callback(widget_id: u64) -> bool {
+    let callbacks = UI_CALLBACKS.lock();
+    callbacks.on_checkbox_change.contains_key(&widget_id)
+}

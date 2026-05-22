@@ -43,6 +43,7 @@ pub struct UICallbacks {
     pub on_file_browser_double_click: HashMap<u64, FileBrowserDoubleClickCallback>,
     pub on_focus_change: Option<FocusChangeCallback>,
     pub on_entity_selected: Option<EntitySelectedCallback>,
+    pub on_checkbox_change: HashMap<u64, CheckboxChangeCallback>,
 }
 
 impl UICallbacks {
@@ -69,6 +70,7 @@ pub fn new() -> Self {
                 on_file_browser_double_click: HashMap::new(),
                 on_focus_change: None,
                 on_entity_selected: None,
+                on_checkbox_change: HashMap::new(),
             }
         }
 
@@ -94,6 +96,7 @@ pub fn new() -> Self {
         self.on_file_browser_double_click.clear();
         self.on_focus_change = None;
         self.on_entity_selected = None;
+        self.on_checkbox_change.clear();
     }
 }
 

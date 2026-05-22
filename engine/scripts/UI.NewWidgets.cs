@@ -620,6 +620,86 @@ namespace Hezhou
             var func = Marshal.GetDelegateForFunctionPointer<FileBrowserSetOnDoubleClickThunkPtrDelegate>(_ffi.ui_file_browser_set_on_double_click_thunk_ptr);
             func(_widgetTree, browserId, callbackPtr);
         }
+
+        // === Checkbox ===
+
+        public static ulong CreateCheckbox(ulong parentId, float width, float height)
+        {
+            if (_ffi.ui_create_checkbox == IntPtr.Zero)
+            {
+                Log.Error("C#", "CreateCheckbox函数指针为空");
+                return 0;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<CreateCheckboxDelegate>(_ffi.ui_create_checkbox);
+            return func(_widgetTree, parentId, width, height);
+        }
+
+        public static ulong CreateCheckbox(ulong parentId, float x, float y, float width, float height, string text)
+        {
+            if (_ffi.ui_create_checkbox_in_parent == IntPtr.Zero)
+            {
+                Log.Error("C#", "CreateCheckboxInParent函数指针为空");
+                return 0;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<CreateCheckboxInParentDelegate>(_ffi.ui_create_checkbox_in_parent);
+            return func(_widgetTree, parentId, x, y, width, height, text);
+        }
+
+        public static void CheckboxSetChecked(ulong widgetId, bool isChecked)
+        {
+            if (_ffi.ui_checkbox_set_checked == IntPtr.Zero)
+            {
+                Log.Error("C#", "CheckboxSetChecked函数指针为空");
+                return;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<CheckboxSetCheckedDelegate>(_ffi.ui_checkbox_set_checked);
+            func(_widgetTree, widgetId, isChecked ? 1u : 0u);
+        }
+
+        public static bool CheckboxGetChecked(ulong widgetId)
+        {
+            if (_ffi.ui_checkbox_get_checked == IntPtr.Zero)
+            {
+                return false;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<CheckboxGetCheckedDelegate>(_ffi.ui_checkbox_get_checked);
+            return func(_widgetTree, widgetId) != 0;
+        }
+
+        public static void CheckboxSetOnChange(ulong widgetId, CheckboxChangeCallbackDelegate callback)
+        {
+            if (_ffi.ui_checkbox_set_on_change_thunk_ptr == IntPtr.Zero)
+            {
+                Log.Error("C#", "CheckboxSetOnChangeThunkPtr函数指针为空");
+                return;
+            }
+            _checkboxCallbacks[widgetId] = callback;
+            IntPtr callbackPtr = Marshal.GetFunctionPointerForDelegate(callback);
+            var func = Marshal.GetDelegateForFunctionPointer<CheckboxSetOnChangeThunkPtrDelegate>(_ffi.ui_checkbox_set_on_change_thunk_ptr);
+            func(_widgetTree, widgetId, callbackPtr);
+        }
+
+        public static void CheckboxSetText(ulong widgetId, string text)
+        {
+            if (_ffi.ui_checkbox_set_text == IntPtr.Zero)
+            {
+                Log.Error("C#", "CheckboxSetText函数指针为空");
+                return;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<CheckboxSetTextDelegate>(_ffi.ui_checkbox_set_text);
+            func(_widgetTree, widgetId, text);
+        }
+
+        public static void RegisterCheckboxOnChangeThunkPtr(ulong widgetId, IntPtr callbackPtr)
+        {
+            if (_ffi.ui_checkbox_set_on_change_thunk_ptr == IntPtr.Zero)
+            {
+                Log.Error("C#", "CheckboxSetOnChangeThunkPtr函数指针为空");
+                return;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<CheckboxSetOnChangeThunkPtrDelegate>(_ffi.ui_checkbox_set_on_change_thunk_ptr);
+            func(_widgetTree, widgetId, callbackPtr);
+        }
     }
 
     public class TabWidget
@@ -859,5 +939,70 @@ namespace Hezhou
         }
         
         public float CellSize => _cellSize;
+    }
+
+    public class Checkbox
+    {
+        public ulong Id;
+        public string Text;
+        public bool Checked;
+
+        private UI.CheckboxChangeCallbackDelegate _onChangeCallback;
+
+        public Checkbox(ulong parentId, float x, float y, float w, float h, string text)
+        {
+            Text = text;
+            Checked = false;
+            Id = UI.CreateCheckbox(parentId, x, y, w, h, text);
+        }
+
+        public static ulong Create(ulong parentId, float x, float y, float w, float h, string text)
+        {
+            return UI.CreateCheckbox(parentId, x, y, w, h, text);
+        }
+
+        public static void SetChecked(ulong id, bool isChecked)
+        {
+            UI.CheckboxSetChecked(id, isChecked);
+        }
+
+        public static bool GetChecked(ulong id)
+        {
+            return UI.CheckboxGetChecked(id);
+        }
+
+        public static void SetOnChangeThunkPtr(ulong id, UI.CheckboxChangeCallbackDelegate callback)
+        {
+            UI.CheckboxSetOnChange(id, callback);
+        }
+
+        public static void SetText(ulong id, string text)
+        {
+            UI.CheckboxSetText(id, text);
+        }
+
+        public void SetChecked(bool isChecked)
+        {
+            Checked = isChecked;
+            UI.CheckboxSetChecked(Id, isChecked);
+        }
+
+        public bool IsChecked()
+        {
+            Checked = UI.CheckboxGetChecked(Id);
+            return Checked;
+        }
+
+        public void SetOnChange(UI.CheckboxChangeCallbackDelegate callback)
+        {
+            _onChangeCallback = callback;
+            UI.CheckboxSetOnChange(Id, callback);
+        }
+
+        public void SetText(string text)
+        {
+            Text = text;
+            UI.CheckboxSetText(Id, text);
+        }
     }
 }

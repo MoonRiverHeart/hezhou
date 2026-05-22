@@ -99,6 +99,7 @@ namespace Hezhou
             const uint KEY_UP = 47;
             const uint KEY_DOWN = 48;
             const uint KEY_D = 4;
+            const uint KEY_DELETE = 49;
 
             bool ctrl = (modifiers & 2) != 0;
             bool shift = (modifiers & 1) != 0;
@@ -112,15 +113,29 @@ namespace Hezhou
             bool selected = UI.IsPreviewWindowSelected(_previewWindowId);
             GameState currentState = _gameScene != null ? _gameScene.GetGameState() : GameState.Editing;
             
+            // Delete key: delete selected entity (with confirmation dialog)
+            if (keycode == KEY_DELETE && pressed)
+            {
+                if (_selectedEntityId != 0 && currentState == GameState.Editing)
+                {
+                    ShowDeleteConfirmDialog();
+                    return;
+                }
+            }
+            
             if (keycode == KEY_ESC && pressed)
             {
-                if (currentState == GameState.Running)
+                if (currentState == GameState.Running || currentState == GameState.Paused)
                 {
                     _gameScene.SetGameState(GameState.Editing);
                     UI.SetRendererGameState(0);
                     UI.SetPreviewWindowEditMode(_previewWindowId, true);
                     UI.SetPreviewWindowSelected(_previewWindowId, false);
                     UI.SetText(_runButtonId, "运行");
+                    // Hide pause button
+                    UI.SetWidgetLayout(_pauseButtonId, 0f, 0f, 0f, 0f);
+                    // Reset preview border
+                    UI.SetWidgetBackgroundColor(_previewWindowId, 0.08f, 0.08f, 0.08f, 0.3f);
                     _cameraX = _savedCameraX;
                     _cameraY = _savedCameraY;
                     _cameraZ = _savedCameraZ;
@@ -131,7 +146,7 @@ namespace Hezhou
                     _keyUpPressed = false;
                     _keyDownPressed = false;
                     _statusItem.Text = "状态: 就绪";
-                    Log.Info("Editor", "ESC: Running → Editing");
+                    Log.Info("Editor", "ESC: Running/Paused → Editing");
                 }
                 else if (selected)
                 {
@@ -437,6 +452,7 @@ namespace Hezhou
             
             _lastScriptBindingCount = scriptCount;
             _removeScriptBtnIndices.Clear();
+            _scriptToggleBtnIndices.Clear();
             
             // Clear existing script rows before rebuilding
             for (int r = 0; r < _scriptRowIds.Count; r++)
@@ -455,10 +471,24 @@ namespace Hezhou
                 var info = _gameScene.GetScriptBindingInfo(entityId, i);
                 
                 string scriptName = Path.GetFileName(info.ScriptPath);
-                string labelText = scriptName + " (" + info.ClassName + ") [" + (info.Enabled ? "ON" : "OFF") + "]";
+                string labelText = scriptName + " (" + info.ClassName + ")";
                 
                 ulong scriptRow = UI.CreateHStack(_scriptsListContainerId, 5f);
-                UI.CreateLabel(scriptRow, RIGHT_PANEL_WIDTH - 90f, 20f, labelText);
+                UI.CreateLabel(scriptRow, RIGHT_PANEL_WIDTH - 130f, 20f, labelText);
+                
+                // Toggle button: [ON] or [OFF] with colored background
+                ulong toggleBtnId = UI.CreateButton(scriptRow, 40f, 20f, info.Enabled ? "[ON]" : "[OFF]");
+                UI.SetOnClick(toggleBtnId, _scriptToggleClickCallback);
+                _scriptToggleBtnIndices[toggleBtnId] = i;
+                
+                if (info.Enabled)
+                {
+                    UI.SetWidgetBackgroundColor(toggleBtnId, 0.2f, 0.8f, 0.2f, 1.0f);
+                }
+                else
+                {
+                    UI.SetWidgetBackgroundColor(toggleBtnId, 0.8f, 0.2f, 0.2f, 1.0f);
+                }
                 
                 ulong removeBtnId = UI.CreateButton(scriptRow, 40f, 20f, "X");
                 UI.SetOnClick(removeBtnId, _removeScriptClickCallback);
@@ -651,14 +681,32 @@ SelectEntity(entityId);
                 UI.SetRendererGameState(1);
                 UI.SetPreviewWindowEditMode(_previewWindowId, false);
                 UI.SetText(_runButtonId, "编辑");
+                // Show pause button
+                UI.SetWidgetLayout(_pauseButtonId, 0f, 0f, 80f, 30f);
+                UI.SetText(_pauseButtonId, "暂停");
+                // Set preview border blue for Running
+                UI.SetWidgetBackgroundColor(_previewWindowId, 0.2f, 0.4f, 0.8f, 0.3f);
                 _statusItem.Text = "状态: 运行中";
             }
-            else
+            else if (currentState == GameState.Running || currentState == GameState.Paused)
             {
                 _gameScene.SetGameState(GameState.Editing);
                 UI.SetRendererGameState(0);
                 UI.SetPreviewWindowEditMode(_previewWindowId, true);
                 UI.SetText(_runButtonId, "运行");
+                // Hide pause button
+                UI.SetWidgetLayout(_pauseButtonId, 0f, 0f, 0f, 0f);
+                // Reset preview border to default
+                UI.SetWidgetBackgroundColor(_previewWindowId, 0.08f, 0.08f, 0.08f, 0.3f);
+                _cameraX = _savedCameraX;
+                _cameraY = _savedCameraY;
+                _cameraZ = _savedCameraZ;
+                _cameraYaw = _savedCameraYaw;
+                _cameraPitch = _savedCameraPitch;
+                _keyLeftPressed = false;
+                _keyRightPressed = false;
+                _keyUpPressed = false;
+                _keyDownPressed = false;
                 _statusItem.Text = "状态: 就绪";
             }
         }
@@ -796,30 +844,6 @@ SelectEntity(entityId);
             }
         }
 
-        private static void OnFileMenuClick(ulong widgetId, int actionId)
-        {
-            UI.PopupMenuHide(_fileMenuId);
-            if (actionId == 1) OnNewClick(0);
-            else if (actionId == 2) OnNewScriptClick(0);
-            else if (actionId == 3) { }
-        }
-        
-        private static void OnOpenMenuClick(ulong widgetId, int actionId)
-        {
-            UI.PopupMenuHide(_openMenuId);
-            if (actionId == 1) { }
-            else if (actionId == 2) OnOpenClick(0);
-            else if (actionId == 3) { }
-        }
-        
-        private static void OnSaveMenuClick(ulong widgetId, int actionId)
-        {
-            UI.PopupMenuHide(_saveMenuId);
-            if (actionId == 1) OnSaveClick(0);
-            else if (actionId == 2) { }
-            else if (actionId == 3) { }
-        }
-
         // === Script Event Handlers ===
 
         private static void ScanScripts()
@@ -954,6 +978,382 @@ SelectEntity(entityId);
                 {
                     _statusItem.Text = "错误: 编辑器未初始化";
                 }
+            }
+        }
+
+        // === Delete Entity Confirmation Dialog ===
+
+        private static void ShowDeleteConfirmDialog()
+        {
+            ulong rootId = UI.GetRootId();
+            float dialogWidth = 300f * _contentScale;
+            float dialogHeight = 150f * _contentScale;
+            
+            _deleteConfirmDialogId = UI.CreateDialog(rootId, "确认删除?", dialogWidth, dialogHeight);
+            UI.DialogSetOnResult(_deleteConfirmDialogId, _deleteConfirmDialogResultCallback);
+            
+            ulong contentId = UI.CreateVStack(_deleteConfirmDialogId, 10f);
+            UI.CreateLabel(contentId, dialogWidth - 40f, 30f, "确定要删除选中的Entity吗?");
+            UI.DialogSetContent(_deleteConfirmDialogId, contentId);
+            UI.DialogAddButton(_deleteConfirmDialogId, "确认", 1);
+            UI.DialogAddButton(_deleteConfirmDialogId, "取消", 0);
+            UI.DialogShow(_deleteConfirmDialogId);
+        }
+        
+        private static void OnDeleteConfirmDialogResult(ulong dialogId, int result)
+        {
+            UI.DialogHide(_deleteConfirmDialogId);
+            
+            if (result == 1 && _selectedEntityId != 0 && _gameScene != null)
+            {
+                ulong entityId = _selectedEntityId;
+                _gameScene.RemoveEntity(entityId);
+                RemoveEntityFromTree(entityId);
+                _gameScene.ClearSelection();
+                ClearPropertiesPanel();
+                _selectedEntityId = 0;
+                _statusItem.Text = "已删除 Entity";
+                Log.Info("Editor", $"删除Entity: id={entityId}");
+            }
+        }
+
+        // === Pause/Resume Handler ===
+
+        private static void OnPauseClick(ulong widgetId)
+        {
+            if (_gameScene == null) return;
+            
+            var currentState = _gameScene.GetGameState();
+            
+            if (currentState == GameState.Running)
+            {
+                // Running → Paused
+                _gameScene.SetGameState(GameState.Paused);
+                UI.SetRendererGameState(2);
+                UI.SetText(_pauseButtonId, "继续");
+                UI.SetWidgetBackgroundColor(_previewWindowId, 0.2f, 0.8f, 0.2f, 0.3f);
+                _statusItem.Text = "状态: 已暂停";
+                Log.Info("Editor", "Pause: Running → Paused");
+            }
+            else if (currentState == GameState.Paused)
+            {
+                // Paused → Running
+                _gameScene.SetGameState(GameState.Running);
+                UI.SetRendererGameState(1);
+                UI.SetText(_pauseButtonId, "暂停");
+                UI.SetWidgetBackgroundColor(_previewWindowId, 0.2f, 0.4f, 0.8f, 0.3f);
+                _statusItem.Text = "状态: 运行中";
+                Log.Info("Editor", "Pause: Paused → Running");
+            }
+        }
+
+        // === Menu Action Handlers ===
+
+        private static void OnFileMenuClick(ulong widgetId, int actionId)
+        {
+            UI.PopupMenuHide(_fileMenuId);
+            if (actionId == 1)
+            {
+                // 新建场景: clear scene, create default Cube+Plane+Light
+                if (_gameScene != null)
+                {
+                    // Remove all entities from tree
+                    foreach (var entityId in _entityNodeMap.Keys)
+                    {
+                        RemoveEntityFromTree(entityId);
+                    }
+                    _entityNodeMap.Clear();
+                    
+                    // Remove all entities from scene
+                    int count = _gameScene.GetEntityCount();
+                    for (int i = count - 1; i >= 0; i--)
+                    {
+                        ulong eid = _gameScene.GetEntityId(i);
+                        _gameScene.RemoveEntity(eid);
+                    }
+                    
+                    // Create default entities
+                    ulong cubeId = _gameScene.CreateCube();
+                    UI.SceneSetEntityName(_gameScene.ScenePtr, cubeId, "Cube");
+                    AddEntityToTree(cubeId, "Cube");
+                    
+                    ulong planeId = _gameScene.CreatePlane();
+                    UI.SceneSetEntityName(_gameScene.ScenePtr, planeId, "Plane");
+                    AddEntityToTree(planeId, "Plane");
+                    
+                    ulong lightId = _gameScene.CreateDirectionalLight();
+                    UI.SceneSetEntityName(_gameScene.ScenePtr, lightId, "DirectionalLight");
+                    AddEntityToTree(lightId, "DirectionalLight");
+                    
+                    _gameScene.ClearSelection();
+                    ClearPropertiesPanel();
+                    _selectedEntityId = 0;
+                    _statusItem.Text = "新建场景完成";
+                    Log.Info("Editor", "新建场景");
+                }
+            }
+            else if (actionId == 2) OnNewScriptClick(0);
+            else if (actionId == 3)
+            {
+                // 退出: no window close API available, show message
+                _statusItem.Text = "请使用窗口关闭按钮退出";
+                Log.Info("Editor", "退出请求（请关闭窗口）");
+            }
+        }
+        
+        private static void OnOpenMenuClick(ulong widgetId, int actionId)
+        {
+            UI.PopupMenuHide(_openMenuId);
+            if (actionId == 1)
+            {
+                // 打开场景: show FileBrowser dialog to select .project.json
+                ShowOpenSceneDialog();
+            }
+            else if (actionId == 2)
+            {
+                // 打开项目: show FileBrowser dialog, then Project.Load
+                ShowOpenProjectDialog();
+            }
+            else if (actionId == 3) { }
+        }
+        
+        private static void OnSaveMenuClick(ulong widgetId, int actionId)
+        {
+            UI.PopupMenuHide(_saveMenuId);
+            if (actionId == 1)
+            {
+                // 保存场景: Project.Save current project
+                if (Project.IsLoaded())
+                {
+                    Project.SyncFromScene(_gameScene.ScenePtr);
+                    bool success = Project.Save();
+                    _statusItem.Text = success ? "保存成功" : "保存失败";
+                    Log.Info("Editor", $"保存场景: {success}");
+                }
+                else
+                {
+                    _statusItem.Text = "未加载项目，无法保存";
+                    Log.Info("Editor", "保存失败: 未加载项目");
+                }
+            }
+            else if (actionId == 2) { }
+            else if (actionId == 3)
+            {
+                // 另存为: show FileBrowser to select save path, then Project.Save
+                ShowSaveAsDialog();
+            }
+        }
+
+        // === Open/Save Dialog Methods ===
+
+        private static void ShowOpenSceneDialog()
+        {
+            ulong rootId = UI.GetRootId();
+            float dialogWidth = 500f * _contentScale;
+            float dialogHeight = 400f * _contentScale;
+            
+            _openSceneDialogId = UI.CreateDialog(rootId, "打开场景", dialogWidth, dialogHeight);
+            UI.DialogSetOnResult(_openSceneDialogId, _openSceneDialogResultCallback);
+            
+            ulong contentId = UI.CreateVStack(_openSceneDialogId, 10f);
+            UI.CreateLabel(contentId, dialogWidth - 40f, 30f, "选择.project.json文件:");
+            _openSceneFileBrowserId = UI.CreateFileBrowser(contentId, 10f, 10f, dialogWidth - 60f, dialogHeight - 120f, ".");
+            UI.FileBrowserSetFilter(_openSceneFileBrowserId, "*.json");
+            UI.DialogSetContent(_openSceneDialogId, contentId);
+            UI.DialogAddButton(_openSceneDialogId, "打开", 1);
+            UI.DialogAddButton(_openSceneDialogId, "取消", 0);
+            UI.DialogShow(_openSceneDialogId);
+        }
+        
+        private static void OnOpenSceneDialogResult(ulong dialogId, int result)
+        {
+            UI.DialogHide(_openSceneDialogId);
+            
+            if (result == 1)
+            {
+                string selectedPath = UI.FileBrowserGetSelectedPath(_openSceneFileBrowserId);
+                if (!string.IsNullOrEmpty(selectedPath) && selectedPath.EndsWith(".project.json"))
+                {
+                    bool success = Project.Load(selectedPath);
+                    if (success)
+                    {
+                        Project.SyncToScene(_gameScene.ScenePtr);
+                        _statusItem.Text = "场景加载成功";
+                        Log.Info("Editor", $"打开场景: {selectedPath}");
+                        
+                        // Refresh entity tree
+                        foreach (var entityId in _entityNodeMap.Keys)
+                        {
+                            RemoveEntityFromTree(entityId);
+                        }
+                        _entityNodeMap.Clear();
+                        
+                        int entityCount = _gameScene.GetEntityCount();
+                        for (int i = 0; i < entityCount; i++)
+                        {
+                            ulong eid = _gameScene.GetEntityId(i);
+                            string name = UI.SceneGetEntityName(_gameScene.ScenePtr, eid);
+                            AddEntityToTree(eid, name);
+                        }
+                    }
+                    else
+                    {
+                        _statusItem.Text = "场景加载失败";
+                        Log.Error("Editor", $"打开场景失败: {selectedPath}");
+                    }
+                }
+                else
+                {
+                    _statusItem.Text = "请选择.project.json文件";
+                }
+            }
+        }
+        
+        private static void ShowOpenProjectDialog()
+        {
+            ulong rootId = UI.GetRootId();
+            float dialogWidth = 500f * _contentScale;
+            float dialogHeight = 400f * _contentScale;
+            
+            _openProjectDialogId = UI.CreateDialog(rootId, "打开项目", dialogWidth, dialogHeight);
+            UI.DialogSetOnResult(_openProjectDialogId, _openProjectDialogResultCallback);
+            
+            ulong contentId = UI.CreateVStack(_openProjectDialogId, 10f);
+            UI.CreateLabel(contentId, dialogWidth - 40f, 30f, "选择项目目录:");
+            _openProjectFileBrowserId = UI.CreateFileBrowser(contentId, 10f, 10f, dialogWidth - 60f, dialogHeight - 120f, ".");
+            UI.FileBrowserSetFilter(_openProjectFileBrowserId, "*.json");
+            UI.DialogSetContent(_openProjectDialogId, contentId);
+            UI.DialogAddButton(_openProjectDialogId, "打开", 1);
+            UI.DialogAddButton(_openProjectDialogId, "取消", 0);
+            UI.DialogShow(_openProjectDialogId);
+        }
+        
+        private static void OnOpenProjectDialogResult(ulong dialogId, int result)
+        {
+            UI.DialogHide(_openProjectDialogId);
+            
+            if (result == 1)
+            {
+                string selectedPath = UI.FileBrowserGetSelectedPath(_openProjectFileBrowserId);
+                if (!string.IsNullOrEmpty(selectedPath))
+                {
+                    // Find .project.json in the selected directory
+                    string projectFile = System.IO.Path.Combine(selectedPath, "project.project.json");
+                    if (!System.IO.File.Exists(projectFile))
+                    {
+                        // Try finding any .project.json in the directory
+                        string[] files = System.IO.Directory.GetFiles(selectedPath, "*.project.json");
+                        if (files.Length > 0)
+                        {
+                            projectFile = files[0];
+                        }
+                    }
+                    
+                    bool success = Project.Load(projectFile);
+                    if (success)
+                    {
+                        Project.SyncToScene(_gameScene.ScenePtr);
+                        _statusItem.Text = "项目加载成功: " + Project.GetName();
+                        Log.Info("Editor", $"打开项目: {projectFile}");
+                        
+                        // Refresh entity tree
+                        foreach (var entityId in _entityNodeMap.Keys)
+                        {
+                            RemoveEntityFromTree(entityId);
+                        }
+                        _entityNodeMap.Clear();
+                        
+                        int entityCount = _gameScene.GetEntityCount();
+                        for (int i = 0; i < entityCount; i++)
+                        {
+                            ulong eid = _gameScene.GetEntityId(i);
+                            string name = UI.SceneGetEntityName(_gameScene.ScenePtr, eid);
+                            AddEntityToTree(eid, name);
+                        }
+                        
+                        // Update project name in status bar
+                        if (_projectItem != null)
+                        {
+                            _projectItem.Text = "项目: " + Project.GetName();
+                        }
+                    }
+                    else
+                    {
+                        _statusItem.Text = "项目加载失败";
+                        Log.Error("Editor", $"打开项目失败: {projectFile}");
+                    }
+                }
+            }
+        }
+        
+        private static void ShowSaveAsDialog()
+        {
+            ulong rootId = UI.GetRootId();
+            float dialogWidth = 500f * _contentScale;
+            float dialogHeight = 400f * _contentScale;
+            
+            _saveAsDialogId = UI.CreateDialog(rootId, "另存为", dialogWidth, dialogHeight);
+            UI.DialogSetOnResult(_saveAsDialogId, _saveAsDialogResultCallback);
+            
+            ulong contentId = UI.CreateVStack(_saveAsDialogId, 10f);
+            UI.CreateLabel(contentId, dialogWidth - 40f, 30f, "选择保存路径:");
+            _saveAsFileBrowserId = UI.CreateFileBrowser(contentId, 10f, 10f, dialogWidth - 60f, dialogHeight - 120f, ".");
+            UI.FileBrowserSetFilter(_saveAsFileBrowserId, "*.json");
+            UI.DialogSetContent(_saveAsDialogId, contentId);
+            UI.DialogAddButton(_saveAsDialogId, "保存", 1);
+            UI.DialogAddButton(_saveAsDialogId, "取消", 0);
+            UI.DialogShow(_saveAsDialogId);
+        }
+        
+        private static void OnSaveAsDialogResult(ulong dialogId, int result)
+        {
+            UI.DialogHide(_saveAsDialogId);
+            
+            if (result == 1)
+            {
+                string selectedPath = UI.FileBrowserGetSelectedPath(_saveAsFileBrowserId);
+                if (!string.IsNullOrEmpty(selectedPath))
+                {
+                    Project.SyncFromScene(_gameScene.ScenePtr);
+                    string savePath = System.IO.Path.Combine(selectedPath, "project.project.json");
+                    bool success = UI.ProjectCreateNew(Project.GetName(), savePath);
+                    if (success)
+                    {
+                        Project.SyncFromScene(_gameScene.ScenePtr);
+                        success = Project.Save();
+                    }
+                    _statusItem.Text = success ? "另存为成功" : "另存为失败";
+                    Log.Info("Editor", $"另存为: {savePath}, success={success}");
+                }
+            }
+        }
+
+        // === Script Toggle Handler ===
+
+        private static void OnScriptToggleClick(ulong widgetId)
+        {
+            if (_selectedEntityId == 0 || _gameScene == null) return;
+            
+            if (_scriptToggleBtnIndices.TryGetValue(widgetId, out int scriptIndex))
+            {
+                var info = _gameScene.GetScriptBindingInfo(_selectedEntityId, scriptIndex);
+                bool newEnabled = !info.Enabled;
+                
+                _gameScene.SetScriptBindingEnabled(_selectedEntityId, scriptIndex, newEnabled);
+                
+                // Update button text and color
+                if (newEnabled)
+                {
+                    UI.SetText(widgetId, "[ON]");
+                    UI.SetWidgetBackgroundColor(widgetId, 0.2f, 0.8f, 0.2f, 1.0f);
+                }
+                else
+                {
+                    UI.SetText(widgetId, "[OFF]");
+                    UI.SetWidgetBackgroundColor(widgetId, 0.8f, 0.2f, 0.2f, 1.0f);
+                }
+                
+                _statusItem.Text = newEnabled ? $"脚本已启用: {info.ClassName}" : $"脚本已禁用: {info.ClassName}";
             }
         }
     }

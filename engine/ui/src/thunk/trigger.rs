@@ -225,3 +225,13 @@ pub fn trigger_entity_selected_callback(entity_id: u64, is_selected: bool) {
         cb(entity_id, is_selected);
     }
 }
+
+pub fn trigger_checkbox_change_callback(widget_id: u64, checked: bool) {
+    let callback = {
+        let callbacks = UI_CALLBACKS.lock();
+        callbacks.on_checkbox_change.get(&widget_id).copied()
+    };
+    if let Some(cb) = callback {
+        cb(widget_id, checked);
+    }
+}

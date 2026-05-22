@@ -26,6 +26,7 @@ namespace Hezhou
         private static Dictionary<ulong, DialogResultCallbackDelegate> _dialogCallbacks = new Dictionary<ulong, DialogResultCallbackDelegate>();
         private static Dictionary<ulong, FileBrowserSelectCallbackDelegate> _fileBrowserSelectCallbacks = new Dictionary<ulong, FileBrowserSelectCallbackDelegate>();
         private static Dictionary<ulong, FileBrowserDoubleClickCallbackDelegate> _fileBrowserDoubleClickCallbacks = new Dictionary<ulong, FileBrowserDoubleClickCallbackDelegate>();
+        private static Dictionary<ulong, CheckboxChangeCallbackDelegate> _checkboxCallbacks = new Dictionary<ulong, CheckboxChangeCallbackDelegate>();
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public delegate ulong GetButtonIdDelegate();
@@ -137,6 +138,9 @@ namespace Hezhou
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public delegate void SetCrossAxisFillDelegate(IntPtr handle, ulong widgetId, uint fill);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void SetWidgetBackgroundColorDelegate(IntPtr handle, ulong widgetId, float r, float g, float b, float a);
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public delegate void RegisterHotReloadCompleteCallbackDelegate(IntPtr callbackPtr);
@@ -400,6 +404,27 @@ namespace Hezhou
         public delegate void FileBrowserSetOnDoubleClickThunkPtrDelegate(IntPtr handle, ulong browserId, IntPtr callbackPtr);
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate ulong CreateCheckboxDelegate(IntPtr handle, ulong parentId, float width, float height);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate ulong CreateCheckboxInParentDelegate(IntPtr handle, ulong parentId, float x, float y, float width, float height, [MarshalAs(UnmanagedType.LPStr)] string text);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void CheckboxSetCheckedDelegate(IntPtr handle, ulong widgetId, uint isChecked);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate uint CheckboxGetCheckedDelegate(IntPtr handle, ulong widgetId);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void CheckboxSetOnChangeThunkPtrDelegate(IntPtr handle, ulong widgetId, IntPtr callbackPtr);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void CheckboxChangeCallbackDelegate(ulong widgetId, bool isChecked);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void CheckboxSetTextDelegate(IntPtr handle, ulong widgetId, [MarshalAs(UnmanagedType.LPStr)] string text);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public delegate void SetWidgetLayerDelegate(IntPtr handle, ulong widgetId, uint layer);
         
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
@@ -626,7 +651,7 @@ namespace Hezhou
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public delegate void RegisterUpdateDelegate(IntPtr callbackPtr);
 
-        [StructLayout(LayoutKind.Sequential)]
+[StructLayout(LayoutKind.Sequential)]
         public struct FfiContext
         {
             public IntPtr ui_get_primary_button_id;
@@ -691,6 +716,12 @@ namespace Hezhou
             public IntPtr ui_input_field_get_text;
             public IntPtr ui_input_field_set_on_change_thunk_ptr;
             public IntPtr ui_input_field_set_placeholder;
+            public IntPtr ui_create_checkbox;
+            public IntPtr ui_create_checkbox_in_parent;
+            public IntPtr ui_checkbox_set_checked;
+            public IntPtr ui_checkbox_get_checked;
+            public IntPtr ui_checkbox_set_on_change_thunk_ptr;
+            public IntPtr ui_checkbox_set_text;
             public IntPtr ui_create_tab_widget;
             public IntPtr ui_tab_widget_add_tab;
             public IntPtr ui_tab_widget_set_active;
@@ -800,6 +831,10 @@ namespace Hezhou
             public IntPtr dfx_perf_end_frame;
             public IntPtr set_status_text;
             public IntPtr on_hot_reload_complete;
+            public IntPtr ui_debug_print_widget_tree;
+            public IntPtr ui_widget_set_flex_expand;
+            public IntPtr ui_widget_set_cross_axis_fill;
+            public IntPtr ui_widget_set_background_color;
             public IntPtr asset_library_get_category_count;
             public IntPtr asset_library_get_category_name;
             public IntPtr asset_library_get_asset_count;
@@ -820,9 +855,6 @@ namespace Hezhou
             public IntPtr project_get_entity_info;
             public IntPtr project_add_entity;
             public IntPtr project_remove_entity;
-            public IntPtr ui_debug_print_widget_tree;
-            public IntPtr ui_widget_set_flex_expand;
-            public IntPtr ui_widget_set_cross_axis_fill;
         }
 
         public static void InitFromContext(IntPtr contextPtr)
