@@ -170,7 +170,56 @@ pub extern "C" fn ui_entity_set_property_value_string(
     let value_str = unsafe { CStr::from_ptr(value).to_string_lossy().into_owned() };
     unsafe {
         let entity = Entity::new(entity_id);
-        let pv = PropertyValue::String(value_str);
+        // Handle Bool values passed as string "true"/"false"
+        if value_str == "true" || value_str == "false" {
+            let b = value_str == "true";
+            let pv = PropertyValue::Bool(b);
+            set_entity_property_value(&mut *scene, entity, &name_str, &pv)
+        } else {
+            let pv = PropertyValue::String(value_str);
+            set_entity_property_value(&mut *scene, entity, &name_str, &pv)
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_entity_get_property_value_float(
+    scene: *mut Scene,
+    entity_id: u64,
+    property_name: *const c_char,
+    out_value: *mut f32,
+) -> bool {
+    if scene.is_null() || property_name.is_null() || out_value.is_null() {
+        return false;
+    }
+    let name_str = unsafe { CStr::from_ptr(property_name).to_string_lossy().into_owned() };
+    unsafe {
+        let entity = Entity::new(entity_id);
+        let value = get_entity_property_value(&*scene, entity, &name_str);
+        match value {
+            Some(PropertyValue::Float(f)) => {
+                *out_value = f;
+                true
+            }
+            _ => false,
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_entity_set_property_value_float(
+    scene: *mut Scene,
+    entity_id: u64,
+    property_name: *const c_char,
+    value: f32,
+) -> bool {
+    if scene.is_null() || property_name.is_null() {
+        return false;
+    }
+    let name_str = unsafe { CStr::from_ptr(property_name).to_string_lossy().into_owned() };
+    unsafe {
+        let entity = Entity::new(entity_id);
+        let pv = PropertyValue::Float(value);
         set_entity_property_value(&mut *scene, entity, &name_str, &pv)
     }
 }

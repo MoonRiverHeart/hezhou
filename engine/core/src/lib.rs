@@ -17,6 +17,7 @@ pub use scene_ffi::*;
 pub use property_ffi::*;
 pub use asset_library::*;
 pub use project::*;
+pub use asset_ffi::*;
 
 pub struct Engine {
     pub world: World,

@@ -69,6 +69,41 @@ pub fn get_entity_property_descriptors() -> Vec<PropertyDescriptor> {
             read_only: false,
         },
         PropertyDescriptor {
+            name: "mesh_path".to_string(),
+            display_name: "Mesh Path".to_string(),
+            property_type: PropertyType::String,
+            category: "Renderable".to_string(),
+            read_only: true,
+        },
+        PropertyDescriptor {
+            name: "visible".to_string(),
+            display_name: "Visible".to_string(),
+            property_type: PropertyType::Bool,
+            category: "Renderable".to_string(),
+            read_only: false,
+        },
+        PropertyDescriptor {
+            name: "light_direction".to_string(),
+            display_name: "Light Direction".to_string(),
+            property_type: PropertyType::Float3,
+            category: "Light".to_string(),
+            read_only: false,
+        },
+        PropertyDescriptor {
+            name: "light_color".to_string(),
+            display_name: "Light Color".to_string(),
+            property_type: PropertyType::Float3,
+            category: "Light".to_string(),
+            read_only: false,
+        },
+        PropertyDescriptor {
+            name: "light_intensity".to_string(),
+            display_name: "Light Intensity".to_string(),
+            property_type: PropertyType::Float,
+            category: "Light".to_string(),
+            read_only: false,
+        },
+        PropertyDescriptor {
             name: "id".to_string(),
             display_name: "Entity ID".to_string(),
             property_type: PropertyType::Int,
@@ -100,6 +135,26 @@ pub fn get_entity_property_value(scene: &Scene, entity: Entity, property_name: &
         }
         "scale" => {
             scene.get_entity_scale(entity).map(|s| PropertyValue::Float3 { x: s.x, y: s.y, z: s.z })
+        }
+        "mesh_path" => {
+            scene.world.get_component::<crate::ecs::RenderableComponent>(entity)
+                .map(|r| PropertyValue::String(r.mesh_path.clone()))
+        }
+        "visible" => {
+            scene.world.get_component::<crate::ecs::RenderableComponent>(entity)
+                .map(|r| PropertyValue::Bool(r.visible))
+        }
+        "light_direction" => {
+            scene.world.get_component::<crate::ecs::DirectionalLightComponent>(entity)
+                .map(|l| PropertyValue::Float3 { x: l.direction.x, y: l.direction.y, z: l.direction.z })
+        }
+        "light_color" => {
+            scene.world.get_component::<crate::ecs::DirectionalLightComponent>(entity)
+                .map(|l| PropertyValue::Float3 { x: l.color.x, y: l.color.y, z: l.color.z })
+        }
+        "light_intensity" => {
+            scene.world.get_component::<crate::ecs::DirectionalLightComponent>(entity)
+                .map(|l| PropertyValue::Float(l.intensity))
         }
         "id" => {
             Some(PropertyValue::Int(entity.id as i32))
@@ -145,6 +200,34 @@ pub fn set_entity_property_value(scene: &mut Scene, entity: Entity, property_nam
             if let PropertyValue::Float3 { x, y, z } = value {
                 scene.set_entity_scale(entity, Vec3::new(*x, *y, *z));
                 true
+            } else {
+                false
+            }
+        }
+"visible" => {
+            if let PropertyValue::Bool(v) = value {
+                scene.set_renderable_visible(entity, *v)
+            } else {
+                false
+            }
+        }
+        "light_direction" => {
+            if let PropertyValue::Float3 { x, y, z } = value {
+                scene.set_light_direction(entity, Vec3::new(*x, *y, *z))
+            } else {
+                false
+            }
+        }
+        "light_color" => {
+            if let PropertyValue::Float3 { x, y, z } = value {
+                scene.set_light_color(entity, Vec3::new(*x, *y, *z))
+            } else {
+                false
+            }
+        }
+        "light_intensity" => {
+            if let PropertyValue::Float(v) = value {
+                scene.set_light_intensity(entity, *v)
             } else {
                 false
             }

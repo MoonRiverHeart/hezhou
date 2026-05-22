@@ -80,6 +80,16 @@ impl Scene {
         self.create_render_entity("builtin://cube".to_string())
     }
     
+    pub fn create_plane(&mut self) -> Entity {
+        self.create_render_entity("builtin://plane".to_string())
+    }
+    
+    pub fn create_directional_light(&mut self) -> Entity {
+        let entity = self.create_entity();
+        self.world.add_component(entity, DirectionalLightComponent::default());
+        entity
+    }
+    
     pub fn attach_script(&mut self, entity: Entity, script: ScriptComponent) {
         if !self.world.entity_exists(entity) {
             return;
@@ -365,6 +375,53 @@ impl Scene {
     
     pub fn get_entity_name(&self, entity: Entity) -> Option<&String> {
         self.entity_names.get(&entity.id)
+    }
+    
+    // RenderableComponent helpers
+    pub fn set_renderable_visible(&mut self, entity: Entity, visible: bool) -> bool {
+        if !self.world.entity_exists(entity) { return false; }
+        if let Some(mut renderable) = self.world.get_component::<RenderableComponent>(entity) {
+            renderable.visible = visible;
+            // Re-add the modified component
+            self.world.add_component(entity, renderable);
+            true
+        } else {
+            false
+        }
+    }
+    
+    // DirectionalLightComponent helpers
+    pub fn set_light_direction(&mut self, entity: Entity, direction: Vec3) -> bool {
+        if !self.world.entity_exists(entity) { return false; }
+        if let Some(mut light) = self.world.get_component::<DirectionalLightComponent>(entity) {
+            light.direction = direction;
+            self.world.add_component(entity, light);
+            true
+        } else {
+            false
+        }
+    }
+    
+    pub fn set_light_color(&mut self, entity: Entity, color: Vec3) -> bool {
+        if !self.world.entity_exists(entity) { return false; }
+        if let Some(mut light) = self.world.get_component::<DirectionalLightComponent>(entity) {
+            light.color = color;
+            self.world.add_component(entity, light);
+            true
+        } else {
+            false
+        }
+    }
+    
+    pub fn set_light_intensity(&mut self, entity: Entity, intensity: f32) -> bool {
+        if !self.world.entity_exists(entity) { return false; }
+        if let Some(mut light) = self.world.get_component::<DirectionalLightComponent>(entity) {
+            light.intensity = intensity;
+            self.world.add_component(entity, light);
+            true
+        } else {
+            false
+        }
     }
 }
 

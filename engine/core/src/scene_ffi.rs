@@ -40,6 +40,28 @@ pub extern "C" fn scene_create_cube(scene: *mut Scene) -> u64 {
 }
 
 #[no_mangle]
+pub extern "C" fn scene_create_plane(scene: *mut Scene) -> u64 {
+    if scene.is_null() {
+        return 0;
+    }
+    unsafe {
+        let entity = (*scene).create_plane();
+        entity.id
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn scene_create_directional_light(scene: *mut Scene) -> u64 {
+    if scene.is_null() {
+        return 0;
+    }
+    unsafe {
+        let entity = (*scene).create_directional_light();
+        entity.id
+    }
+}
+
+#[no_mangle]
 pub extern "C" fn scene_set_entity_position(scene: *mut Scene, entity_id: u64, x: f32, y: f32, z: f32) {
     if scene.is_null() {
         return;

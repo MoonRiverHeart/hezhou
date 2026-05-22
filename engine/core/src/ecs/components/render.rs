@@ -179,7 +179,38 @@ impl LocalTransform {
     pub fn at_position(pos: Vec3) -> Self {
         Self {
             position: pos,
-            ..Default::default()
+            ..Self::default()
         }
+    }
+}
+
+// === Light Components ===
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug)]
+pub struct DirectionalLightComponent {
+    pub direction: Vec3,
+    pub color: Vec3,
+    pub intensity: f32,
+}
+
+impl Component for DirectionalLightComponent {
+    fn type_id() -> crate::ecs::ComponentTypeId { 103 }
+    fn type_name() -> &'static str { "DirectionalLightComponent" }
+}
+
+impl Default for DirectionalLightComponent {
+    fn default() -> Self {
+        Self {
+            direction: Vec3::new(-0.5, -1.0, -0.5),
+            color: Vec3::one(),
+            intensity: 1.0,
+        }
+    }
+}
+
+impl DirectionalLightComponent {
+    pub fn new(direction: Vec3, color: Vec3, intensity: f32) -> Self {
+        Self { direction, color, intensity }
     }
 }
