@@ -39,6 +39,30 @@ pub extern "C" fn scene_create_cube_editor(scene: *mut std::ffi::c_void) -> u64 
 }
 
 #[unsafe(no_mangle)]
+pub extern "C" fn scene_create_plane_editor(scene: *mut std::ffi::c_void) -> u64 {
+    if scene.is_null() {
+        return 0;
+    }
+    unsafe {
+        let scene_ptr = scene as *mut hezhou_core::Scene;
+        let entity = (*scene_ptr).create_plane();
+        entity.id
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn scene_create_directional_light_editor(scene: *mut std::ffi::c_void) -> u64 {
+    if scene.is_null() {
+        return 0;
+    }
+    unsafe {
+        let scene_ptr = scene as *mut hezhou_core::Scene;
+        let entity = (*scene_ptr).create_directional_light();
+        entity.id
+    }
+}
+
+#[unsafe(no_mangle)]
 pub extern "C" fn scene_attach_script_editor(scene: *mut std::ffi::c_void, entity_id: u64,
                                              script_path: *const i8, class_name: *const i8) {
     if scene.is_null() {
@@ -349,6 +373,16 @@ pub extern "C" fn scene_remove_entity_editor(scene: *mut std::ffi::c_void, entit
     }
 }
 
+#[unsafe(no_mangle)]
+pub extern "C" fn asset_library_create_mesh_entity_editor(scene: *mut std::ffi::c_void, mesh_type: u32) -> u64 {
+    if scene.is_null() {
+        return 0;
+    }
+    unsafe {
+        hezhou_core::asset_library_create_mesh_entity(scene as *mut hezhou_core::Scene, mesh_type)
+    }
+}
+
 // Property reflection FFI wrappers
 
 #[unsafe(no_mangle)]
@@ -451,6 +485,42 @@ pub extern "C" fn ui_entity_set_property_value_string_editor(
         return false;
     }
     hezhou_core::ui_entity_set_property_value_string(
+        scene as *mut hezhou_core::Scene,
+        entity_id,
+        property_name,
+        value,
+    )
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_entity_get_property_value_float_editor(
+    scene: *mut std::ffi::c_void,
+    entity_id: u64,
+    property_name: *const std::ffi::c_char,
+    out_value: *mut f32,
+) -> bool {
+    if scene.is_null() {
+        return false;
+    }
+    hezhou_core::ui_entity_get_property_value_float(
+        scene as *mut hezhou_core::Scene,
+        entity_id,
+        property_name,
+        out_value,
+    )
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_entity_set_property_value_float_editor(
+    scene: *mut std::ffi::c_void,
+    entity_id: u64,
+    property_name: *const std::ffi::c_char,
+    value: f32,
+) -> bool {
+    if scene.is_null() {
+        return false;
+    }
+    hezhou_core::ui_entity_set_property_value_float(
         scene as *mut hezhou_core::Scene,
         entity_id,
         property_name,

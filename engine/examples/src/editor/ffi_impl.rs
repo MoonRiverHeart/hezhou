@@ -11,19 +11,18 @@ pub extern "C" fn trigger_hot_reload() {
 pub extern "C" fn set_status_text(status_ptr: *const i8) {
     if !status_ptr.is_null() {
         let status = unsafe { std::ffi::CStr::from_ptr(status_ptr).to_string_lossy().into_owned() };
-        dfx_info!("Status", "状态: {}", status);
+        dfx_info!("Status", "状态更新: {}", status);
     }
 }
 
 pub extern "C" fn on_hot_reload_complete_placeholder() {
-    dfx_info!("HotReload", "OnHotReloadComplete callback placeholder called");
+    // Placeholder — actual callback registered later from C#
 }
 
 #[unsafe(no_mangle)]
 pub extern "C" fn register_hot_reload_complete_callback(callback: OnHotReloadCompleteFn) {
     unsafe {
         super::HOT_RELOAD_COMPLETE_CALLBACK = Some(callback);
-        dfx_info!("HotReload", "Hot reload complete callback registered");
     }
 }
 
@@ -34,7 +33,7 @@ pub extern "C" fn set_game_preview_extent(width: u32, height: u32) {
             if let Err(e) = (*renderer_ptr).set_game_preview_extent(width, height) {
                 dfx_error!("Demo", "Failed to set game preview extent: {}", e);
             } else {
-                dfx_info!("Demo", "Game preview extent set to {}x{}", width, height);
+                // Success — extent updated silently
             }
         }
     }
@@ -45,7 +44,6 @@ pub extern "C" fn set_camera_params(yaw: f32, pitch: f32, x: f32, y: f32, z: f32
     unsafe {
         if let Some(renderer_ptr) = super::RENDERER {
             (*renderer_ptr).set_camera_params(yaw, pitch, x, y, z);
-            dfx_info!("Demo", "Camera params set: yaw={}, pitch={}, pos=({}, {}, {})", yaw, pitch, x, y, z);
         }
     }
 }
@@ -55,7 +53,6 @@ pub extern "C" fn set_renderer_game_state(state: i32) {
     unsafe {
         if let Some(renderer_ptr) = super::RENDERER {
             (*renderer_ptr).set_game_state(state);
-            dfx_info!("Demo", "Renderer game_state set to: {}", state);
         }
     }
 }
