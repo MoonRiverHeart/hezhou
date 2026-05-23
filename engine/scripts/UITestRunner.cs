@@ -69,7 +69,7 @@ namespace Hezhou
 
         // === Config Dialog ===
 
-        public static void ShowTestConfigDialog(TestMode initialMode)
+public static void ShowTestConfigDialog(TestMode initialMode)
         {
             _pendingMode = initialMode;
             ulong rootId = UI.GetRootId();
@@ -81,47 +81,41 @@ namespace Hezhou
             _configDialogResultCallback = OnConfigDialogResult;
             UI.DialogSetOnResult(_configDialogId, _configDialogResultCallback);
 
-            ulong content = UI.CreateVStack(_configDialogId, 6f * cs);
-            UI.SetFlexExpand(content, true);
-            UI.SetCrossAxisFill(content, true);
+            ulong content = UI.CreateVStack(_configDialogId, 10f);
 
-            // Mode selector
-            ulong modeRow = UI.CreateHStack(content, 8f * cs);
-            UI.SetFlexExpand(modeRow, true);
+            // Mode selector row
+            ulong modeRow = UI.CreateHStack(content, 8f);
             UI.CreateLabel(modeRow, 80f * cs, 28f * cs, "Mode:");
             string[] modeOptions = new string[] { "Sequential", "Random", "Stress" };
-            _configModeDropdownId = UI.CreateDropdown(modeRow, 180f * cs, 28f * cs);
+            _configModeDropdownId = UI.CreateDropdown(modeRow, 200f * cs, 28f * cs);
             UI.DropdownSetOptions(_configModeDropdownId, modeOptions);
             UI.DropdownSetSelected(_configModeDropdownId, (ulong)initialMode);
             _configModeSelectCallback = OnConfigModeSelect;
             UI.DropdownSetOnSelect(_configModeDropdownId, _configModeSelectCallback);
 
-            // Steps input
-            ulong stepsRow = UI.CreateHStack(content, 8f * cs);
-            UI.SetFlexExpand(stepsRow, true);
+            // Steps input row
+            ulong stepsRow = UI.CreateHStack(content, 8f);
             UI.CreateLabel(stepsRow, 80f * cs, 28f * cs, "Steps:");
-            _configStepsInputId = UI.CreateInputField(stepsRow, 180f * cs, 28f * cs);
+            _configStepsInputId = UI.CreateInputField(stepsRow, 200f * cs, 28f * cs);
             UI.InputFieldSetPlaceholder(_configStepsInputId, "200");
             UI.InputFieldSetText(_configStepsInputId, "200");
 
-            // Duration input
-            ulong durationRow = UI.CreateHStack(content, 8f * cs);
-            UI.SetFlexExpand(durationRow, true);
-            UI.CreateLabel(durationRow, 80f * cs, 28f * cs, "Duration:");
-            _configDurationInputId = UI.CreateInputField(durationRow, 180f * cs, 28f * cs);
+            // Duration input row
+            ulong durationRow = UI.CreateHStack(content, 8f);
+            UI.CreateLabel(durationRow, 80f * cs, 28f * cs, "Duration(s):");
+            _configDurationInputId = UI.CreateInputField(durationRow, 200f * cs, 28f * cs);
             UI.InputFieldSetPlaceholder(_configDurationInputId, "60");
             UI.InputFieldSetText(_configDurationInputId, "60");
 
-            // Interval input
-            ulong intervalRow = UI.CreateHStack(content, 8f * cs);
-            UI.SetFlexExpand(intervalRow, true);
-            UI.CreateLabel(intervalRow, 80f * cs, 28f * cs, "Interval:");
-            _configIntervalInputId = UI.CreateInputField(intervalRow, 180f * cs, 28f * cs);
+            // Interval input row
+            ulong intervalRow = UI.CreateHStack(content, 8f);
+            UI.CreateLabel(intervalRow, 80f * cs, 28f * cs, "Interval(s):");
+            _configIntervalInputId = UI.CreateInputField(intervalRow, 200f * cs, 28f * cs);
             UI.InputFieldSetPlaceholder(_configIntervalInputId, "0.5");
             UI.InputFieldSetText(_configIntervalInputId, "0.5");
 
             // Hint label
-            UI.CreateLabel(content, dialogWidth - 20f * cs, 24f * cs, "Interval: seconds between clicks (min 0.1)");
+            UI.CreateLabel(content, dialogWidth - 40f * cs, 24f * cs, "Interval: seconds between clicks (min 0.1)");
 
             UI.DialogSetContent(_configDialogId, content);
             UI.DialogAddButton(_configDialogId, "Start", 1);
