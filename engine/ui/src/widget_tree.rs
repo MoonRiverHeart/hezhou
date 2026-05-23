@@ -467,7 +467,7 @@ pub fn perform_layout(&mut self, font_atlas: &FontAtlas) {
                 self.layout_tree_view_children(id, font_atlas);
             }
             "Dialog" => {
-                self.layout_dialog_children(id);
+                self.layout_dialog_children(id, font_atlas);
             }
             "SplitView" => {
                 self.layout_split_view_children(id);
@@ -859,7 +859,7 @@ pub fn perform_layout(&mut self, font_atlas: &FontAtlas) {
         }
     }
 
-    fn layout_dialog_children(&mut self, id: WidgetId) {
+    fn layout_dialog_children(&mut self, id: WidgetId, font_atlas: &crate::font_atlas::FontAtlas) {
         // Get Dialog properties: content_id, title_bar_height, button_height, content_scale
         let dialog_info = {
             if let Some(node) = self.nodes.get(&id) {
@@ -886,6 +886,10 @@ pub fn perform_layout(&mut self, font_atlas: &FontAtlas) {
             let content_width = dialog_layout.width;
             let content_height = dialog_layout.height - scaled_title_height - button_area_height;
 
+            if content_height <= 0.0 {
+                return;
+            }
+
             if let Some(node) = self.nodes.get_mut(&content_widget_id) {
                 node.widget.set_layout(crate::layout::Layout::new(
                     0.0,
@@ -893,6 +897,30 @@ pub fn perform_layout(&mut self, font_atlas: &FontAtlas) {
                     content_width,
                     content_height,
                 ));
+            }
+
+            // Re-layout content widget's children now that the content widget has correct size
+            // (measure_and_layout processes children before the parent, so when the content VStack's
+            // children were first laid out, the VStack still had zero size from initial creation)
+            let content_children = self.get_children(content_widget_id).to_vec();
+            let mut child_sizes = Vec::new();
+            for &child_id in &content_children {
+                let size = self.measure_and_layout(child_id, font_atlas);
+                child_sizes.push(size);
+            }
+
+            let content_type = self.nodes.get(&content_widget_id)
+                .map(|n| n.widget.widget_type())
+                .unwrap_or("");
+
+            match content_type {
+                "VStack" => {
+                    self.layout_vstack_children(content_widget_id, &content_children, &child_sizes);
+                }
+                "HStack" => {
+                    self.layout_hstack_children(content_widget_id, &content_children, &child_sizes);
+                }
+                _ => {}
             }
         }
     }
