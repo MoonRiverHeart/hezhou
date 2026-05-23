@@ -125,11 +125,16 @@ impl UIInputHandler {
 
         match mouse.action {
             MouseAction::Press => {
-                self.touch_active = true;
-                let mut event = Event::new(EventType::TouchBegin, timestamp)
-                    .with_data(EventData::Touch(TouchData::new(x, y, 0).with_modifiers(modifiers)));
-
-                self.event_dispatcher.lock().dispatch_event(&mut event);
+                if ui_button == MouseButton::Right {
+                    let mut event = Event::new(EventType::RightClick, timestamp)
+                        .with_data(EventData::Mouse(MouseData::new(x, y, MouseButton::Right)));
+                    self.event_dispatcher.lock().dispatch_event(&mut event);
+                } else {
+                    self.touch_active = true;
+                    let mut event = Event::new(EventType::TouchBegin, timestamp)
+                        .with_data(EventData::Touch(TouchData::new(x, y, 0).with_modifiers(modifiers)));
+                    self.event_dispatcher.lock().dispatch_event(&mut event);
+                }
             }
             MouseAction::Release => {
                 self.touch_active = false;
@@ -157,6 +162,7 @@ impl UIInputHandler {
                     EventData::Wheel(WheelData::new(x, y, mouse.dx, mouse.dy)),
                 );
                 self.event_dispatcher.lock().dispatch_event(&mut event);
+                crate::thunk::trigger_mouse_wheel_callback(mouse.dx, mouse.dy);
             }
         }
     }
@@ -165,7 +171,7 @@ impl UIInputHandler {
         // volatile read + log 强制使用 action_val 防止编译器优化
         let action_ptr = &key.action as *const KeyAction as *const u32;
         let action_val = unsafe { std::ptr::read_volatile(action_ptr) };
-        dfx_info!("InputHandler", "keycode={} action={}", key.keycode as u32, action_val);
+        dfx_debug!("InputHandler", "keycode={} action={}", key.keycode as u32, action_val);
         
         // 追踪 Shift 和 Ctrl 键状态
         if key.keycode == KeyCode::Shift {

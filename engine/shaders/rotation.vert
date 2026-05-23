@@ -41,7 +41,7 @@ mat4 viewMatrix() {
 }
 
 mat4 projectionMatrix(float aspect) {
-    float fov = 45.0;
+     float fov = 60.0;
     float near = 0.1;
     float far = 100.0;
     float f = 1.0 / tan(fov * 3.14159265 / 360.0);

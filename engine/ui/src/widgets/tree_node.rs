@@ -177,6 +177,11 @@ impl TreeNode {
         queue_callback(PendingCallback::TreeNodeSelect { widget_id: self.id.id, user_data: self.user_data });
     }
 
+    
+    pub fn right_click(&mut self, x: f32, y: f32) {
+        queue_callback(PendingCallback::TreeNodeRightClick { widget_id: self.id.id, x, y });
+    }
+
     fn draw_expand_icon(&self, canvas: &mut Canvas, x: f32, y: f32, size: f32) {
         let icon_style = Style::new().with_background(self.icon_color);
         
@@ -367,6 +372,16 @@ impl Widget for TreeNode {
                 }
             }
 
+            EventType::RightClick => {
+                match &event.data {
+                    EventData::Mouse(mouse) => {
+                        self.right_click(mouse.x, mouse.y);
+                        return EventResult::Handled;
+                    }
+                    _ => {}
+                }
+            }
+
             EventType::TouchEnd => {
                 if self.state == WidgetState::Pressed {
                     self.set_state(WidgetState::Hovered);
@@ -384,6 +399,13 @@ impl Widget for TreeNode {
             EventType::MouseLeave => {
                 self.set_state(WidgetState::Normal);
                 return EventResult::Handled;
+            }
+
+            EventType::RightClick => {
+                if let EventData::Mouse(mouse) = &event.data {
+                    self.right_click(mouse.x, mouse.y);
+                    return EventResult::Handled;
+                }
             }
 
             _ => {}

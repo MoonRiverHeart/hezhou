@@ -23,3 +23,5 @@ pub type CheckboxChangeCallback = extern "C" fn(u64, bool);
 pub type SliderChangeCallback = extern "C" fn(u64, f32);
 pub type ScrollViewScrollCallback = extern "C" fn(u64, f32);
 pub type SplitViewRatioChangeCallback = extern "C" fn(u64, f32);
+pub type MouseWheelCallback = extern "C" fn(f32, f32);
+pub type TreeNodeRightClickCallback = extern "C" fn(u64, f32, f32);

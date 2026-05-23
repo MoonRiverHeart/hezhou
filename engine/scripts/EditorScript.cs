@@ -26,6 +26,7 @@ namespace Hezhou
             _globalClickCallback = OnGlobalClick;
             _keyCallback = OnKey;
             _mouseMoveCallback = OnMouseMove;
+            _mouseWheelCallback = OnMouseWheel;
             _newClickCallback = OnNewClick;
             _openClickCallback = OnOpenClick;
             _saveClickCallback = OnSaveClick;
@@ -52,6 +53,7 @@ _hotReloadCompleteCallback = OnHotReloadComplete;
             _openMenuClickCallback = OnOpenMenuClick;
             _saveMenuClickCallback = OnSaveMenuClick;
             _treeNodeSelectCallback = OnTreeNodeSelect;
+            _treeNodeRightClickCallback = OnTreeNodeRightClick;
             _gridViewClickCallback = OnGridViewClick;
             _fileBrowserSelectCallback = OnFileBrowserSelect;
             _workingDirectoryDialogResultCallback = OnWorkingDirectoryDialogResult;
@@ -68,6 +70,8 @@ _hotReloadCompleteCallback = OnHotReloadComplete;
             UI.RegisterGlobalClickCallback(_globalClickCallback);
             UI.RegisterKeyCallback(_keyCallback);
             UI.RegisterMouseMoveCallback(_mouseMoveCallback);
+            UI.RegisterMouseWheelCallback(_mouseWheelCallback);
+            UI.RegisterTreeNodeRightClickCallback(_treeNodeRightClickCallback);
         }
         
         public static void Update(float deltaTime)

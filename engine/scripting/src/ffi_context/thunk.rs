@@ -6,3 +6,5 @@ pub type RegisterResizeThunkPtrFn = extern "C" fn(*const c_void);
 pub type RegisterGlobalClickThunkPtrFn = extern "C" fn(*const c_void);
 pub type RegisterKeyThunkPtrFn = extern "C" fn(*const c_void);
 pub type RegisterMouseMoveThunkPtrFn = extern "C" fn(*const c_void);
+pub type RegisterMouseWheelThunkPtrFn = extern "C" fn(*const c_void);
+pub type RegisterTreeNodeRightClickThunkPtrFn = extern "C" fn(*const c_void);

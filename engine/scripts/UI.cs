@@ -13,6 +13,7 @@ namespace Hezhou
         private static GlobalClickCallbackDelegate _savedGlobalClickCallback;
         private static KeyCallbackDelegate _savedKeyCallback;
         private static MouseMoveCallbackDelegate _savedMouseMoveCallback;
+        private static MouseWheelCallbackDelegate _savedMouseWheelCallback;
         private static UpdateCallbackDelegate _savedUpdateCallback;
         private static Dictionary<ulong, WidgetCallbackDelegate> _onclickCallbacks = new Dictionary<ulong, WidgetCallbackDelegate>();
         private static Dictionary<ulong, DropdownSelectCallbackDelegate> _dropdownCallbacks = new Dictionary<ulong, DropdownSelectCallbackDelegate>();
@@ -21,6 +22,7 @@ namespace Hezhou
         private static Dictionary<ulong, TabCloseCallbackDelegate> _tabCloseCallbacks = new Dictionary<ulong, TabCloseCallbackDelegate>();
         private static Dictionary<ulong, TreeNodeSelectCallbackDelegate> _treeNodeSelectCallbacks = new Dictionary<ulong, TreeNodeSelectCallbackDelegate>();
         private static Dictionary<ulong, TreeNodeToggleCallbackDelegate> _treeNodeToggleCallbacks = new Dictionary<ulong, TreeNodeToggleCallbackDelegate>();
+        private static TreeNodeRightClickCallbackDelegate _savedTreeNodeRightClickCallback;
         private static Dictionary<ulong, PopupMenuClickCallbackDelegate> _popupMenuCallbacks = new Dictionary<ulong, PopupMenuClickCallbackDelegate>();
         private static Dictionary<ulong, GridViewClickCallbackDelegate> _gridViewCallbacks = new Dictionary<ulong, GridViewClickCallbackDelegate>();
         private static Dictionary<ulong, DialogResultCallbackDelegate> _dialogCallbacks = new Dictionary<ulong, DialogResultCallbackDelegate>();
@@ -42,6 +44,9 @@ namespace Hezhou
         
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public delegate void MouseMoveCallbackDelegate(float x, float y, bool dragging);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void MouseWheelCallbackDelegate(float deltaX, float deltaY);
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public delegate void SetTextDelegate(IntPtr handle, ulong widgetId, [MarshalAs(UnmanagedType.LPStr)] string text);
@@ -279,6 +284,9 @@ namespace Hezhou
         
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public delegate void TreeNodeToggleCallbackDelegate(ulong nodeId);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void TreeNodeRightClickCallbackDelegate(ulong widgetId, float x, float y);
         
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public delegate bool TreeViewIsNodeExpandedDelegate(IntPtr handle, ulong treeViewId, ulong nodeId);
@@ -728,6 +736,8 @@ namespace Hezhou
         public delegate void RegisterGlobalClickDelegate(IntPtr callbackPtr);
         public delegate void RegisterKeyDelegate(IntPtr callbackPtr);
         public delegate void RegisterMouseMoveDelegate(IntPtr callbackPtr);
+        public delegate void RegisterMouseWheelDelegate(IntPtr callbackPtr);
+        public delegate void RegisterTreeNodeRightClickDelegate(IntPtr callbackPtr);
         
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public delegate void RegisterUpdateDelegate(IntPtr callbackPtr);
@@ -744,6 +754,8 @@ namespace Hezhou
             public IntPtr ui_register_global_click_thunk_ptr;
             public IntPtr ui_register_key_thunk_ptr;
             public IntPtr ui_register_mouse_move_thunk_ptr;
+            public IntPtr ui_register_mouse_wheel_thunk_ptr;
+            public IntPtr ui_register_tree_node_right_click_thunk_ptr;
             public IntPtr ui_trigger_resize;
             public IntPtr ui_get_screen_size;
             public IntPtr ui_set_content_scale;
@@ -1062,6 +1074,34 @@ public static void RegisterResizeCallback(ResizeCallbackDelegate callback)
                 return;
             }
             var func = Marshal.GetDelegateForFunctionPointer<RegisterMouseMoveDelegate>(_ffi.ui_register_mouse_move_thunk_ptr);
+            func(callbackPtr);
+        }
+
+        public static void RegisterMouseWheelCallback(MouseWheelCallbackDelegate callback)
+        {
+            _savedMouseWheelCallback = callback;
+            IntPtr callbackPtr = Marshal.GetFunctionPointerForDelegate(callback);
+            
+            if (_ffi.ui_register_mouse_wheel_thunk_ptr == IntPtr.Zero)
+            {
+                Log.Error("C#", "RegisterMouseWheelThunkPtr函数指针为空");
+                return;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<RegisterMouseWheelDelegate>(_ffi.ui_register_mouse_wheel_thunk_ptr);
+            func(callbackPtr);
+        }
+
+        public static void RegisterTreeNodeRightClickCallback(TreeNodeRightClickCallbackDelegate callback)
+        {
+            _savedTreeNodeRightClickCallback = callback;
+            IntPtr callbackPtr = Marshal.GetFunctionPointerForDelegate(callback);
+            
+            if (_ffi.ui_register_tree_node_right_click_thunk_ptr == IntPtr.Zero)
+            {
+                Log.Error("C#", "RegisterTreeNodeRightClickThunkPtr函数指针为空");
+                return;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<RegisterTreeNodeRightClickDelegate>(_ffi.ui_register_tree_node_right_click_thunk_ptr);
             func(callbackPtr);
         }
 

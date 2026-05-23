@@ -81,17 +81,17 @@ pub extern "C" fn ui_register_tab_close_callback(widget_id: u64, callback: TabCl
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn ui_register_tree_node_select_callback(widget_id: u64, callback: TreeNodeSelectCallback) {
+pub extern "C" fn ui_register_tree_node_select_callback(_widget_id: u64, callback: TreeNodeSelectCallback) {
     let mut callbacks = UI_CALLBACKS.lock();
-    callbacks.on_tree_node_select.insert(widget_id, callback);
-    dfx_info!("UI", "注册TreeNodeSelect回调: widget={} callback={:?}", widget_id, callback);
+    callbacks.on_tree_node_select = Some(callback);
+    dfx_debug!("UI", "注册TreeNodeSelect全局回调");
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn ui_register_tree_node_toggle_callback(widget_id: u64, callback: TreeNodeToggleCallback) {
+pub extern "C" fn ui_register_tree_node_toggle_callback(_widget_id: u64, callback: TreeNodeToggleCallback) {
     let mut callbacks = UI_CALLBACKS.lock();
-    callbacks.on_tree_node_toggle.insert(widget_id, callback);
-    dfx_info!("UI", "注册TreeNodeToggle回调: widget={} callback={:?}", widget_id, callback);
+    callbacks.on_tree_node_toggle = Some(callback);
+    dfx_debug!("UI", "注册TreeNodeToggle全局回调");
 }
 
 #[unsafe(no_mangle)]
@@ -176,4 +176,18 @@ pub extern "C" fn ui_register_split_view_ratio_change_callback(widget_id: u64, c
     let mut callbacks = UI_CALLBACKS.lock();
     callbacks.on_split_view_ratio_change.insert(widget_id, callback);
     dfx_debug!("UI", "注册SplitViewRatioChange回调: widget={}", widget_id);
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_register_mouse_wheel_callback(callback: MouseWheelCallback) {
+    let mut callbacks = UI_CALLBACKS.lock();
+    callbacks.on_mouse_wheel = Some(callback);
+    dfx_debug!("UI", "注册MouseWheel回调");
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_register_tree_node_right_click_callback(callback: TreeNodeRightClickCallback) {
+    let mut callbacks = UI_CALLBACKS.lock();
+    callbacks.on_tree_node_right_click = Some(callback);
+    dfx_debug!("UI", "注册TreeNodeRightClick全局回调");
 }

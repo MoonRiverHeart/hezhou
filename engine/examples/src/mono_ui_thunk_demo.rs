@@ -9,6 +9,8 @@ pub extern "C" fn set_game_preview_extent(_width: u32, _height: u32) {}
 pub extern "C" fn set_camera_params(_yaw: f32, _pitch: f32, _x: f32, _y: f32, _z: f32) {}
 pub extern "C" fn register_key_stub(_ptr: *const std::ffi::c_void) {}
 pub extern "C" fn register_mouse_move_stub(_ptr: *const std::ffi::c_void) {}
+pub extern "C" fn register_mouse_wheel_stub(_ptr: *const std::ffi::c_void) {}
+pub extern "C" fn register_tree_node_right_click_stub(_ptr: *const std::ffi::c_void) {}
 pub extern "C" fn set_preview_window_edit_mode_stub(_handle: WidgetTreeHandle, _id: u64, _mode: bool) {}
 pub extern "C" fn scene_create_stub() -> *mut std::ffi::c_void { std::ptr::null_mut() }
 pub extern "C" fn scene_destroy_stub(_scene: *mut std::ffi::c_void) {}
@@ -140,6 +142,8 @@ fn main() {
         ui_register_global_click_thunk_ptr: ui_ffi::ui_register_global_click_thunk_ptr,
         ui_register_key_thunk_ptr: register_key_stub,
         ui_register_mouse_move_thunk_ptr: register_mouse_move_stub,
+        ui_register_mouse_wheel_thunk_ptr: register_mouse_wheel_stub,
+        ui_register_tree_node_right_click_thunk_ptr: register_tree_node_right_click_stub,
         ui_trigger_resize: ui_ffi::ui_trigger_resize,
         ui_get_screen_size: ui_ffi::ui_get_screen_size,
         ui_set_content_scale: ui_ffi::ui_set_content_scale,

@@ -126,6 +126,21 @@ namespace Hezhou
             _mouseDragging = false;
         }
 
+        private static void OnMouseWheel(float deltaX, float deltaY)
+        {
+            if (_gameScene == null) return;
+            GameState state = _gameScene.GetGameState();
+            
+            // Editing mode: orbit camera zoom
+            if (state == GameState.Editing && _previewSelected)
+            {
+                float zoomSpeed = 0.5f;
+                _orbitDistance -= deltaY * zoomSpeed;
+                if (_orbitDistance < 0.5f) _orbitDistance = 0.5f;
+                if (_orbitDistance > 50f) _orbitDistance = 50f;
+            }
+        }
+
         private static void OnKey(uint keycode, bool pressed, uint modifiers)
         {
             const uint KEY_ESC = 39;
@@ -167,8 +182,8 @@ namespace Hezhou
                     UI.SetPreviewWindowEditMode(_previewWindowId, true);
                     UI.SetPreviewWindowSelected(_previewWindowId, false);
                     UI.SetText(_runButtonId, "运行");
-                    // Hide pause button
-                    UI.SetWidgetLayout(_pauseButtonId, 0f, 0f, 0f, 0f);
+                    // Hide pause button — move off-screen since it's a direct toolbar child
+                    UI.SetWidgetLayout(_pauseButtonId, -100f, -100f, 80f, 30f);
                     // Reset preview border
                     UI.SetWidgetBackgroundColor(_previewWindowId, 0.08f, 0.08f, 0.08f, 0.3f);
                     _cameraX = _savedCameraX;
@@ -654,6 +669,88 @@ namespace Hezhou
             }
         }
 
+        private static ulong _contextMenuId;
+        private static ulong _contextMenuTargetNodeId;
+        private static ulong _contextMenuTargetEntityId;
+        private static UI.PopupMenuClickCallbackDelegate _contextMenuClickCallback;
+
+        private static void OnTreeNodeRightClick(ulong widgetId, float x, float y)
+        {
+            // Only show context menu for project tree (not script editor tree)
+            // Check if the node corresponds to an entity in the project tree
+            ulong entityId = 0;
+            foreach (var entry in _entityNodeMap)
+            {
+                if (entry.Value == widgetId)
+                {
+                    entityId = entry.Key;
+                    break;
+                }
+            }
+
+            // Also check _fileItemPaths for script tree nodes
+            if (_fileItemPaths.ContainsKey(widgetId))
+            {
+                _contextMenuId = UI.CreatePopupMenu(_projectTreeViewId);
+                UI.PopupMenuAddItem(_contextMenuId, "Delete", "", 0);
+                _contextMenuTargetNodeId = widgetId;
+                _contextMenuTargetEntityId = 0;
+                
+                if (_contextMenuClickCallback == null)
+                {
+                    _contextMenuClickCallback = new UI.PopupMenuClickCallbackDelegate(OnContextMenuClick);
+                }
+                UI.PopupMenuSetOnClick(_contextMenuId, _contextMenuClickCallback);
+                UI.PopupMenuShow(_contextMenuId, x, y);
+                return;
+            }
+
+            // Show entity context menu if this is an entity node
+            if (entityId != 0)
+            {
+                _contextMenuId = UI.CreatePopupMenu(_projectTreeViewId);
+                UI.PopupMenuAddItem(_contextMenuId, "Delete Entity", "", 0);
+                _contextMenuTargetNodeId = widgetId;
+                _contextMenuTargetEntityId = entityId;
+                
+                if (_contextMenuClickCallback == null)
+                {
+                    _contextMenuClickCallback = new UI.PopupMenuClickCallbackDelegate(OnContextMenuClick);
+                }
+                UI.PopupMenuSetOnClick(_contextMenuId, _contextMenuClickCallback);
+                UI.PopupMenuShow(_contextMenuId, x, y);
+            }
+        }
+
+        private static void OnContextMenuClick(ulong popupMenuId, int actionId)
+        {
+            if (actionId == 0) // Delete
+            {
+                if (_contextMenuTargetEntityId != 0)
+                {
+                    // Delete entity from scene
+                    if (_gameScene != null)
+                    {
+                        _gameScene.RemoveEntity(_contextMenuTargetEntityId);
+                    }
+                    // Remove from project tree
+                    UI.TreeViewRemoveNode(_projectTreeViewId, _contextMenuTargetNodeId);
+                    _entityNodeMap.Remove(_contextMenuTargetEntityId);
+                }
+                else if (_fileItemPaths.ContainsKey(_contextMenuTargetNodeId))
+                {
+                    // Delete file node from tree
+                    string filePath;
+                    if (_fileItemPaths.TryGetValue(_contextMenuTargetNodeId, out filePath))
+                    {
+                        _fileItemPaths.Remove(_contextMenuTargetNodeId);
+                        UI.TreeViewRemoveNode(_projectTreeViewId, _contextMenuTargetNodeId);
+                    }
+                }
+            }
+            UI.PopupMenuHide(popupMenuId);
+        }
+
         private static void RefreshAssetGridView()
         {
             UI.GridViewClear(_assetGridViewId);
@@ -716,8 +813,8 @@ SelectEntity(entityId);
                 UI.SetRendererGameState(1);
                 UI.SetPreviewWindowEditMode(_previewWindowId, false);
                 UI.SetText(_runButtonId, "编辑");
-                // Show pause button
-                UI.SetWidgetLayout(_pauseButtonId, 0f, 0f, 80f, 30f);
+                // Show pause button — position right after run button in toolbar
+                UI.SetWidgetLayout(_pauseButtonId, 375f, 5f, 80f, 30f);
                 UI.SetText(_pauseButtonId, "暂停");
                 // Set preview border blue for Running
                 UI.SetWidgetBackgroundColor(_previewWindowId, 0.2f, 0.4f, 0.8f, 0.3f);
@@ -728,9 +825,9 @@ SelectEntity(entityId);
                 _gameScene.SetGameState(GameState.Editing);
                 UI.SetRendererGameState(0);
                 UI.SetPreviewWindowEditMode(_previewWindowId, true);
-                UI.SetText(_runButtonId, "运行");
-                // Hide pause button
-                UI.SetWidgetLayout(_pauseButtonId, 0f, 0f, 0f, 0f);
+UI.SetText(_runButtonId, "运行");
+                // Hide pause button — move off-screen
+                UI.SetWidgetLayout(_pauseButtonId, -100f, -100f, 80f, 30f);
                 // Reset preview border to default
                 UI.SetWidgetBackgroundColor(_previewWindowId, 0.08f, 0.08f, 0.08f, 0.3f);
                 _cameraX = _savedCameraX;

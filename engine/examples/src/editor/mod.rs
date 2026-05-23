@@ -89,6 +89,8 @@ pub fn run() {
         ui_register_global_click_thunk_ptr: ui_ffi::ui_register_global_click_thunk_ptr,
         ui_register_key_thunk_ptr: ui_ffi::ui_register_key_thunk_ptr,
         ui_register_mouse_move_thunk_ptr: ui_ffi::ui_register_mouse_move_thunk_ptr,
+        ui_register_mouse_wheel_thunk_ptr: ui_ffi::ui_register_mouse_wheel_thunk_ptr,
+        ui_register_tree_node_right_click_thunk_ptr: ui_ffi::ui_register_tree_node_right_click_thunk_ptr,
         ui_trigger_resize: ui_ffi::ui_trigger_resize,
         ui_get_screen_size: ui_ffi::ui_get_screen_size,
         ui_set_content_scale: ui_ffi::ui_set_content_scale,
@@ -446,8 +448,7 @@ ui_tree_view_set_on_select_thunk_ptr: unsafe { std::mem::transmute(ui_ffi::ui_tr
             dfx.lock().get_trace_analyzer().lock().clear();
         }
         
-        std::thread::sleep(Duration::from_millis(16));
-    }
+        }
 
     dfx_info!("Demo", "Shutting down...");
     

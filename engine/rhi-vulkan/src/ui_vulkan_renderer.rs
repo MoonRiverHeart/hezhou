@@ -2694,17 +2694,19 @@ let font_atlas_guard = ui.get_font_atlas().lock();
                 clip_y: f32,
                 clip_w: f32,
                 clip_h: f32,
+                layer: u32,
             }
             
             let mut batches: Vec<RenderBatch> = Vec::new();
             let mut current_vertices: Vec<f32> = Vec::new();
             let mut current_clip: Option<(f32, f32, f32, f32)> = None;
+            let mut current_layer: u32 = 0;
             
             let mut preview_vertices: Vec<f32> = Vec::new();
             let mut preview_border_vertices: Vec<f32> = Vec::new();
             let mut is_preview_window_context = false;
             
-            fn flush_batch(batches: &mut Vec<RenderBatch>, vertices: &mut Vec<f32>, clip: Option<(f32, f32, f32, f32)>) {
+            fn flush_batch(batches: &mut Vec<RenderBatch>, vertices: &mut Vec<f32>, clip: Option<(f32, f32, f32, f32)>, layer: u32) {
                 if !vertices.is_empty() {
                     batches.push(RenderBatch {
                         vertices: vertices.clone(),
@@ -2712,20 +2714,23 @@ let font_atlas_guard = ui.get_font_atlas().lock();
                         clip_y: clip.map(|c| c.1).unwrap_or(0.0),
                         clip_w: clip.map(|c| c.2).unwrap_or(1e6),
                         clip_h: clip.map(|c| c.3).unwrap_or(1e6),
+                        layer,
                     });
                     vertices.clear();
                 }
             }
             
-            // 渲染UI控件
-            for cmd in render_data.iter().flat_map(|data| &data.draw_commands) {
+            // 渲染UI控件 - iterate by render_data item to track layer
+            for data in render_data.iter() {
+                current_layer = data.layer as u32;
+                for cmd in &data.draw_commands {
                 match cmd {
                     DrawCommand::ClipRect { rect } => {
-                        flush_batch(&mut batches, &mut current_vertices, current_clip);
+                        flush_batch(&mut batches, &mut current_vertices, current_clip, current_layer);
                         current_clip = Some((rect.x, rect.y, rect.width, rect.height));
                     }
                     DrawCommand::ClearClip => {
-                        flush_batch(&mut batches, &mut current_vertices, current_clip);
+                        flush_batch(&mut batches, &mut current_vertices, current_clip, current_layer);
                         current_clip = None;
                     }
                     DrawCommand::Rect { bounds, width, height, fill_color, stroke_color, stroke_width, .. } => {
@@ -2818,7 +2823,7 @@ let font_atlas_guard = ui.get_font_atlas().lock();
                         }
                     }
                     DrawCommand::Text { bounds, width, height, font_color, text, font_size, alignment, .. } => {
-                        flush_batch(&mut batches, &mut current_vertices, current_clip);
+                        flush_batch(&mut batches, &mut current_vertices, current_clip, current_layer);
                         
                         let text_str = if text.is_empty() {
                             ""
@@ -2881,11 +2886,11 @@ let font_atlas_guard = ui.get_font_atlas().lock();
                             ]);
                         }
                         
-                        flush_batch(&mut batches, &mut current_vertices, current_clip);
+                        flush_batch(&mut batches, &mut current_vertices, current_clip, current_layer);
                     }
                     DrawCommand::Line { .. } => {}
                     DrawCommand::Image { bounds, width, height, texture_id, uv } => {
-                        flush_batch(&mut batches, &mut current_vertices, current_clip);
+                        flush_batch(&mut batches, &mut current_vertices, current_clip, current_layer);
                         
                         let x = bounds.x.round();
                         let y = bounds.y.round();
@@ -2917,7 +2922,7 @@ let font_atlas_guard = ui.get_font_atlas().lock();
                             current_vertices.extend_from_slice(&quad_vertices);
                         }
                         
-                        flush_batch(&mut batches, &mut current_vertices, current_clip);
+                        flush_batch(&mut batches, &mut current_vertices, current_clip, current_layer);
                     }
                     DrawCommand::Shadow { .. } => {}
                     DrawCommand::SetTransform { .. } => {}
@@ -2946,18 +2951,43 @@ let font_atlas_guard = ui.get_font_atlas().lock();
                         current_vertices.extend_from_slice(&line_vertices);
                     }
                 }
-            }
+                } // inner for cmd loop
+            } // outer for data loop
             
-            flush_batch(&mut batches, &mut current_vertices, current_clip);
+            flush_batch(&mut batches, &mut current_vertices, current_clip, current_layer);
+            
+            // Split batches into before_preview (layer 0-1) and after_preview (layer 2-3)
+            let before_preview_batches: Vec<&RenderBatch> = batches.iter().filter(|b| b.layer <= 1).collect();
+            let after_preview_batches: Vec<&RenderBatch> = batches.iter().filter(|b| b.layer >= 2).collect();
             
             let mut all_vertices: Vec<f32> = Vec::new();
-            let mut batch_ranges: Vec<(usize, usize, f32, f32, f32, f32)> = Vec::new();
+            let mut before_preview_ranges: Vec<(usize, usize, f32, f32, f32, f32)> = Vec::new();
             let mut current_offset = 0;
             
-            for batch in &batches {
+            for batch in &before_preview_batches {
                 let start = current_offset;
                 let end = current_offset + batch.vertices.len();
-                batch_ranges.push((start, end, batch.clip_x, batch.clip_y, batch.clip_w, batch.clip_h));
+                before_preview_ranges.push((start, end, batch.clip_x, batch.clip_y, batch.clip_w, batch.clip_h));
+                all_vertices.extend_from_slice(&batch.vertices);
+                current_offset = end;
+            }
+            
+            // Preview vertices go between before_preview and after_preview
+            let preview_vertex_offset = current_offset;
+            all_vertices.extend_from_slice(&preview_vertices);
+            current_offset += preview_vertices.len();
+            
+            // Preview border vertices go after preview
+            let preview_border_vertex_offset = current_offset;
+            all_vertices.extend_from_slice(&preview_border_vertices);
+            current_offset += preview_border_vertices.len();
+            
+            let mut after_preview_ranges: Vec<(usize, usize, f32, f32, f32, f32)> = Vec::new();
+            
+            for batch in &after_preview_batches {
+                let start = current_offset;
+                let end = current_offset + batch.vertices.len();
+                after_preview_ranges.push((start, end, batch.clip_x, batch.clip_y, batch.clip_w, batch.clip_h));
                 all_vertices.extend_from_slice(&batch.vertices);
                 current_offset = end;
             }
@@ -2981,7 +3011,8 @@ let font_atlas_guard = ui.get_font_atlas().lock();
                 &[0]
             );
             
-            for (start, end, clip_x, clip_y, clip_w, clip_h) in &batch_ranges {
+            // Phase 1: Draw before_preview batches (layer 0-1: Background + Content)
+            for (start, end, clip_x, clip_y, clip_w, clip_h) in &before_preview_ranges {
                 if *clip_w < 1e5 {
                     let scissor = vk::Rect2D {
                         offset: vk::Offset2D { 
@@ -3016,18 +3047,9 @@ let font_atlas_guard = ui.get_font_atlas().lock();
                 }
             }
             
-            // Render preview texture quads (if any)
+            // Phase 2: Render preview texture quads (between Content and Popup layers)
             if !preview_vertices.is_empty() {
-                let preview_offset = vertex_data.len() as u64;
-                let preview_data: &[u8] = bytemuck::cast_slice(&preview_vertices);
-                let preview_ptr = self.device.map_memory(
-                    self.vertex_buffer_memory,
-                    preview_offset,
-                    preview_data.len() as vk::DeviceSize,
-                    vk::MemoryMapFlags::empty()
-                ).map_err(|e| format!("Failed to map preview memory: {}", e))?;
-                std::ptr::copy_nonoverlapping(preview_data.as_ptr(), preview_ptr as *mut u8, preview_data.len());
-                self.device.unmap_memory(self.vertex_buffer_memory);
+                let preview_offset = (preview_vertex_offset * 4) as u64;
                 
                 // Bind preview descriptor set
                 self.device.cmd_bind_descriptor_sets(
@@ -3082,18 +3104,9 @@ let font_atlas_guard = ui.get_font_atlas().lock();
                 );
             }
             
-            // Draw preview border vertices (after preview texture, before end)
+            // Phase 2b: Draw preview border vertices (after preview texture)
             if !preview_border_vertices.is_empty() {
-                let border_offset = vertex_data.len() as u64 + preview_vertices.len() as u64 * 4;
-                let border_data: &[u8] = bytemuck::cast_slice(&preview_border_vertices);
-                let border_ptr = self.device.map_memory(
-                    self.vertex_buffer_memory,
-                    border_offset,
-                    border_data.len() as vk::DeviceSize,
-                    vk::MemoryMapFlags::empty()
-                ).map_err(|e| format!("Failed to map border memory: {}", e))?;
-                std::ptr::copy_nonoverlapping(border_data.as_ptr(), border_ptr as *mut u8, border_data.len());
-                self.device.unmap_memory(self.vertex_buffer_memory);
+                let border_offset = (preview_border_vertex_offset * 4) as u64;
                 
                 self.device.cmd_bind_vertex_buffers(
                     self.command_buffers[image_index_usize],
@@ -3109,6 +3122,49 @@ let font_atlas_guard = ui.get_font_atlas().lock();
                     0,
                     0
                 );
+            }
+            
+            // Phase 3: Draw after_preview batches (layer 2-3: Popup + Overlay)
+            self.device.cmd_bind_vertex_buffers(
+                self.command_buffers[image_index_usize],
+                0,
+                &[self.vertex_buffer],
+                &[0]
+            );
+            
+            for (start, end, clip_x, clip_y, clip_w, clip_h) in &after_preview_ranges {
+                if *clip_w < 1e5 {
+                    let scissor = vk::Rect2D {
+                        offset: vk::Offset2D { 
+                            x: clip_x.round() as i32, 
+                            y: clip_y.round() as i32 
+                        },
+                        extent: vk::Extent2D { 
+                            width: clip_w.round() as u32, 
+                            height: clip_h.round() as u32 
+                        },
+                    };
+                    self.device.cmd_set_scissor(self.command_buffers[image_index_usize], 0, &[scissor]);
+                } else {
+                    let scissor = vk::Rect2D {
+                        offset: vk::Offset2D { x: 0, y: 0 },
+                        extent: self.extent,
+                    };
+                    self.device.cmd_set_scissor(self.command_buffers[image_index_usize], 0, &[scissor]);
+                }
+                
+                let vertex_count = ((end - start) / 8) as u32;
+                let first_vertex = (start / 8) as u32;
+                
+                if vertex_count > 0 {
+                    self.device.cmd_draw(
+                        self.command_buffers[image_index_usize],
+                        vertex_count,
+                        1,
+                        first_vertex,
+                        0
+                    );
+                }
             }
             
             if self.frame_count == 0 {

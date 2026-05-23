@@ -23,6 +23,7 @@ pub enum PendingCallback {
     SliderChange { widget_id: u64, value: f32 },
     ScrollViewScroll { widget_id: u64, offset_y: f32 },
     SplitViewRatioChange { widget_id: u64, ratio: f32 },
+    TreeNodeRightClick { widget_id: u64, x: f32, y: f32 },
 }
 
 static PENDING_CALLBACKS: LazyLock<Mutex<Vec<PendingCallback>>> =
@@ -92,6 +93,9 @@ pub fn flush_pending_callbacks() {
             }
             PendingCallback::SplitViewRatioChange { widget_id, ratio } => {
                 trigger_split_view_ratio_change_callback(widget_id, ratio);
+            }
+            PendingCallback::TreeNodeRightClick { widget_id, x, y } => {
+                trigger_tree_node_right_click_callback(widget_id, x, y);
             }
         }
     }

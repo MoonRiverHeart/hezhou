@@ -25,14 +25,14 @@ pub fn has_tab_close_callback(widget_id: u64) -> bool {
     callbacks.on_tab_close.contains_key(&widget_id)
 }
 
-pub fn has_tree_node_select_callback(widget_id: u64) -> bool {
+pub fn has_tree_node_select_callback(_widget_id: u64) -> bool {
     let callbacks = UI_CALLBACKS.lock();
-    callbacks.on_tree_node_select.contains_key(&widget_id)
+    callbacks.on_tree_node_select.is_some()
 }
 
-pub fn has_tree_node_toggle_callback(widget_id: u64) -> bool {
+pub fn has_tree_node_toggle_callback(_widget_id: u64) -> bool {
     let callbacks = UI_CALLBACKS.lock();
-    callbacks.on_tree_node_toggle.contains_key(&widget_id)
+    callbacks.on_tree_node_toggle.is_some()
 }
 
 pub fn has_popup_menu_click_callback(widget_id: u64) -> bool {
@@ -78,4 +78,9 @@ pub fn has_scroll_view_scroll_callback(widget_id: u64) -> bool {
 pub fn has_split_view_ratio_change_callback(widget_id: u64) -> bool {
     let callbacks = UI_CALLBACKS.lock();
     callbacks.on_split_view_ratio_change.contains_key(&widget_id)
+}
+
+pub fn has_tree_node_right_click_callback() -> bool {
+    let callbacks = UI_CALLBACKS.lock();
+    callbacks.on_tree_node_right_click.is_some()
 }

@@ -33,8 +33,8 @@ pub struct UICallbacks {
     pub on_input_field_change: HashMap<u64, InputFieldChangeCallback>,
     pub on_tab_select: HashMap<u64, TabSelectCallback>,
     pub on_tab_close: HashMap<u64, TabCloseCallback>,
-    pub on_tree_node_select: HashMap<u64, TreeNodeSelectCallback>,
-    pub on_tree_node_toggle: HashMap<u64, TreeNodeToggleCallback>,
+    pub on_tree_node_select: Option<TreeNodeSelectCallback>,
+    pub on_tree_node_toggle: Option<TreeNodeToggleCallback>,
     pub on_popup_menu_click: HashMap<u64, PopupMenuClickCallback>,
     pub on_popup_menu_close: HashMap<u64, PopupMenuCloseCallback>,
     pub on_grid_view_click: HashMap<u64, GridViewClickCallback>,
@@ -47,6 +47,8 @@ pub struct UICallbacks {
     pub on_slider_change: HashMap<u64, SliderChangeCallback>,
     pub on_scroll_view_scroll: HashMap<u64, ScrollViewScrollCallback>,
     pub on_split_view_ratio_change: HashMap<u64, SplitViewRatioChangeCallback>,
+    pub on_mouse_wheel: Option<MouseWheelCallback>,
+    pub on_tree_node_right_click: Option<TreeNodeRightClickCallback>,
 }
 
 impl UICallbacks {
@@ -63,8 +65,8 @@ pub fn new() -> Self {
                 on_input_field_change: HashMap::new(),
                 on_tab_select: HashMap::new(),
                 on_tab_close: HashMap::new(),
-                on_tree_node_select: HashMap::new(),
-                on_tree_node_toggle: HashMap::new(),
+                on_tree_node_select: None,
+                on_tree_node_toggle: None,
                 on_popup_menu_click: HashMap::new(),
                 on_popup_menu_close: HashMap::new(),
                 on_grid_view_click: HashMap::new(),
@@ -77,6 +79,8 @@ pub fn new() -> Self {
                 on_slider_change: HashMap::new(),
                 on_scroll_view_scroll: HashMap::new(),
                 on_split_view_ratio_change: HashMap::new(),
+                on_mouse_wheel: None,
+                on_tree_node_right_click: None,
             }
         }
 
@@ -92,8 +96,8 @@ pub fn new() -> Self {
         self.on_input_field_change.clear();
         self.on_tab_select.clear();
         self.on_tab_close.clear();
-        self.on_tree_node_select.clear();
-        self.on_tree_node_toggle.clear();
+        self.on_tree_node_select = None;
+        self.on_tree_node_toggle = None;
         self.on_popup_menu_click.clear();
         self.on_popup_menu_close.clear();
         self.on_grid_view_click.clear();
@@ -106,6 +110,8 @@ pub fn new() -> Self {
         self.on_slider_change.clear();
         self.on_scroll_view_scroll.clear();
         self.on_split_view_ratio_change.clear();
+        self.on_mouse_wheel = None;
+        self.on_tree_node_right_click = None;
     }
 }
 

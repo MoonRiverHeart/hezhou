@@ -120,7 +120,7 @@ pub fn trigger_tab_close_callback(widget_id: u64, index: usize) {
 pub fn trigger_tree_node_select_callback(widget_id: u64, user_data: u64) {
     let callback = {
         let callbacks = UI_CALLBACKS.lock();
-        callbacks.on_tree_node_select.get(&widget_id).copied()
+        callbacks.on_tree_node_select
     };
     if let Some(cb) = callback {
         cb(widget_id, user_data);
@@ -130,7 +130,7 @@ pub fn trigger_tree_node_select_callback(widget_id: u64, user_data: u64) {
 pub fn trigger_tree_node_toggle_callback(widget_id: u64) {
     let callback = {
         let callbacks = UI_CALLBACKS.lock();
-        callbacks.on_tree_node_toggle.get(&widget_id).copied()
+        callbacks.on_tree_node_toggle
     };
     if let Some(cb) = callback {
         cb(widget_id);
@@ -263,5 +263,25 @@ pub fn trigger_split_view_ratio_change_callback(widget_id: u64, ratio: f32) {
     };
     if let Some(cb) = callback {
         cb(widget_id, ratio);
+    }
+}
+
+pub fn trigger_mouse_wheel_callback(delta_x: f32, delta_y: f32) {
+    let callback = {
+        let callbacks = UI_CALLBACKS.lock();
+        callbacks.on_mouse_wheel
+    };
+    if let Some(cb) = callback {
+        cb(delta_x, delta_y);
+    }
+}
+
+pub fn trigger_tree_node_right_click_callback(widget_id: u64, x: f32, y: f32) {
+    let callback = {
+        let callbacks = UI_CALLBACKS.lock();
+        callbacks.on_tree_node_right_click
+    };
+    if let Some(cb) = callback {
+        cb(widget_id, x, y);
     }
 }

@@ -12,6 +12,7 @@ pub enum EventType {
     Click,
     LongPress,
     DoubleClick,
+    RightClick,
 
     KeyDown,
     KeyUp,
@@ -38,6 +39,7 @@ impl fmt::Display for EventType {
             EventType::Click => write!(f, "Click"),
             EventType::LongPress => write!(f, "LongPress"),
             EventType::DoubleClick => write!(f, "DoubleClick"),
+            EventType::RightClick => write!(f, "RightClick"),
             EventType::KeyDown => write!(f, "KeyDown"),
             EventType::KeyUp => write!(f, "KeyUp"),
             EventType::MouseEnter => write!(f, "MouseEnter"),
@@ -183,7 +185,7 @@ impl MouseData {
 }
 
 #[repr(C)]
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MouseButton {
     None,
     Left,

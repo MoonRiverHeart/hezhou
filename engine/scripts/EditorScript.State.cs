@@ -80,6 +80,7 @@ namespace Hezhou
         private static UI.PopupMenuClickCallbackDelegate _openMenuClickCallback;
         private static UI.PopupMenuClickCallbackDelegate _saveMenuClickCallback;
         private static UI.TreeNodeSelectCallbackDelegate _treeNodeSelectCallback;
+        private static UI.TreeNodeRightClickCallbackDelegate _treeNodeRightClickCallback;
         private static UI.GridViewClickCallbackDelegate _gridViewClickCallback;
         private static UI.FileBrowserSelectCallbackDelegate _fileBrowserSelectCallback;
         private static UI.DialogResultCallbackDelegate _workingDirectoryDialogResultCallback;
@@ -164,6 +165,7 @@ private static float _cameraYaw = 0f;
         private static UI.GlobalClickCallbackDelegate _globalClickCallback;
         private static UI.KeyCallbackDelegate _keyCallback;
         private static UI.MouseMoveCallbackDelegate _mouseMoveCallback;
+        private static UI.MouseWheelCallbackDelegate _mouseWheelCallback;
         private static UI.WidgetCallbackDelegate _newClickCallback;
         private static UI.WidgetCallbackDelegate _openClickCallback;
         private static UI.WidgetCallbackDelegate _saveClickCallback;

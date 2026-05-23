@@ -276,6 +276,24 @@ pub extern "C" fn ui_register_mouse_move_thunk_ptr(callback_ptr: *const std::ffi
 }
 
 #[unsafe(no_mangle)]
+pub extern "C" fn ui_register_mouse_wheel_thunk_ptr(callback_ptr: *const std::ffi::c_void) {
+    if callback_ptr.is_null() {
+        return;
+    }
+    let callback: crate::thunk::MouseWheelCallback = unsafe { std::mem::transmute(callback_ptr) };
+    crate::thunk::ui_register_mouse_wheel_callback(callback);
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_register_tree_node_right_click_thunk_ptr(callback_ptr: *const std::ffi::c_void) {
+    if callback_ptr.is_null() {
+        return;
+    }
+    let callback: crate::thunk::TreeNodeRightClickCallback = unsafe { std::mem::transmute(callback_ptr) };
+    crate::thunk::ui_register_tree_node_right_click_callback(callback);
+}
+
+#[unsafe(no_mangle)]
 pub extern "C" fn ui_trigger_resize(width: f32, height: f32) {
     crate::thunk::trigger_resize_callback(width, height);
 }

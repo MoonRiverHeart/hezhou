@@ -33,6 +33,8 @@ pub struct FfiContext {
     pub ui_register_global_click_thunk_ptr: RegisterGlobalClickThunkPtrFn,
     pub ui_register_key_thunk_ptr: RegisterKeyThunkPtrFn,
     pub ui_register_mouse_move_thunk_ptr: RegisterMouseMoveThunkPtrFn,
+    pub ui_register_mouse_wheel_thunk_ptr: RegisterMouseWheelThunkPtrFn,
+    pub ui_register_tree_node_right_click_thunk_ptr: RegisterTreeNodeRightClickThunkPtrFn,
     pub ui_trigger_resize: TriggerResizeFn,
     pub ui_get_screen_size: GetScreenSizeFn,
     pub ui_set_content_scale: SetContentScaleFn,

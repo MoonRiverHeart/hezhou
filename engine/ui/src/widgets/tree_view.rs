@@ -21,6 +21,7 @@ pub struct TreeView {
     indent_width: f32,
     content_scale: f32,
     scroll_offset: f32,
+    max_scroll_offset: f32,
     node_parent_map: std::collections::HashMap<WidgetId, WidgetId>,
     node_children: std::collections::HashMap<WidgetId, Vec<WidgetId>>,
 }
@@ -41,6 +42,7 @@ impl TreeView {
             indent_width: 20.0,
             content_scale: 1.0,
             scroll_offset: 0.0,
+            max_scroll_offset: 0.0,
             node_parent_map: std::collections::HashMap::new(),
             node_children: std::collections::HashMap::new(),
         }
@@ -213,6 +215,17 @@ fn update_node_positions(&mut self, tree: &mut crate::WidgetTree) {
             }
         }
 
+        // Calculate max scroll offset based on total content height vs viewport height
+        let total_content_height = visible_nodes.len() as f32 * self.node_height;
+        self.max_scroll_offset = if total_content_height > self.layout.height {
+            total_content_height - self.layout.height
+        } else {
+            0.0
+        };
+        
+        // Clamp scroll_offset to valid range
+        self.scroll_offset = self.scroll_offset.clamp(0.0, self.max_scroll_offset);
+
         for (node_id, y) in visible_nodes {
             if let Some(widget) = tree.get_widget_mut(node_id) {
                 if let Some(node) = widget.as_any_mut().downcast_mut::<TreeNode>() {
@@ -325,7 +338,25 @@ impl Widget for TreeView {
         let width = self.layout.width;
         let height = self.layout.height;
 
+        // Clip content to viewport bounds
+        canvas.set_clip_rect(Rect::new(0.0, 0.0, width, height));
         canvas.draw_rect(Rect::new(0.0, 0.0, width, height), &self.style);
+        
+        // Draw scrollbar indicator when scrollable
+        if self.max_scroll_offset > 0.0 {
+            let scrollbar_width = 6.0 * self.content_scale;
+            let scrollbar_x = width - scrollbar_width - 2.0;
+            let viewport_ratio = height / (height + self.max_scroll_offset);
+            let scrollbar_height = height * viewport_ratio;
+            let scrollbar_y = (self.scroll_offset / self.max_scroll_offset) * (height - scrollbar_height);
+            
+            canvas.draw_rect(
+                Rect::new(scrollbar_x, scrollbar_y, scrollbar_width, scrollbar_height),
+                &Style::new().with_background(Color::new(0.4, 0.4, 0.4, 0.6))
+            );
+        }
+        
+        canvas.clear_clip();
     }
 
     fn on_event(&mut self, event: &Event) -> EventResult {
@@ -342,6 +373,16 @@ impl Widget for TreeView {
                         }
                     }
                     _ => {}
+                }
+            }
+            
+            EventType::MouseWheel => {
+                if let EventData::Wheel(wheel) = &event.data {
+                    let delta = wheel.delta_y * 20.0 * self.content_scale;
+                    self.scroll_offset = (self.scroll_offset + delta).clamp(0.0, self.max_scroll_offset);
+                    self.flags.dirty_layout = true;
+                    self.flags.dirty_render = true;
+                    return EventResult::Handled;
                 }
             }
 

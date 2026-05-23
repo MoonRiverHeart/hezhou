@@ -305,6 +305,8 @@ impl Widget for GridView {
         let width = self.layout.width;
         let height = self.layout.height;
         
+        // Clip content to viewport bounds
+        canvas.set_clip_rect(Rect::new(0.0, 0.0, width, height));
         canvas.draw_rect(Rect::new(0.0, 0.0, width, height), &self.style);
         
         let font_size = 12.0 * self.content_scale;
@@ -368,6 +370,8 @@ impl Widget for GridView {
             let scrollbar_style = Style::new().with_background(Color::new(0.5, 0.5, 0.5, 0.5));
             canvas.draw_rect(Rect::new(width - scrollbar_width, scrollbar_y, scrollbar_width, scrollbar_height), &scrollbar_style);
         }
+        
+        canvas.clear_clip();
     }
     
     fn on_event(&mut self, event: &Event) -> EventResult {

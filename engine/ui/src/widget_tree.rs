@@ -440,7 +440,10 @@ pub fn perform_layout(&mut self, font_atlas: &FontAtlas) {
 
         if let Some(node) = self.nodes.get_mut(&id) {
             let current_layout = *node.widget.layout();
-            if current_layout.width == 0.0 || current_layout.height == 0.0 {
+            // HStack and VStack auto-size from children every frame (children sizes can change)
+            // Other widgets auto-size only on first frame (when width/height == 0)
+            let auto_size_from_children = widget_type == "HStack" || widget_type == "VStack";
+            if auto_size_from_children || current_layout.width == 0.0 || current_layout.height == 0.0 {
                 node.widget.set_layout(crate::layout::Layout::new(
                     current_layout.x,
                     current_layout.y,
@@ -561,6 +564,19 @@ pub fn perform_layout(&mut self, font_atlas: &FontAtlas) {
             for (i, &child_id) in children.iter().enumerate() {
                 let (w, h) = child_sizes[i];
                 let child_height = if cross_flags[i] { content_height } else { h };
+                
+                // Skip effectively hidden children (zero-size) — they don't occupy layout space
+                if w == 0.0 && h == 0.0 {
+                    if let Some(node) = self.nodes.get_mut(&child_id) {
+                        node.widget.set_layout(crate::layout::Layout::new(
+                            current_x,
+                            padding.top,
+                            0.0,
+                            0.0,
+                        ));
+                    }
+                    continue;
+                }
                 
                 if let Some(node) = self.nodes.get_mut(&child_id) {
                     let child_layout = *node.widget.layout();

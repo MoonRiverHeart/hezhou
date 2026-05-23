@@ -137,33 +137,37 @@ impl EventDispatcher {
 
         let gesture = self.gesture_recognizer.lock().process_event(event);
         
-        if let Some(g) = gesture {
-            if g.gesture_type == GestureType::Tap {
-                let mut tree = self.widget_tree.lock();
-                let widget_type = tree.get_widget(g.target)
-                    .map(|w| w.widget_type())
-                    .unwrap_or("");
-                drop(tree);
-                
-                if widget_type == "Button" {
+        // Only process gesture if the event was NOT stopped by a widget handler
+        // (e.g., PopupMenu stops event propagation on item click)
+        if !event.stopped {
+            if let Some(g) = gesture {
+                if g.gesture_type == GestureType::Tap {
                     let mut tree = self.widget_tree.lock();
-                    if let Some(widget) = tree.get_widget_mut(g.target) {
-                        use crate::widgets::Button;
-                        if let Some(button) = widget.as_any_mut().downcast_mut::<Button>() {
-                            button.trigger_click();
-                        }
-                    }
+                    let widget_type = tree.get_widget(g.target)
+                        .map(|w| w.widget_type())
+                        .unwrap_or("");
                     drop(tree);
-                    crate::thunk::queue_callback(crate::thunk::PendingCallback::ButtonClick { widget_id: g.target.id });
-                } else if widget_type == "Label" {
-                    // Labels with SetOnClick should trigger click callbacks
-                    crate::thunk::queue_callback(crate::thunk::PendingCallback::ButtonClick { widget_id: g.target.id });
-                } else {
-                    crate::thunk::ui_trigger_global_click(click_point.x, click_point.y);
+                    
+                    // PopupMenu and PreviewWindow handle their own click callbacks
+                    // Don't trigger global_click for these widget types
+                    if widget_type == "Button" {
+                        let mut tree = self.widget_tree.lock();
+                        if let Some(widget) = tree.get_widget_mut(g.target) {
+                            use crate::widgets::Button;
+                            if let Some(button) = widget.as_any_mut().downcast_mut::<Button>() {
+                                button.trigger_click();
+                            }
+                        }
+                        drop(tree);
+                        crate::thunk::queue_callback(crate::thunk::PendingCallback::ButtonClick { widget_id: g.target.id });
+                    } else if widget_type == "Label" {
+                        // Labels with SetOnClick should trigger click callbacks
+                        crate::thunk::queue_callback(crate::thunk::PendingCallback::ButtonClick { widget_id: g.target.id });
+                    } else if widget_type != "PopupMenu" && widget_type != "PreviewWindow" && widget_type != "Dialog" && widget_type != "TreeView" && widget_type != "GridView" && widget_type != "Dropdown" && widget_type != "ScrollView" {
+                        crate::thunk::ui_trigger_global_click(click_point.x, click_point.y);
+                    }
                 }
             }
-        } else if event.event_type == EventType::TouchEnd {
-            crate::thunk::ui_trigger_global_click(click_point.x, click_point.y);
         }
     }
     

@@ -85,11 +85,11 @@ namespace Hezhou
             _runButtonId = runBtn.Id;
             runBtn.SetOnClick(_runClickCallback);
             
-            var pauseBtn = _toolbarButtons.AddButton(80f, 30f, "暂停");
-            _pauseButtonId = pauseBtn.Id;
-            pauseBtn.SetOnClick(_pauseClickCallback);
-            // Initially hidden (Editing state) — set width to 0
-            UI.SetWidgetLayout(_pauseButtonId, 0f, 0f, 0f, 0f);
+            // Pause button is a direct child of toolbar (not in HStack) to avoid HStack overriding its layout
+            _pauseButtonId = UI.CreateButton(_toolbar.Id, 80f, 30f, "暂停");
+            UI.SetOnClick(_pauseButtonId, _pauseClickCallback);
+            // Initially hidden (Editing state) — position outside visible area
+            UI.SetWidgetLayout(_pauseButtonId, -100f, -100f, 80f, 30f);
             
             _toggleEditorBtn = new Button(_toolbar.Id, 100f, 30f, "编辑器");
             UI.SetWidgetLayout(_toggleEditorBtn.Id, _screenWidth - 120f, 5f, 100f, 30f);
