@@ -64,3 +64,18 @@ pub fn has_checkbox_change_callback(widget_id: u64) -> bool {
     let callbacks = UI_CALLBACKS.lock();
     callbacks.on_checkbox_change.contains_key(&widget_id)
 }
+
+pub fn has_slider_change_callback(widget_id: u64) -> bool {
+    let callbacks = UI_CALLBACKS.lock();
+    callbacks.on_slider_change.contains_key(&widget_id)
+}
+
+pub fn has_scroll_view_scroll_callback(widget_id: u64) -> bool {
+    let callbacks = UI_CALLBACKS.lock();
+    callbacks.on_scroll_view_scroll.contains_key(&widget_id)
+}
+
+pub fn has_split_view_ratio_change_callback(widget_id: u64) -> bool {
+    let callbacks = UI_CALLBACKS.lock();
+    callbacks.on_split_view_ratio_change.contains_key(&widget_id)
+}

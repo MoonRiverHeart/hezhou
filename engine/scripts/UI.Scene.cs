@@ -233,6 +233,26 @@ UI.SceneSelectEntity(_scenePtr, entityId);
             UI.SetSelectedEntity(0, false);
         }
 
+        public void SetParent(ulong entityId, ulong parentId)
+        {
+            UI.SceneSetParent(_scenePtr, entityId, parentId);
+        }
+
+        public ulong GetParent(ulong entityId)
+        {
+            return UI.SceneGetParent(_scenePtr, entityId);
+        }
+
+        public ulong GetChildCount(ulong parentId)
+        {
+            return UI.SceneGetChildCount(_scenePtr, parentId);
+        }
+
+        public ulong GetChildId(ulong parentId, ulong index)
+        {
+            return UI.SceneGetChildId(_scenePtr, parentId, index);
+        }
+
         public void Update(float deltaTime)
         {
             UI.SceneUpdate(_scenePtr, deltaTime);
@@ -641,6 +661,47 @@ UI.SceneSelectEntity(_scenePtr, entityId);
             }
             var func = Marshal.GetDelegateForFunctionPointer<SceneRemoveEntityDelegate>(_ffi.scene_remove_entity);
             func(scene, entityId);
+        }
+        
+        public static void SceneSetParent(IntPtr scene, ulong entityId, ulong parentId)
+        {
+            if (_ffi.scene_set_parent == IntPtr.Zero)
+            {
+                Log.Error("C#", "SceneSetParent函数指针为空");
+                return;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<SceneSetParentDelegate>(_ffi.scene_set_parent);
+            func(scene, entityId, parentId);
+        }
+        
+        public static ulong SceneGetParent(IntPtr scene, ulong entityId)
+        {
+            if (_ffi.scene_get_parent == IntPtr.Zero)
+            {
+                return 0;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<SceneGetParentDelegate>(_ffi.scene_get_parent);
+            return func(scene, entityId);
+        }
+        
+        public static ulong SceneGetChildCount(IntPtr scene, ulong parentId)
+        {
+            if (_ffi.scene_get_child_count == IntPtr.Zero)
+            {
+                return 0;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<SceneGetChildCountDelegate>(_ffi.scene_get_child_count);
+            return func(scene, parentId);
+        }
+        
+        public static ulong SceneGetChildId(IntPtr scene, ulong parentId, ulong index)
+        {
+            if (_ffi.scene_get_child_id == IntPtr.Zero)
+            {
+                return 0;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<SceneGetChildIdDelegate>(_ffi.scene_get_child_id);
+            return func(scene, parentId, index);
         }
     }
 }

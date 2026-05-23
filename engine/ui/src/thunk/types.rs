@@ -20,3 +20,6 @@ pub type FileBrowserDoubleClickCallback = extern "C" fn(u64, *const std::ffi::c_
 pub type FocusChangeCallback = extern "C" fn(u64, bool);
 pub type EntitySelectedCallback = extern "C" fn(u64, bool);
 pub type CheckboxChangeCallback = extern "C" fn(u64, bool);
+pub type SliderChangeCallback = extern "C" fn(u64, f32);
+pub type ScrollViewScrollCallback = extern "C" fn(u64, f32);
+pub type SplitViewRatioChangeCallback = extern "C" fn(u64, f32);

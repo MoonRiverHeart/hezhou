@@ -27,6 +27,9 @@ namespace Hezhou
         private static Dictionary<ulong, FileBrowserSelectCallbackDelegate> _fileBrowserSelectCallbacks = new Dictionary<ulong, FileBrowserSelectCallbackDelegate>();
         private static Dictionary<ulong, FileBrowserDoubleClickCallbackDelegate> _fileBrowserDoubleClickCallbacks = new Dictionary<ulong, FileBrowserDoubleClickCallbackDelegate>();
         private static Dictionary<ulong, CheckboxChangeCallbackDelegate> _checkboxCallbacks = new Dictionary<ulong, CheckboxChangeCallbackDelegate>();
+        private static Dictionary<ulong, SliderChangeCallbackDelegate> _sliderCallbacks = new Dictionary<ulong, SliderChangeCallbackDelegate>();
+        private static Dictionary<ulong, ScrollViewScrollCallbackDelegate> _scrollViewCallbacks = new Dictionary<ulong, ScrollViewScrollCallbackDelegate>();
+        private static Dictionary<ulong, SplitViewRatioChangeCallbackDelegate> _splitViewCallbacks = new Dictionary<ulong, SplitViewRatioChangeCallbackDelegate>();
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public delegate ulong GetButtonIdDelegate();
@@ -424,6 +427,72 @@ namespace Hezhou
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public delegate void CheckboxSetTextDelegate(IntPtr handle, ulong widgetId, [MarshalAs(UnmanagedType.LPStr)] string text);
 
+        // Slider delegates
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate ulong CreateSliderDelegate(IntPtr handle, ulong parentId, float width, float height);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate ulong CreateSliderInParentDelegate(IntPtr handle, ulong parentId, float x, float y, float width, float height, float min, float max, float value);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void SliderSetValueDelegate(IntPtr handle, ulong widgetId, float value);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate float SliderGetValueDelegate(IntPtr handle, ulong widgetId);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void SliderSetRangeDelegate(IntPtr handle, ulong widgetId, float min, float max);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void SliderSetOnChangeThunkPtrDelegate(IntPtr handle, ulong widgetId, IntPtr callbackPtr);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void SliderChangeCallbackDelegate(ulong widgetId, float value);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void SliderSetStepDelegate(IntPtr handle, ulong widgetId, float step);
+
+        // ScrollView delegates
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate ulong CreateScrollViewDelegate(IntPtr handle, ulong parentId, float x, float y, float width, float height);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void ScrollViewSetScrollOffsetDelegate(IntPtr handle, ulong widgetId, float offsetY);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate float ScrollViewGetScrollOffsetDelegate(IntPtr handle, ulong widgetId);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void ScrollViewSetShowScrollbarsDelegate(IntPtr handle, ulong widgetId, uint showV, uint showH);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void ScrollViewSetOnScrollThunkPtrDelegate(IntPtr handle, ulong widgetId, IntPtr callbackPtr);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void ScrollViewScrollCallbackDelegate(ulong widgetId, float offsetY);
+
+        // SplitView delegates
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate ulong CreateSplitViewDelegate(IntPtr handle, ulong parentId, float x, float y, float width, float height, uint orientation);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void SplitViewSetSplitRatioDelegate(IntPtr handle, ulong widgetId, float ratio);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate float SplitViewGetSplitRatioDelegate(IntPtr handle, ulong widgetId);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void SplitViewSetMinRatioDelegate(IntPtr handle, ulong widgetId, float min);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void SplitViewSetMaxRatioDelegate(IntPtr handle, ulong widgetId, float max);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void SplitViewSetOnRatioChangeThunkPtrDelegate(IntPtr handle, ulong widgetId, IntPtr callbackPtr);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void SplitViewRatioChangeCallbackDelegate(ulong widgetId, float ratio);
+
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public delegate void SetWidgetLayerDelegate(IntPtr handle, ulong widgetId, uint layer);
         
@@ -533,6 +602,18 @@ namespace Hezhou
         
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public delegate void SceneRemoveEntityDelegate(IntPtr scene, ulong entityId);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void SceneSetParentDelegate(IntPtr scene, ulong entityId, ulong parentId);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate ulong SceneGetParentDelegate(IntPtr scene, ulong entityId);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate ulong SceneGetChildCountDelegate(IntPtr scene, ulong parentId);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate ulong SceneGetChildIdDelegate(IntPtr scene, ulong parentId, ulong index);
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public delegate uint EntityGetPropertyCountDelegate();
@@ -722,6 +803,27 @@ namespace Hezhou
             public IntPtr ui_checkbox_get_checked;
             public IntPtr ui_checkbox_set_on_change_thunk_ptr;
             public IntPtr ui_checkbox_set_text;
+            // Slider
+            public IntPtr ui_create_slider;
+            public IntPtr ui_create_slider_in_parent;
+            public IntPtr ui_slider_set_value;
+            public IntPtr ui_slider_get_value;
+            public IntPtr ui_slider_set_range;
+            public IntPtr ui_slider_set_on_change_thunk_ptr;
+            public IntPtr ui_slider_set_step;
+            // ScrollView
+            public IntPtr ui_create_scroll_view;
+            public IntPtr ui_scroll_view_set_scroll_offset;
+            public IntPtr ui_scroll_view_get_scroll_offset;
+            public IntPtr ui_scroll_view_set_show_scrollbars;
+            public IntPtr ui_scroll_view_set_on_scroll_thunk_ptr;
+            // SplitView
+            public IntPtr ui_create_split_view;
+            public IntPtr ui_split_view_set_split_ratio;
+            public IntPtr ui_split_view_get_split_ratio;
+            public IntPtr ui_split_view_set_min_ratio;
+            public IntPtr ui_split_view_set_max_ratio;
+            public IntPtr ui_split_view_set_on_ratio_change_thunk_ptr;
             public IntPtr ui_create_tab_widget;
             public IntPtr ui_tab_widget_add_tab;
             public IntPtr ui_tab_widget_set_active;
@@ -810,6 +912,10 @@ namespace Hezhou
             public IntPtr scene_get_entity_count;
             public IntPtr scene_get_entity_id;
             public IntPtr scene_remove_entity;
+            public IntPtr scene_set_parent;
+            public IntPtr scene_get_parent;
+            public IntPtr scene_get_child_count;
+            public IntPtr scene_get_child_id;
             public IntPtr ui_entity_get_property_count;
             public IntPtr ui_entity_get_property_name;
             public IntPtr ui_entity_get_property_type;

@@ -62,33 +62,68 @@ namespace Hezhou
 
         private static void OnMouseMove(float x, float y, bool dragging)
         {
-            if (_gameScene == null || _gameScene.GetGameState() != GameState.Running)
-            {
-                _mouseDragging = false;
-                return;
-            }
+            if (_gameScene == null) return;
             
-            if (!dragging || !_previewSelected)
-            {
-                _mouseDragging = false;
-                return;
-            }
+            GameState state = _gameScene.GetGameState();
             
-            if (!_mouseDragging)
+            // Running mode: yaw/pitch camera rotation
+            if (state == GameState.Running)
             {
-                _mouseDragging = true;
+                if (!dragging || !_previewSelected)
+                {
+                    _mouseDragging = false;
+                    return;
+                }
+                
+                if (!_mouseDragging)
+                {
+                    _mouseDragging = true;
+                    _lastMouseX = x;
+                    _lastMouseY = y;
+                    return;
+                }
+                
+                float dx = x - _lastMouseX;
+                float dy = y - _lastMouseY;
                 _lastMouseX = x;
                 _lastMouseY = y;
+                
+                _cameraYaw += dx * 0.01f;
+                _cameraPitch += dy * 0.01f;
                 return;
             }
             
-            float dx = x - _lastMouseX;
-            float dy = y - _lastMouseY;
-            _lastMouseX = x;
-            _lastMouseY = y;
+            // Editing mode: orbit camera rotation
+            if (state == GameState.Editing)
+            {
+                if (!dragging || !_previewSelected)
+                {
+                    _mouseDragging = false;
+                    return;
+                }
+                
+                if (!_mouseDragging)
+                {
+                    _mouseDragging = true;
+                    _lastMouseX = x;
+                    _lastMouseY = y;
+                    return;
+                }
+                
+                float dx = x - _lastMouseX;
+                float dy = y - _lastMouseY;
+                _lastMouseX = x;
+                _lastMouseY = y;
+                
+                _orbitYaw += dx * 0.005f;
+                _orbitPitch -= dy * 0.005f;
+                // Clamp pitch to avoid flipping
+                if (_orbitPitch > 1.4f) _orbitPitch = 1.4f;
+                if (_orbitPitch < -1.4f) _orbitPitch = -1.4f;
+                return;
+            }
             
-            _cameraYaw += dx * 0.01f;
-            _cameraPitch += dy * 0.01f;
+            _mouseDragging = false;
         }
 
         private static void OnKey(uint keycode, bool pressed, uint modifiers)

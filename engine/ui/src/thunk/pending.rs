@@ -20,6 +20,9 @@ pub enum PendingCallback {
     FocusChange { widget_id: u64, is_focused: bool },
     EntitySelected { entity_id: u64, is_selected: bool },
     CheckboxChange { widget_id: u64, checked: bool },
+    SliderChange { widget_id: u64, value: f32 },
+    ScrollViewScroll { widget_id: u64, offset_y: f32 },
+    SplitViewRatioChange { widget_id: u64, ratio: f32 },
 }
 
 static PENDING_CALLBACKS: LazyLock<Mutex<Vec<PendingCallback>>> =
@@ -80,6 +83,15 @@ pub fn flush_pending_callbacks() {
             }
             PendingCallback::CheckboxChange { widget_id, checked } => {
                 trigger_checkbox_change_callback(widget_id, checked);
+            }
+            PendingCallback::SliderChange { widget_id, value } => {
+                trigger_slider_change_callback(widget_id, value);
+            }
+            PendingCallback::ScrollViewScroll { widget_id, offset_y } => {
+                trigger_scroll_view_scroll_callback(widget_id, offset_y);
+            }
+            PendingCallback::SplitViewRatioChange { widget_id, ratio } => {
+                trigger_split_view_ratio_change_callback(widget_id, ratio);
             }
         }
     }

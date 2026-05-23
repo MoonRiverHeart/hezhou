@@ -44,6 +44,9 @@ pub struct UICallbacks {
     pub on_focus_change: Option<FocusChangeCallback>,
     pub on_entity_selected: Option<EntitySelectedCallback>,
     pub on_checkbox_change: HashMap<u64, CheckboxChangeCallback>,
+    pub on_slider_change: HashMap<u64, SliderChangeCallback>,
+    pub on_scroll_view_scroll: HashMap<u64, ScrollViewScrollCallback>,
+    pub on_split_view_ratio_change: HashMap<u64, SplitViewRatioChangeCallback>,
 }
 
 impl UICallbacks {
@@ -71,6 +74,9 @@ pub fn new() -> Self {
                 on_focus_change: None,
                 on_entity_selected: None,
                 on_checkbox_change: HashMap::new(),
+                on_slider_change: HashMap::new(),
+                on_scroll_view_scroll: HashMap::new(),
+                on_split_view_ratio_change: HashMap::new(),
             }
         }
 
@@ -97,6 +103,9 @@ pub fn new() -> Self {
         self.on_focus_change = None;
         self.on_entity_selected = None;
         self.on_checkbox_change.clear();
+        self.on_slider_change.clear();
+        self.on_scroll_view_scroll.clear();
+        self.on_split_view_ratio_change.clear();
     }
 }
 

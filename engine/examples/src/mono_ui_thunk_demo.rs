@@ -50,6 +50,28 @@ pub extern "C" fn scene_create_entity_stub(_scene: *mut std::ffi::c_void) -> u64
 pub extern "C" fn scene_remove_entity_stub(_scene: *mut std::ffi::c_void, _entity_id: u64) { }
 pub extern "C" fn scene_get_entity_count_stub(_scene: *mut std::ffi::c_void) -> u64 { 0 }
 pub extern "C" fn scene_get_entity_id_stub(_scene: *mut std::ffi::c_void, _index: u64) -> u64 { 0 }
+pub extern "C" fn scene_set_parent_stub(_scene: *mut std::ffi::c_void, _entity_id: u64, _parent_id: u64) {}
+pub extern "C" fn scene_get_parent_stub(_scene: *mut std::ffi::c_void, _entity_id: u64) -> u64 { 0 }
+pub extern "C" fn scene_get_child_count_stub(_scene: *mut std::ffi::c_void, _parent_id: u64) -> usize { 0 }
+pub extern "C" fn scene_get_child_id_stub(_scene: *mut std::ffi::c_void, _parent_id: u64, _index: usize) -> u64 { 0 }
+pub extern "C" fn ui_create_slider_stub(_handle: *mut std::ffi::c_void, _parent_id: u64, _w: f32, _h: f32) -> u64 { 0 }
+pub extern "C" fn ui_create_slider_in_parent_stub(_handle: *mut std::ffi::c_void, _parent_id: u64, _x: f32, _y: f32, _w: f32, _h: f32, _min: f32, _max: f32, _val: f32) -> u64 { 0 }
+pub extern "C" fn ui_slider_set_value_stub(_handle: *mut std::ffi::c_void, _id: u64, _val: f32) {}
+pub extern "C" fn ui_slider_get_value_stub(_handle: *mut std::ffi::c_void, _id: u64) -> f32 { 0.0 }
+pub extern "C" fn ui_slider_set_range_stub(_handle: *mut std::ffi::c_void, _id: u64, _min: f32, _max: f32) {}
+pub extern "C" fn ui_slider_set_on_change_thunk_ptr_stub(_handle: *mut std::ffi::c_void, _id: u64, _ptr: *const std::ffi::c_void) {}
+pub extern "C" fn ui_slider_set_step_stub(_handle: *mut std::ffi::c_void, _id: u64, _step: f32) {}
+pub extern "C" fn ui_create_scroll_view_stub(_handle: *mut std::ffi::c_void, _parent_id: u64, _x: f32, _y: f32, _w: f32, _h: f32) -> u64 { 0 }
+pub extern "C" fn ui_scroll_view_set_scroll_offset_stub(_handle: *mut std::ffi::c_void, _id: u64, _offset: f32) {}
+pub extern "C" fn ui_scroll_view_get_scroll_offset_stub(_handle: *mut std::ffi::c_void, _id: u64) -> f32 { 0.0 }
+pub extern "C" fn ui_scroll_view_set_show_scrollbars_stub(_handle: *mut std::ffi::c_void, _id: u64, _v: u32, _h: u32) {}
+pub extern "C" fn ui_scroll_view_set_on_scroll_thunk_ptr_stub(_handle: *mut std::ffi::c_void, _id: u64, _ptr: *const std::ffi::c_void) {}
+pub extern "C" fn ui_create_split_view_stub(_handle: *mut std::ffi::c_void, _parent_id: u64, _x: f32, _y: f32, _w: f32, _h: f32, _orientation: u32) -> u64 { 0 }
+pub extern "C" fn ui_split_view_set_split_ratio_stub(_handle: *mut std::ffi::c_void, _id: u64, _ratio: f32) {}
+pub extern "C" fn ui_split_view_get_split_ratio_stub(_handle: *mut std::ffi::c_void, _id: u64) -> f32 { 0.5 }
+pub extern "C" fn ui_split_view_set_min_ratio_stub(_handle: *mut std::ffi::c_void, _id: u64, _min: f32) {}
+pub extern "C" fn ui_split_view_set_max_ratio_stub(_handle: *mut std::ffi::c_void, _id: u64, _max: f32) {}
+pub extern "C" fn ui_split_view_set_on_ratio_change_thunk_ptr_stub(_handle: *mut std::ffi::c_void, _id: u64, _ptr: *const std::ffi::c_void) {}
 // Property reflection stubs
 pub extern "C" fn ui_entity_get_property_count_stub() -> u32 { 0 }
 pub extern "C" fn ui_entity_get_property_name_stub(_index: u32) -> *const std::ffi::c_char { std::ptr::null() }
@@ -177,6 +199,24 @@ fn main() {
         ui_checkbox_get_checked: unsafe { std::mem::transmute(ui_ffi::ui_checkbox_get_checked as *const std::ffi::c_void) },
         ui_checkbox_set_on_change_thunk_ptr: unsafe { std::mem::transmute(ui_ffi::ui_checkbox_set_on_change_thunk_ptr as *const std::ffi::c_void) },
         ui_checkbox_set_text: unsafe { std::mem::transmute(ui_ffi::ui_checkbox_set_text as *const std::ffi::c_void) },
+        ui_create_slider: unsafe { std::mem::transmute(ui_create_slider_stub as *const std::ffi::c_void) },
+        ui_create_slider_in_parent: unsafe { std::mem::transmute(ui_create_slider_in_parent_stub as *const std::ffi::c_void) },
+        ui_slider_set_value: unsafe { std::mem::transmute(ui_slider_set_value_stub as *const std::ffi::c_void) },
+        ui_slider_get_value: unsafe { std::mem::transmute(ui_slider_get_value_stub as *const std::ffi::c_void) },
+        ui_slider_set_range: unsafe { std::mem::transmute(ui_slider_set_range_stub as *const std::ffi::c_void) },
+        ui_slider_set_on_change_thunk_ptr: unsafe { std::mem::transmute(ui_slider_set_on_change_thunk_ptr_stub as *const std::ffi::c_void) },
+        ui_slider_set_step: unsafe { std::mem::transmute(ui_slider_set_step_stub as *const std::ffi::c_void) },
+        ui_create_scroll_view: unsafe { std::mem::transmute(ui_create_scroll_view_stub as *const std::ffi::c_void) },
+        ui_scroll_view_set_scroll_offset: unsafe { std::mem::transmute(ui_scroll_view_set_scroll_offset_stub as *const std::ffi::c_void) },
+        ui_scroll_view_get_scroll_offset: unsafe { std::mem::transmute(ui_scroll_view_get_scroll_offset_stub as *const std::ffi::c_void) },
+        ui_scroll_view_set_show_scrollbars: unsafe { std::mem::transmute(ui_scroll_view_set_show_scrollbars_stub as *const std::ffi::c_void) },
+        ui_scroll_view_set_on_scroll_thunk_ptr: unsafe { std::mem::transmute(ui_scroll_view_set_on_scroll_thunk_ptr_stub as *const std::ffi::c_void) },
+        ui_create_split_view: unsafe { std::mem::transmute(ui_create_split_view_stub as *const std::ffi::c_void) },
+        ui_split_view_set_split_ratio: unsafe { std::mem::transmute(ui_split_view_set_split_ratio_stub as *const std::ffi::c_void) },
+        ui_split_view_get_split_ratio: unsafe { std::mem::transmute(ui_split_view_get_split_ratio_stub as *const std::ffi::c_void) },
+        ui_split_view_set_min_ratio: unsafe { std::mem::transmute(ui_split_view_set_min_ratio_stub as *const std::ffi::c_void) },
+        ui_split_view_set_max_ratio: unsafe { std::mem::transmute(ui_split_view_set_max_ratio_stub as *const std::ffi::c_void) },
+        ui_split_view_set_on_ratio_change_thunk_ptr: unsafe { std::mem::transmute(ui_split_view_set_on_ratio_change_thunk_ptr_stub as *const std::ffi::c_void) },
         ui_create_tab_widget: unsafe { std::mem::transmute(ui_ffi::ui_create_tab_widget as *const std::ffi::c_void) },
         ui_tab_widget_add_tab: unsafe { std::mem::transmute(ui_ffi::ui_tab_widget_add_tab as *const std::ffi::c_void) },
         ui_tab_widget_set_active: unsafe { std::mem::transmute(ui_ffi::ui_tab_widget_set_active as *const std::ffi::c_void) },
@@ -265,6 +305,10 @@ fn main() {
         scene_get_entity_count: scene_get_entity_count_stub,
         scene_get_entity_id: scene_get_entity_id_stub,
         scene_remove_entity: scene_remove_entity_stub,
+        scene_set_parent: scene_set_parent_stub,
+        scene_get_parent: scene_get_parent_stub,
+        scene_get_child_count: scene_get_child_count_stub,
+        scene_get_child_id: scene_get_child_id_stub,
         ui_entity_get_property_count: ui_entity_get_property_count_stub,
         ui_entity_get_property_name: ui_entity_get_property_name_stub,
         ui_entity_get_property_type: ui_entity_get_property_type_stub,

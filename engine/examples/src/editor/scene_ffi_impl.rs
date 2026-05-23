@@ -527,3 +527,49 @@ pub extern "C" fn ui_entity_set_property_value_float_editor(
         value,
     )
 }
+
+#[unsafe(no_mangle)]
+pub extern "C" fn scene_set_parent_editor(scene: *mut std::ffi::c_void, entity_id: u64, parent_id: u64) {
+    if scene.is_null() {
+        return;
+    }
+    hezhou_core::scene_set_parent(
+        scene as *mut hezhou_core::Scene,
+        entity_id,
+        parent_id,
+    )
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn scene_get_parent_editor(scene: *mut std::ffi::c_void, entity_id: u64) -> u64 {
+    if scene.is_null() {
+        return 0;
+    }
+    hezhou_core::scene_get_parent(
+        scene as *mut hezhou_core::Scene,
+        entity_id,
+    )
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn scene_get_child_count_editor(scene: *mut std::ffi::c_void, parent_id: u64) -> usize {
+    if scene.is_null() {
+        return 0;
+    }
+    hezhou_core::scene_get_child_count(
+        scene as *mut hezhou_core::Scene,
+        parent_id,
+    )
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn scene_get_child_id_editor(scene: *mut std::ffi::c_void, parent_id: u64, index: usize) -> u64 {
+    if scene.is_null() {
+        return 0;
+    }
+    hezhou_core::scene_get_child_id(
+        scene as *mut hezhou_core::Scene,
+        parent_id,
+        index,
+    )
+}

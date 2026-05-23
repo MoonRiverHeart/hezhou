@@ -139,7 +139,11 @@ _hotReloadCompleteCallback = OnHotReloadComplete;
                     }
                     else
                     {
-                        UI.SetCameraParams(0f, 0f, 0f, 0f, 3f);
+                        // Editing mode: orbit camera
+                        float camX = _orbitTargetX + _orbitDistance * (float)Math.Sin(_orbitYaw) * (float)Math.Cos(_orbitPitch);
+                        float camY = _orbitTargetY + _orbitDistance * (float)Math.Sin(_orbitPitch);
+                        float camZ = _orbitTargetZ + _orbitDistance * (float)Math.Cos(_orbitYaw) * (float)Math.Cos(_orbitPitch);
+                        UI.SetCameraParams(_orbitYaw, -_orbitPitch, camX, camY, camZ);
                     }
                 }
                 catch (Exception ex)

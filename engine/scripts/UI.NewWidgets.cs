@@ -700,6 +700,213 @@ namespace Hezhou
             var func = Marshal.GetDelegateForFunctionPointer<CheckboxSetOnChangeThunkPtrDelegate>(_ffi.ui_checkbox_set_on_change_thunk_ptr);
             func(_widgetTree, widgetId, callbackPtr);
         }
+
+        // === Slider ===
+
+        public static ulong CreateSlider(ulong parentId, float width, float height)
+        {
+            if (_ffi.ui_create_slider == IntPtr.Zero)
+            {
+                Log.Error("C#", "CreateSlider函数指针为空");
+                return 0;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<CreateSliderDelegate>(_ffi.ui_create_slider);
+            return func(_widgetTree, parentId, width, height);
+        }
+
+        public static ulong CreateSlider(ulong parentId, float x, float y, float width, float height, float min, float max, float value)
+        {
+            if (_ffi.ui_create_slider_in_parent == IntPtr.Zero)
+            {
+                Log.Error("C#", "CreateSliderInParent函数指针为空");
+                return 0;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<CreateSliderInParentDelegate>(_ffi.ui_create_slider_in_parent);
+            return func(_widgetTree, parentId, x, y, width, height, min, max, value);
+        }
+
+        public static void SliderSetValue(ulong widgetId, float value)
+        {
+            if (_ffi.ui_slider_set_value == IntPtr.Zero)
+            {
+                Log.Error("C#", "SliderSetValue函数指针为空");
+                return;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<SliderSetValueDelegate>(_ffi.ui_slider_set_value);
+            func(_widgetTree, widgetId, value);
+        }
+
+        public static float SliderGetValue(ulong widgetId)
+        {
+            if (_ffi.ui_slider_get_value == IntPtr.Zero)
+            {
+                return 0.0f;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<SliderGetValueDelegate>(_ffi.ui_slider_get_value);
+            return func(_widgetTree, widgetId);
+        }
+
+        public static void SliderSetRange(ulong widgetId, float min, float max)
+        {
+            if (_ffi.ui_slider_set_range == IntPtr.Zero)
+            {
+                Log.Error("C#", "SliderSetRange函数指针为空");
+                return;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<SliderSetRangeDelegate>(_ffi.ui_slider_set_range);
+            func(_widgetTree, widgetId, min, max);
+        }
+
+        public static void SliderSetStep(ulong widgetId, float step)
+        {
+            if (_ffi.ui_slider_set_step == IntPtr.Zero)
+            {
+                Log.Error("C#", "SliderSetStep函数指针为空");
+                return;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<SliderSetStepDelegate>(_ffi.ui_slider_set_step);
+            func(_widgetTree, widgetId, step);
+        }
+
+        public static void SliderSetOnChange(ulong widgetId, SliderChangeCallbackDelegate callback)
+        {
+            if (_ffi.ui_slider_set_on_change_thunk_ptr == IntPtr.Zero)
+            {
+                Log.Error("C#", "SliderSetOnChangeThunkPtr函数指针为空");
+                return;
+            }
+            _sliderCallbacks[widgetId] = callback;
+            IntPtr callbackPtr = Marshal.GetFunctionPointerForDelegate(callback);
+            var func = Marshal.GetDelegateForFunctionPointer<SliderSetOnChangeThunkPtrDelegate>(_ffi.ui_slider_set_on_change_thunk_ptr);
+            func(_widgetTree, widgetId, callbackPtr);
+        }
+
+        // === ScrollView ===
+
+        public static ulong CreateScrollView(ulong parentId, float x, float y, float width, float height)
+        {
+            if (_ffi.ui_create_scroll_view == IntPtr.Zero)
+            {
+                Log.Error("C#", "CreateScrollView函数指针为空");
+                return 0;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<CreateScrollViewDelegate>(_ffi.ui_create_scroll_view);
+            return func(_widgetTree, parentId, x, y, width, height);
+        }
+
+        public static void ScrollViewSetScrollOffset(ulong widgetId, float offsetY)
+        {
+            if (_ffi.ui_scroll_view_set_scroll_offset == IntPtr.Zero)
+            {
+                Log.Error("C#", "ScrollViewSetScrollOffset函数指针为空");
+                return;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<ScrollViewSetScrollOffsetDelegate>(_ffi.ui_scroll_view_set_scroll_offset);
+            func(_widgetTree, widgetId, offsetY);
+        }
+
+        public static float ScrollViewGetScrollOffset(ulong widgetId)
+        {
+            if (_ffi.ui_scroll_view_get_scroll_offset == IntPtr.Zero)
+            {
+                return 0.0f;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<ScrollViewGetScrollOffsetDelegate>(_ffi.ui_scroll_view_get_scroll_offset);
+            return func(_widgetTree, widgetId);
+        }
+
+        public static void ScrollViewSetShowScrollbars(ulong widgetId, bool showV, bool showH)
+        {
+            if (_ffi.ui_scroll_view_set_show_scrollbars == IntPtr.Zero)
+            {
+                Log.Error("C#", "ScrollViewSetShowScrollbars函数指针为空");
+                return;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<ScrollViewSetShowScrollbarsDelegate>(_ffi.ui_scroll_view_set_show_scrollbars);
+            func(_widgetTree, widgetId, showV ? 1u : 0u, showH ? 1u : 0u);
+        }
+
+        public static void ScrollViewSetOnScroll(ulong widgetId, ScrollViewScrollCallbackDelegate callback)
+        {
+            if (_ffi.ui_scroll_view_set_on_scroll_thunk_ptr == IntPtr.Zero)
+            {
+                Log.Error("C#", "ScrollViewSetOnScrollThunkPtr函数指针为空");
+                return;
+            }
+            _scrollViewCallbacks[widgetId] = callback;
+            IntPtr callbackPtr = Marshal.GetFunctionPointerForDelegate(callback);
+            var func = Marshal.GetDelegateForFunctionPointer<ScrollViewSetOnScrollThunkPtrDelegate>(_ffi.ui_scroll_view_set_on_scroll_thunk_ptr);
+            func(_widgetTree, widgetId, callbackPtr);
+        }
+
+        // === SplitView ===
+
+        public static ulong CreateSplitView(ulong parentId, float x, float y, float width, float height, uint orientation)
+        {
+            if (_ffi.ui_create_split_view == IntPtr.Zero)
+            {
+                Log.Error("C#", "CreateSplitView函数指针为空");
+                return 0;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<CreateSplitViewDelegate>(_ffi.ui_create_split_view);
+            return func(_widgetTree, parentId, x, y, width, height, orientation);
+        }
+
+        public static void SplitViewSetSplitRatio(ulong widgetId, float ratio)
+        {
+            if (_ffi.ui_split_view_set_split_ratio == IntPtr.Zero)
+            {
+                Log.Error("C#", "SplitViewSetSplitRatio函数指针为空");
+                return;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<SplitViewSetSplitRatioDelegate>(_ffi.ui_split_view_set_split_ratio);
+            func(_widgetTree, widgetId, ratio);
+        }
+
+        public static float SplitViewGetSplitRatio(ulong widgetId)
+        {
+            if (_ffi.ui_split_view_get_split_ratio == IntPtr.Zero)
+            {
+                return 0.5f;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<SplitViewGetSplitRatioDelegate>(_ffi.ui_split_view_get_split_ratio);
+            return func(_widgetTree, widgetId);
+        }
+
+        public static void SplitViewSetMinRatio(ulong widgetId, float min)
+        {
+            if (_ffi.ui_split_view_set_min_ratio == IntPtr.Zero)
+            {
+                Log.Error("C#", "SplitViewSetMinRatio函数指针为空");
+                return;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<SplitViewSetMinRatioDelegate>(_ffi.ui_split_view_set_min_ratio);
+            func(_widgetTree, widgetId, min);
+        }
+
+        public static void SplitViewSetMaxRatio(ulong widgetId, float max)
+        {
+            if (_ffi.ui_split_view_set_max_ratio == IntPtr.Zero)
+            {
+                Log.Error("C#", "SplitViewSetMaxRatio函数指针为空");
+                return;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<SplitViewSetMaxRatioDelegate>(_ffi.ui_split_view_set_max_ratio);
+            func(_widgetTree, widgetId, max);
+        }
+
+        public static void SplitViewSetOnRatioChange(ulong widgetId, SplitViewRatioChangeCallbackDelegate callback)
+        {
+            if (_ffi.ui_split_view_set_on_ratio_change_thunk_ptr == IntPtr.Zero)
+            {
+                Log.Error("C#", "SplitViewSetOnRatioChangeThunkPtr函数指针为空");
+                return;
+            }
+            _splitViewCallbacks[widgetId] = callback;
+            IntPtr callbackPtr = Marshal.GetFunctionPointerForDelegate(callback);
+            var func = Marshal.GetDelegateForFunctionPointer<SplitViewSetOnRatioChangeThunkPtrDelegate>(_ffi.ui_split_view_set_on_ratio_change_thunk_ptr);
+            func(_widgetTree, widgetId, callbackPtr);
+        }
     }
 
     public class TabWidget
@@ -1003,6 +1210,185 @@ namespace Hezhou
         {
             Text = text;
             UI.CheckboxSetText(Id, text);
+        }
+    }
+
+    public class Slider
+    {
+        public ulong Id;
+        public float Value;
+        public float Min;
+        public float Max;
+
+        private UI.SliderChangeCallbackDelegate _onChangeCallback;
+
+        public Slider(ulong parentId, float x, float y, float w, float h, float min, float max, float value)
+        {
+            Min = min;
+            Max = max;
+            Value = value;
+            Id = UI.CreateSlider(parentId, x, y, w, h, min, max, value);
+        }
+
+        public static ulong Create(ulong parentId, float x, float y, float w, float h, float min, float max, float value)
+        {
+            return UI.CreateSlider(parentId, x, y, w, h, min, max, value);
+        }
+
+        public static void SetValue(ulong id, float value)
+        {
+            UI.SliderSetValue(id, value);
+        }
+
+        public static float GetValue(ulong id)
+        {
+            return UI.SliderGetValue(id);
+        }
+
+        public static void SetRange(ulong id, float min, float max)
+        {
+            UI.SliderSetRange(id, min, max);
+        }
+
+        public static void SetStep(ulong id, float step)
+        {
+            UI.SliderSetStep(id, step);
+        }
+
+        public static void SetOnChangeThunkPtr(ulong id, UI.SliderChangeCallbackDelegate callback)
+        {
+            UI.SliderSetOnChange(id, callback);
+        }
+
+        public void SetValue(float value)
+        {
+            Value = value;
+            UI.SliderSetValue(Id, value);
+        }
+
+        public float GetValue()
+        {
+            Value = UI.SliderGetValue(Id);
+            return Value;
+        }
+
+        public void SetOnChange(UI.SliderChangeCallbackDelegate callback)
+        {
+            _onChangeCallback = callback;
+            UI.SliderSetOnChange(Id, callback);
+        }
+    }
+
+    public class ScrollView
+    {
+        public ulong Id;
+        private UI.ScrollViewScrollCallbackDelegate _onScrollCallback;
+
+        public ScrollView(ulong parentId, float x, float y, float w, float h)
+        {
+            Id = UI.CreateScrollView(parentId, x, y, w, h);
+        }
+
+        public static ulong Create(ulong parentId, float x, float y, float w, float h)
+        {
+            return UI.CreateScrollView(parentId, x, y, w, h);
+        }
+
+        public static void SetScrollOffset(ulong id, float offsetY)
+        {
+            UI.ScrollViewSetScrollOffset(id, offsetY);
+        }
+
+        public static float GetScrollOffset(ulong id)
+        {
+            return UI.ScrollViewGetScrollOffset(id);
+        }
+
+        public static void SetShowScrollbars(ulong id, bool showV, bool showH)
+        {
+            UI.ScrollViewSetShowScrollbars(id, showV, showH);
+        }
+
+        public static void SetOnScrollThunkPtr(ulong id, UI.ScrollViewScrollCallbackDelegate callback)
+        {
+            UI.ScrollViewSetOnScroll(id, callback);
+        }
+
+        public void SetScrollOffset(float offsetY)
+        {
+            UI.ScrollViewSetScrollOffset(Id, offsetY);
+        }
+
+        public float GetScrollOffset()
+        {
+            return UI.ScrollViewGetScrollOffset(Id);
+        }
+
+        public void SetOnScroll(UI.ScrollViewScrollCallbackDelegate callback)
+        {
+            _onScrollCallback = callback;
+            UI.ScrollViewSetOnScroll(Id, callback);
+        }
+    }
+
+    public class SplitView
+    {
+        public ulong Id;
+        public float Ratio;
+        private UI.SplitViewRatioChangeCallbackDelegate _onRatioChangeCallback;
+
+        public SplitView(ulong parentId, float x, float y, float w, float h, uint orientation)
+        {
+            Id = UI.CreateSplitView(parentId, x, y, w, h, orientation);
+            Ratio = 0.5f;
+        }
+
+        public static ulong Create(ulong parentId, float x, float y, float w, float h, uint orientation)
+        {
+            return UI.CreateSplitView(parentId, x, y, w, h, orientation);
+        }
+
+        public static void SetSplitRatio(ulong id, float ratio)
+        {
+            UI.SplitViewSetSplitRatio(id, ratio);
+        }
+
+        public static float GetSplitRatio(ulong id)
+        {
+            return UI.SplitViewGetSplitRatio(id);
+        }
+
+        public static void SetMinRatio(ulong id, float min)
+        {
+            UI.SplitViewSetMinRatio(id, min);
+        }
+
+        public static void SetMaxRatio(ulong id, float max)
+        {
+            UI.SplitViewSetMaxRatio(id, max);
+        }
+
+        public static void SetOnRatioChangeThunkPtr(ulong id, UI.SplitViewRatioChangeCallbackDelegate callback)
+        {
+            UI.SplitViewSetOnRatioChange(id, callback);
+        }
+
+        public void SetSplitRatio(float ratio)
+        {
+            Ratio = ratio;
+            UI.SplitViewSetSplitRatio(Id, ratio);
+        }
+
+        public float GetSplitRatio()
+        {
+            Ratio = UI.SplitViewGetSplitRatio(Id);
+            return Ratio;
+        }
+
+        public void SetOnRatioChange(UI.SplitViewRatioChangeCallbackDelegate callback)
+        {
+            _onRatioChangeCallback = callback;
+            UI.SplitViewSetOnRatioChange(Id, callback);
         }
     }
 }

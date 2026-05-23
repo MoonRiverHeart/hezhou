@@ -328,6 +328,37 @@ impl Scene {
         self.world.destroy_entity(entity);
     }
     
+    pub fn set_parent(&mut self, entity: Entity, parent: Option<Entity>) {
+        if !self.world.entity_exists(entity) {
+            return;
+        }
+        if let Some(p) = parent {
+            if !self.world.entity_exists(p) {
+                return;
+            }
+            // Remove from root_entities if becoming a child
+            self.root_entities.retain(|e| *e != entity);
+        } else {
+            // Add back to root_entities if unparenting
+            if !self.root_entities.contains(&entity) {
+                self.root_entities.push(entity);
+            }
+        }
+        self.world.set_parent(entity, parent);
+    }
+    
+    pub fn get_parent(&self, entity: Entity) -> Option<Entity> {
+        self.world.get_parent(entity)
+    }
+    
+    pub fn get_children(&self, parent: Entity) -> Vec<Entity> {
+        self.world.get_children(parent)
+    }
+    
+    pub fn get_root_entities(&self) -> &Vec<Entity> {
+        &self.root_entities
+    }
+    
     pub fn get_entity_position(&self, entity: Entity) -> Option<Vec3> {
         self.world.get_component::<LocalTransform>(entity).map(|t| t.position)
     }

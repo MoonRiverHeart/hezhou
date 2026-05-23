@@ -235,3 +235,33 @@ pub fn trigger_checkbox_change_callback(widget_id: u64, checked: bool) {
         cb(widget_id, checked);
     }
 }
+
+pub fn trigger_slider_change_callback(widget_id: u64, value: f32) {
+    let callback = {
+        let callbacks = UI_CALLBACKS.lock();
+        callbacks.on_slider_change.get(&widget_id).copied()
+    };
+    if let Some(cb) = callback {
+        cb(widget_id, value);
+    }
+}
+
+pub fn trigger_scroll_view_scroll_callback(widget_id: u64, offset_y: f32) {
+    let callback = {
+        let callbacks = UI_CALLBACKS.lock();
+        callbacks.on_scroll_view_scroll.get(&widget_id).copied()
+    };
+    if let Some(cb) = callback {
+        cb(widget_id, offset_y);
+    }
+}
+
+pub fn trigger_split_view_ratio_change_callback(widget_id: u64, ratio: f32) {
+    let callback = {
+        let callbacks = UI_CALLBACKS.lock();
+        callbacks.on_split_view_ratio_change.get(&widget_id).copied()
+    };
+    if let Some(cb) = callback {
+        cb(widget_id, ratio);
+    }
+}

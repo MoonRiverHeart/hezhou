@@ -17,6 +17,9 @@ pub mod text_edit;
 pub mod tree_node;
 pub mod tree_view;
 pub mod vstack;
+pub mod slider;
+pub mod scroll_view;
+pub mod split_view;
 
 pub use button::Button;
 pub use checkbox::Checkbox;
@@ -42,3 +45,7 @@ pub use text_edit::TextEdit;
 pub use tree_node::TreeNode;
 pub use tree_view::TreeView;
 pub use vstack::VStack;
+pub use slider::Slider;
+pub use scroll_view::ScrollView;
+pub use split_view::SplitView;
+pub use split_view::SplitOrientation;

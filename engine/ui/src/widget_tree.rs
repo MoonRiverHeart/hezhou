@@ -421,6 +421,14 @@ pub fn perform_layout(&mut self, font_atlas: &FontAtlas) {
 
                 (max_width, total_height)
             }
+            "SplitView" => {
+                // SplitView is self-measured: returns its own layout dimensions
+                if let Some(node) = self.nodes.get_mut(&id) {
+                    node.widget.as_mut().measure(font_atlas)
+                } else {
+                    (0.0, 0.0)
+                }
+            }
             _ => {
                 if let Some(node) = self.nodes.get_mut(&id) {
                     node.widget.as_mut().measure(font_atlas)
@@ -454,6 +462,9 @@ pub fn perform_layout(&mut self, font_atlas: &FontAtlas) {
             }
             "TreeView" => {
                 self.layout_tree_view_children(id, font_atlas);
+            }
+            "SplitView" => {
+                self.layout_split_view_children(id);
             }
             _ => {}
         }
@@ -752,6 +763,79 @@ pub fn perform_layout(&mut self, font_atlas: &FontAtlas) {
                     current_layout.width,
                     y_offset.max(current_layout.height),
                 ));
+            }
+        }
+    }
+
+    fn layout_split_view_children(&mut self, id: WidgetId) {
+        let split_info = {
+            if let Some(node) = self.nodes.get(&id) {
+                if let Some(split_view) = node.widget.as_any().downcast_ref::<crate::widgets::SplitView>() {
+                    (split_view.split_ratio, split_view.divider_thickness, split_view.content_scale, split_view.orientation, *split_view.layout())
+                } else {
+                    return;
+                }
+            } else {
+                return;
+            }
+        };
+
+        let (ratio, divider_thickness, content_scale, orientation, layout) = split_info;
+        let thickness = divider_thickness * content_scale;
+        let children = self.get_children(id).to_vec();
+
+        if children.len() < 2 {
+            return;
+        }
+
+        match orientation {
+            crate::widgets::SplitOrientation::Horizontal => {
+                let first_width = layout.width * ratio - thickness / 2.0;
+                let second_width = layout.width * (1.0 - ratio) - thickness / 2.0;
+                let second_x = layout.width * ratio + thickness / 2.0;
+
+                if let Some(node) = self.nodes.get_mut(&children[0]) {
+                    let child_layout = *node.widget.layout();
+                    node.widget.set_layout(crate::layout::Layout::new(
+                        0.0,
+                        0.0,
+                        first_width.max(child_layout.width),
+                        layout.height,
+                    ));
+                }
+                if let Some(node) = self.nodes.get_mut(&children[1]) {
+                    let child_layout = *node.widget.layout();
+                    node.widget.set_layout(crate::layout::Layout::new(
+                        second_x,
+                        0.0,
+                        second_width.max(child_layout.width),
+                        layout.height,
+                    ));
+                }
+            }
+            crate::widgets::SplitOrientation::Vertical => {
+                let first_height = layout.height * ratio - thickness / 2.0;
+                let second_height = layout.height * (1.0 - ratio) - thickness / 2.0;
+                let second_y = layout.height * ratio + thickness / 2.0;
+
+                if let Some(node) = self.nodes.get_mut(&children[0]) {
+                    let child_layout = *node.widget.layout();
+                    node.widget.set_layout(crate::layout::Layout::new(
+                        0.0,
+                        0.0,
+                        layout.width,
+                        first_height.max(child_layout.height),
+                    ));
+                }
+                if let Some(node) = self.nodes.get_mut(&children[1]) {
+                    let child_layout = *node.widget.layout();
+                    node.widget.set_layout(crate::layout::Layout::new(
+                        0.0,
+                        second_y,
+                        layout.width,
+                        second_height.max(child_layout.height),
+                    ));
+                }
             }
         }
     }

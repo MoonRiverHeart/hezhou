@@ -154,5 +154,26 @@ pub extern "C" fn ui_register_entity_selected_callback(callback: EntitySelectedC
 pub extern "C" fn ui_register_checkbox_change_callback(widget_id: u64, callback: CheckboxChangeCallback) {
     let mut callbacks = UI_CALLBACKS.lock();
     callbacks.on_checkbox_change.insert(widget_id, callback);
-    dfx_info!("UI", "注册CheckboxChange回调: widget={} callback={:?}", widget_id, callback);
+    dfx_debug!("UI", "注册CheckboxChange回调: widget={}", widget_id);
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_register_slider_change_callback(widget_id: u64, callback: SliderChangeCallback) {
+    let mut callbacks = UI_CALLBACKS.lock();
+    callbacks.on_slider_change.insert(widget_id, callback);
+    dfx_debug!("UI", "注册SliderChange回调: widget={}", widget_id);
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_register_scroll_view_scroll_callback(widget_id: u64, callback: ScrollViewScrollCallback) {
+    let mut callbacks = UI_CALLBACKS.lock();
+    callbacks.on_scroll_view_scroll.insert(widget_id, callback);
+    dfx_debug!("UI", "注册ScrollViewScroll回调: widget={}", widget_id);
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_register_split_view_ratio_change_callback(widget_id: u64, callback: SplitViewRatioChangeCallback) {
+    let mut callbacks = UI_CALLBACKS.lock();
+    callbacks.on_split_view_ratio_change.insert(widget_id, callback);
+    dfx_debug!("UI", "注册SplitViewRatioChange回调: widget={}", widget_id);
 }

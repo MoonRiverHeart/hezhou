@@ -140,6 +140,14 @@ namespace Hezhou
 private static float _cameraYaw = 0f;
         private static float _cameraPitch = 0f;
 
+        // === Orbit Camera State (Editing mode) ===
+        private static float _orbitYaw = 0.3f;     // initial slight angle to show cube
+        private static float _orbitPitch = -0.3f;   // slight downward look
+        private static float _orbitDistance = 5f;    // distance from target
+        private static float _orbitTargetX = 0f;
+        private static float _orbitTargetY = 0f;
+        private static float _orbitTargetZ = 0f;
+
         private static bool _mouseDragging = false;
         private static float _lastMouseX = 0f;
         private static float _lastMouseY = 0f;

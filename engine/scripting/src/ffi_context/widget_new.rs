@@ -60,3 +60,27 @@ pub type FileBrowserGetSelectedPathFn = extern "C" fn(WidgetTreeHandle, u64, *mu
 pub type FileBrowserGetCurrentPathFn = extern "C" fn(WidgetTreeHandle, u64, *mut c_char, usize) -> bool;
 pub type FileBrowserSetOnSelectThunkPtrFn = extern "C" fn(WidgetTreeHandle, u64, *const c_void);
 pub type FileBrowserSetOnDoubleClickThunkPtrFn = extern "C" fn(WidgetTreeHandle, u64, *const c_void);
+
+// Slider
+pub type CreateSliderFn = extern "C" fn(WidgetTreeHandle, u64, f32, f32) -> u64;
+pub type CreateSliderInParentFn = extern "C" fn(WidgetTreeHandle, u64, f32, f32, f32, f32, f32, f32, f32) -> u64;
+pub type SliderSetValueFn = extern "C" fn(WidgetTreeHandle, u64, f32);
+pub type SliderGetValueFn = extern "C" fn(WidgetTreeHandle, u64) -> f32;
+pub type SliderSetRangeFn = extern "C" fn(WidgetTreeHandle, u64, f32, f32);
+pub type SliderSetOnChangeThunkPtrFn = extern "C" fn(WidgetTreeHandle, u64, *const c_void);
+pub type SliderSetStepFn = extern "C" fn(WidgetTreeHandle, u64, f32);
+
+// ScrollView
+pub type CreateScrollViewFn = extern "C" fn(WidgetTreeHandle, u64, f32, f32, f32, f32) -> u64;
+pub type ScrollViewSetScrollOffsetFn = extern "C" fn(WidgetTreeHandle, u64, f32);
+pub type ScrollViewGetScrollOffsetFn = extern "C" fn(WidgetTreeHandle, u64) -> f32;
+pub type ScrollViewSetShowScrollbarsFn = extern "C" fn(WidgetTreeHandle, u64, u32, u32);
+pub type ScrollViewSetOnScrollThunkPtrFn = extern "C" fn(WidgetTreeHandle, u64, *const c_void);
+
+// SplitView
+pub type CreateSplitViewFn = extern "C" fn(WidgetTreeHandle, u64, f32, f32, f32, f32, u32) -> u64;
+pub type SplitViewSetSplitRatioFn = extern "C" fn(WidgetTreeHandle, u64, f32);
+pub type SplitViewGetSplitRatioFn = extern "C" fn(WidgetTreeHandle, u64) -> f32;
+pub type SplitViewSetMinRatioFn = extern "C" fn(WidgetTreeHandle, u64, f32);
+pub type SplitViewSetMaxRatioFn = extern "C" fn(WidgetTreeHandle, u64, f32);
+pub type SplitViewSetOnRatioChangeThunkPtrFn = extern "C" fn(WidgetTreeHandle, u64, *const c_void);

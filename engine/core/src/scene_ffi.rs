@@ -431,3 +431,53 @@ pub extern "C" fn scene_set_script_binding_enabled(scene: *mut Scene, entity_id:
         (*scene).set_script_binding_enabled(entity, index, enabled);
     }
 }
+
+#[no_mangle]
+pub extern "C" fn scene_set_parent(scene: *mut Scene, entity_id: u64, parent_id: u64) {
+    if scene.is_null() {
+        return;
+    }
+    unsafe {
+        let entity = Entity::new(entity_id);
+        let parent = if parent_id != 0 {
+            Some(Entity::new(parent_id))
+        } else {
+            None
+        };
+        (*scene).set_parent(entity, parent);
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn scene_get_parent(scene: *const Scene, entity_id: u64) -> u64 {
+    if scene.is_null() {
+        return 0;
+    }
+    unsafe {
+        let entity = Entity::new(entity_id);
+        (*scene).get_parent(entity).map(|p| p.id).unwrap_or(0)
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn scene_get_child_count(scene: *const Scene, parent_id: u64) -> usize {
+    if scene.is_null() {
+        return 0;
+    }
+    unsafe {
+        let parent = Entity::new(parent_id);
+        (*scene).get_children(parent).len()
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn scene_get_child_id(scene: *const Scene, parent_id: u64, index: usize) -> u64 {
+    if scene.is_null() {
+        return 0;
+    }
+    unsafe {
+        let parent = Entity::new(parent_id);
+        let children = (*scene).get_children(parent);
+        children.get(index).map(|c| c.id).unwrap_or(0)
+    }
+}
