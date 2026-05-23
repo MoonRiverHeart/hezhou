@@ -77,6 +77,8 @@ pub fn compile_editor_script() {
             "scripts/UI.NewWidgets.cs",
             "scripts/UI.Scene.cs",
             "scripts/UI.AssetProject.cs",
+            "scripts/AssetProjectTest.cs",
+            "scripts/UITestRunner.cs",
             "scripts/DFX.cs",
         ])
         .output();
@@ -119,6 +121,8 @@ fn recompile_editor_script() -> bool {
             "scripts/UI.NewWidgets.cs",
             "scripts/UI.Scene.cs",
             "scripts/UI.AssetProject.cs",
+            "scripts/AssetProjectTest.cs",
+            "scripts/UITestRunner.cs",
             "scripts/DFX.cs",
         ])
         .output();
