@@ -163,22 +163,22 @@ namespace Hezhou
                 return;
             }
 
-            // UI Test shortcuts: Ctrl+Shift+F5=Sequential, Ctrl+Shift+F6=Random, Ctrl+Shift+F7=Stress
+            // UI Test shortcuts: Ctrl+Shift+F5/F6/F7 → show config dialog
             if (pressed && ctrl && shift)
             {
                 if (keycode == KEY_F5)
                 {
-                    UITestRunner.StartSequentialTraversal(200, 60f);
+                    UITestRunner.ShowTestConfigDialog(TestMode.SequentialTraversal);
                     return;
                 }
                 if (keycode == KEY_F6)
                 {
-                    UITestRunner.StartRandomTraversal(200, 60f);
+                    UITestRunner.ShowTestConfigDialog(TestMode.RandomTraversal);
                     return;
                 }
                 if (keycode == KEY_F7)
                 {
-                    UITestRunner.StartStressTest(30f);
+                    UITestRunner.ShowTestConfigDialog(TestMode.StressTest);
                     return;
                 }
             }

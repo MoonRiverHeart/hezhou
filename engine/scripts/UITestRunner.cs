@@ -38,10 +38,27 @@ namespace Hezhou
         private static int _passedCount = 0;
         private static int _failedCount = 0;
 
+        // === Click Interval ===
+        private static float _clickInterval = 0.5f; // seconds between clicks
+        private static float _intervalTimer = 0f;
+
+        // === No-Response Timeout ===
+        private static float _lastFrameDelta = 0f; // detect engine freeze
+
         // === Report UI ===
         private static ulong _reportPanelId = 0;
         private static ulong _reportCloseBtnId = 0;
         private static UI.WidgetCallbackDelegate _closeReportCallback;
+
+        // === Config Dialog ===
+        private static ulong _configDialogId = 0;
+        private static ulong _configStepsInputId = 0;
+        private static ulong _configDurationInputId = 0;
+        private static ulong _configIntervalInputId = 0;
+        private static ulong _configModeDropdownId = 0;
+        private static TestMode _pendingMode;
+        private static UI.DialogResultCallbackDelegate _configDialogResultCallback;
+        private static UI.DropdownSelectCallbackDelegate _configModeSelectCallback;
 
         // === Random ===
         private static Random _random = new Random();
@@ -50,28 +67,144 @@ namespace Hezhou
         public static bool IsRunning { get { return _running; } }
         public static bool IsCompleted { get { return _completed; } }
 
+        // === Config Dialog ===
+
+        public static void ShowTestConfigDialog(TestMode initialMode)
+        {
+            _pendingMode = initialMode;
+            ulong rootId = UI.GetRootId();
+            float cs = UI.GetContentScale();
+            float dialogWidth = 420f * cs;
+            float dialogHeight = 320f * cs;
+
+            _configDialogId = UI.CreateDialog(rootId, "UI Test Config", dialogWidth, dialogHeight);
+            _configDialogResultCallback = OnConfigDialogResult;
+            UI.DialogSetOnResult(_configDialogId, _configDialogResultCallback);
+
+            ulong content = UI.CreateVStack(_configDialogId, 6f * cs);
+            UI.SetFlexExpand(content, true);
+            UI.SetCrossAxisFill(content, true);
+
+            // Mode selector
+            ulong modeRow = UI.CreateHStack(content, 8f * cs);
+            UI.SetFlexExpand(modeRow, true);
+            UI.CreateLabel(modeRow, 80f * cs, 28f * cs, "Mode:");
+            string[] modeOptions = new string[] { "Sequential", "Random", "Stress" };
+            _configModeDropdownId = UI.CreateDropdown(modeRow, 180f * cs, 28f * cs);
+            UI.DropdownSetOptions(_configModeDropdownId, modeOptions);
+            UI.DropdownSetSelected(_configModeDropdownId, (ulong)initialMode);
+            _configModeSelectCallback = OnConfigModeSelect;
+            UI.DropdownSetOnSelect(_configModeDropdownId, _configModeSelectCallback);
+
+            // Steps input
+            ulong stepsRow = UI.CreateHStack(content, 8f * cs);
+            UI.SetFlexExpand(stepsRow, true);
+            UI.CreateLabel(stepsRow, 80f * cs, 28f * cs, "Steps:");
+            _configStepsInputId = UI.CreateInputField(stepsRow, 180f * cs, 28f * cs);
+            UI.InputFieldSetPlaceholder(_configStepsInputId, "200");
+            UI.InputFieldSetText(_configStepsInputId, "200");
+
+            // Duration input
+            ulong durationRow = UI.CreateHStack(content, 8f * cs);
+            UI.SetFlexExpand(durationRow, true);
+            UI.CreateLabel(durationRow, 80f * cs, 28f * cs, "Duration:");
+            _configDurationInputId = UI.CreateInputField(durationRow, 180f * cs, 28f * cs);
+            UI.InputFieldSetPlaceholder(_configDurationInputId, "60");
+            UI.InputFieldSetText(_configDurationInputId, "60");
+
+            // Interval input
+            ulong intervalRow = UI.CreateHStack(content, 8f * cs);
+            UI.SetFlexExpand(intervalRow, true);
+            UI.CreateLabel(intervalRow, 80f * cs, 28f * cs, "Interval:");
+            _configIntervalInputId = UI.CreateInputField(intervalRow, 180f * cs, 28f * cs);
+            UI.InputFieldSetPlaceholder(_configIntervalInputId, "0.5");
+            UI.InputFieldSetText(_configIntervalInputId, "0.5");
+
+            // Hint label
+            UI.CreateLabel(content, dialogWidth - 20f * cs, 24f * cs, "Interval: seconds between clicks (min 0.1)");
+
+            UI.DialogSetContent(_configDialogId, content);
+            UI.DialogAddButton(_configDialogId, "Start", 1);
+            UI.DialogAddButton(_configDialogId, "Cancel", 0);
+            UI.DialogShow(_configDialogId);
+        }
+
+        private static void OnConfigModeSelect(ulong widgetId, ulong index)
+        {
+            _pendingMode = (TestMode)index;
+        }
+
+        private static void OnConfigDialogResult(ulong dialogId, int result)
+        {
+            UI.DialogHide(_configDialogId);
+
+            if (result == 1)
+            {
+                // Parse inputs
+                int steps = ParseInt(UI.InputFieldGetText(_configStepsInputId), 200);
+                float duration = ParseFloat(UI.InputFieldGetText(_configDurationInputId), 60f);
+                float interval = ParseFloat(UI.InputFieldGetText(_configIntervalInputId), 0.5f);
+
+                // Clamp interval to minimum 0.1s
+                if (interval < 0.1f) interval = 0.1f;
+
+                StartTest(_pendingMode, steps, duration, interval);
+            }
+
+            _configDialogId = 0;
+        }
+
+        private static int ParseInt(string text, int defaultVal)
+        {
+            try
+            {
+                if (text != null && text.Length > 0)
+                {
+                    return int.Parse(text);
+                }
+            }
+            catch { }
+            return defaultVal;
+        }
+
+        private static float ParseFloat(string text, float defaultVal)
+        {
+            try
+            {
+                if (text != null && text.Length > 0)
+                {
+                    return float.Parse(text);
+                }
+            }
+            catch { }
+            return defaultVal;
+        }
+
         // === Start Test ===
 
-        public static void StartSequentialTraversal(int maxSteps, float maxDurationSeconds)
+        public static void StartSequentialTraversal(int maxSteps, float maxDurationSeconds, float clickInterval)
         {
-            StartTest(TestMode.SequentialTraversal, maxSteps, maxDurationSeconds);
+            StartTest(TestMode.SequentialTraversal, maxSteps, maxDurationSeconds, clickInterval);
         }
 
-        public static void StartRandomTraversal(int maxSteps, float maxDurationSeconds)
+        public static void StartRandomTraversal(int maxSteps, float maxDurationSeconds, float clickInterval)
         {
-            StartTest(TestMode.RandomTraversal, maxSteps, maxDurationSeconds);
+            StartTest(TestMode.RandomTraversal, maxSteps, maxDurationSeconds, clickInterval);
         }
 
-        public static void StartStressTest(float maxDurationSeconds)
+        public static void StartStressTest(float maxDurationSeconds, float clickInterval)
         {
-            StartTest(TestMode.StressTest, 99999, maxDurationSeconds);
+            StartTest(TestMode.StressTest, 99999, maxDurationSeconds, clickInterval);
         }
 
-        private static void StartTest(TestMode mode, int maxSteps, float maxDurationSeconds)
+        private static void StartTest(TestMode mode, int maxSteps, float maxDurationSeconds, float clickInterval)
         {
             _mode = mode;
             _targetSteps = maxSteps;
             _targetDuration = maxDurationSeconds;
+            _clickInterval = clickInterval;
+            _intervalTimer = 0f;
+            _lastFrameDelta = 0f;
             _steps = new List<TestStep>();
             _widgetIds = new List<ulong>();
             _currentStepIndex = 0;
@@ -108,7 +241,7 @@ namespace Hezhou
 
             _running = true;
             string modeStr = ModeToString(mode);
-            Log.Info("UITest", "Test started: mode=" + modeStr + " steps=" + maxSteps + " duration=" + maxDurationSeconds + "s widgets=" + _widgetIds.Count);
+            Log.Info("UITest", "Test started: mode=" + modeStr + " steps=" + maxSteps + " duration=" + maxDurationSeconds + "s interval=" + clickInterval + "s widgets=" + _widgetIds.Count);
         }
 
         // === Update (called from EditorScript.Update) ===
@@ -117,7 +250,43 @@ namespace Hezhou
         {
             if (!_running) return;
 
-            _elapsedTime += deltaTime / 1000f;
+            // deltaTime in milliseconds from editor
+            float dtSeconds = deltaTime / 1000f;
+
+            // No-response timeout detection: if a single frame delta > 3s, engine was frozen
+            if (deltaTime > 3000f && _lastFrameDelta > 0f)
+            {
+                // Engine froze for >3 seconds — record as timeout
+                TestStep timeoutStep = new TestStep();
+                timeoutStep.StepNumber = _steps.Count + 1;
+                timeoutStep.WidgetId = 0;
+                timeoutStep.WidgetType = "Engine Freeze";
+                timeoutStep.Success = false;
+                timeoutStep.ErrorMessage = "No response for " + (deltaTime / 1000f).ToString("F1") + "s (timeout >3s)";
+                timeoutStep.ScreenshotPath = "";
+                timeoutStep.ClickX = 0;
+                timeoutStep.ClickY = 0;
+                timeoutStep.Layout = null;
+                _steps.Add(timeoutStep);
+                _failedCount++;
+
+                // Try to capture screenshot of frozen state
+                try
+                {
+                    string freezePath = "screenshots/step_" + timeoutStep.StepNumber + "_freeze.png";
+                    int errResult = UI.CaptureScreenshotToFile(freezePath);
+                    if (errResult == 0)
+                    {
+                        timeoutStep.ScreenshotPath = freezePath;
+                    }
+                }
+                catch { }
+
+                Log.Error("UITest", "Engine freeze detected: " + (deltaTime / 1000f).ToString("F1") + "s gap");
+            }
+            _lastFrameDelta = deltaTime;
+
+            _elapsedTime += dtSeconds;
 
             // Check termination conditions
             bool shouldStop = false;
@@ -130,6 +299,14 @@ namespace Hezhou
                 CompleteTest();
                 return;
             }
+
+            // Click interval control: accumulate time, only click when interval elapsed
+            _intervalTimer += dtSeconds;
+            if (_intervalTimer < _clickInterval)
+            {
+                return; // Wait for next interval
+            }
+            _intervalTimer -= _clickInterval; // Keep residual time for next step
 
             // Select widget for this step
             ulong widgetId;
@@ -302,7 +479,7 @@ namespace Hezhou
             float passRate = _steps.Count > 0 ? (_passedCount * 100f / _steps.Count) : 0f;
 
             string summaryLine1 = "Mode: " + modeStr + "  |  Total Steps: " + _steps.Count + "  |  Passed: " + _passedCount + "  |  Failed: " + _failedCount;
-            string summaryLine2 = "Pass Rate: " + passRate.ToString("F1") + "%  |  Duration: " + _elapsedTime.ToString("F1") + "s  |  Widgets Tested: " + _widgetIds.Count;
+            string summaryLine2 = "Pass Rate: " + passRate.ToString("F1") + "%  |  Duration: " + _elapsedTime.ToString("F1") + "s  |  Interval: " + _clickInterval.ToString("F2") + "s  |  Widgets: " + _widgetIds.Count;
 
             ulong summaryPanel = UI.CreatePanel(_reportPanelId, 15f * cs, 55f * cs, sw - 30f * cs, 70f * cs, 0.12f, 0.12f, 0.15f, 1.0f);
             ulong summaryContent = UI.CreateVStack(summaryPanel, 5f * cs);
@@ -354,11 +531,15 @@ namespace Hezhou
         {
             float rowWidth = screenWidth - 50f * cs;
 
-            // Color: green for pass, red for fail
+            // Color: green for pass, red for fail, orange for timeout/freeze
             float bgR, bgG, bgB;
             if (step.Success)
             {
                 bgR = 0.12f; bgG = 0.22f; bgB = 0.12f;
+            }
+            else if (step.WidgetType == "Engine Freeze")
+            {
+                bgR = 0.25f; bgG = 0.18f; bgB = 0.08f; // Orange for timeout
             }
             else
             {
@@ -371,8 +552,12 @@ namespace Hezhou
             UI.SetCrossAxisFill(rowContent, true);
 
             // Line 1: step number, status, widget type, click position
-            string statusIcon = step.Success ? "PASS" : "FAIL";
-            string line1 = "#" + step.StepNumber + " [" + statusIcon + "] " + step.WidgetType + "(id=" + step.WidgetId + ")";
+            string statusIcon = step.WidgetType == "Engine Freeze" ? "TIMEOUT" : (step.Success ? "PASS" : "FAIL");
+            string line1 = "#" + step.StepNumber + " [" + statusIcon + "] " + step.WidgetType;
+            if (step.WidgetId != 0)
+            {
+                line1 += "(id=" + step.WidgetId + ")";
+            }
 
             if (step.ClickX != 0 || step.ClickY != 0)
             {
