@@ -5,7 +5,7 @@ use glfw::{Glfw, PWindow, GlfwReceiver, WindowEvent, WindowMode, Action, Key};
 use std::ffi::CString;
 use std::collections::HashMap;
 use hezhou_ui::{UISystem, UIInputHandler, Panel, Button, Label, TextEdit, Layout, DrawCommand, Widget, Style, Color, TextStyle, ffi::WidgetTreeHandle, ffi::ui_set_primary_button_id};
-use hezhou_platform::{MouseAction, MouseEvent, MouseButton, CharEvent, KeyEvent, KeyAction, KeyModifiers, KeyCode};
+use hezhou_platform::{MouseAction, MouseEvent, MouseButton, CharEvent, KeyEvent, KeyAction, KeyModifiers, KeyCode, convert_glfw_key};
 use hezhou_dfx::{DfxSystem, LogLevel, dfx_debug};
 use parking_lot::Mutex;
 use std::sync::Arc;
@@ -3290,161 +3290,25 @@ let font_atlas_guard = ui.get_font_atlas().lock();
                         }
                     }
                     
-                    // 方向键和其他键需要处理 Press/Release/Repeat
-                    
-                    // Escape键
-                    if key == Key::Escape {
-                        // GLFW: Press=1, Release=0, Repeat=2 → Rust: Press=0, Release=1, Repeat=2
+                    // Generic key event handler: dispatch ALL keys with proper modifier state
+                    let keycode = convert_glfw_key(key);
+                    if keycode != KeyCode::Unknown {
                         let key_action = match action_raw {
                             1 => KeyAction::Press,
                             0 => KeyAction::Release,
                             2 => KeyAction::Repeat,
                             _ => KeyAction::Press,
                         };
-                        self.input_handler.lock().on_key_event(&KeyEvent {
-                            action: key_action,
-                            keycode: KeyCode::Escape,
-                            modifiers: KeyModifiers::default(),
-                        }, self.frame_count);
-                    }
-                    
-                    if key == Key::Backspace {
-                        let key_action = match action_raw {
-                            1 => KeyAction::Press,
-                            0 => KeyAction::Release,
-                            2 => KeyAction::Repeat,
-                            _ => KeyAction::Press,
+                        let key_modifiers = KeyModifiers {
+                            shift: mods.contains(glfw::Modifiers::Shift),
+                            ctrl: mods.contains(glfw::Modifiers::Control),
+                            alt: mods.contains(glfw::Modifiers::Alt),
                         };
                         self.input_handler.lock().on_key_event(&KeyEvent {
                             action: key_action,
-                            keycode: KeyCode::Backspace,
-                            modifiers: KeyModifiers::default(),
+                            keycode,
+                            modifiers: key_modifiers,
                         }, self.frame_count);
-                    }
-                    
-                    // 方向键
-                    if key == Key::Left {
-                        let key_action = match action_raw {
-                            1 => KeyAction::Press,
-                            0 => KeyAction::Release,
-                            2 => KeyAction::Repeat,
-                            _ => KeyAction::Press,
-                        };
-                        self.input_handler.lock().on_key_event(&KeyEvent {
-                            action: key_action,
-                            keycode: KeyCode::Left,
-                            modifiers: KeyModifiers::default(),
-                        }, self.frame_count);
-                    }
-                    if key == Key::Right {
-                        let key_action = match action_raw {
-                            1 => KeyAction::Press,
-                            0 => KeyAction::Release,
-                            2 => KeyAction::Repeat,
-                            _ => KeyAction::Press,
-                        };
-                        self.input_handler.lock().on_key_event(&KeyEvent {
-                            action: key_action,
-                            keycode: KeyCode::Right,
-                            modifiers: KeyModifiers::default(),
-                        }, self.frame_count);
-                    }
-                    if key == Key::Up {
-                        let key_action = match action_raw {
-                            1 => KeyAction::Press,
-                            0 => KeyAction::Release,
-                            2 => KeyAction::Repeat,
-                            _ => KeyAction::Press,
-                        };
-                        self.input_handler.lock().on_key_event(&KeyEvent {
-                            action: key_action,
-                            keycode: KeyCode::Up,
-                            modifiers: KeyModifiers::default(),
-                        }, self.frame_count);
-                    }
-                    if key == Key::Down {
-                        let key_action = match action_raw {
-                            1 => KeyAction::Press,
-                            0 => KeyAction::Release,
-                            2 => KeyAction::Repeat,
-                            _ => KeyAction::Press,
-                        };
-                        self.input_handler.lock().on_key_event(&KeyEvent {
-                            action: key_action,
-                            keycode: KeyCode::Down,
-                            modifiers: KeyModifiers::default(),
-                        }, self.frame_count);
-                    }
-                    
-                    // Home/End键
-                    if key == Key::Home {
-                        let key_action = match action_raw {
-                            1 => KeyAction::Press,
-                            0 => KeyAction::Release,
-                            2 => KeyAction::Repeat,
-                            _ => KeyAction::Press,
-                        };
-                        self.input_handler.lock().on_key_event(&KeyEvent {
-                            action: key_action,
-                            keycode: KeyCode::Home,
-                            modifiers: KeyModifiers::default(),
-                        }, self.frame_count);
-                    }
-                    if key == Key::End {
-                        let key_action = match action_raw {
-                            1 => KeyAction::Press,
-                            0 => KeyAction::Release,
-                            2 => KeyAction::Repeat,
-                            _ => KeyAction::Press,
-                        };
-                        self.input_handler.lock().on_key_event(&KeyEvent {
-                            action: key_action,
-                            keycode: KeyCode::End,
-                            modifiers: KeyModifiers::default(),
-                        }, self.frame_count);
-                    }
-                    
-                    // Ctrl+C/V/X 复制粘贴剪切
-                    if mods == glfw::Modifiers::Control {
-                        if key == Key::C {
-                            let key_action = match action_raw {
-                                1 => KeyAction::Press,
-                                0 => KeyAction::Release,
-                                2 => KeyAction::Repeat,
-                                _ => KeyAction::Press,
-                            };
-                            self.input_handler.lock().on_key_event(&KeyEvent {
-                                action: key_action,
-                                keycode: KeyCode::C,
-                                modifiers: KeyModifiers { ctrl: true, shift: false, alt: false },
-                            }, self.frame_count);
-                        }
-                        if key == Key::V {
-                            let key_action = match action_raw {
-                                1 => KeyAction::Press,
-                                0 => KeyAction::Release,
-                                2 => KeyAction::Repeat,
-                                _ => KeyAction::Press,
-                            };
-                            self.input_handler.lock().on_key_event(&KeyEvent {
-                                action: key_action,
-                                keycode: KeyCode::V,
-                                modifiers: KeyModifiers { ctrl: true, shift: false, alt: false },
-                            }, self.frame_count);
-                        }
-                        if key == Key::X {
-                            let key_action = match action_raw {
-                                1 => KeyAction::Press,
-                                0 => KeyAction::Release,
-                                2 => KeyAction::Repeat,
-                                _ => KeyAction::Press,
-                            };
-                            self.input_handler.lock().on_key_event(&KeyEvent {
-                                action: key_action,
-                                keycode: KeyCode::X,
-                                modifiers: KeyModifiers { ctrl: true, shift: false, alt: false },
-                            }, self.frame_count);
-                        }
                     }
                 }
                 WindowEvent::Char(codepoint) => {

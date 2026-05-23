@@ -17,6 +17,9 @@ use hezhou_dfx::*;
 #[cfg(feature = "glfw")]
 pub use glfw_backend::GLFWPlatform;
 
+#[cfg(feature = "glfw")]
+pub use glfw_backend::convert_glfw_key;
+
 #[cfg(feature = "harmony")]
 pub use harmony_backend::HarmonyPlatform;
 
