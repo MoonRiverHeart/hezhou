@@ -466,6 +466,9 @@ pub fn perform_layout(&mut self, font_atlas: &FontAtlas) {
             "TreeView" => {
                 self.layout_tree_view_children(id, font_atlas);
             }
+            "Dialog" => {
+                self.layout_dialog_children(id);
+            }
             "SplitView" => {
                 self.layout_split_view_children(id);
             }
@@ -852,6 +855,44 @@ pub fn perform_layout(&mut self, font_atlas: &FontAtlas) {
                         second_height.max(child_layout.height),
                     ));
                 }
+            }
+        }
+    }
+
+    fn layout_dialog_children(&mut self, id: WidgetId) {
+        // Get Dialog properties: content_id, title_bar_height, button_height, content_scale
+        let dialog_info = {
+            if let Some(node) = self.nodes.get(&id) {
+                if let Some(dialog) = node.widget.as_any().downcast_ref::<crate::widgets::Dialog>() {
+                    (dialog.content_id, dialog.title_bar_height, dialog.button_height, dialog.content_scale, *dialog.layout())
+                } else {
+                    return;
+                }
+            } else {
+                return;
+            }
+        };
+
+        let (content_id, title_bar_height, button_height, content_scale, dialog_layout) = dialog_info;
+        let scaled_title_height = title_bar_height * content_scale;
+        let scaled_button_height = button_height * content_scale;
+        // Button area has 10px padding above buttons
+        let button_area_height = scaled_button_height + 10.0 * content_scale;
+
+        // Position the content widget inside the content_rect area
+        // Content rect: (0, scaled_title_height, dialog_width, dialog_height - scaled_title_height - button_area_height)
+        if let Some(content_widget_id) = content_id {
+            let content_y = scaled_title_height;
+            let content_width = dialog_layout.width;
+            let content_height = dialog_layout.height - scaled_title_height - button_area_height;
+
+            if let Some(node) = self.nodes.get_mut(&content_widget_id) {
+                node.widget.set_layout(crate::layout::Layout::new(
+                    0.0,
+                    content_y,
+                    content_width,
+                    content_height,
+                ));
             }
         }
     }
