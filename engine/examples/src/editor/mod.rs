@@ -1,5 +1,5 @@
 use hezhou_rhi_vulkan::UIVulkanRenderer;
-use hezhou_scripting::{MonoUIExecutor, ffi_context::{FfiContext, WidgetTreeHandle, SetStatusTextFn, OnHotReloadCompleteFn}};
+use hezhou_scripting::{MonoUIExecutor, ffi_context::{FfiContext, WidgetTreeHandle, EventDispatcherHandle, SetStatusTextFn, OnHotReloadCompleteFn}};
 use hezhou_ui::ffi as ui_ffi;
 use hezhou_dfx::*;
 use std::time::{Duration, Instant};
@@ -72,6 +72,7 @@ pub fn run() {
     dfx_trace_end!("Script", "compile");
 
     let widget_tree_handle: WidgetTreeHandle = renderer.get_widget_tree_handle() as WidgetTreeHandle;
+    let event_dispatcher_handle = renderer.get_event_dispatcher_handle() as *mut std::ffi::c_void;
     
     let dfx_for_csharp = hezhou_dfx::dfx_create();
     hezhou_dfx::dfx_set_log_level(dfx_for_csharp, 2);
@@ -285,6 +286,16 @@ ui_tree_view_set_on_select_thunk_ptr: unsafe { std::mem::transmute(ui_ffi::ui_tr
         ui_widget_set_flex_expand: unsafe { std::mem::transmute(ui_ffi::ui_widget_set_flex_expand as *const std::ffi::c_void) },
         ui_widget_set_cross_axis_fill: unsafe { std::mem::transmute(ui_ffi::ui_widget_set_cross_axis_fill as *const std::ffi::c_void) },
         ui_widget_set_background_color: unsafe { std::mem::transmute(ui_ffi::ui_widget_set_background_color as *const std::ffi::c_void) },
+        event_dispatcher_ptr: event_dispatcher_handle,
+        ui_simulate_click_at: unsafe { std::mem::transmute(ui_ffi::ui_simulate_click_at as *const std::ffi::c_void) },
+        ui_widget_get_type: unsafe { std::mem::transmute(ui_ffi::ui_widget_get_type as *const std::ffi::c_void) },
+        ui_widget_get_layout: unsafe { std::mem::transmute(ui_ffi::ui_widget_get_layout as *const std::ffi::c_void) },
+        ui_widget_get_parent: unsafe { std::mem::transmute(ui_ffi::ui_widget_get_parent as *const std::ffi::c_void) },
+        ui_widget_get_child_count: unsafe { std::mem::transmute(ui_ffi::ui_widget_get_child_count as *const std::ffi::c_void) },
+        ui_widget_get_child_id: unsafe { std::mem::transmute(ui_ffi::ui_widget_get_child_id as *const std::ffi::c_void) },
+        ui_widget_get_total_count: unsafe { std::mem::transmute(ui_ffi::ui_widget_get_total_count as *const std::ffi::c_void) },
+        ui_debug_dump_tree_to_buffer: unsafe { std::mem::transmute(ui_ffi::ui_debug_dump_tree_to_buffer as *const std::ffi::c_void) },
+        capture_screenshot_to_file: ffi_impl::capture_screenshot_to_file,
         asset_library_get_category_count: hezhou_core::asset_library_get_category_count,
         asset_library_get_category_name: hezhou_core::asset_library_get_category_name,
         asset_library_get_asset_count: hezhou_core::asset_library_get_asset_count,

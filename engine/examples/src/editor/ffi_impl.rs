@@ -107,3 +107,21 @@ pub extern "C" fn set_selected_entity(entity_id: u64, selected: bool) {
         }
     }
 }
+
+#[unsafe(no_mangle)]
+pub extern "C" fn capture_screenshot_to_file(path_ptr: *const i8) -> i32 {
+    unsafe {
+        if path_ptr.is_null() {
+            return -1;
+        }
+        let path = std::ffi::CStr::from_ptr(path_ptr).to_string_lossy().into_owned();
+        if let Some(renderer_ptr) = super::RENDERER {
+            match (*renderer_ptr).capture_screenshot(&path) {
+                Ok(_) => 0,
+                Err(_) => -2,
+            }
+        } else {
+            -3
+        }
+    }
+}

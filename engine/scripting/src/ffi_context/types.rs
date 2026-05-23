@@ -27,3 +27,15 @@ pub type DebugPrintWidgetTreeFn = extern "C" fn(WidgetTreeHandle);
 pub type SetFlexExpandFn = extern "C" fn(WidgetTreeHandle, u64, u32);
 pub type SetCrossAxisFillFn = extern "C" fn(WidgetTreeHandle, u64, u32);
 pub type SetWidgetBackgroundColorFn = extern "C" fn(WidgetTreeHandle, u64, f32, f32, f32, f32);
+
+pub type EventDispatcherHandle = *mut c_void;
+
+pub type SimulateClickAtFn = extern "C" fn(WidgetTreeHandle, EventDispatcherHandle, f32, f32) -> u64;
+pub type WidgetGetTypeFn = extern "C" fn(WidgetTreeHandle, u64, *mut u8, u32) -> u32;
+pub type WidgetGetLayoutFn = extern "C" fn(WidgetTreeHandle, u64, *mut f32) -> u32;
+pub type WidgetGetParentFn = extern "C" fn(WidgetTreeHandle, u64) -> u64;
+pub type WidgetGetChildCountFn = extern "C" fn(WidgetTreeHandle, u64) -> u32;
+pub type WidgetGetChildIdFn = extern "C" fn(WidgetTreeHandle, u64, u32) -> u64;
+pub type WidgetGetTotalCountFn = extern "C" fn(WidgetTreeHandle) -> u32;
+pub type DebugDumpTreeToBufferFn = extern "C" fn(WidgetTreeHandle, *mut u8, u32) -> u32;
+pub type CaptureScreenshotToFileFn = extern "C" fn(*const c_char) -> i32;

@@ -365,6 +365,138 @@ public static ulong GetRootId()
             var func = Marshal.GetDelegateForFunctionPointer<SetOnClickDelegate>(_ffi.ui_button_set_on_click_thunk_ptr);
             func(_widgetTree, widgetId, callbackPtr);
         }
+
+        // ========== Automated UI Testing ==========
+
+        public static ulong SimulateClickAt(float x, float y)
+        {
+            if (_ffi.ui_simulate_click_at == IntPtr.Zero)
+            {
+                Log.Error("C#", "SimulateClickAt函数指针为空");
+                return 0;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<SimulateClickAtDelegate>(_ffi.ui_simulate_click_at);
+            return func(_widgetTree, _eventDispatcher, x, y);
+        }
+
+        public static string WidgetGetType(ulong widgetId)
+        {
+            if (_ffi.ui_widget_get_type == IntPtr.Zero)
+            {
+                Log.Error("C#", "WidgetGetType函数指针为空");
+                return "";
+            }
+            const uint BUF_SIZE = 256;
+            IntPtr buf = Marshal.AllocHGlobal((int)BUF_SIZE);
+            var func = Marshal.GetDelegateForFunctionPointer<WidgetGetTypeDelegate>(_ffi.ui_widget_get_type);
+            uint written = func(_widgetTree, widgetId, buf, BUF_SIZE);
+            if (written == 0)
+            {
+                Marshal.FreeHGlobal(buf);
+                return "";
+            }
+            string result = Marshal.PtrToStringAnsi(buf);
+            Marshal.FreeHGlobal(buf);
+            return result ?? "";
+        }
+
+        public static float[] WidgetGetLayout(ulong widgetId)
+        {
+            if (_ffi.ui_widget_get_layout == IntPtr.Zero)
+            {
+                Log.Error("C#", "WidgetGetLayout函数指针为空");
+                return new float[] { 0, 0, 0, 0 };
+            }
+            float[] buffer = new float[4];
+            IntPtr outLayout = Marshal.AllocHGlobal(4 * 4); // float[4] = 16 bytes
+            var func = Marshal.GetDelegateForFunctionPointer<WidgetGetLayoutDelegate>(_ffi.ui_widget_get_layout);
+            uint found = func(_widgetTree, widgetId, outLayout);
+            if (found == 1)
+            {
+                Marshal.Copy(outLayout, buffer, 0, 4);
+            }
+            Marshal.FreeHGlobal(outLayout);
+            return buffer;
+        }
+
+        public static ulong WidgetGetParent(ulong widgetId)
+        {
+            if (_ffi.ui_widget_get_parent == IntPtr.Zero)
+            {
+                Log.Error("C#", "WidgetGetParent函数指针为空");
+                return 0;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<WidgetGetParentDelegate>(_ffi.ui_widget_get_parent);
+            return func(_widgetTree, widgetId);
+        }
+
+        public static uint WidgetGetChildCount(ulong widgetId)
+        {
+            if (_ffi.ui_widget_get_child_count == IntPtr.Zero)
+            {
+                Log.Error("C#", "WidgetGetChildCount函数指针为空");
+                return 0;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<WidgetGetChildCountDelegate>(_ffi.ui_widget_get_child_count);
+            return func(_widgetTree, widgetId);
+        }
+
+        public static ulong WidgetGetChildId(ulong widgetId, uint index)
+        {
+            if (_ffi.ui_widget_get_child_id == IntPtr.Zero)
+            {
+                Log.Error("C#", "WidgetGetChildId函数指针为空");
+                return 0;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<WidgetGetChildIdDelegate>(_ffi.ui_widget_get_child_id);
+            return func(_widgetTree, widgetId, index);
+        }
+
+        public static uint WidgetGetTotalCount()
+        {
+            if (_ffi.ui_widget_get_total_count == IntPtr.Zero)
+            {
+                Log.Error("C#", "WidgetGetTotalCount函数指针为空");
+                return 0;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<WidgetGetTotalCountDelegate>(_ffi.ui_widget_get_total_count);
+            return func(_widgetTree);
+        }
+
+        public static string DebugDumpTree()
+        {
+            if (_ffi.ui_debug_dump_tree_to_buffer == IntPtr.Zero)
+            {
+                Log.Error("C#", "DebugDumpTree函数指针为空");
+                return "";
+            }
+            const uint BUF_SIZE = 8192;
+            IntPtr buf = Marshal.AllocHGlobal((int)BUF_SIZE);
+            var func = Marshal.GetDelegateForFunctionPointer<DebugDumpTreeToBufferDelegate>(_ffi.ui_debug_dump_tree_to_buffer);
+            uint written = func(_widgetTree, buf, BUF_SIZE);
+            if (written == 0)
+            {
+                Marshal.FreeHGlobal(buf);
+                return "";
+            }
+            string result = Marshal.PtrToStringAnsi(buf);
+            Marshal.FreeHGlobal(buf);
+            return result ?? "";
+        }
+
+        public static int CaptureScreenshotToFile(string path)
+        {
+            if (_ffi.capture_screenshot_to_file == IntPtr.Zero)
+            {
+                Log.Error("C#", "CaptureScreenshotToFile函数指针为空");
+                return -1;
+            }
+            IntPtr pathPtr = Marshal.StringToHGlobalAnsi(path);
+            var func = Marshal.GetDelegateForFunctionPointer<CaptureScreenshotToFileDelegate>(_ffi.capture_screenshot_to_file);
+            int result = func(pathPtr);
+            Marshal.FreeHGlobal(pathPtr);
+            return result;
+        }
     }
 
     public class VStack

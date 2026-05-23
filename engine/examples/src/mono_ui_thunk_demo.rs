@@ -91,6 +91,16 @@ pub extern "C" fn on_hot_reload_complete_stub() {}
 pub extern "C" fn dfx_set_counter_stub(_system: *mut std::ffi::c_void, _name: *const i8, _category: *const i8, _value: i64) {}
 pub extern "C" fn dfx_perf_begin_frame_stub(_system: *mut std::ffi::c_void) {}
 pub extern "C" fn dfx_perf_end_frame_stub(_system: *mut std::ffi::c_void) {}
+// UI Testing stubs
+pub extern "C" fn ui_simulate_click_at_stub(_handle: *mut std::ffi::c_void, _ed: *mut std::ffi::c_void, _x: f32, _y: f32) -> u64 { 0 }
+pub extern "C" fn ui_widget_get_type_stub(_handle: *mut std::ffi::c_void, _id: u64, _buf: *mut u8, _len: u32) -> u32 { 0 }
+pub extern "C" fn ui_widget_get_layout_stub(_handle: *mut std::ffi::c_void, _id: u64, _out: *mut f32) -> u32 { 0 }
+pub extern "C" fn ui_widget_get_parent_stub(_handle: *mut std::ffi::c_void, _id: u64) -> u64 { 0 }
+pub extern "C" fn ui_widget_get_child_count_stub(_handle: *mut std::ffi::c_void, _id: u64) -> u32 { 0 }
+pub extern "C" fn ui_widget_get_child_id_stub(_handle: *mut std::ffi::c_void, _id: u64, _index: u32) -> u64 { 0 }
+pub extern "C" fn ui_widget_get_total_count_stub(_handle: *mut std::ffi::c_void) -> u32 { 0 }
+pub extern "C" fn ui_debug_dump_tree_to_buffer_stub(_handle: *mut std::ffi::c_void, _buf: *mut u8, _len: u32) -> u32 { 0 }
+pub extern "C" fn capture_screenshot_to_file_stub(_path: *const i8) -> i32 { -1 }
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
@@ -338,6 +348,16 @@ fn main() {
         ui_widget_set_flex_expand: unsafe { std::mem::transmute(ui_ffi::ui_widget_set_flex_expand as *const std::ffi::c_void) },
         ui_widget_set_cross_axis_fill: unsafe { std::mem::transmute(ui_ffi::ui_widget_set_cross_axis_fill as *const std::ffi::c_void) },
         ui_widget_set_background_color: unsafe { std::mem::transmute(ui_ffi::ui_widget_set_background_color as *const std::ffi::c_void) },
+        event_dispatcher_ptr: std::ptr::null_mut(),
+        ui_simulate_click_at: unsafe { std::mem::transmute(ui_simulate_click_at_stub as *const std::ffi::c_void) },
+        ui_widget_get_type: unsafe { std::mem::transmute(ui_widget_get_type_stub as *const std::ffi::c_void) },
+        ui_widget_get_layout: unsafe { std::mem::transmute(ui_widget_get_layout_stub as *const std::ffi::c_void) },
+        ui_widget_get_parent: unsafe { std::mem::transmute(ui_widget_get_parent_stub as *const std::ffi::c_void) },
+        ui_widget_get_child_count: unsafe { std::mem::transmute(ui_widget_get_child_count_stub as *const std::ffi::c_void) },
+        ui_widget_get_child_id: unsafe { std::mem::transmute(ui_widget_get_child_id_stub as *const std::ffi::c_void) },
+        ui_widget_get_total_count: unsafe { std::mem::transmute(ui_widget_get_total_count_stub as *const std::ffi::c_void) },
+        ui_debug_dump_tree_to_buffer: unsafe { std::mem::transmute(ui_debug_dump_tree_to_buffer_stub as *const std::ffi::c_void) },
+        capture_screenshot_to_file: unsafe { std::mem::transmute(capture_screenshot_to_file_stub as *const std::ffi::c_void) },
         // Asset library stubs (not used in this demo)
         asset_library_get_category_count: stub_asset_library_get_category_count,
         asset_library_get_category_name: stub_asset_library_get_category_name,

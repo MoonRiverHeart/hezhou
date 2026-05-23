@@ -34,6 +34,7 @@ $EditorStateFile = "$ScriptsDir/EditorScript.State.cs"
 $EditorViewFile = "$ScriptsDir/EditorScript.View.cs"
 $EditorPresenterFile = "$ScriptsDir/EditorScript.Presenter.cs"
 $TestFile = "$ScriptsDir/AssetProjectTest.cs"
+$UITestRunnerFile = "$ScriptsDir/UITestRunner.cs"
 Write-Host "[Info] Compiling: $SourceFile"
 Write-Host "[Info] Including: $UiFile"
 Write-Host "[Info] Including: $UiWidgetsFile"
@@ -47,8 +48,9 @@ Write-Host "[Info] Including: $EditorStateFile"
 Write-Host "[Info] Including: $EditorViewFile"
 Write-Host "[Info] Including: $EditorPresenterFile"
 Write-Host "[Info] Including: $TestFile"
+Write-Host "[Info] Including: $UITestRunnerFile"
 
-$SourceFiles = @($SourceFile, $UiFile, $UiWidgetsFile, $UiComplexWidgetsFile, $UiNewWidgetsFile, $UiSceneFile, $UiAssetProjectFile, $DfxFile, $EditorFile, $EditorStateFile, $EditorViewFile, $EditorPresenterFile, $TestFile)
+$SourceFiles = @($SourceFile, $UiFile, $UiWidgetsFile, $UiComplexWidgetsFile, $UiNewWidgetsFile, $UiSceneFile, $UiAssetProjectFile, $DfxFile, $EditorFile, $EditorStateFile, $EditorViewFile, $EditorPresenterFile, $TestFile, $UITestRunnerFile)
 foreach ($file in $SourceFiles) {
     if (-not (Test-Path $file)) {
         Write-Host "[Error] Source file not found: $file" -ForegroundColor Red

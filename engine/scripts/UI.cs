@@ -7,6 +7,7 @@ namespace Hezhou
     public static partial class UI
     {
         private static IntPtr _widgetTree;
+        private static IntPtr _eventDispatcher;
         private static FfiContext _ffi;
         
         private static ResizeCallbackDelegate _savedResizeCallback;
@@ -720,6 +721,34 @@ namespace Hezhou
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public delegate bool ProjectRemoveEntityDelegate(ulong entityId);
 
+        // Automated UI Testing delegates
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate ulong SimulateClickAtDelegate(IntPtr widgetTree, IntPtr eventDispatcher, float x, float y);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate uint WidgetGetTypeDelegate(IntPtr handle, ulong widgetId, IntPtr buf, uint bufLen);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate uint WidgetGetLayoutDelegate(IntPtr handle, ulong widgetId, IntPtr outLayout);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate ulong WidgetGetParentDelegate(IntPtr handle, ulong widgetId);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate uint WidgetGetChildCountDelegate(IntPtr handle, ulong widgetId);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate ulong WidgetGetChildIdDelegate(IntPtr handle, ulong widgetId, uint index);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate uint WidgetGetTotalCountDelegate(IntPtr handle);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate uint DebugDumpTreeToBufferDelegate(IntPtr handle, IntPtr buf, uint bufLen);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate int CaptureScreenshotToFileDelegate(IntPtr pathPtr);
+
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public delegate void WidgetCallbackDelegate(ulong widgetId);
         
@@ -953,6 +982,16 @@ namespace Hezhou
             public IntPtr ui_widget_set_flex_expand;
             public IntPtr ui_widget_set_cross_axis_fill;
             public IntPtr ui_widget_set_background_color;
+            public IntPtr event_dispatcher_ptr;
+            public IntPtr ui_simulate_click_at;
+            public IntPtr ui_widget_get_type;
+            public IntPtr ui_widget_get_layout;
+            public IntPtr ui_widget_get_parent;
+            public IntPtr ui_widget_get_child_count;
+            public IntPtr ui_widget_get_child_id;
+            public IntPtr ui_widget_get_total_count;
+            public IntPtr ui_debug_dump_tree_to_buffer;
+            public IntPtr capture_screenshot_to_file;
             public IntPtr asset_library_get_category_count;
             public IntPtr asset_library_get_category_name;
             public IntPtr asset_library_get_asset_count;
@@ -979,6 +1018,7 @@ namespace Hezhou
         {
             _ffi = Marshal.PtrToStructure<FfiContext>(contextPtr);
             _widgetTree = _ffi.widget_tree_ptr;
+            _eventDispatcher = _ffi.event_dispatcher_ptr;
             
             if (_ffi.dfx_handle != IntPtr.Zero)
             {

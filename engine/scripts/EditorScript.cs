@@ -76,6 +76,13 @@ _hotReloadCompleteCallback = OnHotReloadComplete;
         
         public static void Update(float deltaTime)
         {
+            // If UITestRunner is active, delegate to it and skip normal editor update
+            if (UITestRunner.IsRunning)
+            {
+                UITestRunner.Update(deltaTime);
+                return;
+            }
+
             if (deltaTime > 0 && _fpsItem != null)
             {
                 try

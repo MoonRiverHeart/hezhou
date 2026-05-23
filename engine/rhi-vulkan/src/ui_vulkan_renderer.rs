@@ -1878,6 +1878,12 @@ let font_atlas_guard = ui.get_font_atlas().lock();
         Box::into_raw(Box::new(tree)) as WidgetTreeHandle
     }
     
+    pub fn get_event_dispatcher_handle(&self) -> hezhou_ui::ffi::EventDispatcherHandle {
+        let ui = self.ui_system.lock();
+        let dispatcher = ui.get_event_dispatcher();
+        Box::into_raw(Box::new(dispatcher)) as hezhou_ui::ffi::EventDispatcherHandle
+    }
+    
     pub fn get_ui_system(&self) -> Arc<Mutex<UISystem>> {
         Arc::clone(&self.ui_system)
     }

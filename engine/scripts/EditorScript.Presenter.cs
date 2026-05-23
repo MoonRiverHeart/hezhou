@@ -150,6 +150,9 @@ namespace Hezhou
             const uint KEY_DOWN = 48;
             const uint KEY_D = 4;
             const uint KEY_DELETE = 49;
+            const uint KEY_F5 = 57;
+            const uint KEY_F6 = 58;
+            const uint KEY_F7 = 59;
 
             bool ctrl = (modifiers & 2) != 0;
             bool shift = (modifiers & 1) != 0;
@@ -158,6 +161,26 @@ namespace Hezhou
             {
                 UI.DebugPrintUITree();
                 return;
+            }
+
+            // UI Test shortcuts: Ctrl+Shift+F5=Sequential, Ctrl+Shift+F6=Random, Ctrl+Shift+F7=Stress
+            if (pressed && ctrl && shift)
+            {
+                if (keycode == KEY_F5)
+                {
+                    UITestRunner.StartSequentialTraversal(200, 60f);
+                    return;
+                }
+                if (keycode == KEY_F6)
+                {
+                    UITestRunner.StartRandomTraversal(200, 60f);
+                    return;
+                }
+                if (keycode == KEY_F7)
+                {
+                    UITestRunner.StartStressTest(30f);
+                    return;
+                }
             }
             
             bool selected = UI.IsPreviewWindowSelected(_previewWindowId);

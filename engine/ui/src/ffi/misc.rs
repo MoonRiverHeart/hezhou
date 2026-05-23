@@ -6,6 +6,7 @@ use std::ffi::{c_char, CStr};
 use std::sync::Arc;
 
 use super::WidgetTreeHandle;
+use super::EventDispatcherHandle;
 
 #[unsafe(no_mangle)]
 pub extern "C" fn ui_widget_set_layout(
@@ -394,5 +395,200 @@ pub extern "C" fn ui_debug_print_widget_tree(handle: WidgetTreeHandle) {
         let arc = &*(handle as *const Arc<Mutex<WidgetTree>>);
         let tree = arc.lock();
         tree.debug_print_tree();
+    }
+}
+
+// ========== Automated UI Testing FFI ==========
+
+/// Simulate a click at (x, y) through the full event pipeline:
+/// TouchBegin → hit_test → widget on_event → gesture recognition → TouchEnd
+/// Returns the widget_id that was hit (0 if nothing hit)
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_simulate_click_at(
+    handle: WidgetTreeHandle,
+    event_dispatcher_handle: EventDispatcherHandle,
+    x: f32,
+    y: f32,
+) -> u64 {
+    let timestamp = 0;
+    let hit_id = if handle.is_null() {
+        0
+    } else {
+        unsafe {
+            let arc = &*(handle as *const Arc<Mutex<WidgetTree>>);
+            let tree = arc.lock();
+            tree.hit_test(Point::new(x, y)).map(|id| id.id).unwrap_or(0)
+        }
+    };
+    
+    if !event_dispatcher_handle.is_null() {
+        // TouchBegin (press)
+        crate::ffi::event::ui_event_dispatcher_dispatch_touch_begin(
+            event_dispatcher_handle, x, y, 0, timestamp,
+        );
+        // TouchEnd (release) — triggers gesture recognition
+        crate::ffi::event::ui_event_dispatcher_dispatch_touch_end(
+            event_dispatcher_handle, x, y, 0, timestamp,
+        );
+    }
+    
+    // Flush any pending callbacks triggered by the click
+    crate::thunk::flush_pending_callbacks();
+    
+    hit_id
+}
+
+/// Get widget type string as a null-terminated C string written into a caller-provided buffer.
+/// Returns the number of bytes written (excluding null terminator).
+/// If widget_id is invalid or buffer too small, returns 0.
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_widget_get_type(
+    handle: WidgetTreeHandle,
+    widget_id: u64,
+    buf: *mut u8,
+    buf_len: u32,
+) -> u32 {
+    if handle.is_null() || buf.is_null() || buf_len == 0 {
+        return 0;
+    }
+    unsafe {
+        let arc = &*(handle as *const Arc<Mutex<WidgetTree>>);
+        let tree = arc.lock();
+        let id = WidgetId::from_raw(widget_id);
+        let widget_type = tree.get_widget(id)
+            .map(|w| w.widget_type())
+            .unwrap_or("");
+        let type_bytes = widget_type.as_bytes();
+        let write_len = std::cmp::min(type_bytes.len(), buf_len as usize - 1);
+        std::ptr::copy_nonoverlapping(type_bytes.as_ptr(), buf, write_len);
+        *buf.add(write_len) = 0; // null terminator
+        write_len as u32
+    }
+}
+
+/// Get widget layout (x, y, width, height) packed into a float array.
+/// Caller provides a float[4] buffer. Returns 1 if widget found, 0 if not.
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_widget_get_layout(
+    handle: WidgetTreeHandle,
+    widget_id: u64,
+    out_layout: *mut f32, // must point to float[4]
+) -> u32 {
+    if handle.is_null() || out_layout.is_null() {
+        return 0;
+    }
+    unsafe {
+        let arc = &*(handle as *const Arc<Mutex<WidgetTree>>);
+        let tree = arc.lock();
+        let id = WidgetId::from_raw(widget_id);
+        if let Some(widget) = tree.get_widget(id) {
+            let layout = widget.layout();
+            *out_layout = layout.x;
+            *out_layout.add(1) = layout.y;
+            *out_layout.add(2) = layout.width;
+            *out_layout.add(3) = layout.height;
+            1
+        } else {
+            0
+        }
+    }
+}
+
+/// Get the parent widget ID. Returns 0 if widget has no parent or is invalid.
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_widget_get_parent(
+    handle: WidgetTreeHandle,
+    widget_id: u64,
+) -> u64 {
+    if handle.is_null() {
+        return 0;
+    }
+    unsafe {
+        let arc = &*(handle as *const Arc<Mutex<WidgetTree>>);
+        let tree = arc.lock();
+        let id = WidgetId::from_raw(widget_id);
+        tree.get_parent(id).map(|p| p.id).unwrap_or(0)
+    }
+}
+
+/// Get the number of children of a widget. Returns 0 if widget is invalid.
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_widget_get_child_count(
+    handle: WidgetTreeHandle,
+    widget_id: u64,
+) -> u32 {
+    if handle.is_null() {
+        return 0;
+    }
+    unsafe {
+        let arc = &*(handle as *const Arc<Mutex<WidgetTree>>);
+        let tree = arc.lock();
+        let id = WidgetId::from_raw(widget_id);
+        tree.get_children(id).len() as u32
+    }
+}
+
+/// Get the ID of a specific child by index. Returns 0 if index out of bounds or widget invalid.
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_widget_get_child_id(
+    handle: WidgetTreeHandle,
+    widget_id: u64,
+    index: u32,
+) -> u64 {
+    if handle.is_null() {
+        return 0;
+    }
+    unsafe {
+        let arc = &*(handle as *const Arc<Mutex<WidgetTree>>);
+        let tree = arc.lock();
+        let id = WidgetId::from_raw(widget_id);
+        let children = tree.get_children(id);
+            if (index as usize) < children.len() {
+                children[index as usize].id
+            } else {
+                0
+            }
+    }
+}
+
+/// Get the total number of widgets in the tree.
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_widget_get_total_count(
+    handle: WidgetTreeHandle,
+) -> u32 {
+    if handle.is_null() {
+        return 0;
+    }
+    unsafe {
+        let arc = &*(handle as *const Arc<Mutex<WidgetTree>>);
+        let tree = arc.lock();
+        tree.get_all_widget_ids().len() as u32
+    }
+}
+
+/// Dump the entire UI tree to a caller-provided buffer as a null-terminated string.
+/// Each line: "[type] id=X pos=(x,y) size=(w,h) layer=L"
+/// Returns number of bytes written (excluding null terminator). If buffer too small, returns 0.
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_debug_dump_tree_to_buffer(
+    handle: WidgetTreeHandle,
+    buf: *mut u8,
+    buf_len: u32,
+) -> u32 {
+    if handle.is_null() || buf.is_null() || buf_len == 0 {
+        return 0;
+    }
+    unsafe {
+        let arc = &*(handle as *const Arc<Mutex<WidgetTree>>);
+        let tree = arc.lock();
+        let mut output = String::new();
+        if let Some(root) = tree.root() {
+            tree.dump_node_to_string(root, 0, &mut output);
+        }
+        let bytes = output.as_bytes();
+        let write_len = std::cmp::min(bytes.len(), buf_len as usize - 1);
+        std::ptr::copy_nonoverlapping(bytes.as_ptr(), buf, write_len);
+        *buf.add(write_len) = 0;
+        write_len as u32
     }
 }

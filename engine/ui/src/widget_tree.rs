@@ -1091,6 +1091,28 @@ pub fn perform_layout(&mut self, font_atlas: &FontAtlas) {
             dfx_info!("UITree", "{}[UNKNOWN] id={}", indent, id.id);
         }
     }
+
+    pub fn root(&self) -> Option<WidgetId> {
+        self.root
+    }
+
+    pub fn dump_node_to_string(&self, id: WidgetId, depth: usize, output: &mut String) {
+        let indent = "  ".repeat(depth);
+        if let Some(node) = self.nodes.get(&id) {
+            let layout = node.widget.layout();
+            let widget_type = node.widget.widget_type();
+            let layer = node.layer;
+            output.push_str(&format!(
+                "{}[{}] id={} pos=({:.0},{:.0}) size=({:.0},{:.0}) layer={}\n",
+                indent, widget_type, id.id, layout.x, layout.y, layout.width, layout.height, layer as i32
+            ));
+            if let Some(children) = self.children_map.get(&id) {
+                for &child_id in children {
+                    self.dump_node_to_string(child_id, depth + 1, output);
+                }
+            }
+        }
+    }
 }
 
 impl Default for WidgetTree {
