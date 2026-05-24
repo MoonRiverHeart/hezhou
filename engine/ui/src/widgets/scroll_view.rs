@@ -185,7 +185,9 @@ impl Widget for ScrollView {
     fn set_flags(&mut self, flags: WidgetFlags) { self.flags = flags; }
 
     fn measure(&self, _font_atlas: &crate::font_atlas::FontAtlas) -> (f32, f32) {
-        (self.layout.width, self.layout.height)
+        let w = if self.layout.width > 0.0 { self.layout.width } else { 300.0 };
+        let h = if self.layout.height > 0.0 { self.layout.height } else { 400.0 };
+        (w, h)
     }
 
     fn draw(&mut self, canvas: &mut Canvas) {

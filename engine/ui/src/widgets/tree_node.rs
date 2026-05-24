@@ -296,20 +296,35 @@ impl Widget for TreeNode {
         // Layout x already accounts for depth indent, so draw at local origin
         let icon_size = self.indent_width * 0.6;
 
-        // 绘制背景: hover=淡蓝, pressed=蓝, selected=淡蓝, normal=透明
+        // 绘制背景: pressed=蓝, selected=淡底色+左侧指示条, hover=淡蓝, normal=透明
+        // The user expects: click highlight disappears on release, 
+        // only a subtle selection indicator remains (not full background fill).
         let bg_color = if self.state == WidgetState::Pressed {
-            Color::new(0.15, 0.35, 0.55, 1.0)  // 蓝色(点击时)
-        } else if self.is_selected {
-            self.selected_color  // 淡蓝(选中)
+            Color::new(0.15, 0.35, 0.55, 1.0)  // 蓝色(按下时, 仅在press期间显示)
         } else if self.state == WidgetState::Hovered {
-            self.hover_color  // 淡蓝(hover)
+            self.hover_color  // 淡蓝(悬浮)
         } else {
-            Color::transparent()
+            Color::transparent()  // 正常: 无背景
         };
 
         if bg_color.a > 0.0 {
             let bg_style = Style::new().with_background(bg_color);
             canvas.draw_rect(Rect::new(0.0, 0.0, width, height), &bg_style);
+        }
+
+        // 选中指示: 左侧2px竖线 + 底色极淡(区别于pressed/hover)
+        if self.is_selected && self.state != WidgetState::Pressed {
+            let indicator_color = Color::new(0.3, 0.6, 0.9, 1.0);
+            canvas.draw_rect(
+                Rect::new(0.0, 0.0, 2.0 * self.content_scale, height),
+                &Style::new().with_background(indicator_color),
+            );
+            // 极淡底色表示选中状态(比hover更淡)
+            let selected_bg = Color::new(0.18, 0.22, 0.28, 0.5);
+            canvas.draw_rect(
+                Rect::new(2.0 * self.content_scale, 0.0, width - 2.0 * self.content_scale, height),
+                &Style::new().with_background(selected_bg),
+            );
         }
 
         // 绘制展开/折叠图标

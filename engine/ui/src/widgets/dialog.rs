@@ -437,8 +437,9 @@ impl Widget for Dialog {
                             self.set_state(WidgetState::Normal);
                             return EventResult::Stopped;
                         }
-                        // hit_test failed (capturing phase with raw coords) — 
-                        // don't reset pressed_button_index, let bubbling phase handle it
+                        // hit_test failed — reset pressed state to avoid stuck button
+                        self.pressed_button_index = None;
+                        self.set_state(WidgetState::Normal);
                     }
                 }
             }

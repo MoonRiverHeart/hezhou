@@ -20,6 +20,7 @@ pub mod vstack;
 pub mod slider;
 pub mod scroll_view;
 pub mod split_view;
+pub mod image;
 
 pub use button::Button;
 pub use checkbox::Checkbox;
@@ -49,3 +50,5 @@ pub use slider::Slider;
 pub use scroll_view::ScrollView;
 pub use split_view::SplitView;
 pub use split_view::SplitOrientation;
+pub use image::Image;
+pub use image::ImageScaleMode;

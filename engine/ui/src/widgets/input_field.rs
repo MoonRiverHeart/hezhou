@@ -303,22 +303,23 @@ impl Widget for InputField {
             let start = self.selection_start.min(self.selection_end);
             let end = self.selection_start.max(self.selection_end);
             
-            let font_atlas_guard = crate::font_atlas::get_font_atlas().lock();
-            let chars_before_start: String = self.text.chars().take(start).collect();
-            let (start_x, _) = font_atlas_guard.measure_text(0, &chars_before_start, font_size);
-            
-            let chars_selected: String = self.text.chars().take(end).collect();
-            let (end_x, _) = font_atlas_guard.measure_text(0, &chars_selected, font_size);
-            
-            let selection_rect = Rect::new(
-                8.0 + start_x,
-                6.0,
-                end_x - start_x,
-                self.layout.height - 12.0
-            );
-            let selection_style = Style::new()
-                .with_background(Color::new(0.2, 0.4, 0.8, 0.5));
-            canvas.draw_rect(selection_rect, &selection_style);
+            if let Some(font_atlas) = canvas.get_font_atlas() {
+                let chars_before_start: String = self.text.chars().take(start).collect();
+                let (start_x, _) = font_atlas.measure_text(0, &chars_before_start, font_size);
+                
+                let chars_selected: String = self.text.chars().take(end).collect();
+                let (end_x, _) = font_atlas.measure_text(0, &chars_selected, font_size);
+                
+                let selection_rect = Rect::new(
+                    8.0 + start_x,
+                    6.0,
+                    end_x - start_x,
+                    self.layout.height - 12.0
+                );
+                let selection_style = Style::new()
+                    .with_background(Color::new(0.2, 0.4, 0.8, 0.5));
+                canvas.draw_rect(selection_rect, &selection_style);
+            }
         }
         
         let display_text = if self.text.is_empty() && !self.is_focused {
@@ -345,27 +346,28 @@ impl Widget for InputField {
         canvas.draw_text(text_rect, display_text, &text_style);
         
         if self.is_focused {
-            let font_atlas_guard = crate::font_atlas::get_font_atlas().lock();
-            let text_width = if self.text.is_empty() {
-                0.0
-            } else {
-                let chars_before_cursor: String = self.text.chars()
-                    .take(self.cursor_position)
-                    .collect();
-                let (w, _) = font_atlas_guard.measure_text(0, &chars_before_cursor, font_size);
-                w
-            };
-            
-            let cursor_x = 8.0 + text_width;
-            let cursor_y1 = 6.0;
-            let cursor_y2 = self.layout.height - 6.0;
-            
-            canvas.draw_line(
-                Point::new(cursor_x, cursor_y1),
-                Point::new(cursor_x, cursor_y2),
-                Color::white(),
-                1.0
-            );
+            if let Some(font_atlas) = canvas.get_font_atlas() {
+                let text_width = if self.text.is_empty() {
+                    0.0
+                } else {
+                    let chars_before_cursor: String = self.text.chars()
+                        .take(self.cursor_position)
+                        .collect();
+                    let (w, _) = font_atlas.measure_text(0, &chars_before_cursor, font_size);
+                    w
+                };
+                
+                let cursor_x = 8.0 + text_width;
+                let cursor_y1 = 6.0;
+                let cursor_y2 = self.layout.height - 6.0;
+                
+                canvas.draw_line(
+                    Point::new(cursor_x, cursor_y1),
+                    Point::new(cursor_x, cursor_y2),
+                    Color::white(),
+                    1.0
+                );
+            }
         }
     }
     

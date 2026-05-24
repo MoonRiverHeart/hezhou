@@ -153,6 +153,19 @@ impl PopupMenu {
         let mut max_shortcut_width: f32 = 0.0;
         let font_size = 14.0 * self.content_scale;
         let shortcut_font_size = 12.0 * self.content_scale;
+        
+        // Ensure all menu item characters are rasterized before measuring.
+        // Without this, unrasterized chars (CJK, emoji, etc.) return 0 width,
+        // causing menu text truncation.
+        for item in &self.items {
+            if !item.is_separator {
+                crate::font_atlas::ensure_chars_rasterized(0, &item.text, font_size);
+                if let Some(shortcut) = &item.shortcut {
+                    crate::font_atlas::ensure_chars_rasterized(0, shortcut, shortcut_font_size);
+                }
+            }
+        }
+        
         let font_atlas_guard = crate::font_atlas::get_font_atlas().lock();
         
         for item in &self.items {
@@ -292,11 +305,11 @@ impl Widget for PopupMenu {
         
         let width = self.layout.width;
         let height = self.layout.height;
+        let font_size = 14.0 * self.content_scale;
+        let shortcut_font_size = 12.0 * self.content_scale;
         
         canvas.draw_rect(Rect::new(0.0, 0.0, width, height), &self.style);
         
-        let font_size = 14.0 * self.content_scale;
-        let shortcut_font_size = 12.0 * self.content_scale;
         let mut current_y = self.padding;
         
         for (i, item) in self.items.iter().enumerate() {

@@ -125,7 +125,7 @@ impl EventDispatcher {
             return;
         }
         
-        event.target = target.unwrap_or(WidgetId::invalid());
+event.target = target.unwrap_or(WidgetId::invalid());
 
         let path = self.widget_tree.lock().find_path(event.target);
 
@@ -137,33 +137,85 @@ impl EventDispatcher {
 
         let gesture = self.gesture_recognizer.lock().process_event(event);
         
-        // Only process gesture if the event was NOT stopped by a widget handler
-        // (e.g., PopupMenu stops event propagation on item click)
-        if !event.stopped {
-            if let Some(g) = gesture {
-                if g.gesture_type == GestureType::Tap {
-                    let mut tree = self.widget_tree.lock();
-                    let widget_type = tree.get_widget(g.target)
-                        .map(|w| w.widget_type())
-                        .unwrap_or("");
-                    drop(tree);
-                    
-                    // PopupMenu and PreviewWindow handle their own click callbacks
-                    // Don't trigger global_click for these widget types
-                    if widget_type == "Button" {
-                        let mut tree = self.widget_tree.lock();
-                        if let Some(widget) = tree.get_widget_mut(g.target) {
-                            use crate::widgets::Button;
-                            if let Some(button) = widget.as_any_mut().downcast_mut::<Button>() {
-                                button.trigger_click();
+        // Process gesture Tap on Button even when event.stopped — Button intentionally
+        // stops propagation on TouchEnd, but we still need to recognize the Tap gesture
+        // and trigger thunk callbacks. Only skip global_click for stopped events.
+        if let Some(g) = gesture {
+            if g.gesture_type == GestureType::Tap {
+                let mut tree = self.widget_tree.lock();
+                let widget_type = tree.get_widget(g.target)
+                    .map(|w| w.widget_type())
+                    .unwrap_or("");
+                
+                // Close any visible PopupMenu that was NOT the click target
+                // (click-outside dismiss behavior for popup menus)
+                let all_ids = tree.get_all_widget_ids();
+                let popup_ids_to_close: Vec<u64> = all_ids.iter()
+                    .filter_map(|wid| {
+                        if wid.id != g.target.id {
+                            if let Some(w) = tree.get_widget(*wid) {
+                                if w.widget_type() == "PopupMenu" {
+                                    if let Some(pm) = w.as_any().downcast_ref::<crate::widgets::PopupMenu>() {
+                                        if pm.is_visible() {
+                                            return Some(wid.id);
+                                        }
+                                    }
+                                }
                             }
                         }
-                        drop(tree);
+                        None
+                    })
+                    .collect();
+                
+                drop(tree);
+                
+                // Hide popup menus and notify C# that they closed
+                for popup_id in popup_ids_to_close {
+                    let mut tree = self.widget_tree.lock();
+                    if let Some(w) = tree.get_widget_mut(crate::WidgetId::from_raw(popup_id)) {
+                        if let Some(pm) = w.as_any_mut().downcast_mut::<crate::widgets::PopupMenu>() {
+                            pm.hide();
+                            crate::thunk::queue_callback(crate::thunk::PendingCallback::PopupMenuClose { widget_id: popup_id });
+                        }
+                    }
+                    drop(tree);
+                }
+                
+                let mut tree = self.widget_tree.lock();
+                let widget_type = tree.get_widget(g.target)
+                    .map(|w| w.widget_type())
+                    .unwrap_or("");
+                drop(tree);
+                
+                // Button Tap: always trigger callback regardless of event.stopped
+                if widget_type == "Button" {
+                    let mut tree = self.widget_tree.lock();
+                    if let Some(widget) = tree.get_widget_mut(g.target) {
+                        use crate::widgets::Button;
+                        if let Some(button) = widget.as_any_mut().downcast_mut::<Button>() {
+                            button.trigger_click();
+                        }
+                    }
+                    drop(tree);
+                    crate::thunk::queue_callback(crate::thunk::PendingCallback::ButtonClick { widget_id: g.target.id });
+                } else if widget_type == "Label" {
+                    // Label with OnClick callback: trigger it (used for menu bar items)
+                    if crate::thunk::has_onclick_callback(g.target.id) {
                         crate::thunk::queue_callback(crate::thunk::PendingCallback::ButtonClick { widget_id: g.target.id });
-                    } else if widget_type == "Label" {
-                        // Labels with SetOnClick should trigger click callbacks
-                        crate::thunk::queue_callback(crate::thunk::PendingCallback::ButtonClick { widget_id: g.target.id });
-                    } else if widget_type != "PopupMenu" && widget_type != "PreviewWindow" && widget_type != "Dialog" && widget_type != "TreeView" && widget_type != "GridView" && widget_type != "Dropdown" && widget_type != "ScrollView" {
+                    }
+                } else if !event.stopped {
+                    // For non-Button widgets, only trigger global_click if event not stopped
+                    
+                    // Widget types that handle their own click callbacks — skip global_click
+                    const GLOBAL_CLICK_EXCLUDE: &[&str] = &[
+                        "PopupMenu", "PreviewWindow", "Dialog",
+                        "TreeView", "GridView", "Dropdown", "InputField",
+                        "ScrollView", "Label", "VStack", "HStack", "Panel",
+                        "Checkbox", "Slider", "TextEdit", "TabWidget", "Image",
+                    ];
+                    let should_global_click = !GLOBAL_CLICK_EXCLUDE.contains(&widget_type);
+                    
+                    if should_global_click {
                         crate::thunk::ui_trigger_global_click(click_point.x, click_point.y);
                     }
                 }
