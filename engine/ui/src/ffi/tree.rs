@@ -363,6 +363,33 @@ pub extern "C" fn ui_tree_node_get_user_data(
 }
 
 #[unsafe(no_mangle)]
+pub extern "C" fn ui_tree_node_set_selected(
+    handle: WidgetTreeHandle,
+    node_id: u64,
+    selected: bool,
+) {
+    if handle.is_null() {
+        return;
+    }
+    unsafe {
+        let arc = &*(handle as *const Arc<Mutex<WidgetTree>>);
+        let mut tree = arc.lock();
+        let id = WidgetId::from_raw(node_id);
+        
+        if let Some(widget) = tree.get_widget_mut(id) {
+            if widget.widget_type() == "TreeNode" {
+                use crate::widgets::TreeNode;
+                if let Some(node) = widget.as_any_mut().downcast_mut::<TreeNode>() {
+                    node.set_selected(selected);
+                }
+            }
+        }
+        
+        dfx_debug!("FFI", "TreeNodeSetSelected: node_id={}, selected={}", node_id, selected);
+    }
+}
+
+#[unsafe(no_mangle)]
 pub extern "C" fn ui_tree_view_clear_selection(
     handle: WidgetTreeHandle,
     tree_view_id: u64,

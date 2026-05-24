@@ -21,6 +21,7 @@ pub type TreeViewSetOnSelectThunkPtrFn = extern "C" fn(WidgetTreeHandle, u64, *c
 pub type TreeViewSetOnToggleThunkPtrFn = extern "C" fn(WidgetTreeHandle, u64, *const c_void);
 pub type TreeViewIsNodeExpandedFn = extern "C" fn(WidgetTreeHandle, u64, u64) -> bool;
 pub type TreeNodeSetTextFn = extern "C" fn(WidgetTreeHandle, u64, *const c_char);
+pub type TreeNodeSetSelectedFn = extern "C" fn(WidgetTreeHandle, u64, bool);
 pub type TreeNodeGetUserDataFn = extern "C" fn(WidgetTreeHandle, u64) -> u64;
 pub type TreeViewClearSelectionFn = extern "C" fn(WidgetTreeHandle, u64);
 
@@ -75,6 +76,7 @@ pub type CreateScrollViewFn = extern "C" fn(WidgetTreeHandle, u64, f32, f32, f32
 pub type ScrollViewSetScrollOffsetFn = extern "C" fn(WidgetTreeHandle, u64, f32);
 pub type ScrollViewGetScrollOffsetFn = extern "C" fn(WidgetTreeHandle, u64) -> f32;
 pub type ScrollViewSetShowScrollbarsFn = extern "C" fn(WidgetTreeHandle, u64, u32, u32);
+pub type ScrollViewSetContentSizeFn = extern "C" fn(WidgetTreeHandle, u64, f32, f32);
 pub type ScrollViewSetOnScrollThunkPtrFn = extern "C" fn(WidgetTreeHandle, u64, *const c_void);
 
 // SplitView
@@ -84,3 +86,10 @@ pub type SplitViewGetSplitRatioFn = extern "C" fn(WidgetTreeHandle, u64) -> f32;
 pub type SplitViewSetMinRatioFn = extern "C" fn(WidgetTreeHandle, u64, f32);
 pub type SplitViewSetMaxRatioFn = extern "C" fn(WidgetTreeHandle, u64, f32);
 pub type SplitViewSetOnRatioChangeThunkPtrFn = extern "C" fn(WidgetTreeHandle, u64, *const c_void);
+
+// Image
+pub type CreateImageFn = extern "C" fn(WidgetTreeHandle, u64, f32, f32, f32, f32) -> u64;
+pub type ImageSetTextureIdFn = extern "C" fn(WidgetTreeHandle, u64, u64);
+pub type ImageGetTextureIdFn = extern "C" fn(WidgetTreeHandle, u64) -> u64;
+pub type ImageSetScaleModeFn = extern "C" fn(WidgetTreeHandle, u64, u32);
+pub type ImageSetUvFn = extern "C" fn(WidgetTreeHandle, u64, f32, f32, f32, f32);
