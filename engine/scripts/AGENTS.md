@@ -22,11 +22,15 @@ C# scripts create all editor UI, manage Scene entities, handle user interaction.
 | `UI.cs` | FFI delegates, FfiContext, static fields, InitFromContext, Register callbacks | ~750 |
 | `UI.Widgets.cs` | VStack/HStack/Button/Label/Panel + widget creation/operation methods | ~600 |
 | `UI.ComplexWidgets.cs` | Dropdown/InputField/List + Dropdown/InputField methods | ~400 |
-| `UI.NewWidgets.cs` | TabWidget/TreeView/PopupMenu/GridView/Dialog/FileBrowser + methods | ~900 |
-| `UI.Scene.cs` | Scene/Entity/ScriptBinding/GameState + Scene FFI methods | ~600 |
+| `UI.NewWidgets.cs` | TabWidget/TreeView/PopupMenu/GridView/Dialog/FileBrowser + methods | ~1423 |
+| `UI.Scene.cs` | Scene/Entity/ScriptBinding/GameState + Scene FFI methods | ~663 |
 | `UI.AssetProject.cs` | AssetLibrary/Project + Asset/Project FFI methods | ~400 |
-| `EditorScript.cs` | Editor application logic | ~1693 |
+| `EditorScript.cs` | Editor application main entry | ~10 |
+| `EditorScript.View.cs` | Editor layout, CreateEditorLayout, SplitView, PreviewWindow | ~964 |
+| `EditorScript.Presenter.cs` | Editor presenter logic, property panel, callbacks | ~1483 |
+| `EditorScript.State.cs` | Editor state management, Editing/Running/Paused | ~78 |
 | `DFX.cs` | Logging bridge | ~50 |
+| `UITestRunner.cs` | Automated UI test runner (called from EditorScript.Update) | ~708 |
 | `AssetProjectTest.cs` | Asset/Project test script | ~100 |
 
 ## Conventions

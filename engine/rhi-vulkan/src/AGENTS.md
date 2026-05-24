@@ -39,3 +39,13 @@ Render Flow:
 - NEVER forget depth attachment (D32_SFLOAT) in game_render_pass
 - NEVER hardcode viewport size — use `cmd_set_viewport` at render time
 - NEVER mismatch push constant layout with shader struct
+- NEVER destroy FBO resources without device_wait_idle() first (causes device lost)
+
+## Key Files
+| File | Lines | Role |
+|------|-------|------|
+| `ui_vulkan_renderer.rs` | 4098 | Central renderer — init, game pass, UI pass, outline pass, FBO management |
+| `ui_renderer.rs` | 559 | Font atlas texture + MSDF rendering |
+| `renderer.rs` | 607 | Pipeline creation, render pass setup, swapchain management |
+| `rotation_renderer.rs` | 815 | Entity mesh rendering (rotation demo) |
+| `mono_rotation_renderer.rs` | 750 | Entity mesh rendering (Mono demo) |

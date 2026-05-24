@@ -1,9 +1,9 @@
 # UI Widgets
 
-16 widget types for the game editor UI system.
+17 widget types for the game editor UI system.
 
 ## Overview
-Each widget implements `Widget` trait (id, parent, children, layout, style, state, measure, draw, on_event). Created via FFI, wrapped in C#.
+Each widget implements `Widget` trait (id, parent, children, layout, style, state, measure, draw, on_event). Created via FFI, wrapped in C#. All visual sizes multiplied by content_scale.
 
 ## Widget Types
 | Widget | Purpose | Key Methods |
@@ -19,13 +19,15 @@ Each widget implements `Widget` trait (id, parent, children, layout, style, stat
 | InputField | Single-line input | SetText, GetText, SetOnChange, SetPlaceholder |
 | TextEdit | Multi-line editor | Selection, scroll, cursor, Ctrl+C/V |
 | PreviewWindow | Show offscreen texture | texture_id=1 for game pass |
-| TabWidget | Tab switcher | AddTab, SetActive, GetActive, OnSelect |
+| TabWidget | Tab switcher | AddTab, SetActive, GetActive, OnSelect, dog-ear fold (Triangle) |
 | TreeView | Tree container | AddNode, SetSelected, ExpandNode, OnSelect |
 | TreeNode | Tree entry | depth, is_expanded, is_selected, user_data |
 | GridView | Grid asset browser | AddItem, SetSelected, Clear, OnClick |
 | PopupMenu | Dropdown menu | AddItem, AddSeparator, Show, Hide, OnClick |
-| Dialog | Modal dialog | SetContent, AddButton, Show, Hide, OnResult |
+| Dialog | Modal dialog | SetContent, AddButton, Show, Hide, OnResult, auto-size from content |
 | FileBrowser | File system browser | SetPath, SetFilter, NavigateUp, OnSelect |
+| ScrollView | Scrollable container | SetContentHeight, ScrollTo, OnScroll, ClipRect + scroll_offset_y |
+| SplitView | Split pane | SetRatio, OnRatioChange, drag-resize propagates to child Panels |
 
 ## Where To Look
 | Task | File | Notes |

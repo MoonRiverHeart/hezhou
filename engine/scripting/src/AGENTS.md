@@ -19,6 +19,35 @@ Two script modes: Mono JIT (development, hot reload) and NativeAOT (release, per
 - Each FFI function: type alias (e.g. `CreateButtonFn = extern "C" fn(...) -> u64`) + field in FfiContext
 - C# delegates match FFI signatures exactly, stored as static fields
 - FfiContext initialization in `mono_editor_demo.rs`: assign each field to actual FFI function address
+- Two script modes: Mono JIT (development, hot reload) and NativeAOT (release, performance)
+- NativeAOT uses `[UnmanagedCallersOnly]` attribute on C# static methods
+
+## Key Files
+| File | Lines | Role |
+|------|-------|------|
+| `ffi_context/mod.rs` | ~350 | 270-field FfiContext struct (see ffi_context/AGENTS.md) |
+| `script_manager.rs` | Mono JIT bootstrap: `jit::init("ScriptDomain")` |
+| `mono_executor.rs` | Rotation script executor |
+| `mono_ui_executor.rs` | UI script executor (loads DLL, calls Initialize) |
+| `native_aot_executor.rs` | NativeAOT executor (feature-gated) |
+
+## Module Structure
+```
+scripting/src/
+├── lib.rs           # Feature-gated module exports
+├── ffi_context/     # See ffi_context/AGENTS.md for full detail
+├── script_manager.rs # Mono JIT domain init
+├── mono_executor.rs  # Mono JIT rotation executor
+├── mono_ui_executor.rs # Mono JIT UI executor (call_static_with_ptr_namespace)
+├── native_aot_executor.rs # NativeAOT executor
+├── executor.rs       # ScriptExecutor trait + DefaultExecutor alias
+├── script_manager_lite.rs # Lightweight script manager
+├── callback_registry.rs # Script callback tracking
+├── callback_types.rs # Callback type definitions
+├── value_bridge.rs   # Value marshalling bridge
+├── error.rs          # ScriptingError enum
+└── ffi.rs            # FFI module root
+```
 
 ## Anti-Patterns
 - NEVER skip adding new FFI function to FfiContext struct (Rust AND C#)
