@@ -314,6 +314,9 @@ namespace Hezhou
         public delegate ulong TreeNodeGetUserDataDelegate(IntPtr handle, ulong nodeId);
         
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void TreeNodeSetSelectedDelegate(IntPtr handle, ulong nodeId, bool selected);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public delegate void TreeViewClearSelectionDelegate(IntPtr handle, ulong treeViewId);
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
@@ -475,6 +478,9 @@ namespace Hezhou
         public delegate void ScrollViewSetShowScrollbarsDelegate(IntPtr handle, ulong widgetId, uint showV, uint showH);
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void ScrollViewSetContentSizeDelegate(IntPtr handle, ulong widgetId, float contentWidth, float contentHeight);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public delegate void ScrollViewSetOnScrollThunkPtrDelegate(IntPtr handle, ulong widgetId, IntPtr callbackPtr);
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
@@ -501,6 +507,22 @@ namespace Hezhou
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public delegate void SplitViewRatioChangeCallbackDelegate(ulong widgetId, float ratio);
+
+        // Image delegates
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate ulong CreateImageDelegate(IntPtr handle, ulong parentId, float x, float y, float width, float height);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void ImageSetTextureIdDelegate(IntPtr handle, ulong widgetId, ulong textureId);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate ulong ImageGetTextureIdDelegate(IntPtr handle, ulong widgetId);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void ImageSetScaleModeDelegate(IntPtr handle, ulong widgetId, uint scaleMode);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void ImageSetUvDelegate(IntPtr handle, ulong widgetId, float uvX, float uvY, float uvW, float uvH);
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public delegate void SetWidgetLayerDelegate(IntPtr handle, ulong widgetId, uint layer);
@@ -857,6 +879,7 @@ namespace Hezhou
             public IntPtr ui_scroll_view_set_scroll_offset;
             public IntPtr ui_scroll_view_get_scroll_offset;
             public IntPtr ui_scroll_view_set_show_scrollbars;
+            public IntPtr ui_scroll_view_set_content_size;
             public IntPtr ui_scroll_view_set_on_scroll_thunk_ptr;
             // SplitView
             public IntPtr ui_create_split_view;
@@ -865,6 +888,12 @@ namespace Hezhou
             public IntPtr ui_split_view_set_min_ratio;
             public IntPtr ui_split_view_set_max_ratio;
             public IntPtr ui_split_view_set_on_ratio_change_thunk_ptr;
+            // Image
+            public IntPtr ui_create_image;
+            public IntPtr ui_image_set_texture_id;
+            public IntPtr ui_image_get_texture_id;
+            public IntPtr ui_image_set_scale_mode;
+            public IntPtr ui_image_set_uv;
             public IntPtr ui_create_tab_widget;
             public IntPtr ui_tab_widget_add_tab;
             public IntPtr ui_tab_widget_set_active;
@@ -884,6 +913,7 @@ namespace Hezhou
             public IntPtr ui_tree_view_set_on_toggle_thunk_ptr;
             public IntPtr ui_tree_view_is_node_expanded;
             public IntPtr ui_tree_node_set_text;
+            public IntPtr ui_tree_node_set_selected;
             public IntPtr ui_tree_node_get_user_data;
             public IntPtr ui_tree_view_clear_selection;
             public IntPtr ui_create_popup_menu;

@@ -233,6 +233,17 @@ namespace Hezhou
             return func(_widgetTree, nodeId);
         }
         
+        public static void TreeNodeSetSelected(ulong nodeId, bool selected)
+        {
+            if (_ffi.ui_tree_node_set_selected == IntPtr.Zero)
+            {
+                Log.Error("C#", "TreeNodeSetSelected函数指针为空");
+                return;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<TreeNodeSetSelectedDelegate>(_ffi.ui_tree_node_set_selected);
+            func(_widgetTree, nodeId, selected);
+        }
+        
         public static void TreeViewClearSelection(ulong treeViewId)
         {
             if (_ffi.ui_tree_view_clear_selection == IntPtr.Zero)
@@ -826,6 +837,17 @@ namespace Hezhou
             func(_widgetTree, widgetId, showV ? 1u : 0u, showH ? 1u : 0u);
         }
 
+        public static void ScrollViewSetContentSize(ulong widgetId, float contentWidth, float contentHeight)
+        {
+            if (_ffi.ui_scroll_view_set_content_size == IntPtr.Zero)
+            {
+                Log.Error("C#", "ScrollViewSetContentSize函数指针为空");
+                return;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<ScrollViewSetContentSizeDelegate>(_ffi.ui_scroll_view_set_content_size);
+            func(_widgetTree, widgetId, contentWidth, contentHeight);
+        }
+
         public static void ScrollViewSetOnScroll(ulong widgetId, ScrollViewScrollCallbackDelegate callback)
         {
             if (_ffi.ui_scroll_view_set_on_scroll_thunk_ptr == IntPtr.Zero)
@@ -906,6 +928,62 @@ namespace Hezhou
             IntPtr callbackPtr = Marshal.GetFunctionPointerForDelegate(callback);
             var func = Marshal.GetDelegateForFunctionPointer<SplitViewSetOnRatioChangeThunkPtrDelegate>(_ffi.ui_split_view_set_on_ratio_change_thunk_ptr);
             func(_widgetTree, widgetId, callbackPtr);
+        }
+
+        // === Image ===
+
+        public static ulong CreateImage(ulong parentId, float x, float y, float width, float height)
+        {
+            if (_ffi.ui_create_image == IntPtr.Zero)
+            {
+                Log.Error("C#", "CreateImage函数指针为空");
+                return 0;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<CreateImageDelegate>(_ffi.ui_create_image);
+            return func(_widgetTree, parentId, x, y, width, height);
+        }
+
+        public static void ImageSetTextureId(ulong widgetId, ulong textureId)
+        {
+            if (_ffi.ui_image_set_texture_id == IntPtr.Zero)
+            {
+                Log.Error("C#", "ImageSetTextureId函数指针为空");
+                return;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<ImageSetTextureIdDelegate>(_ffi.ui_image_set_texture_id);
+            func(_widgetTree, widgetId, textureId);
+        }
+
+        public static ulong ImageGetTextureId(ulong widgetId)
+        {
+            if (_ffi.ui_image_get_texture_id == IntPtr.Zero)
+            {
+                return 0;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<ImageGetTextureIdDelegate>(_ffi.ui_image_get_texture_id);
+            return func(_widgetTree, widgetId);
+        }
+
+        public static void ImageSetScaleMode(ulong widgetId, uint scaleMode)
+        {
+            if (_ffi.ui_image_set_scale_mode == IntPtr.Zero)
+            {
+                Log.Error("C#", "ImageSetScaleMode函数指针为空");
+                return;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<ImageSetScaleModeDelegate>(_ffi.ui_image_set_scale_mode);
+            func(_widgetTree, widgetId, scaleMode);
+        }
+
+        public static void ImageSetUv(ulong widgetId, float uvX, float uvY, float uvW, float uvH)
+        {
+            if (_ffi.ui_image_set_uv == IntPtr.Zero)
+            {
+                Log.Error("C#", "ImageSetUv函数指针为空");
+                return;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<ImageSetUvDelegate>(_ffi.ui_image_set_uv);
+            func(_widgetTree, widgetId, uvX, uvY, uvW, uvH);
         }
     }
 
@@ -1389,6 +1467,54 @@ namespace Hezhou
         {
             _onRatioChangeCallback = callback;
             UI.SplitViewSetOnRatioChange(Id, callback);
+        }
+    }
+
+    public class Image
+    {
+        public ulong Id;
+        public ulong TextureId;
+
+        public Image(ulong parentId, float x, float y, float w, float h)
+        {
+            Id = UI.CreateImage(parentId, x, y, w, h);
+            TextureId = 0;
+        }
+
+        public static ulong Create(ulong parentId, float x, float y, float w, float h)
+        {
+            return UI.CreateImage(parentId, x, y, w, h);
+        }
+
+        public static void SetTextureId(ulong id, ulong textureId)
+        {
+            UI.ImageSetTextureId(id, textureId);
+        }
+
+        public static ulong GetTextureId(ulong id)
+        {
+            return UI.ImageGetTextureId(id);
+        }
+
+        public static void SetScaleMode(ulong id, uint scaleMode)
+        {
+            UI.ImageSetScaleMode(id, scaleMode);
+        }
+
+        public static void SetUv(ulong id, float uvX, float uvY, float uvW, float uvH)
+        {
+            UI.ImageSetUv(id, uvX, uvY, uvW, uvH);
+        }
+
+        public void SetTexture(ulong textureId)
+        {
+            TextureId = textureId;
+            UI.ImageSetTextureId(Id, textureId);
+        }
+
+        public void SetScaleMode(uint scaleMode)
+        {
+            UI.ImageSetScaleMode(Id, scaleMode);
         }
     }
 }
