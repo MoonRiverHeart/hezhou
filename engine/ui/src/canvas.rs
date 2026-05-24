@@ -224,6 +224,10 @@ impl Canvas {
         self.commands.push(DrawCommand::ResetTransform);
     }
 
+    pub fn draw_triangle(&mut self, p1: Point, p2: Point, p3: Point, fill_color: Color) {
+        self.commands.push(DrawCommand::Triangle { p1, p2, p3, fill_color });
+    }
+
     pub fn set_opacity(&mut self, opacity: f32) {
         self.opacity = opacity;
     }
@@ -305,4 +309,11 @@ pub enum DrawCommand {
     },
 
     ResetTransform,
+
+    Triangle {
+        p1: Point,
+        p2: Point,
+        p3: Point,
+        fill_color: Color,
+    },
 }

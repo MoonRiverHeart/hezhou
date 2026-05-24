@@ -114,6 +114,10 @@ impl TabWidget {
         self.content_scale
     }
 
+    pub fn tab_bar_height(&self) -> f32 {
+        self.tab_bar_height
+    }
+
     fn get_tab_rect(&self, index: usize) -> Rect {
         let scaled_width = self.tab_width * self.content_scale;
         let scaled_height = self.tab_bar_height * self.content_scale;
@@ -223,8 +227,10 @@ impl Widget for TabWidget {
         self.flags.dirty_render = true;
     }
 
-    fn measure(&self, _font_atlas: &crate::font_atlas::FontAtlas) -> (f32, f32) {
-        (self.layout.width, self.layout.height)
+fn measure(&self, _font_atlas: &crate::font_atlas::FontAtlas) -> (f32, f32) {
+        let w = if self.layout.width > 0.0 { self.layout.width } else { 300.0 };
+        let h = if self.layout.height > 0.0 { self.layout.height } else { 400.0 };
+        (w, h)
     }
 
     fn widget_type(&self) -> &'static str {
@@ -272,6 +278,37 @@ impl Widget for TabWidget {
                 .with_background(tab_bg_color)
                 .with_border(Color::new(0.3, 0.3, 0.3, 1.0), 1.0, 0.0);
             canvas.draw_rect(tab_rect, &tab_style);
+
+            // Dog-ear fold on top-right corner of tab
+            let fold_size = 6.0 * self.content_scale;
+            let fold_x = tab_rect.x + tab_rect.width;
+            let fold_y = tab_rect.y;
+            // Triangle: top-right corner, fold-back triangle
+            // p1 = top-right corner, p2 = along top edge, p3 = along right edge
+            let fold_shadow_color = if i == self.active_index {
+                Color::new(0.18, 0.18, 0.18, 1.0)   // slightly darker shadow
+            } else {
+                Color::new(0.15, 0.15, 0.15, 1.0)
+            };
+            let fold_color = if i == self.active_index {
+                Color::new(0.35, 0.35, 0.35, 1.0)   // lighter fold for active
+            } else {
+                Color::new(0.28, 0.28, 0.28, 1.0)   // subtle fold for inactive
+            };
+            // Shadow triangle (slightly offset)
+            canvas.draw_triangle(
+                Point::new(fold_x + 1.0 * self.content_scale, fold_y + 1.0 * self.content_scale),
+                Point::new(fold_x - fold_size + 1.0 * self.content_scale, fold_y + 1.0 * self.content_scale),
+                Point::new(fold_x + 1.0 * self.content_scale, fold_y + fold_size + 1.0 * self.content_scale),
+                fold_shadow_color,
+            );
+            // Main fold triangle
+            canvas.draw_triangle(
+                Point::new(fold_x, fold_y),
+                Point::new(fold_x - fold_size, fold_y),
+                Point::new(fold_x, fold_y + fold_size),
+                fold_color,
+            );
 
             let font_size = 14.0 * self.content_scale;
             let text_style = TextStyle::new()

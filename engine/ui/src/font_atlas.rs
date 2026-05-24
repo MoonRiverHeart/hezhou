@@ -82,6 +82,97 @@ impl FontAtlas {
         
         self.fonts.len() - 1
     }
+
+    /// Try to rasterize a character with fallback to emoji font.
+    /// If the primary font_index doesn't have the glyph (empty bitmap),
+    /// try all other fonts until one produces a non-empty result.
+    pub fn rasterize_char_with_fallback(&mut self, primary_font_index: usize, character: char, font_size: f32) {
+        // Try primary font first
+        let primary_key = CharacterKey {
+            font_index: primary_font_index,
+            character,
+            font_size: font_size as u32,
+        };
+        
+        if self.character_cache.contains_key(&primary_key) {
+            return; // Already cached
+        }
+        
+        // Rasterize with primary font
+        self.rasterize_char_direct(primary_font_index, character, font_size);
+        
+        // Check if the result is a placeholder (empty glyph = font doesn't have this char)
+        let is_placeholder = self.character_cache.get(&primary_key)
+            .map(|info| info.uv_x == 0.97 && info.uv_w == 0.0 && info.width == 0.0 && info.height == 0.0)
+            .unwrap_or(false);
+        
+        if !is_placeholder {
+            return; // Primary font has the glyph — done
+        }
+        
+        // Primary font doesn't have this glyph — try fallback fonts
+        let font_count = self.fonts.len();
+        let mut found_fallback: Option<CharacterInfo> = None;
+        
+        for fallback_idx in 0..font_count {
+            if fallback_idx == primary_font_index {
+                continue;
+            }
+            
+            let fallback_key = CharacterKey {
+                font_index: fallback_idx,
+                character,
+                font_size: font_size as u32,
+            };
+            
+            if self.character_cache.contains_key(&fallback_key) {
+                // Check if this fallback already has a real glyph
+                if let Some(info) = self.character_cache.get(&fallback_key) {
+                    if info.uv_x != 0.97 || info.uv_w != 0.0 {
+                        found_fallback = Some(CharacterInfo {
+                            uv_x: info.uv_x,
+                            uv_y: info.uv_y,
+                            uv_w: info.uv_w,
+                            uv_h: info.uv_h,
+                            width: info.width,
+                            height: info.height,
+                            advance_x: info.advance_x,
+                            bearing_x: info.bearing_x,
+                            bearing_y: info.bearing_y,
+                        });
+                        break;
+                    }
+                }
+                continue;
+            }
+            
+            // Try rasterizing with this fallback font
+            self.rasterize_char_direct(fallback_idx, character, font_size);
+            
+            // Check result
+            if let Some(info) = self.character_cache.get(&fallback_key) {
+                if info.uv_x != 0.97 || info.uv_w != 0.0 {
+                    found_fallback = Some(CharacterInfo {
+                        uv_x: info.uv_x,
+                        uv_y: info.uv_y,
+                        uv_w: info.uv_w,
+                        uv_h: info.uv_h,
+                        width: info.width,
+                        height: info.height,
+                        advance_x: info.advance_x,
+                        bearing_x: info.bearing_x,
+                        bearing_y: info.bearing_y,
+                    });
+                    break;
+                }
+            }
+        }
+        
+        // Replace the placeholder in primary font with fallback glyph data
+        if let Some(replacement) = found_fallback {
+            self.character_cache.insert(primary_key, replacement);
+        }
+    }
     
     pub fn get_font_ascent(&self, font_index: usize, font_size: f32) -> f32 {
         if font_index < self.fonts.len() {
@@ -546,6 +637,25 @@ pub fn get_font_atlas() -> &'static parking_lot::Mutex<FontAtlas> {
         
         atlas.prerasterize_chars(font_index, ascii_chars, &sizes);
         
+        // Load system emoji font as fallback (Windows: Segoe UI Emoji)
+        let emoji_font_candidates = [
+            "C:\\Windows\\Fonts\\seguiemj.ttf",   // Segoe UI Emoji
+            "C:\\Windows\\Fonts\\Segoe UI Emoji.ttf", // Alternative path
+        ];
+        
+        for emoji_path in &emoji_font_candidates {
+            if std::path::Path::new(emoji_path).exists() {
+                if let Ok(emoji_data) = std::fs::read(emoji_path) {
+                    let emoji_idx = atlas.add_font(&emoji_data);
+                    // Pre-cache common emoji ranges
+                    let emoji_chars = "😀😁😂🤣😃😄😅😆😉😊😋😎😍😘😗😙😚🙂🤗🤔😐😑😶🙄😏😣😥😮🤐😯😪😫😴😌🤓🤔🤗🤕🤠🤡🤢🤣🤤🤥🤧🤮🤯🤰🤱🤲🤳🤴🤵🤶🤷🤸🤹🤺🤻🤼🤽🤾🤿🙄😂";
+                    atlas.prerasterize_chars(emoji_idx, emoji_chars, &sizes);
+                    Arc::new(Mutex::new(DfxSystem::new())).lock().get_logger().lock().log(LogLevel::Info, "FontAtlas", &format!("Loaded emoji font (idx={}) from {}", emoji_idx, emoji_path), file!(), line!());
+                    break;
+                }
+            }
+        }
+        
         Arc::new(Mutex::new(DfxSystem::new())).lock().get_logger().lock().log(LogLevel::Info, "FontAtlas", &format!("Pre-rasterized {} ASCII chars at sizes {:?}", ascii_chars.len(), sizes), file!(), line!());
         
         parking_lot::Mutex::new(atlas)
@@ -571,7 +681,7 @@ pub fn ensure_chars_rasterized(font_index: usize, text: &str, font_size: f32) {
         
         // Only rasterize if not already cached
         if !atlas_guard.character_cache.contains_key(&key) {
-            atlas_guard.rasterize_char_direct(font_index, character, cached_size as f32);
+            atlas_guard.rasterize_char_with_fallback(font_index, character, cached_size as f32);
         }
     }
 }
