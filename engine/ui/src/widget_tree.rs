@@ -104,13 +104,19 @@ impl WidgetTree {
     pub fn add_widget(&mut self, widget: Box<dyn Widget>, parent: WidgetId) {
         let id = widget.id();
 
+        // Child inherits parent's render layer so Overlay/Popup widgets' children
+        // are rendered on the same layer as their parent (not hidden behind it).
+        let parent_layer = self.nodes.get(&parent)
+            .map(|n| n.layer)
+            .unwrap_or(RenderLayer::default());
+
         self.nodes.insert(
             id,
             WidgetNode {
                 widget,
                 flags: crate::widget::WidgetFlags::default(),
                 render_data: None,
-                layer: RenderLayer::default(),
+                layer: parent_layer,
             },
         );
 
@@ -227,8 +233,8 @@ impl WidgetTree {
                         if cn.widget.as_ref().widget_type() == "PopupMenu" {
                             if let Some(popup) = cn.widget.as_ref().as_any().downcast_ref::<crate::widgets::PopupMenu>() {
                                 if !popup.is_visible() {
-                                    continue; // Skip hidden popup menus
-                                }
+                                    continue;
+}
                             }
                         }
                     }
@@ -277,16 +283,36 @@ impl WidgetTree {
 
     /// Ensure all text from widgets is rasterized in the font atlas cache.
     /// This must be called BEFORE perform_layout/generate_render_data to guarantee
-    /// all glyphs (including CJK characters not in the startup precache) are available.
+    /// all glyphs (including CJK characters and emoji not in the primary font) are available.
+    /// Uses font fallback so characters missing from the primary font (e.g. emoji) are
+    /// rasterized from a fallback font instead of becoming invisible zero-size placeholders.
     pub fn ensure_text_rasterized(&self, font_atlas: &mut FontAtlas) {
         let font_index = 0; // Default font index
         let sizes: [f32; 13] = [48.0, 36.0, 32.0, 28.0, 24.0, 22.0, 20.0, 18.0, 16.0, 15.0, 14.0, 13.0, 12.0];
         
         for node in self.nodes.values() {
             if let Some(text) = node.widget.as_ref().get_text() {
-                font_atlas.prerasterize_chars(font_index, text, &sizes);
+                for size in &sizes {
+                    let cached_size = font_atlas.get_nearest_cached_font_size(*size) as u32;
+                    for c in text.chars() {
+                        font_atlas.rasterize_char_with_fallback(font_index, c, cached_size as f32);
+                    }
+                }
             }
         }
+    }
+
+    /// Find the layout extent of any PreviewWindow widget in the tree.
+    /// Returns (width, height) if a PreviewWindow exists, or None.
+    /// Used by the renderer to auto-sync the offscreen FBO size with the PreviewWindow.
+    pub fn find_preview_window_extent(&self) -> Option<(f32, f32)> {
+        for node in self.nodes.values() {
+            if node.widget.widget_type() == "PreviewWindow" {
+                let layout = *node.widget.layout();
+                return Some((layout.width, layout.height));
+            }
+        }
+        None
     }
 
 pub fn perform_layout(&mut self, font_atlas: &FontAtlas) {
@@ -441,9 +467,12 @@ pub fn perform_layout(&mut self, font_atlas: &FontAtlas) {
         if let Some(node) = self.nodes.get_mut(&id) {
             let current_layout = *node.widget.layout();
             // HStack and VStack auto-size from children every frame (children sizes can change)
+            // SplitView and Dialog are parent-allocated containers — their size comes from the parent
             // Other widgets auto-size only on first frame (when width/height == 0)
             let auto_size_from_children = widget_type == "HStack" || widget_type == "VStack";
-            if auto_size_from_children || current_layout.width == 0.0 || current_layout.height == 0.0 {
+            let is_parent_allocated = widget_type == "SplitView" || widget_type == "Dialog";
+            let should_auto_size = auto_size_from_children || (!is_parent_allocated && (current_layout.width == 0.0 || current_layout.height == 0.0));
+            if should_auto_size {
                 node.widget.set_layout(crate::layout::Layout::new(
                     current_layout.x,
                     current_layout.y,
@@ -470,7 +499,16 @@ pub fn perform_layout(&mut self, font_atlas: &FontAtlas) {
                 self.layout_dialog_children(id, font_atlas);
             }
             "SplitView" => {
-                self.layout_split_view_children(id);
+                self.layout_split_view_children(id, font_atlas);
+            }
+            "Panel" => {
+                self.layout_panel_children(id, font_atlas);
+            }
+            "TabWidget" => {
+                self.layout_tab_widget_children(id, font_atlas);
+            }
+            "ScrollView" => {
+                self.layout_scroll_view_children(id, font_atlas);
             }
             _ => {}
         }
@@ -786,7 +824,7 @@ pub fn perform_layout(&mut self, font_atlas: &FontAtlas) {
         }
     }
 
-    fn layout_split_view_children(&mut self, id: WidgetId) {
+    fn layout_split_view_children(&mut self, id: WidgetId, font_atlas: &crate::font_atlas::FontAtlas) {
         let split_info = {
             if let Some(node) = self.nodes.get(&id) {
                 if let Some(split_view) = node.widget.as_any().downcast_ref::<crate::widgets::SplitView>() {
@@ -814,20 +852,18 @@ pub fn perform_layout(&mut self, font_atlas: &FontAtlas) {
                 let second_x = layout.width * ratio + thickness / 2.0;
 
                 if let Some(node) = self.nodes.get_mut(&children[0]) {
-                    let child_layout = *node.widget.layout();
                     node.widget.set_layout(crate::layout::Layout::new(
                         0.0,
                         0.0,
-                        first_width.max(child_layout.width),
+                        first_width,
                         layout.height,
                     ));
                 }
                 if let Some(node) = self.nodes.get_mut(&children[1]) {
-                    let child_layout = *node.widget.layout();
                     node.widget.set_layout(crate::layout::Layout::new(
                         second_x,
                         0.0,
-                        second_width.max(child_layout.width),
+                        second_width,
                         layout.height,
                     ));
                 }
@@ -838,23 +874,221 @@ pub fn perform_layout(&mut self, font_atlas: &FontAtlas) {
                 let second_y = layout.height * ratio + thickness / 2.0;
 
                 if let Some(node) = self.nodes.get_mut(&children[0]) {
-                    let child_layout = *node.widget.layout();
                     node.widget.set_layout(crate::layout::Layout::new(
                         0.0,
                         0.0,
                         layout.width,
-                        first_height.max(child_layout.height),
+                        first_height,
                     ));
                 }
                 if let Some(node) = self.nodes.get_mut(&children[1]) {
-                    let child_layout = *node.widget.layout();
                     node.widget.set_layout(crate::layout::Layout::new(
                         0.0,
                         second_y,
                         layout.width,
-                        second_height.max(child_layout.height),
+                        second_height,
                     ));
                 }
+            }
+        }
+
+        // Re-layout each child subtree so nested SplitViews/containers get parent-allocated sizes
+        for &child_id in &children {
+            self.measure_and_layout(child_id, font_atlas);
+        }
+    }
+
+    /// Propagate Panel size to child containers (SplitView, Dialog, TabWidget, ScrollView)
+    /// that should fill the Panel. These containers must always match the Panel's
+    /// dimensions (minus position offset), not just on initial creation (0×0).
+    /// This is critical for SplitView drag: when the divider moves, child Panels
+    /// get new sizes and their content containers must re-fill immediately.
+    fn layout_panel_children(&mut self, id: WidgetId, font_atlas: &crate::font_atlas::FontAtlas) {
+        let panel_layout = {
+            if let Some(node) = self.nodes.get(&id) {
+                *node.widget.layout()
+            } else {
+                return;
+            }
+        };
+
+        // Only propagate if Panel has a known size
+        if panel_layout.width <= 0.0 || panel_layout.height <= 0.0 {
+            return;
+        }
+
+        let children = self.get_children(id).to_vec();
+        let mut needs_remeasure = false;
+
+        for &child_id in &children {
+            let child_type = self.nodes.get(&child_id).map(|n| n.widget.widget_type()).unwrap_or("");
+            if child_type == "SplitView" || child_type == "Dialog" {
+                // SplitView/Dialog that fills the Panel: always sync size to Panel dimensions.
+                // These are parent-allocated containers — their size must track the Panel
+                // even after initial creation, so drag-resize works correctly.
+                if let Some(node) = self.nodes.get_mut(&child_id) {
+                    let child_layout = *node.widget.layout();
+                    // Compute the fill dimensions: if at (0,0) fill the whole Panel;
+                    // otherwise fill remaining space from the child's offset position
+                    let fill_width = panel_layout.width - child_layout.x;
+                    let fill_height = panel_layout.height - child_layout.y;
+                    let needs_update = child_layout.width != fill_width 
+                        || child_layout.height != fill_height;
+                    if needs_update && fill_width > 0.0 && fill_height > 0.0 {
+                        node.widget.set_layout(crate::layout::Layout::new(
+                            child_layout.x,
+                            child_layout.y,
+                            fill_width,
+                            fill_height,
+                        ));
+                        needs_remeasure = true;
+                    }
+                }
+            } else if child_type == "TabWidget" || child_type == "ScrollView" || child_type == "PreviewWindow" || child_type == "TreeView" || child_type == "GridView" {
+                // Content containers: always fill remaining space within the Panel.
+                // These widgets display content that should scale with available space,
+                // not just when initially created (0×0). On SplitView drag the Panel
+                // changes size but these containers must re-fill to avoid invisible
+                // or un-clickable regions outside the old bounds.
+                if let Some(node) = self.nodes.get_mut(&child_id) {
+                    let child_layout = *node.widget.layout();
+                    let fill_width = panel_layout.width - child_layout.x;
+                    let fill_height = panel_layout.height - child_layout.y;
+                    let needs_update = child_layout.width != fill_width 
+                        || child_layout.height != fill_height;
+                    if needs_update && fill_width > 0.0 && fill_height > 0.0 {
+                        node.widget.set_layout(crate::layout::Layout::new(
+                            child_layout.x,
+                            child_layout.y,
+                            fill_width,
+                            fill_height,
+                        ));
+                        needs_remeasure = true;
+                    }
+                }
+            }
+        }
+
+        if needs_remeasure {
+            for &child_id in &children {
+                self.measure_and_layout(child_id, font_atlas);
+            }
+        }
+    }
+
+    fn layout_tab_widget_children(&mut self, id: WidgetId, font_atlas: &crate::font_atlas::FontAtlas) {
+        // Get TabWidget properties: active_index, tab_bar_height, content_scale
+        let (active_index, tab_bar_height, content_scale, tab_layout) = {
+            if let Some(node) = self.nodes.get(&id) {
+                if let Some(tab_widget) = node.widget.as_any().downcast_ref::<crate::widgets::TabWidget>() {
+                    (tab_widget.active_index(), tab_widget.tab_bar_height(), tab_widget.content_scale(), *tab_widget.layout())
+                } else {
+                    return;
+                }
+            } else {
+                return;
+            }
+        };
+
+        let scaled_tab_bar_height = tab_bar_height * content_scale;
+        let content_y = scaled_tab_bar_height;
+        let content_width = tab_layout.width;
+        let content_height = tab_layout.height - scaled_tab_bar_height;
+
+        if content_width <= 0.0 || content_height <= 0.0 {
+            return;
+        }
+
+        let children = self.get_children(id).to_vec();
+
+        for (i, &child_id) in children.iter().enumerate() {
+            if let Some(node) = self.nodes.get_mut(&child_id) {
+                let child_layout = *node.widget.layout();
+
+                // Position content below the tab bar, fill the content area
+                // Only the active tab's content is visible; inactive tabs are moved off-screen
+                if i == active_index {
+                    node.widget.set_layout(crate::layout::Layout::new(
+                        0.0,
+                        content_y,
+                        content_width,
+                        content_height,
+                    ));
+                } else {
+                    // Move inactive tab content off-screen so it doesn't overlap
+                    node.widget.set_layout(crate::layout::Layout::new(
+                        -9999.0,
+                        content_y,
+                        content_width,
+                        content_height,
+                    ));
+                }
+            }
+
+            // Re-measure and layout the active tab's content children
+            if i == active_index {
+                self.measure_and_layout(child_id, font_atlas);
+            }
+        }
+    }
+
+    fn layout_scroll_view_children(&mut self, id: WidgetId, font_atlas: &crate::font_atlas::FontAtlas) {
+        // Get ScrollView properties
+        let scroll_offset_y = {
+            if let Some(node) = self.nodes.get(&id) {
+                if let Some(sv) = node.widget.as_any().downcast_ref::<crate::widgets::ScrollView>() {
+                    sv.get_scroll_offset_y()
+                } else {
+                    return;
+                }
+            } else {
+                return;
+            }
+        };
+
+        let sv_layout = self.nodes.get(&id)
+            .map(|n| *n.widget.layout())
+            .unwrap_or_default();
+
+        let children = self.get_children(id).to_vec();
+        if children.is_empty() {
+            return;
+        }
+
+        // Measure children and compute total content size
+        let mut total_content_height: f32 = 0.0;
+        let mut max_content_width: f32 = 0.0;
+        let mut child_sizes = Vec::new();
+        for &child_id in &children {
+            let size = self.nodes.get(&child_id)
+                .map(|n| n.widget.as_ref().measure(font_atlas))
+                .unwrap_or((0.0, 0.0));
+            child_sizes.push(size);
+            total_content_height += size.1;
+            max_content_width = max_content_width.max(size.0);
+        }
+
+        // Position children: stack vertically, offset by scroll_offset_y
+        let mut current_y = -scroll_offset_y;
+        for (i, &child_id) in children.iter().enumerate() {
+            let (w, h) = child_sizes[i];
+            if let Some(node) = self.nodes.get_mut(&child_id) {
+                let child_layout = *node.widget.layout();
+                // Fill width to ScrollView width, position vertically with scroll offset
+                node.widget.set_layout(crate::layout::Layout::new(
+                    0.0,
+                    current_y,
+                    sv_layout.width.max(w).max(child_layout.width),
+                    h.max(child_layout.height),
+                ));
+            }
+            current_y += h;
+        }
+
+        // Update ScrollView's content_height and content_width
+        if let Some(node) = self.nodes.get_mut(&id) {
+            if let Some(sv) = node.widget.as_any_mut().downcast_mut::<crate::widgets::ScrollView>() {
+                sv.set_content_size(max_content_width.max(sv_layout.width), total_content_height);
             }
         }
     }
@@ -879,17 +1113,72 @@ pub fn perform_layout(&mut self, font_atlas: &FontAtlas) {
         // Button area has 10px padding above buttons
         let button_area_height = scaled_button_height + 10.0 * content_scale;
 
-        // Position the content widget inside the content_rect area
-        // Content rect: (0, scaled_title_height, dialog_width, dialog_height - scaled_title_height - button_area_height)
+        // Measure content children to compute required height for auto-sizing
+        // Use measure() only (not measure_and_layout) to avoid recursive layout_dialog_children
         if let Some(content_widget_id) = content_id {
+            let content_children = self.get_children(content_widget_id).to_vec();
+            let mut child_sizes = Vec::new();
+            for &child_id in &content_children {
+                let size = self.nodes.get(&child_id)
+                    .map(|n| n.widget.as_ref().measure(font_atlas))
+                    .unwrap_or((0.0, 0.0));
+                child_sizes.push(size);
+            }
+
+            // Compute required content height from children + spacing + padding
+            let (spacing, padding) = self.nodes.get(&content_widget_id)
+                .and_then(|n| {
+                    if let Some(vstack) = n.widget.as_any().downcast_ref::<crate::widgets::VStack>() {
+                        Some((vstack.spacing, vstack.padding))
+                    } else if let Some(hstack) = n.widget.as_any().downcast_ref::<crate::widgets::HStack>() {
+                        Some((hstack.spacing, hstack.padding))
+                    } else {
+                        None
+                    }
+                })
+                .unwrap_or((8.0, crate::types::EdgeInsets::zero()));
+
+            let children_total_height: f32 = child_sizes.iter().map(|(_, h)| *h).sum();
+            let spacing_total = if content_children.len() > 1 {
+                spacing * (content_children.len() - 1) as f32
+            } else {
+                0.0
+            };
+            let required_content_height = children_total_height + spacing_total + padding.top + padding.bottom;
+
             let content_y = scaled_title_height;
             let content_width = dialog_layout.width;
-            let content_height = dialog_layout.height - scaled_title_height - button_area_height;
+
+            // Auto-size: if dialog is too small for content, expand it
+            let min_dialog_height = required_content_height + scaled_title_height + button_area_height;
+            let dialog_height = if dialog_layout.height < min_dialog_height {
+                min_dialog_height
+            } else {
+                dialog_layout.height
+            };
+
+            let content_height = dialog_height - scaled_title_height - button_area_height;
 
             if content_height <= 0.0 {
                 return;
             }
 
+            // Update Dialog layout if height changed, and re-center it on screen
+            if dialog_height > dialog_layout.height {
+                let screen_size = crate::thunk::ui_get_screen_size();
+                let new_x = (screen_size.0 - dialog_layout.width) / 2.0;
+                let new_y = (screen_size.1 - dialog_height) / 2.0;
+                if let Some(node) = self.nodes.get_mut(&id) {
+                    node.widget.set_layout(crate::layout::Layout::new(
+                        new_x,
+                        new_y,
+                        dialog_layout.width,
+                        dialog_height,
+                    ));
+                }
+            }
+
+            // Position the content widget inside the content_rect area
             if let Some(node) = self.nodes.get_mut(&content_widget_id) {
                 node.widget.set_layout(crate::layout::Layout::new(
                     0.0,
@@ -899,16 +1188,7 @@ pub fn perform_layout(&mut self, font_atlas: &FontAtlas) {
                 ));
             }
 
-            // Re-layout content widget's children now that the content widget has correct size
-            // (measure_and_layout processes children before the parent, so when the content VStack's
-            // children were first laid out, the VStack still had zero size from initial creation)
-            let content_children = self.get_children(content_widget_id).to_vec();
-            let mut child_sizes = Vec::new();
-            for &child_id in &content_children {
-                let size = self.measure_and_layout(child_id, font_atlas);
-                child_sizes.push(size);
-            }
-
+            // Layout content children (VStack/HStack specific layout)
             let content_type = self.nodes.get(&content_widget_id)
                 .map(|n| n.widget.widget_type())
                 .unwrap_or("");
@@ -1032,6 +1312,37 @@ pub fn perform_layout(&mut self, font_atlas: &FontAtlas) {
             }
         }
 
+        // Check if this widget is a ScrollView — apply ClipRect + scroll offset to children
+        let is_scroll_view = self.nodes.get(&id)
+            .map(|n| n.widget.as_ref().widget_type() == "ScrollView")
+            .unwrap_or(false);
+        let scroll_offset_y = if is_scroll_view {
+            self.nodes.get(&id)
+                .and_then(|n| n.widget.as_any().downcast_ref::<crate::widgets::ScrollView>())
+                .map(|sv| sv.get_scroll_offset_y())
+                .unwrap_or(0.0)
+        } else {
+            0.0
+        };
+
+        // For ScrollView: add ClipRect before children, then ClearClip after
+        if is_scroll_view {
+            let layout = self.nodes.get(&id).map(|n| *n.widget.layout()).unwrap_or_default();
+            let abs_x = parent_abs_x + layout.x;
+            let abs_y = parent_abs_y + layout.y;
+            
+            // ClipRect: viewport area (clip children to ScrollView bounds)
+            render_data.push(RenderData {
+                draw_commands: vec![DrawCommand::ClipRect { 
+                    rect: Rect::new(abs_x, abs_y, layout.width, layout.height) 
+                }],
+                bounds: Rect::new(abs_x, abs_y, layout.width, layout.height),
+                z_index: 0,
+                layer: self.nodes.get(&id).map(|n| n.layer).unwrap_or_default(),
+                widget_id: id.id,
+            });
+        }
+
         let layout = self.nodes.get(&id).map(|n| *n.widget.layout()).unwrap_or_default();
         let abs_x = parent_abs_x + layout.x;
         let abs_y = parent_abs_y + layout.y;
@@ -1054,8 +1365,26 @@ pub fn perform_layout(&mut self, font_atlas: &FontAtlas) {
             }
         };
         
+        // For ScrollView: offset children by -scroll_offset_y so scrolled content shifts up
+        let child_abs_y = if is_scroll_view {
+            abs_y - scroll_offset_y
+        } else {
+            abs_y
+        };
+        
         for child in children {
-            self.generate_render_data_recursive(child, abs_x, abs_y, render_data, font_atlas);
+            self.generate_render_data_recursive(child, abs_x, child_abs_y, render_data, font_atlas);
+        }
+
+        // For ScrollView: ClearClip after all children are rendered
+        if is_scroll_view {
+            render_data.push(RenderData {
+                draw_commands: vec![DrawCommand::ClearClip],
+                bounds: Rect::new(abs_x, abs_y, layout.width, layout.height),
+                z_index: 0,
+                layer: self.nodes.get(&id).map(|n| n.layer).unwrap_or_default(),
+                widget_id: id.id,
+            });
         }
     }
     
@@ -1131,6 +1460,14 @@ pub fn perform_layout(&mut self, font_atlas: &FontAtlas) {
                     height: *height,
                     color: *color,
                     stroke_width: *stroke_width,
+                }
+            }
+            &DrawCommand::Triangle { p1, p2, p3, fill_color } => {
+                DrawCommand::Triangle {
+                    p1: Point::new(p1.x + offset_x, p1.y + offset_y),
+                    p2: Point::new(p2.x + offset_x, p2.y + offset_y),
+                    p3: Point::new(p3.x + offset_x, p3.y + offset_y),
+                    fill_color: fill_color.clone(),
                 }
             }
         }

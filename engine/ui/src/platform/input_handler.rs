@@ -70,6 +70,8 @@ impl UIInputHandler {
     }
 
     pub fn on_touch_event(&mut self, touch: &TouchEvent, timestamp: u64) {
+        // Touch coordinates from platform layer use logical pixels (same as extent).
+        // Widget layouts also use extent-space coordinates. Do NOT scale by content_scale.
         let x = touch.x;
         let y = self.screen_height - touch.y;
         
@@ -118,6 +120,11 @@ impl UIInputHandler {
 
     pub fn on_mouse_event(&mut self, mouse: &MouseEvent, timestamp: u64) {
         let ui_button = convert_mouse_button(mouse.button);
+        // GLFW on desktop reports cursor position in logical pixels (window coordinates).
+        // Widget layouts use logical pixels (matching the swapchain extent on desktop).
+        // Do NOT scale by content_scale — the coordinates are already in the correct space.
+        // On high-DPI displays, GLFW's get_cursor_pos() returns logical coordinates,
+        // and our widget tree root uses logical-pixel dimensions (1280x720 not 1920x1080).
         let x = mouse.x;
         let y = mouse.y;
         
