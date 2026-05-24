@@ -39,15 +39,19 @@ namespace Hezhou
             _directoryClickCallback = OnDirectoryClick;
             _fileClickCallback = OnFileClick;
              
-_addScriptClickCallback = OnAddScriptClick;
+_bindScriptClickCallback = OnBindScriptClick;
             _removeScriptClickCallback = OnRemoveScriptClick;
-            _createEntityClickCallback = OnCreateEntityClick;
             _pauseClickCallback = OnPauseClick;
             _scriptToggleClickCallback = OnScriptToggleClick;
             _scriptDropdownSelectCallback = OnScriptDropdownSelect;
-_hotReloadCompleteCallback = OnHotReloadComplete;
+            _hotReloadCompleteCallback = OnHotReloadComplete;
             _tabSelectCallback = OnTabSelect;
             _treeNodeToggleCallback = OnTreeNodeToggle;
+            
+            // SplitView ratio change callbacks (static fields to prevent GC)
+            _outerSplitViewRatioCallback = OnOuterSplitViewRatioChange;
+            _leftCenterSplitViewRatioCallback = OnLeftCenterSplitViewRatioChange;
+            _innerHorizontalSplitViewRatioCallback = OnInnerHorizontalSplitViewRatioChange;
             
             _fileMenuClickCallback = OnFileMenuClick;
             _openMenuClickCallback = OnOpenMenuClick;

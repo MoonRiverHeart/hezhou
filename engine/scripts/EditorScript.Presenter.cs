@@ -15,6 +15,7 @@ namespace Hezhou
 
         private static void OnWorkingDirectoryDialogResult(ulong dialogId, int result)
         {
+            Log.Info("Editor", "OnWorkingDirectoryDialogResult: dialogId=" + dialogId + " result=" + result);
             if (result == 1)
             {
                 string selectedPath = UI.FileBrowserGetSelectedPath(_workingDirectoryFileBrowserId);
@@ -251,10 +252,16 @@ namespace Hezhou
                 
                 if (currentState == GameState.Editing && _gameScene != null)
                 {
-                    float previewX = LEFT_PANEL_WIDTH + 10f * _contentScale;
-                    float previewY = TOOLBAR_HEIGHT + 40f * _contentScale;
-                    float previewWidth = _screenWidth - LEFT_PANEL_WIDTH - RIGHT_PANEL_WIDTH - 20f * _contentScale;
-                    float previewHeight = _screenHeight - TOOLBAR_HEIGHT - STATUS_BAR_HEIGHT - BOTTOM_PANEL_HEIGHT - 50f * _contentScale;
+                    // Use actual preview panel layout from SplitView (not fixed constants)
+                    float[] previewLayout = UI.WidgetGetLayout(_previewPanel.Id);
+                    if (previewLayout == null || previewLayout.Length < 4) return;
+                    
+                    float previewX = previewLayout[0] + 10f;
+                    float previewY = previewLayout[1] + 40f;
+                    float previewWidth = previewLayout[2] - 20f;
+                    float previewHeight = previewLayout[3] - 50f;
+                    
+                    if (previewWidth <= 0 || previewHeight <= 0) return;
                     
                     float relX = (x - previewX) / previewWidth;
                     float relY = (y - previewY) / previewHeight;
@@ -279,7 +286,7 @@ namespace Hezhou
                     if (hitEntity != 0)
                     {
                         _gameScene.SelectEntity(hitEntity);
-                        _statusItem.Text = $"选中Entity: {hitEntity}";
+                        _statusItem.Text = "选中Entity: " + hitEntity;
                         UpdatePropertiesPanel(hitEntity);
                     }
                     else
@@ -668,6 +675,13 @@ namespace Hezhou
 
         private static void OnTreeNodeSelect(ulong widgetId, ulong userData)
         {
+            // Clear previous node selection highlight
+            if (_lastSelectedNodeId != 0 && _lastSelectedNodeId != widgetId)
+            {
+                UI.TreeNodeSetSelected(_lastSelectedNodeId, false);
+            }
+            _lastSelectedNodeId = widgetId;
+            
             // Check if this is a directory tree node selection
             if (_dirItemPaths.TryGetValue(widgetId, out string dirPath))
             {
@@ -776,12 +790,17 @@ namespace Hezhou
 
         private static void RefreshAssetGridView()
         {
-            UI.GridViewClear(_assetGridViewId);
+            // Use _assetModelGridViewId (the actual GridView inside the 模型 tab)
+            // _assetGridViewId is a legacy alias that is never set
+            ulong gridViewId = _assetModelGridViewId != 0 ? _assetModelGridViewId : _assetGridViewId;
+            if (gridViewId == 0) return;
             
-            UI.GridViewAddItem(_assetGridViewId, "Cube", 1);
-            UI.GridViewAddItem(_assetGridViewId, "Sphere", 2);
-            UI.GridViewAddItem(_assetGridViewId, "Plane", 3);
-            UI.GridViewAddItem(_assetGridViewId, "Cylinder", 4);
+            UI.GridViewClear(gridViewId);
+            
+            UI.GridViewAddItem(gridViewId, "Cube", 1);
+            UI.GridViewAddItem(gridViewId, "Sphere", 2);
+            UI.GridViewAddItem(gridViewId, "Plane", 3);
+            UI.GridViewAddItem(gridViewId, "Cylinder", 4);
         }
         
 private static void OnGridViewClick(ulong widgetId, int index, ulong userData)
@@ -808,17 +827,17 @@ SelectEntity(entityId);
 
         private static void OnNewClick(ulong widgetId)
         {
-            UI.PopupMenuShow(_fileMenuId, 10f * _contentScale, TOOLBAR_HEIGHT * _contentScale);
+            UI.PopupMenuShow(_fileMenuId, 10f, TOOLBAR_HEIGHT);
         }
         
         private static void OnOpenClick(ulong widgetId)
         {
-            UI.PopupMenuShow(_openMenuId, 90f * _contentScale, TOOLBAR_HEIGHT * _contentScale);
+            UI.PopupMenuShow(_openMenuId, 90f, TOOLBAR_HEIGHT);
         }
         
         private static void OnSaveClick(ulong widgetId)
         {
-            UI.PopupMenuShow(_saveMenuId, 170f * _contentScale, TOOLBAR_HEIGHT * _contentScale);
+            UI.PopupMenuShow(_saveMenuId, 170f, TOOLBAR_HEIGHT);
         }
         
         private static void OnRunClick(ulong widgetId)
@@ -939,29 +958,15 @@ UI.SetText(_runButtonId, "运行");
                 
                 if (!_scriptEditorVisible)
                 {
+                    // Hide main layout (removes SplitView structure)
+                    HideMainLayout();
+                    
                     ulong rootId = UI.GetRootId();
-                    float editorX = LEFT_PANEL_WIDTH;
                     float editorY = TOOLBAR_HEIGHT;
-                    float editorWidth = _screenWidth - LEFT_PANEL_WIDTH;
+                    float editorWidth = _screenWidth;
                     float editorHeight = _screenHeight - TOOLBAR_HEIGHT - STATUS_BAR_HEIGHT;
                     
-                    if (_previewPanel != null)
-                    {
-                        UI.RemoveWidget(_previewPanel.Id);
-                        _previewPanel = null;
-                    }
-                    if (_assetPanel != null)
-                    {
-                        UI.RemoveWidget(_assetPanel.Id);
-                        _assetPanel = null;
-                    }
-                    if (_propertiesPanel != null)
-                    {
-                        UI.RemoveWidget(_propertiesPanel.Id);
-                        _propertiesPanel = null;
-                    }
-                    
-                    _scriptEditorPanel = new Panel(rootId, editorX, editorY, editorWidth, editorHeight, 0.12f, 0.12f, 0.14f, 1.0f);
+                    _scriptEditorPanel = new Panel(rootId, 0, editorY, editorWidth, editorHeight, 0.12f, 0.12f, 0.14f, 1.0f);
                     
                     var hotReloadBtn = new Button(_scriptEditorPanel.Id, 100f, 30f, "Hot Reload");
                     UI.SetWidgetLayout(hotReloadBtn.Id, 10f, 10f, 100f, 30f);
@@ -971,8 +976,8 @@ UI.SetText(_runButtonId, "运行");
                     UI.SetWidgetLayout(_scriptEditorLabel.Id, 120f, 10f, 300f, 25f);
                     
                     _scriptTextEditId = UI.CreateTextEdit(_scriptEditorPanel.Id, editorWidth - 20f, editorHeight - 50f);
-            UI.SetTextEditShowLineNumbers(_scriptTextEditId, true);
-            UI.SetWidgetLayout(_scriptTextEditId, 10f, 50f, editorWidth - 20f, editorHeight - 50f);
+                    UI.SetTextEditShowLineNumbers(_scriptTextEditId, true);
+                    UI.SetWidgetLayout(_scriptTextEditId, 10f, 50f, editorWidth - 20f, editorHeight - 50f);
                     
                     _scriptEditorVisible = true;
                     
@@ -985,7 +990,7 @@ UI.SetText(_runButtonId, "运行");
                     
                     if (_scriptEditorLabel != null)
                     {
-                        _scriptEditorLabel.Text = $"Script Editor - {fileName}";
+                        _scriptEditorLabel.Text = "Script Editor - " + fileName;
                     }
                 }
                 else
@@ -1033,6 +1038,12 @@ UI.SetText(_runButtonId, "运行");
         
         private static void OnAddScriptClick(ulong widgetId)
         {
+            // Legacy alias - now delegates to OnBindScriptClick
+            OnBindScriptClick(widgetId);
+        }
+        
+        private static void OnBindScriptClick(ulong widgetId)
+        {
             if (_selectedEntityId == 0 || _gameScene == null)
             {
                 Log.Error("Editor", "未选中Entity!");
@@ -1046,7 +1057,7 @@ UI.SetText(_runButtonId, "运行");
             }
             
             string scriptName = _availableScripts[_selectedScriptIndex];
-            string scriptPath = $"scripts/{scriptName}";
+            string scriptPath = "scripts/" + scriptName;
             string className = Path.GetFileNameWithoutExtension(scriptName);
             
             _gameScene.AttachScriptBinding(_selectedEntityId, scriptPath, className);
@@ -1088,8 +1099,9 @@ UI.SetText(_runButtonId, "运行");
         
         private static void OnTabSelect(ulong widgetId, ulong index)
         {
-            string tabName = index == 0 ? "Transform" : "Scripts";
-            _statusItem.Text = $"属性页: {tabName}";
+            string[] tabNames = new string[] { "几何", "位置", "渲染", "运动", "物理" };
+            string tabName = ((int)index < tabNames.Length) ? tabNames[(int)index] : "未知";
+            _statusItem.Text = "属性页: " + tabName;
         }
         
         private static void OnNewScriptClick(ulong widgetId)
@@ -1141,8 +1153,8 @@ UI.SetText(_runButtonId, "运行");
         private static void ShowDeleteConfirmDialog()
         {
             ulong rootId = UI.GetRootId();
-            float dialogWidth = 300f * _contentScale;
-            float dialogHeight = 150f * _contentScale;
+            float dialogWidth = 300f;
+            float dialogHeight = 150f;
             
             _deleteConfirmDialogId = UI.CreateDialog(rootId, "确认删除?", dialogWidth, dialogHeight);
             UI.DialogSetOnResult(_deleteConfirmDialogId, _deleteConfirmDialogResultCallback);
@@ -1304,8 +1316,8 @@ UI.SetText(_runButtonId, "运行");
         private static void ShowOpenSceneDialog()
         {
             ulong rootId = UI.GetRootId();
-            float dialogWidth = 500f * _contentScale;
-            float dialogHeight = 400f * _contentScale;
+            float dialogWidth = 500f;
+            float dialogHeight = 400f;
             
             _openSceneDialogId = UI.CreateDialog(rootId, "打开场景", dialogWidth, dialogHeight);
             UI.DialogSetOnResult(_openSceneDialogId, _openSceneDialogResultCallback);
@@ -1367,8 +1379,8 @@ UI.SetText(_runButtonId, "运行");
         private static void ShowOpenProjectDialog()
         {
             ulong rootId = UI.GetRootId();
-            float dialogWidth = 500f * _contentScale;
-            float dialogHeight = 400f * _contentScale;
+            float dialogWidth = 500f;
+            float dialogHeight = 400f;
             
             _openProjectDialogId = UI.CreateDialog(rootId, "打开项目", dialogWidth, dialogHeight);
             UI.DialogSetOnResult(_openProjectDialogId, _openProjectDialogResultCallback);
@@ -1444,8 +1456,8 @@ UI.SetText(_runButtonId, "运行");
         private static void ShowSaveAsDialog()
         {
             ulong rootId = UI.GetRootId();
-            float dialogWidth = 500f * _contentScale;
-            float dialogHeight = 400f * _contentScale;
+            float dialogWidth = 500f;
+            float dialogHeight = 400f;
             
             _saveAsDialogId = UI.CreateDialog(rootId, "另存为", dialogWidth, dialogHeight);
             UI.DialogSetOnResult(_saveAsDialogId, _saveAsDialogResultCallback);

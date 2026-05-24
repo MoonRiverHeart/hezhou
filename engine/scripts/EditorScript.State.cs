@@ -8,23 +8,45 @@ namespace Hezhou
         // === Layout Constants ===
         private const float TOOLBAR_HEIGHT = 40f;
         private const float STATUS_BAR_HEIGHT = 40f;
-        private const float LEFT_PANEL_WIDTH = 250f;
-        private const float RIGHT_PANEL_WIDTH = 250f;
-        private const float BOTTOM_PANEL_HEIGHT = 200f;
+        private const float LEFT_PANEL_WIDTH = 250f;   // kept for backward compat (property widget sizing)
+        private const float RIGHT_PANEL_WIDTH = 250f;   // kept for backward compat (property widget sizing)
 
-        // === UI Widget References ===
+        // === SplitView Layout Widget IDs ===
+        private static ulong _outerSplitViewId;          // Horizontal: LeftCenter | Properties
+        private static ulong _leftCenterSplitViewId;     // Vertical: Top | Asset
+        private static ulong _innerHorizontalSplitViewId; // Horizontal: Project | Preview
+
+        // === SplitView Pane Panel References ===
+        private static Panel _leftCenterPanel;           // First pane of outer SplitView
+        private static Panel _rightPanel;                // Second pane of outer SplitView (Properties)
+        private static Panel _topPanel;                  // First pane of leftCenter SplitView
+        private static Panel _projectPanel;              // First pane of inner SplitView
+        private static Panel _previewPanel;              // Second pane of inner SplitView
+        private static Panel _assetPanel;                // Second pane of leftCenter SplitView
+        private static ulong _previewWindowId;
+
+        // === Legacy (kept for backward compat references in Presenter) ===
+        private static Panel _propertiesPanel;           // Now null; _rightPanel used instead
         private static Panel _toolbar;
         private static HStack _toolbarButtons;
-        private static Panel _projectPanel;
-        private static Panel _assetPanel;
-        private static VStack _assetList;
-        private static Panel _previewPanel;
-        private static ulong _previewWindowId;
-        private static Panel _propertiesPanel;
-        private static VStack _propsList;
+
+        // === Property Panel 5-Tab References ===
         private static TabWidget _propsTabWidget;
-        private static ulong _transformTabContentId;
-        private static ulong _scriptsTabContentId;
+        private static ulong _geometryTabContentId;      // 几何 (Geometry)
+        private static ulong _positionTabContentId;      // 位置 (Position/Transform)
+        private static ulong _renderTabContentId;        // 渲染 (Render)
+        private static ulong _motionTabContentId;        // 运动 (Motion/Scripts)
+        private static ulong _physicsTabContentId;       // 物理 (Physics)
+
+        // === Motion Tab Script Binding References ===
+        private static ulong _scriptDropdownId;          // Script selection dropdown
+        private static ulong _bindScriptBtnId;           // "绑定" button (replaces _addScriptBtnId)
+        private static ulong _scriptsListContainerId;    // VStack for bound scripts list
+
+        // === Asset Panel TabWidget ===
+        private static TabWidget _assetTabWidget;
+        private static ulong _assetModelGridViewId;      // GridView inside 模型 tab
+        private static ulong _assetGridViewId;           // Legacy alias for backward compat
 
         // === Entity Selection State ===
         private static ulong _selectedEntityId = 0;
@@ -39,11 +61,7 @@ namespace Hezhou
 
         // === Script Management State ===
         private static List<string> _availableScripts = new List<string>();
-        private static ulong _scriptDropdownId;
-        private static ulong _addScriptBtnId;
-        private static ulong _scriptsListContainerId;
         private static List<ulong> _scriptRowIds = new List<ulong>();
-        private static ulong _createEntityBtnId;
         private static Dictionary<ulong, int> _removeScriptBtnIndices = new Dictionary<ulong, int>();
         private static Dictionary<ulong, int> _scriptToggleBtnIndices = new Dictionary<ulong, int>();
 
@@ -71,9 +89,6 @@ namespace Hezhou
         private static Dictionary<ulong, ulong> _entityNodeMap = new Dictionary<ulong, ulong>();
         private static HashSet<string> _expandedNodeNames = new HashSet<string>();
         private static Dictionary<ulong, string> _nodeIdToName = new Dictionary<ulong, string>();
-
-        // === Asset Grid State ===
-        private static ulong _assetGridViewId;
 
         // === Popup Menu Callbacks ===
         private static UI.PopupMenuClickCallbackDelegate _fileMenuClickCallback;
@@ -122,6 +137,7 @@ namespace Hezhou
         private static ulong _directoryTreeViewId;
         private static ulong _directoryRootNodeId;
         private static ulong _directoryBackNodeId;
+        private static ulong _lastSelectedNodeId = 0;
 
         // === Working Directory Dialog State ===
         private static bool _workingDirectorySet = false;
@@ -138,13 +154,13 @@ namespace Hezhou
         private static float _cameraX = 0f;
         private static float _cameraY = 0f;
         private static float _cameraZ = 3f;
-private static float _cameraYaw = 0f;
+        private static float _cameraYaw = 0f;
         private static float _cameraPitch = 0f;
 
         // === Orbit Camera State (Editing mode) ===
-        private static float _orbitYaw = 0.3f;     // initial slight angle to show cube
-        private static float _orbitPitch = -0.3f;   // slight downward look
-        private static float _orbitDistance = 5f;    // distance from target
+        private static float _orbitYaw = 0.3f;
+        private static float _orbitPitch = -0.3f;
+        private static float _orbitDistance = 5f;
         private static float _orbitTargetX = 0f;
         private static float _orbitTargetY = 0f;
         private static float _orbitTargetZ = 0f;
@@ -181,14 +197,18 @@ private static float _cameraYaw = 0f;
         private static ulong _testCubeId;
 
         // === Script Callback Delegates ===
-        private static UI.WidgetCallbackDelegate _addScriptClickCallback;
+        private static UI.WidgetCallbackDelegate _bindScriptClickCallback;    // "绑定" button (replaces _addScriptClickCallback)
         private static UI.WidgetCallbackDelegate _removeScriptClickCallback;
-        private static UI.WidgetCallbackDelegate _createEntityClickCallback;
         private static UI.WidgetCallbackDelegate _pauseClickCallback;
         private static UI.WidgetCallbackDelegate _scriptToggleClickCallback;
         private static UI.DropdownSelectCallbackDelegate _scriptDropdownSelectCallback;
         private static UI.OnHotReloadCompleteDelegate _hotReloadCompleteCallback;
         private static UI.TabSelectCallbackDelegate _tabSelectCallback;
+
+        // === SplitView Ratio Change Callbacks (static fields to prevent GC) ===
+        private static UI.SplitViewRatioChangeCallbackDelegate _outerSplitViewRatioCallback;
+        private static UI.SplitViewRatioChangeCallbackDelegate _leftCenterSplitViewRatioCallback;
+        private static UI.SplitViewRatioChangeCallbackDelegate _innerHorizontalSplitViewRatioCallback;
 
         // === Tree Toggle Callback ===
         private static UI.TreeNodeToggleCallbackDelegate _treeNodeToggleCallback;
@@ -198,19 +218,17 @@ private static float _cameraYaw = 0f;
         private static int _selectedScriptIndex = 0;
 
         // === Property Descriptor (Model Type) ===
-        // PropertyDescriptor caches reflection metadata and widget IDs for each property
         private struct PropertyDescriptor
         {
             public string Name;
             public uint Type;       // 0=Float, 1=Float3, 2=String, 3=Bool, 4=Int, 5=Enum
             public string Category;
             public bool ReadOnly;
-            public ulong LabelId;   // Label showing property display name
-            public ulong[] WidgetIds; // Float3: [xId, yId, zId]; String/Int: [inputId]; ReadOnly: [valueLabelId]
+            public ulong LabelId;
+            public ulong[] WidgetIds;
         }
 
         // === Property Change Callback Delegate (Model Type) ===
-        // New delegate type for property change callbacks (prevents GC when stored in dictionary)
         public delegate void PropertyChangeCallback(ulong widgetId, string text);
     }
 }
