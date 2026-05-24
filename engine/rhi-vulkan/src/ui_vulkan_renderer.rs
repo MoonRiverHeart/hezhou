@@ -94,6 +94,7 @@ pub struct UIVulkanRenderer {
     button_clicked: Arc<AtomicBool>,
     needs_resize: bool,
     new_extent: vk::Extent2D,
+    pending_offscreen_resize: Option<vk::Extent2D>,  // Deferred FBO recreation to avoid mid-frame device_wait_idle
     swapchain_format: vk::Format,
     physical_device: vk::PhysicalDevice,
     triangle_angle: f32,
@@ -968,11 +969,13 @@ p_multisample_state: &vk::PipelineMultisampleStateCreateInfo {
             device.destroy_shader_module(outline_vert_shader, None);
             device.destroy_shader_module(outline_frag_shader, None);
             
-            // Light UBO buffer (48 bytes: direction(3+pad=16) + color(3+pad=16) + intensity(1+pad=12) = 48 bytes, std140 layout)
-            // std140: vec3 has alignment 16, each vec3 occupies 16 bytes. float has alignment 4.
-            // direction at offset 0 (16 bytes), color at offset 16 (16 bytes), intensity at offset 32 (4 bytes)
-            // Struct size rounded to multiple of largest alignment (16) = 48 bytes
-            let light_ubo_size: vk::DeviceSize = 48;
+            // Light UBO buffer (32 bytes): shader uses std430 layout where vec3 occupies 12 bytes (not padded to vec4).
+            // direction (vec3): offset 0, 12 bytes. Gap: offset 12-15 (4 bytes, alignment pad for next vec3).
+            // color (vec3): offset 16, 12 bytes.
+            // intensity (float): offset 28, 4 bytes.
+            // Struct total = 32 bytes, rounded to multiple of largest alignment (16) = 32 bytes.
+            // Data: [dir.x, dir.y, dir.z, pad, color.x, color.y, color.z, intensity] = 8 floats = 32 bytes
+            let light_ubo_size: vk::DeviceSize = 32;
             let light_ubo = device.create_buffer(&vk::BufferCreateInfo {
                 size: light_ubo_size,
                 usage: vk::BufferUsageFlags::UNIFORM_BUFFER,
@@ -998,15 +1001,16 @@ p_multisample_state: &vk::PipelineMultisampleStateCreateInfo {
                 .map_err(|e| format!("Failed to bind light UBO memory: {}", e))?;
             
             // Write default light data to UBO: direction=(-0.5,-1.0,-0.5), color=(1,1,1), intensity=1.0
-            // std140 layout: [dir.x, dir.y, dir.z, 0(pad), color.x, color.y, color.z, 0(pad), intensity, 0(pad), 0(pad), 0(pad)] = 12 floats = 48 bytes
+            // std430 layout: direction(3 floats, offset 0) + pad(1 float, offset 12) + color(3 floats, offset 16) + intensity(1 float, offset 28)
+            // = 8 floats = 32 bytes. Intensity is at offset 28 (NOT 32 as in std140!)
             {
-                let default_light_data: [f32; 12] = [-0.5, -1.0, -0.5, 0.0, 1.0, 1.0, 1.0, 0.0, 1.0, 0.0, 0.0, 0.0];
+                let default_light_data: [f32; 8] = [-0.5, -1.0, -0.5, 0.0, 1.0, 1.0, 1.0, 1.0];
                 let data_ptr = device.map_memory(light_ubo_memory, 0, light_ubo_size, vk::MemoryMapFlags::empty())
                     .map_err(|e| format!("Failed to map light UBO memory: {}", e))?;
                 std::ptr::copy_nonoverlapping(
                     default_light_data.as_ptr() as *const u8,
                     data_ptr as *mut u8,
-                    48,
+                    32,
                 );
                 device.unmap_memory(light_ubo_memory);
             }
@@ -1374,6 +1378,7 @@ p_multisample_state: &vk::PipelineMultisampleStateCreateInfo {
                 button_clicked: Arc::new(AtomicBool::new(false)),
                 needs_resize: false,
                 new_extent: extent,
+                pending_offscreen_resize: None,
                 swapchain_format: format,
                 physical_device,
                 triangle_angle: 0.0,
@@ -1646,6 +1651,8 @@ pub fn setup_ui(&mut self) {
         let mut tree_guard = tree.lock();
         
         let mut root_panel = Panel::new();
+        // Root panel uses extent dimensions directly.
+        // Widget tree coordinates share the same pixel space as extent.
         root_panel.set_layout(Layout::new(0.0, 0.0, self.extent.width as f32, self.extent.height as f32));
         root_panel.set_style(Style::new().with_background(Color::transparent()));
         tree_guard.set_root(Box::new(root_panel));
@@ -1700,7 +1707,10 @@ pub fn setup_ui(&mut self) {
             
             self.dfx.lock().get_logger().lock().log(LogLevel::Info, "UI", "VStack created with Button and Label", file!(), line!());
             
-let font_atlas_guard = ui.get_font_atlas().lock();
+let mut font_atlas_guard = ui.get_font_atlas().lock();
+            tree_guard.ensure_text_rasterized(&mut *font_atlas_guard);
+            drop(font_atlas_guard);
+let mut font_atlas_guard = ui.get_font_atlas().lock();
             tree_guard.perform_layout(&*font_atlas_guard);
             
             tree_guard.recenter_widget(vstack_id, self.extent.width as f32, self.extent.height as f32);
@@ -1794,6 +1804,8 @@ let font_atlas_guard = ui.get_font_atlas().lock();
         let mut tree_guard = tree.lock();
         
         let mut root_panel = Panel::new();
+        // Root panel uses extent dimensions directly.
+        // Widget tree coordinates share the same pixel space as extent.
         root_panel.set_layout(Layout::new(0.0, 0.0, self.extent.width as f32, self.extent.height as f32));
         root_panel.set_style(Style::new().with_background(Color::transparent()));
         tree_guard.set_root(Box::new(root_panel));
@@ -2006,35 +2018,87 @@ let font_atlas_guard = ui.get_font_atlas().lock();
     }
     
     unsafe fn update_ui_layout(&mut self) {
-        let ui = self.ui_system.lock();
-        let tree = ui.get_widget_tree();
-        let mut tree_guard = tree.lock();
-        let font_atlas_guard = ui.get_font_atlas().lock();
+        // Use extent dimensions directly for UI layout.
+        // On Windows with GLFW, extent matches the window size (logical pixels on high DPI).
+        // The widget tree coordinates use the same pixel space as extent.
+        let width = self.extent.width as f32;
+        let height = self.extent.height as f32;
         
-        if let Some(root_id) = tree_guard.root {
-            if let Some(root_widget) = tree_guard.get_widget_mut(root_id) {
-                root_widget.set_layout(hezhou_ui::Layout::new(
-                    0.0, 0.0, 
-                    self.extent.width as f32, 
-                    self.extent.height as f32
-                ));
+        // First: set root widget layout to extent size
+        {
+            let ui = self.ui_system.lock();
+            let tree = ui.get_widget_tree();
+            let mut tree_guard = tree.lock();
+            
+            if let Some(root_id) = tree_guard.root {
+                if let Some(root_widget) = tree_guard.get_widget_mut(root_id) {
+                    root_widget.set_layout(hezhou_ui::Layout::new(
+                        0.0, 0.0, 
+                        width,
+                        height
+                    ));
+                }
+            }
+            drop(tree_guard);
+            drop(ui);
+        }
+        
+        // Second: update global screen size so C# GetScreenSize is consistent
+        hezhou_ui::thunk::ui_set_screen_size(width, height);
+        
+        // Third: rasterize all text + run full layout pass BEFORE triggering C# OnResize.
+        // This ensures that when C# calls WidgetGetLayout() in UpdatePreviewExtent(),
+        // the layout values are already computed for the current frame (not stale
+        // from the previous frame, which caused the delayed/inverted resize bug),
+        // and that all glyphs (including emoji/CJK fallback) are cached before measurement.
+        {
+            let ui = self.ui_system.lock();
+            let tree = ui.get_widget_tree();
+            let mut tree_guard = tree.lock();
+            let font_atlas_mutex = ui.get_font_atlas();
+            
+            // Step 1: Ensure all text is rasterized with font fallback before layout
+            {
+                let mut font_atlas_guard = font_atlas_mutex.lock();
+                tree_guard.ensure_text_rasterized(&mut *font_atlas_guard);
+                
+                if font_atlas_guard.is_atlas_dirty() {
+                    let texture_data = font_atlas_guard.get_atlas_texture().to_vec();
+                    font_atlas_guard.clear_atlas_dirty();
+                    
+                    unsafe {
+                        let mem_requirements = self.device.get_image_memory_requirements(self.font_texture);
+                        let data_ptr = self.device.map_memory(
+                            self.font_texture_memory,
+                            0,
+                            mem_requirements.size,
+                            vk::MemoryMapFlags::empty(),
+                        ).expect("Failed to map font texture memory in resize");
+                        
+                        std::ptr::copy_nonoverlapping(texture_data.as_ptr(), data_ptr as *mut u8, texture_data.len());
+                        self.device.unmap_memory(self.font_texture_memory);
+                    }
+                }
             }
             
-            let vstack_id = tree_guard.get_children(root_id)
-                .first()
-                .copied()
-                .unwrap_or_else(hezhou_ui::WidgetId::invalid);
-            
-            if vstack_id.is_valid() {
-                tree_guard.recenter_widget(vstack_id, self.extent.width as f32, self.extent.height as f32);
+            // Step 2: Now all glyphs cached, do layout
+            let font_atlas_guard = font_atlas_mutex.lock();
+            if let Some(root_id) = tree_guard.root {
                 tree_guard.perform_layout(&*font_atlas_guard);
             }
+            drop(tree_guard);
+            drop(font_atlas_guard);
+            drop(ui);
         }
+        
+        // Fourth: trigger C# OnResize — now C# reads correct (post-layout) dimensions
+        hezhou_ui::ffi::ui_trigger_resize(width, height);
         
         self.dfx.lock().get_logger().lock().log(
             LogLevel::Info,
             "UI",
-            &format!("UI layout updated for {}x{}", self.extent.width, self.extent.height),
+            &format!("UI layout updated: extent={}x{}, scale={}", 
+                self.extent.width, self.extent.height, self.content_scale),
             file!(),
             line!()
         );
@@ -2061,8 +2125,6 @@ let font_atlas_guard = ui.get_font_atlas().lock();
                 self.update_ui_layout();
             }
             self.needs_resize = false;
-            
-            hezhou_ui::ffi::ui_trigger_resize(self.extent.width as f32, self.extent.height as f32);
         }
         
         if self.button_clicked.load(Ordering::SeqCst) {
@@ -2106,6 +2168,14 @@ let font_atlas_guard = ui.get_font_atlas().lock();
             
             self.device.reset_fences(&[self.in_flight_fences[self.current_frame]])
                 .map_err(|e| format!("Failed to reset fence: {}", e))?;
+            
+            // Apply deferred offscreen FBO resize if pending — safe here because
+            // the frame fence just completed, so no command buffers reference old FBO
+            if self.pending_offscreen_resize.is_some() {
+                self.device.device_wait_idle()
+                    .map_err(|e| format!("Failed to wait device idle for resize: {}", e))?;
+                self.apply_pending_offscreen_resize()?;
+            }
             
             self.device.reset_command_buffer(self.command_buffers[image_index_usize], vk::CommandBufferResetFlags::RELEASE_RESOURCES)
                 .map_err(|e| format!("Failed to reset command buffer: {}", e))?;
@@ -2200,8 +2270,6 @@ let font_atlas_guard = ui.get_font_atlas().lock();
             self.device.cmd_set_viewport(self.command_buffers[image_index_usize], 0, &[game_viewport]);
             self.device.cmd_set_scissor(self.command_buffers[image_index_usize], 0, &[game_scissor]);
             
-            // Per-frame rendering — skip log
-            
             // Bind game mesh vertex buffer
             self.device.cmd_bind_vertex_buffers(
                 self.command_buffers[image_index_usize],
@@ -2212,7 +2280,7 @@ let font_atlas_guard = ui.get_font_atlas().lock();
             
             // Extract directional light data from Scene ECS and upload to UBO
             // std140 layout: [dir.x, dir.y, dir.z, 0(pad), color.x, color.y, color.z, 0(pad), intensity, 0(pad), 0(pad), 0(pad)] = 12 floats = 48 bytes
-            let light_data: [f32; 12] = if let Some(scene_ptr) = self.scene_ptr {
+            let light_data: [f32; 8] = if let Some(scene_ptr) = self.scene_ptr {
                 unsafe {
                     let scene = &*scene_ptr;
                     let mut found_light = None;
@@ -2223,27 +2291,28 @@ let font_atlas_guard = ui.get_font_atlas().lock();
                         }
                     }
                     if let Some(light_comp) = found_light {
+                        // std430 layout: [dir.x, dir.y, dir.z, pad, color.x, color.y, color.z, intensity] = 8 floats
+                        // intensity at offset 28 (NOT 32 as std140 would place it)
                         [light_comp.direction.x, light_comp.direction.y, light_comp.direction.z, 0.0,
-                         light_comp.color.x, light_comp.color.y, light_comp.color.z, 0.0,
-                         light_comp.intensity, 0.0, 0.0, 0.0]
+                         light_comp.color.x, light_comp.color.y, light_comp.color.z, light_comp.intensity]
                     } else {
                         // Default fallback: direction=(-0.5,-1.0,-0.5), color=(1,1,1), intensity=1.0
-                        [-0.5, -1.0, -0.5, 0.0, 1.0, 1.0, 1.0, 0.0, 1.0, 0.0, 0.0, 0.0]
+                        [-0.5, -1.0, -0.5, 0.0, 1.0, 1.0, 1.0, 1.0]
                     }
                 }
             } else {
                 // Default fallback when no scene exists
-                [-0.5, -1.0, -0.5, 0.0, 1.0, 1.0, 1.0, 0.0, 1.0, 0.0, 0.0, 0.0]
+                [-0.5, -1.0, -0.5, 0.0, 1.0, 1.0, 1.0, 1.0]
             };
             
-            // Upload light data to UBO
+            // Upload light data to UBO (32 bytes, std430 layout)
             unsafe {
-                let data_ptr = self.device.map_memory(self.light_ubo_memory, 0, 48, vk::MemoryMapFlags::empty())
+                let data_ptr = self.device.map_memory(self.light_ubo_memory, 0, 32, vk::MemoryMapFlags::empty())
                     .expect("Failed to map light UBO memory");
                 std::ptr::copy_nonoverlapping(
                     light_data.as_ptr() as *const u8,
                     data_ptr as *mut u8,
-                    48,
+                    32,
                 );
                 self.device.unmap_memory(self.light_ubo_memory);
             }
@@ -2639,10 +2708,14 @@ let font_atlas_guard = ui.get_font_atlas().lock();
             self.device.cmd_set_scissor(self.command_buffers[image_index_usize], 0, &[scissor]);
             
             let px_range = 4.0;
+            // Use extent dimensions for screen_size in push constants.
+            // Widget positions and extent share the same coordinate space.
+            let screen_width = self.extent.width as f32;
+            let screen_height = self.extent.height as f32;
             
             let push_constants = [
-                self.extent.width as f32,
-                self.extent.height as f32,
+                screen_width,
+                screen_height,
                 0.0,
                 0.0,
                 px_range,
@@ -2691,6 +2764,24 @@ let font_atlas_guard = ui.get_font_atlas().lock();
                 // Step 2: Now all glyphs are cached, use &FontAtlas for layout/render
                 let font_atlas_guard = font_atlas_mutex.lock();
                 tree_guard.perform_layout(&*font_atlas_guard);
+                
+                // Step 2b: After layout, check if PreviewWindow extent changed and
+                // queue FBO resize to match. This ensures the game preview FBO always
+                // tracks the PreviewWindow's actual layout size, even when resized via
+                // SplitView drag (where C# callback may read stale dimensions).
+                {
+                    let preview_extent = tree_guard.find_preview_window_extent();
+                    if let Some((pw, ph)) = preview_extent {
+                        let pw_u = pw as u32;
+                        let ph_u = ph as u32;
+                        if pw_u != self.offscreen_extent.width || ph_u != self.offscreen_extent.height {
+                            if pw_u > 0 && ph_u > 0 {
+                                self.pending_offscreen_resize = Some(vk::Extent2D { width: pw_u, height: ph_u });
+                            }
+                        }
+                    }
+                }
+                
                 tree_guard.generate_render_data(&*font_atlas_guard)
             };
             
@@ -2894,7 +2985,36 @@ let font_atlas_guard = ui.get_font_atlas().lock();
                         
                         flush_batch(&mut batches, &mut current_vertices, current_clip, current_layer);
                     }
-                    DrawCommand::Line { .. } => {}
+                    DrawCommand::Line { start, end, color, width } => {
+                        // Render line as a thin quad (2 triangles) oriented along the line direction.
+                        // This enables line rendering in TRIANGLE_LIST topology.
+                        let dx = end.x - start.x;
+                        let dy = end.y - start.y;
+                        let len = (dx * dx + dy * dy).sqrt();
+                        if len < 0.001 { continue; }
+                        // Normalized perpendicular direction for line width
+                        let nx = -dy / len * *width / 2.0;
+                        let ny = dx / len * *width / 2.0;
+                        let r = color.r;
+                        let g = color.g;
+                        let b = color.b;
+                        let a = color.a;
+                        // 4 corners of the line quad
+                        let x0 = start.x + nx; let y0 = start.y + ny;
+                        let x1 = start.x - nx; let y1 = start.y - ny;
+                        let x2 = end.x + nx;   let y2 = end.y + ny;
+                        let x3 = end.x - nx;   let y3 = end.y - ny;
+                        // 2 triangles forming the quad
+                        let line_vertices: Vec<f32> = vec![
+                            x0, y0, r, g, b, a,
+                            x2, y2, r, g, b, a,
+                            x1, y1, r, g, b, a,
+                            x1, y1, r, g, b, a,
+                            x2, y2, r, g, b, a,
+                            x3, y3, r, g, b, a,
+                        ];
+                        current_vertices.extend_from_slice(&line_vertices);
+                    }
                     DrawCommand::Image { bounds, width, height, texture_id, uv } => {
                         flush_batch(&mut batches, &mut current_vertices, current_clip, current_layer);
                         
@@ -2955,6 +3075,19 @@ let font_atlas_guard = ui.get_font_atlas().lock();
                             x, y, r, g, b, a,
                         ];
                         current_vertices.extend_from_slice(&line_vertices);
+                    }
+                    DrawCommand::Triangle { p1, p2, p3, fill_color } => {
+                        let r = fill_color.r;
+                        let g = fill_color.g;
+                        let b = fill_color.b;
+                        let a = fill_color.a;
+                        
+                        let tri_vertices: Vec<f32> = vec![
+                            p1.x, p1.y, r, g, b, a,
+                            p2.x, p2.y, r, g, b, a,
+                            p3.x, p3.y, r, g, b, a,
+                        ];
+                        current_vertices.extend_from_slice(&tri_vertices);
                     }
                 }
                 } // inner for cmd loop
@@ -3226,7 +3359,7 @@ let font_atlas_guard = ui.get_font_atlas().lock();
         }
     }
     
-    pub fn process_events(&mut self) {
+pub fn process_events(&mut self) {
         self.glfw.poll_events();
         
         let events: Vec<_> = glfw::flush_messages(&self.event_receiver).collect();
@@ -3287,6 +3420,10 @@ let font_atlas_guard = ui.get_font_atlas().lock();
                         }
                         if key == Key::S {
                             self.s_pressed = true;
+                        }
+                        if key == Key::F12 {
+                            // Take diagnostic screenshot
+                            let _ = self.capture_screenshot("screenshots/layout_diagnostic.png");
                         }
                     }
                     
@@ -3639,170 +3776,190 @@ let font_atlas_guard = ui.get_font_atlas().lock();
         self.dfx.lock().get_logger().lock().log(
             LogLevel::Info,
             "Vulkan",
-            &format!("Recreating game preview resources: {}x{} -> {}x{}", 
+            &format!("Deferring game preview resize: {}x{} -> {}x{}", 
                 self.offscreen_extent.width, self.offscreen_extent.height, width, height),
             file!(),
             line!()
         );
         
-        unsafe {
-            self.device.device_wait_idle()
-                .map_err(|e| format!("Failed to wait for device idle: {}", e))?;
-            
-            // Destroy old offscreen resources
-            self.device.destroy_framebuffer(self.offscreen_framebuffer, None);
-            self.device.destroy_image_view(self.offscreen_image_view, None);
-            self.device.destroy_image(self.offscreen_image, None);
-            self.device.free_memory(self.offscreen_image_memory, None);
-            
-            self.device.destroy_image_view(self.depth_image_view, None);
-            self.device.destroy_image(self.depth_image, None);
-            self.device.free_memory(self.depth_image_memory, None);
-            
-            self.device.destroy_framebuffer(self.offscreen_fxaa_framebuffer, None);
-            self.device.destroy_image_view(self.offscreen_fxaa_image_view, None);
-            self.device.destroy_image(self.offscreen_fxaa_image, None);
-            self.device.free_memory(self.offscreen_fxaa_image_memory, None);
-            
-            // Create new offscreen image (game output)
-            let (offscreen_image, offscreen_image_memory) = Self::create_offscreen_image(
-                &self.instance, &self.device, self.physical_device, new_extent, self.offscreen_format
-            )?;
-            
-            let offscreen_image_view = self.device.create_image_view(&vk::ImageViewCreateInfo {
-                image: offscreen_image,
-                view_type: vk::ImageViewType::TYPE_2D,
-                format: self.offscreen_format,
-                subresource_range: vk::ImageSubresourceRange {
-                    aspect_mask: vk::ImageAspectFlags::COLOR,
-                    base_mip_level: 0,
-                    level_count: 1,
-                    base_array_layer: 0,
-                    layer_count: 1,
+        // Store the new extent for deferred recreation at the start of next frame.
+        // This avoids a mid-frame device_wait_idle() that causes visible delay/jitter.
+        self.pending_offscreen_resize = Some(new_extent);
+        
+        Ok(())
+    }
+    
+    /// Recreate offscreen FBO resources with a pending extent.
+    /// Called at the start of draw_frame after acquiring the swapchain image and
+    /// waiting for the in-flight fence — at this point the GPU is idle for this frame
+    /// so we can safely destroy and recreate Vulkan objects without a full device_wait_idle.
+    unsafe fn apply_pending_offscreen_resize(&mut self) -> Result<(), String> {
+        let new_extent = self.pending_offscreen_resize.take()
+            .expect("apply_pending_offscreen_resize called without pending extent");
+        
+        self.dfx.lock().get_logger().lock().log(
+            LogLevel::Info,
+            "Vulkan",
+            &format!("Applying deferred game preview resize: {}x{} -> {}x{}", 
+                self.offscreen_extent.width, self.offscreen_extent.height, 
+                new_extent.width, new_extent.height),
+            file!(),
+            line!()
+        );
+        
+        // Destroy old offscreen resources — safe because we just waited for the frame fence
+        self.device.destroy_framebuffer(self.offscreen_framebuffer, None);
+        self.device.destroy_image_view(self.offscreen_image_view, None);
+        self.device.destroy_image(self.offscreen_image, None);
+        self.device.free_memory(self.offscreen_image_memory, None);
+        
+        self.device.destroy_image_view(self.depth_image_view, None);
+        self.device.destroy_image(self.depth_image, None);
+        self.device.free_memory(self.depth_image_memory, None);
+        
+        self.device.destroy_framebuffer(self.offscreen_fxaa_framebuffer, None);
+        self.device.destroy_image_view(self.offscreen_fxaa_image_view, None);
+        self.device.destroy_image(self.offscreen_fxaa_image, None);
+        self.device.free_memory(self.offscreen_fxaa_image_memory, None);
+        
+        // Create new offscreen image (game output)
+        let (offscreen_image, offscreen_image_memory) = Self::create_offscreen_image(
+            &self.instance, &self.device, self.physical_device, new_extent, self.offscreen_format
+        )?;
+        
+        let offscreen_image_view = self.device.create_image_view(&vk::ImageViewCreateInfo {
+            image: offscreen_image,
+            view_type: vk::ImageViewType::TYPE_2D,
+            format: self.offscreen_format,
+            subresource_range: vk::ImageSubresourceRange {
+                aspect_mask: vk::ImageAspectFlags::COLOR,
+                base_mip_level: 0,
+                level_count: 1,
+                base_array_layer: 0,
+                layer_count: 1,
+            },
+            ..Default::default()
+        }, None).map_err(|e| format!("Failed to create offscreen image view: {}", e))?;
+        
+        // Create new depth image
+        let (depth_image, depth_image_memory) = Self::create_depth_image(
+            &self.instance, &self.device, self.physical_device, new_extent
+        )?;
+        
+        let depth_image_view = self.device.create_image_view(&vk::ImageViewCreateInfo {
+            image: depth_image,
+            view_type: vk::ImageViewType::TYPE_2D,
+            format: vk::Format::D32_SFLOAT,
+            subresource_range: vk::ImageSubresourceRange {
+                aspect_mask: vk::ImageAspectFlags::DEPTH,
+                base_mip_level: 0,
+                level_count: 1,
+                base_array_layer: 0,
+                layer_count: 1,
+            },
+            ..Default::default()
+        }, None).map_err(|e| format!("Failed to create depth image view: {}", e))?;
+        
+        let offscreen_framebuffer = self.device.create_framebuffer(&vk::FramebufferCreateInfo {
+            render_pass: self.game_render_pass,
+            attachment_count: 2,
+            p_attachments: &[offscreen_image_view, depth_image_view] as *const _,
+            width: new_extent.width,
+            height: new_extent.height,
+            layers: 1,
+            ..Default::default()
+        }, None).map_err(|e| format!("Failed to create offscreen framebuffer: {}", e))?;
+        
+        // Create new FXAA output image
+        let (offscreen_fxaa_image, offscreen_fxaa_image_memory) = Self::create_offscreen_image(
+            &self.instance, &self.device, self.physical_device, new_extent, self.offscreen_format
+        )?;
+        
+        let offscreen_fxaa_image_view = self.device.create_image_view(&vk::ImageViewCreateInfo {
+            image: offscreen_fxaa_image,
+            view_type: vk::ImageViewType::TYPE_2D,
+            format: self.offscreen_format,
+            subresource_range: vk::ImageSubresourceRange {
+                aspect_mask: vk::ImageAspectFlags::COLOR,
+                base_mip_level: 0,
+                level_count: 1,
+                base_array_layer: 0,
+                layer_count: 1,
+            },
+            ..Default::default()
+        }, None).map_err(|e| format!("Failed to create FXAA image view: {}", e))?;
+        
+        let offscreen_fxaa_framebuffer = self.device.create_framebuffer(&vk::FramebufferCreateInfo {
+            render_pass: self.game_render_pass,
+            attachment_count: 2,
+            p_attachments: &[offscreen_fxaa_image_view, depth_image_view] as *const _,
+            width: new_extent.width,
+            height: new_extent.height,
+            layers: 1,
+            ..Default::default()
+        }, None).map_err(|e| format!("Failed to create FXAA framebuffer: {}", e))?;
+        
+        // Update FXAA descriptor set to sample from new offscreen image
+        self.device.update_descriptor_sets(
+            &[vk::WriteDescriptorSet {
+                dst_set: self.fxaa_descriptor_set,
+                dst_binding: 0,
+                dst_array_element: 0,
+                descriptor_count: 1,
+                descriptor_type: vk::DescriptorType::COMBINED_IMAGE_SAMPLER,
+                p_image_info: &vk::DescriptorImageInfo {
+                    sampler: self.fxaa_sampler,
+                    image_view: offscreen_image_view,
+                    image_layout: vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
                 },
                 ..Default::default()
-            }, None).map_err(|e| format!("Failed to create offscreen image view: {}", e))?;
-            
-            // Create new depth image
-            let (depth_image, depth_image_memory) = Self::create_depth_image(
-                &self.instance, &self.device, self.physical_device, new_extent
-            )?;
-            
-            let depth_image_view = self.device.create_image_view(&vk::ImageViewCreateInfo {
-                image: depth_image,
-                view_type: vk::ImageViewType::TYPE_2D,
-                format: vk::Format::D32_SFLOAT,
-                subresource_range: vk::ImageSubresourceRange {
-                    aspect_mask: vk::ImageAspectFlags::DEPTH,
-                    base_mip_level: 0,
-                    level_count: 1,
-                    base_array_layer: 0,
-                    layer_count: 1,
+            }],
+            &[]
+        );
+        
+        // Update preview descriptor set to point to new offscreen image
+        self.device.update_descriptor_sets(
+            &[vk::WriteDescriptorSet {
+                dst_set: self.preview_descriptor_set,
+                dst_binding: 0,
+                dst_array_element: 0,
+                descriptor_count: 1,
+                descriptor_type: vk::DescriptorType::COMBINED_IMAGE_SAMPLER,
+                p_image_info: &vk::DescriptorImageInfo {
+                    sampler: self.preview_sampler,
+                    image_view: offscreen_image_view,
+                    image_layout: vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
                 },
                 ..Default::default()
-            }, None).map_err(|e| format!("Failed to create depth image view: {}", e))?;
-            
-            let offscreen_framebuffer = self.device.create_framebuffer(&vk::FramebufferCreateInfo {
-                render_pass: self.game_render_pass,
-                attachment_count: 2,
-                p_attachments: &[offscreen_image_view, depth_image_view] as *const _,
-                width: new_extent.width,
-                height: new_extent.height,
-                layers: 1,
-                ..Default::default()
-            }, None).map_err(|e| format!("Failed to create offscreen framebuffer: {}", e))?;
-            
-            // Create new FXAA output image
-            let (offscreen_fxaa_image, offscreen_fxaa_image_memory) = Self::create_offscreen_image(
-                &self.instance, &self.device, self.physical_device, new_extent, self.offscreen_format
-            )?;
-            
-            let offscreen_fxaa_image_view = self.device.create_image_view(&vk::ImageViewCreateInfo {
-                image: offscreen_fxaa_image,
-                view_type: vk::ImageViewType::TYPE_2D,
-                format: self.offscreen_format,
-                subresource_range: vk::ImageSubresourceRange {
-                    aspect_mask: vk::ImageAspectFlags::COLOR,
-                    base_mip_level: 0,
-                    level_count: 1,
-                    base_array_layer: 0,
-                    layer_count: 1,
-                },
-                ..Default::default()
-            }, None).map_err(|e| format!("Failed to create FXAA image view: {}", e))?;
-            
-            let offscreen_fxaa_framebuffer = self.device.create_framebuffer(&vk::FramebufferCreateInfo {
-                render_pass: self.game_render_pass,
-                attachment_count: 2,
-                p_attachments: &[offscreen_fxaa_image_view, depth_image_view] as *const _,
-                width: new_extent.width,
-                height: new_extent.height,
-                layers: 1,
-                ..Default::default()
-            }, None).map_err(|e| format!("Failed to create FXAA framebuffer: {}", e))?;
-            
-            // Update FXAA descriptor set to sample from new offscreen image
-            self.device.update_descriptor_sets(
-                &[vk::WriteDescriptorSet {
-                    dst_set: self.fxaa_descriptor_set,
-                    dst_binding: 0,
-                    dst_array_element: 0,
-                    descriptor_count: 1,
-                    descriptor_type: vk::DescriptorType::COMBINED_IMAGE_SAMPLER,
-                    p_image_info: &vk::DescriptorImageInfo {
-                        sampler: self.fxaa_sampler,
-                        image_view: offscreen_image_view,
-                        image_layout: vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
-                    },
-                    ..Default::default()
-                }],
-                &[]
-            );
-            
-            // Update preview descriptor set to point to new offscreen image
-            self.device.update_descriptor_sets(
-                &[vk::WriteDescriptorSet {
-                    dst_set: self.preview_descriptor_set,
-                    dst_binding: 0,
-                    dst_array_element: 0,
-                    descriptor_count: 1,
-                    descriptor_type: vk::DescriptorType::COMBINED_IMAGE_SAMPLER,
-                    p_image_info: &vk::DescriptorImageInfo {
-                        sampler: self.preview_sampler,
-                        image_view: offscreen_image_view,
-                        image_layout: vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
-                    },
-                    ..Default::default()
-                }],
-                &[]
-            );
-            
-            // Update struct fields
-            self.offscreen_image = offscreen_image;
-            self.offscreen_image_memory = offscreen_image_memory;
-            self.offscreen_image_view = offscreen_image_view;
-            self.offscreen_framebuffer = offscreen_framebuffer;
-            self.offscreen_extent = new_extent;
-            
-            self.depth_image = depth_image;
-            self.depth_image_memory = depth_image_memory;
-            self.depth_image_view = depth_image_view;
-            
-            self.offscreen_fxaa_image = offscreen_fxaa_image;
-            self.offscreen_fxaa_image_memory = offscreen_fxaa_image_memory;
-            self.offscreen_fxaa_image_view = offscreen_fxaa_image_view;
-            self.offscreen_fxaa_framebuffer = offscreen_fxaa_framebuffer;
-            
-            self.dfx.lock().get_logger().lock().log(
-                LogLevel::Info,
-                "Vulkan",
-                &format!("Game preview resources recreated: {}x{}", width, height),
-                file!(),
-                line!()
-            );
-            
-            Ok(())
-        }
+            }],
+            &[]
+        );
+        
+        // Update struct fields
+        self.offscreen_image = offscreen_image;
+        self.offscreen_image_memory = offscreen_image_memory;
+        self.offscreen_image_view = offscreen_image_view;
+        self.offscreen_framebuffer = offscreen_framebuffer;
+        self.offscreen_extent = new_extent;
+        
+        self.depth_image = depth_image;
+        self.depth_image_memory = depth_image_memory;
+        self.depth_image_view = depth_image_view;
+        
+        self.offscreen_fxaa_image = offscreen_fxaa_image;
+        self.offscreen_fxaa_image_memory = offscreen_fxaa_image_memory;
+        self.offscreen_fxaa_image_view = offscreen_fxaa_image_view;
+        self.offscreen_fxaa_framebuffer = offscreen_fxaa_framebuffer;
+        
+        self.dfx.lock().get_logger().lock().log(
+            LogLevel::Info,
+            "Vulkan",
+            &format!("Game preview resources recreated: {}x{}", new_extent.width, new_extent.height),
+            file!(),
+            line!()
+        );
+        
+        Ok(())
     }
     
     pub fn set_camera_params(&mut self, yaw: f32, pitch: f32, x: f32, y: f32, z: f32) {
