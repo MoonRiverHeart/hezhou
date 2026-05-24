@@ -67,6 +67,7 @@ pub extern "C" fn ui_create_scroll_view_stub(_handle: *mut std::ffi::c_void, _pa
 pub extern "C" fn ui_scroll_view_set_scroll_offset_stub(_handle: *mut std::ffi::c_void, _id: u64, _offset: f32) {}
 pub extern "C" fn ui_scroll_view_get_scroll_offset_stub(_handle: *mut std::ffi::c_void, _id: u64) -> f32 { 0.0 }
 pub extern "C" fn ui_scroll_view_set_show_scrollbars_stub(_handle: *mut std::ffi::c_void, _id: u64, _v: u32, _h: u32) {}
+pub extern "C" fn ui_scroll_view_set_content_size_stub(_handle: *mut std::ffi::c_void, _id: u64, _w: f32, _h: f32) {}
 pub extern "C" fn ui_scroll_view_set_on_scroll_thunk_ptr_stub(_handle: *mut std::ffi::c_void, _id: u64, _ptr: *const std::ffi::c_void) {}
 pub extern "C" fn ui_create_split_view_stub(_handle: *mut std::ffi::c_void, _parent_id: u64, _x: f32, _y: f32, _w: f32, _h: f32, _orientation: u32) -> u64 { 0 }
 pub extern "C" fn ui_split_view_set_split_ratio_stub(_handle: *mut std::ffi::c_void, _id: u64, _ratio: f32) {}
@@ -74,6 +75,11 @@ pub extern "C" fn ui_split_view_get_split_ratio_stub(_handle: *mut std::ffi::c_v
 pub extern "C" fn ui_split_view_set_min_ratio_stub(_handle: *mut std::ffi::c_void, _id: u64, _min: f32) {}
 pub extern "C" fn ui_split_view_set_max_ratio_stub(_handle: *mut std::ffi::c_void, _id: u64, _max: f32) {}
 pub extern "C" fn ui_split_view_set_on_ratio_change_thunk_ptr_stub(_handle: *mut std::ffi::c_void, _id: u64, _ptr: *const std::ffi::c_void) {}
+pub extern "C" fn ui_create_image_stub(_handle: *mut std::ffi::c_void, _parent_id: u64, _x: f32, _y: f32, _w: f32, _h: f32) -> u64 { 0 }
+pub extern "C" fn ui_image_set_texture_id_stub(_handle: *mut std::ffi::c_void, _id: u64, _tid: u64) {}
+pub extern "C" fn ui_image_get_texture_id_stub(_handle: *mut std::ffi::c_void, _id: u64) -> u64 { 0 }
+pub extern "C" fn ui_image_set_scale_mode_stub(_handle: *mut std::ffi::c_void, _id: u64, _mode: u32) {}
+pub extern "C" fn ui_image_set_uv_stub(_handle: *mut std::ffi::c_void, _id: u64, _x: f32, _y: f32, _w: f32, _h: f32) {}
 // Property reflection stubs
 pub extern "C" fn ui_entity_get_property_count_stub() -> u32 { 0 }
 pub extern "C" fn ui_entity_get_property_name_stub(_index: u32) -> *const std::ffi::c_char { std::ptr::null() }
@@ -224,6 +230,7 @@ fn main() {
         ui_scroll_view_set_scroll_offset: unsafe { std::mem::transmute(ui_scroll_view_set_scroll_offset_stub as *const std::ffi::c_void) },
         ui_scroll_view_get_scroll_offset: unsafe { std::mem::transmute(ui_scroll_view_get_scroll_offset_stub as *const std::ffi::c_void) },
         ui_scroll_view_set_show_scrollbars: unsafe { std::mem::transmute(ui_scroll_view_set_show_scrollbars_stub as *const std::ffi::c_void) },
+        ui_scroll_view_set_content_size: unsafe { std::mem::transmute(ui_scroll_view_set_content_size_stub as *const std::ffi::c_void) },
         ui_scroll_view_set_on_scroll_thunk_ptr: unsafe { std::mem::transmute(ui_scroll_view_set_on_scroll_thunk_ptr_stub as *const std::ffi::c_void) },
         ui_create_split_view: unsafe { std::mem::transmute(ui_create_split_view_stub as *const std::ffi::c_void) },
         ui_split_view_set_split_ratio: unsafe { std::mem::transmute(ui_split_view_set_split_ratio_stub as *const std::ffi::c_void) },
@@ -231,6 +238,11 @@ fn main() {
         ui_split_view_set_min_ratio: unsafe { std::mem::transmute(ui_split_view_set_min_ratio_stub as *const std::ffi::c_void) },
         ui_split_view_set_max_ratio: unsafe { std::mem::transmute(ui_split_view_set_max_ratio_stub as *const std::ffi::c_void) },
         ui_split_view_set_on_ratio_change_thunk_ptr: unsafe { std::mem::transmute(ui_split_view_set_on_ratio_change_thunk_ptr_stub as *const std::ffi::c_void) },
+        ui_create_image: unsafe { std::mem::transmute(ui_create_image_stub as *const std::ffi::c_void) },
+        ui_image_set_texture_id: unsafe { std::mem::transmute(ui_image_set_texture_id_stub as *const std::ffi::c_void) },
+        ui_image_get_texture_id: unsafe { std::mem::transmute(ui_image_get_texture_id_stub as *const std::ffi::c_void) },
+        ui_image_set_scale_mode: unsafe { std::mem::transmute(ui_image_set_scale_mode_stub as *const std::ffi::c_void) },
+        ui_image_set_uv: unsafe { std::mem::transmute(ui_image_set_uv_stub as *const std::ffi::c_void) },
         ui_create_tab_widget: unsafe { std::mem::transmute(ui_ffi::ui_create_tab_widget as *const std::ffi::c_void) },
         ui_tab_widget_add_tab: unsafe { std::mem::transmute(ui_ffi::ui_tab_widget_add_tab as *const std::ffi::c_void) },
         ui_tab_widget_set_active: unsafe { std::mem::transmute(ui_ffi::ui_tab_widget_set_active as *const std::ffi::c_void) },
@@ -250,6 +262,7 @@ fn main() {
         ui_tree_view_set_on_toggle_thunk_ptr: unsafe { std::mem::transmute(ui_ffi::ui_tree_view_set_on_toggle_thunk_ptr as *const std::ffi::c_void) },
         ui_tree_view_is_node_expanded: unsafe { std::mem::transmute(ui_ffi::ui_tree_view_is_node_expanded as *const std::ffi::c_void) },
         ui_tree_node_set_text: unsafe { std::mem::transmute(ui_ffi::ui_tree_node_set_text as *const std::ffi::c_void) },
+        ui_tree_node_set_selected: unsafe { std::mem::transmute(ui_ffi::ui_tree_node_set_selected as *const std::ffi::c_void) },
         ui_tree_node_get_user_data: unsafe { std::mem::transmute(ui_ffi::ui_tree_node_get_user_data as *const std::ffi::c_void) },
         ui_tree_view_clear_selection: unsafe { std::mem::transmute(ui_ffi::ui_tree_view_clear_selection as *const std::ffi::c_void) },
         ui_create_popup_menu: unsafe { std::mem::transmute(ui_ffi::ui_create_popup_menu as *const std::ffi::c_void) },

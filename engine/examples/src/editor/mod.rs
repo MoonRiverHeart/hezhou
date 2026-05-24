@@ -72,7 +72,7 @@ pub fn run() {
     dfx_trace_end!("Script", "compile");
 
     let widget_tree_handle: WidgetTreeHandle = renderer.get_widget_tree_handle() as WidgetTreeHandle;
-    let event_dispatcher_handle = renderer.get_event_dispatcher_handle() as *mut std::ffi::c_void;
+    let event_dispatcher_handle = renderer.get_event_dispatcher_handle() as ui_ffi::EventDispatcherHandle;
     
     let dfx_for_csharp = hezhou_dfx::dfx_create();
     hezhou_dfx::dfx_set_log_level(dfx_for_csharp, 2);
@@ -162,6 +162,7 @@ pub fn run() {
         ui_scroll_view_set_scroll_offset: unsafe { std::mem::transmute(ui_ffi::ui_scroll_view_set_scroll_offset as *const std::ffi::c_void) },
         ui_scroll_view_get_scroll_offset: unsafe { std::mem::transmute(ui_ffi::ui_scroll_view_get_scroll_offset as *const std::ffi::c_void) },
         ui_scroll_view_set_show_scrollbars: unsafe { std::mem::transmute(ui_ffi::ui_scroll_view_set_show_scrollbars as *const std::ffi::c_void) },
+        ui_scroll_view_set_content_size: unsafe { std::mem::transmute(ui_ffi::ui_scroll_view_set_content_size as *const std::ffi::c_void) },
         ui_scroll_view_set_on_scroll_thunk_ptr: unsafe { std::mem::transmute(ui_ffi::ui_scroll_view_set_on_scroll_thunk_ptr as *const std::ffi::c_void) },
         ui_create_split_view: unsafe { std::mem::transmute(ui_ffi::ui_create_split_view as *const std::ffi::c_void) },
         ui_split_view_set_split_ratio: unsafe { std::mem::transmute(ui_ffi::ui_split_view_set_split_ratio as *const std::ffi::c_void) },
@@ -169,6 +170,11 @@ pub fn run() {
         ui_split_view_set_min_ratio: unsafe { std::mem::transmute(ui_ffi::ui_split_view_set_min_ratio as *const std::ffi::c_void) },
         ui_split_view_set_max_ratio: unsafe { std::mem::transmute(ui_ffi::ui_split_view_set_max_ratio as *const std::ffi::c_void) },
         ui_split_view_set_on_ratio_change_thunk_ptr: unsafe { std::mem::transmute(ui_ffi::ui_split_view_set_on_ratio_change_thunk_ptr as *const std::ffi::c_void) },
+        ui_create_image: unsafe { std::mem::transmute(ui_ffi::ui_create_image as *const std::ffi::c_void) },
+        ui_image_set_texture_id: unsafe { std::mem::transmute(ui_ffi::ui_image_set_texture_id as *const std::ffi::c_void) },
+        ui_image_get_texture_id: unsafe { std::mem::transmute(ui_ffi::ui_image_get_texture_id as *const std::ffi::c_void) },
+        ui_image_set_scale_mode: unsafe { std::mem::transmute(ui_ffi::ui_image_set_scale_mode as *const std::ffi::c_void) },
+        ui_image_set_uv: unsafe { std::mem::transmute(ui_ffi::ui_image_set_uv as *const std::ffi::c_void) },
         ui_create_tab_widget: unsafe { std::mem::transmute(ui_ffi::ui_create_tab_widget as *const std::ffi::c_void) },
         ui_tab_widget_add_tab: unsafe { std::mem::transmute(ui_ffi::ui_tab_widget_add_tab as *const std::ffi::c_void) },
         ui_tab_widget_set_active: unsafe { std::mem::transmute(ui_ffi::ui_tab_widget_set_active as *const std::ffi::c_void) },
@@ -188,6 +194,7 @@ ui_tree_view_set_on_select_thunk_ptr: unsafe { std::mem::transmute(ui_ffi::ui_tr
             ui_tree_view_set_on_toggle_thunk_ptr: unsafe { std::mem::transmute(ui_ffi::ui_tree_view_set_on_toggle_thunk_ptr as *const std::ffi::c_void) },
             ui_tree_view_is_node_expanded: unsafe { std::mem::transmute(ui_ffi::ui_tree_view_is_node_expanded as *const std::ffi::c_void) },
             ui_tree_node_set_text: unsafe { std::mem::transmute(ui_ffi::ui_tree_node_set_text as *const std::ffi::c_void) },
+            ui_tree_node_set_selected: unsafe { std::mem::transmute(ui_ffi::ui_tree_node_set_selected as *const std::ffi::c_void) },
         ui_tree_node_get_user_data: unsafe { std::mem::transmute(ui_ffi::ui_tree_node_get_user_data as *const std::ffi::c_void) },
         ui_tree_view_clear_selection: unsafe { std::mem::transmute(ui_ffi::ui_tree_view_clear_selection as *const std::ffi::c_void) },
         ui_create_popup_menu: unsafe { std::mem::transmute(ui_ffi::ui_create_popup_menu as *const std::ffi::c_void) },
@@ -286,7 +293,7 @@ ui_tree_view_set_on_select_thunk_ptr: unsafe { std::mem::transmute(ui_ffi::ui_tr
         ui_widget_set_flex_expand: unsafe { std::mem::transmute(ui_ffi::ui_widget_set_flex_expand as *const std::ffi::c_void) },
         ui_widget_set_cross_axis_fill: unsafe { std::mem::transmute(ui_ffi::ui_widget_set_cross_axis_fill as *const std::ffi::c_void) },
         ui_widget_set_background_color: unsafe { std::mem::transmute(ui_ffi::ui_widget_set_background_color as *const std::ffi::c_void) },
-        event_dispatcher_ptr: event_dispatcher_handle,
+        event_dispatcher_ptr: event_dispatcher_handle as *mut std::ffi::c_void,
         ui_simulate_click_at: unsafe { std::mem::transmute(ui_ffi::ui_simulate_click_at as *const std::ffi::c_void) },
         ui_widget_get_type: unsafe { std::mem::transmute(ui_ffi::ui_widget_get_type as *const std::ffi::c_void) },
         ui_widget_get_layout: unsafe { std::mem::transmute(ui_ffi::ui_widget_get_layout as *const std::ffi::c_void) },
@@ -363,8 +370,18 @@ ui_tree_view_set_on_select_thunk_ptr: unsafe { std::mem::transmute(ui_ffi::ui_tr
     dfx_info!("Demo", "Trace → traces/trace_latest.json");
 
     let mut frame_count = 0u64;
-    let start_time = Instant::now();
+    let mut start_time = Instant::now();
     let mut screenshot_taken = false;
+    let mut dialog_auto_clicked = false;
+    
+    // Auto-click "使用默认目录" button position calculation:
+    // Dialog: centered on screen, width=500*cs, height=400*cs
+    // Button "使用默认目录" (index 1) is in bottom button area
+    // Approximate center of the button: screen_w*0.53, screen_h*0.74
+    let auto_click_x = 1280.0 * 0.53;
+    let auto_click_y = 720.0 * 0.74;
+    let auto_click_delay = 3.0; // seconds to wait for Dialog to appear
+    let screenshot_after_click_delay = 5.0; // seconds to wait for layout after click
     
     loop {
         frame_count += 1;
@@ -375,9 +392,28 @@ ui_tree_view_set_on_select_thunk_ptr: unsafe { std::mem::transmute(ui_ffi::ui_tr
         renderer.process_events();
         dfx_trace_end!("ProcessEvents", "ui");
         
-        if screenshot_mode && !screenshot_taken {
+        // Auto-click the "使用默认目录" button to dismiss the startup Dialog
+        if screenshot_mode && !dialog_auto_clicked {
             let elapsed = start_time.elapsed().as_secs_f32();
-            if elapsed >= screenshot_delay {
+            if elapsed >= auto_click_delay {
+                dfx_info!("Screenshot", "Auto-clicking '使用默认目录' button at ({}, {}) after {:.1}s...", 
+                    auto_click_x, auto_click_y, elapsed);
+                let hit_id = ui_ffi::ui_simulate_click_at(
+                    widget_tree_handle as ui_ffi::WidgetTreeHandle,
+                    event_dispatcher_handle as ui_ffi::EventDispatcherHandle,
+                    auto_click_x,
+                    auto_click_y,
+                );
+                dfx_info!("Screenshot", "Auto-click hit widget id={}", hit_id);
+                dialog_auto_clicked = true;
+                // Reset start_time so screenshot_delay counts from the click moment
+                start_time = Instant::now();
+            }
+        }
+        
+        if screenshot_mode && !screenshot_taken && dialog_auto_clicked {
+            let elapsed = start_time.elapsed().as_secs_f32();
+            if elapsed >= screenshot_after_click_delay {
                 dfx_trace_begin!("DrawFrame", "render");
                 match renderer.draw_frame() {
                     Ok(_) => {
