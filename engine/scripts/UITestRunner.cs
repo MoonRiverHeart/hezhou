@@ -21,6 +21,7 @@ namespace Hezhou
         public bool Success;
         public string ErrorMessage;
         public float[] Layout;
+        public string WidgetPath;
     }
 
     public static class UITestRunner
@@ -50,6 +51,18 @@ namespace Hezhou
         private static ulong _reportCloseBtnId = 0;
         private static UI.WidgetCallbackDelegate _closeReportCallback;
 
+        // === Cleanup Confirmation Dialog ===
+        private static ulong _cleanupDialogId = 0;
+        private static UI.DialogResultCallbackDelegate _cleanupDialogResultCallback;
+
+        // === Screenshot Preview Dialog ===
+        private static ulong _previewDialogId = 0;
+        private static UI.DialogResultCallbackDelegate _previewDialogResultCallback;
+
+        // === Screenshot Click Mapping ===
+        private static UI.WidgetCallbackDelegate _screenshotClickCallback;
+        private static Dictionary<ulong, int> _screenshotWidgetToStepIndex = new Dictionary<ulong, int>();
+
         // === Config Dialog ===
         private static ulong _configDialogId = 0;
         private static ulong _configStepsInputId = 0;
@@ -69,13 +82,19 @@ namespace Hezhou
 
         // === Config Dialog ===
 
-public static void ShowTestConfigDialog(TestMode initialMode)
+        public static void ShowTestConfigDialog(TestMode initialMode)
         {
+            // Prevent creating multiple dialogs
+            if (_configDialogId != 0)
+            {
+                return;
+            }
+
             _pendingMode = initialMode;
             ulong rootId = UI.GetRootId();
             float cs = UI.GetContentScale();
             float dialogWidth = 420f * cs;
-            float dialogHeight = 250f * cs;
+            float dialogHeight = 100f * cs; // Auto-sized to fit content
 
             _configDialogId = UI.CreateDialog(rootId, "UI Test Config", dialogWidth, dialogHeight);
             _configDialogResultCallback = OnConfigDialogResult;
@@ -249,6 +268,7 @@ public static void ShowTestConfigDialog(TestMode initialMode)
                 timeoutStep.ClickX = 0;
                 timeoutStep.ClickY = 0;
                 timeoutStep.Layout = null;
+                timeoutStep.WidgetPath = "";
                 _steps.Add(timeoutStep);
                 _failedCount++;
 
@@ -358,6 +378,7 @@ public static void ShowTestConfigDialog(TestMode initialMode)
             step.Success = false;
             step.ClickX = 0;
             step.ClickY = 0;
+            step.WidgetPath = BuildWidgetPath(widgetId);
 
             try
             {
@@ -419,6 +440,45 @@ public static void ShowTestConfigDialog(TestMode initialMode)
             _steps.Add(step);
         }
 
+        // === Widget Path Builder ===
+
+        private static string BuildWidgetPath(ulong widgetId)
+        {
+            List<string> parts = new List<string>();
+            ulong current = widgetId;
+            ulong rootId = UI.GetRootId();
+            int maxDepth = 20; // Prevent infinite loops
+
+            while (current != 0 && current != rootId && maxDepth > 0)
+            {
+                string type = UI.WidgetGetType(current);
+                if (type != null && type.Length > 0)
+                {
+                    parts.Add(type);
+                }
+                ulong parent = UI.WidgetGetParent(current);
+                if (parent == 0 || parent == current) break;
+                current = parent;
+                maxDepth--;
+            }
+
+            if (parts.Count == 0) return "Root";
+
+            // Reverse: parts is leaf-to-root, we want root-to-leaf
+            string[] arr = new string[parts.Count];
+            for (int i = 0; i < parts.Count; i++)
+            {
+                arr[i] = parts[parts.Count - 1 - i];
+            }
+
+            string result = "Root";
+            for (int i = 0; i < arr.Length; i++)
+            {
+                result += " > " + arr[i];
+            }
+            return result;
+        }
+
         // === Test Completion ===
 
         private static void CompleteTest()
@@ -440,6 +500,10 @@ public static void ShowTestConfigDialog(TestMode initialMode)
             UI.GetScreenSize(out float sw, out float sh);
             float cs = UI.GetContentScale();
 
+            // Clear screenshot click mapping from any previous report
+            _screenshotWidgetToStepIndex.Clear();
+            _screenshotClickCallback = OnScreenshotClick;
+
             // Full-screen overlay panel
             _reportPanelId = UI.CreatePanel(rootId, 0, 0, sw, sh, 0.06f, 0.06f, 0.08f, 0.97f);
             UI.SetWidgetLayer(_reportPanelId, 3); // Overlay
@@ -456,7 +520,7 @@ public static void ShowTestConfigDialog(TestMode initialMode)
             _closeReportCallback = OnCloseReport;
             UI.SetOnClick(_reportCloseBtnId, _closeReportCallback);
 
-            // === Summary Panel ===
+            // === Summary Section ===
             string modeStr = ModeToString(_mode);
             float passRate = _steps.Count > 0 ? (_passedCount * 100f / _steps.Count) : 0f;
 
@@ -477,10 +541,20 @@ public static void ShowTestConfigDialog(TestMode initialMode)
             ulong barBg = UI.CreatePanel(summaryContent, 0, 0, barFullWidth, 8f * cs, 0.3f, 0.15f, 0.15f, 0.8f);
             ulong barGreen = UI.CreatePanel(barBg, 0, 0, barPassWidth, 8f * cs, 0.2f, 0.7f, 0.2f, 1.0f);
 
+            // === Click Path Section ===
+            string clickPath = BuildClickPathSummary();
+            ulong clickPathPanel = UI.CreatePanel(_reportPanelId, 15f * cs, 130f * cs, sw - 30f * cs, 35f * cs, 0.1f, 0.15f, 0.12f, 1.0f);
+            ulong clickPathContent = UI.CreateVStack(clickPathPanel, 3f * cs);
+            UI.SetFlexExpand(clickPathContent, true);
+            UI.SetCrossAxisFill(clickPathContent, true);
+            UI.CreateLabel(clickPathContent, sw - 50f * cs, 15f * cs, "Click Path:");
+            UI.CreateLabel(clickPathContent, sw - 50f * cs, 15f * cs, clickPath);
+
             // === Step Details (ScrollView) ===
-            float scrollY = 135f * cs;
+            float scrollY = 170f * cs;
             float scrollH = sh - scrollY - 25f * cs;
             ulong scrollView = UI.CreateScrollView(_reportPanelId, 15f * cs, scrollY, sw - 30f * cs, scrollH);
+            UI.ScrollViewSetShowScrollbars(scrollView, true, false);
 
             ulong scrollContent = UI.CreateVStack(scrollView, 4f * cs);
             UI.SetFlexExpand(scrollContent, true);
@@ -493,9 +567,9 @@ public static void ShowTestConfigDialog(TestMode initialMode)
             UI.SetCrossAxisFill(headerContent, true);
             UI.CreateLabel(headerContent, 50f * cs, 22f * cs, "#");
             UI.CreateLabel(headerContent, 60f * cs, 22f * cs, "Status");
-            UI.CreateLabel(headerContent, 120f * cs, 22f * cs, "Type");
+            UI.CreateLabel(headerContent, 120f * cs, 22f * cs, "Widget");
             UI.CreateLabel(headerContent, 100f * cs, 22f * cs, "Click");
-            UI.CreateLabel(headerContent, 80f * cs, 22f * cs, "Layout");
+            UI.CreateLabel(headerContent, 80f * cs, 22f * cs, "Path");
             UI.CreateLabel(headerContent, 200f * cs, 22f * cs, "Screenshot/Error");
 
             // Step rows
@@ -508,6 +582,30 @@ public static void ShowTestConfigDialog(TestMode initialMode)
             ulong footer = UI.CreatePanel(_reportPanelId, 15f * cs, sh - 20f * cs, sw - 30f * cs, 18f * cs, 0.1f, 0.1f, 0.12f, 1.0f);
             UI.CreateLabel(footer, sw - 50f * cs, 15f * cs, "Report: " + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + "  |  Press Close to resume editor");
         }
+
+        // === Click Path Summary ===
+
+        private static string BuildClickPathSummary()
+        {
+            if (_steps.Count == 0) return "(no steps)";
+
+            string result = "";
+            for (int i = 0; i < _steps.Count; i++)
+            {
+                TestStep step = _steps[i];
+                if (i > 0) result += " -> ";
+                result += step.StepNumber + ":" + step.WidgetType;
+                // Limit length to prevent overflow in UI label
+                if (result.Length > 200)
+                {
+                    result += " ...";
+                    break;
+                }
+            }
+            return result;
+        }
+
+        // === Step Row ===
 
         private static void AddStepRow(ulong parent, TestStep step, float screenWidth, float cs)
         {
@@ -528,12 +626,12 @@ public static void ShowTestConfigDialog(TestMode initialMode)
                 bgR = 0.25f; bgG = 0.12f; bgB = 0.12f;
             }
 
-            ulong rowPanel = UI.CreatePanel(parent, 0, 0, rowWidth, 50f * cs, bgR, bgG, bgB, 0.85f);
+            ulong rowPanel = UI.CreatePanel(parent, 0, 0, rowWidth, 55f * cs, bgR, bgG, bgB, 0.85f);
             ulong rowContent = UI.CreateVStack(rowPanel, 2f * cs);
             UI.SetFlexExpand(rowContent, true);
             UI.SetCrossAxisFill(rowContent, true);
 
-            // Line 1: step number, status, widget type, click position
+            // Line 1: step number, status, widget type + id, click position, widget path
             string statusIcon = step.WidgetType == "Engine Freeze" ? "TIMEOUT" : (step.Success ? "PASS" : "FAIL");
             string line1 = "#" + step.StepNumber + " [" + statusIcon + "] " + step.WidgetType;
             if (step.WidgetId != 0)
@@ -546,48 +644,193 @@ public static void ShowTestConfigDialog(TestMode initialMode)
                 line1 += "  Click:(" + step.ClickX.ToString("F0") + "," + step.ClickY.ToString("F0") + ")";
             }
 
-            // Layout info
-            if (step.Layout != null && step.Layout.Length == 4)
+            // Widget path (abbreviated if too long)
+            if (step.WidgetPath != null && step.WidgetPath.Length > 0 && step.WidgetPath != "Root")
             {
-                line1 += "  Layout:" + step.Layout[0].ToString("F0") + "," + step.Layout[1].ToString("F0") + "," + step.Layout[2].ToString("F0") + "," + step.Layout[3].ToString("F0");
+                string path = step.WidgetPath;
+                if (path.Length > 60)
+                {
+                    // Show last few segments only
+                    int lastSep = path.LastIndexOf(" > ");
+                    if (lastSep > 0)
+                    {
+                        int prevSep = path.LastIndexOf(" > ", lastSep - 1);
+                        if (prevSep > 0)
+                        {
+                            path = "..." + path.Substring(prevSep + 3);
+                        }
+                    }
+                }
+                line1 += "  Path:" + path;
             }
 
             UI.CreateLabel(rowContent, rowWidth - 10f * cs, 22f * cs, line1);
 
-            // Line 2: screenshot path or error
-            string line2 = "";
-            if (!step.Success && step.ErrorMessage != null && step.ErrorMessage.Length > 0)
+            // Line 2: screenshot (clickable button) or error message
+            bool hasScreenshot = step.ScreenshotPath != null && step.ScreenshotPath.Length > 0
+                && !step.ScreenshotPath.StartsWith("(screenshot failed");
+
+            if (hasScreenshot)
+            {
+                // Clickable screenshot button — opens preview dialog on click
+                ulong screenshotBtn = UI.CreateButton(rowContent, rowWidth - 10f * cs, 22f * cs, "[IMG] " + step.ScreenshotPath);
+                UI.SetWidgetBackgroundColor(screenshotBtn, 0.15f, 0.25f, 0.35f, 0.6f);
+
+                // Map button widgetId to step index for click callback lookup
+                _screenshotWidgetToStepIndex[screenshotBtn] = step.StepNumber - 1;
+                UI.SetOnClick(screenshotBtn, _screenshotClickCallback);
+            }
+            else if (!step.Success && step.ErrorMessage != null && step.ErrorMessage.Length > 0)
             {
                 string err = step.ErrorMessage;
                 if (err.Length > 100) err = err.Substring(0, 100) + "...";
-                line2 = "Error: " + err;
-            }
-            else if (step.ScreenshotPath != null && step.ScreenshotPath.Length > 0)
-            {
-                line2 = "Screenshot: " + step.ScreenshotPath;
+                UI.CreateLabel(rowContent, rowWidth - 10f * cs, 18f * cs, "Error: " + err);
             }
             else if (step.Success && step.ErrorMessage != null && step.ErrorMessage.Length > 0)
             {
-                line2 = step.ErrorMessage; // "Skipped" message
-            }
-
-            if (line2.Length > 0)
-            {
-                UI.CreateLabel(rowContent, rowWidth - 10f * cs, 18f * cs, line2);
+                UI.CreateLabel(rowContent, rowWidth - 10f * cs, 18f * cs, step.ErrorMessage); // "Skipped" message
             }
         }
 
-        // === Close Report ===
+        // === Close Report → Cleanup Confirmation Dialog ===
 
         private static void OnCloseReport(ulong widgetId)
         {
+            // Don't open cleanup dialog if one is already open or preview is open
+            if (_cleanupDialogId != 0) return;
+            if (_previewDialogId != 0) return;
+
+            ulong rootId = UI.GetRootId();
+            float cs = UI.GetContentScale();
+            float dialogWidth = 380f * cs;
+            float dialogHeight = 100f * cs;
+
+            _cleanupDialogId = UI.CreateDialog(rootId, "Close Report", dialogWidth, dialogHeight);
+            _cleanupDialogResultCallback = OnCleanupDialogResult;
+            UI.DialogSetOnResult(_cleanupDialogId, _cleanupDialogResultCallback);
+
+            ulong content = UI.CreateVStack(_cleanupDialogId, 10f * cs);
+            UI.CreateLabel(content, dialogWidth - 40f * cs, 30f * cs, "是否清理所有测试产生的数据？");
+            UI.CreateLabel(content, dialogWidth - 40f * cs, 22f * cs, "(截图文件等)");
+
+            UI.DialogSetContent(_cleanupDialogId, content);
+            UI.DialogAddButton(_cleanupDialogId, "清理并关闭", 2);
+            UI.DialogAddButton(_cleanupDialogId, "仅关闭", 1);
+            UI.DialogShow(_cleanupDialogId);
+        }
+
+        private static void OnCleanupDialogResult(ulong dialogId, int result)
+        {
+            UI.DialogHide(_cleanupDialogId);
+            _cleanupDialogId = 0;
+
+            // Also close any open preview dialog
+            if (_previewDialogId != 0)
+            {
+                UI.DialogHide(_previewDialogId);
+                _previewDialogId = 0;
+            }
+
+            if (result == 2)
+            {
+                CleanupScreenshots();
+            }
+
+            // Close the report panel
             if (_reportPanelId != 0)
             {
                 UI.RemoveWidget(_reportPanelId);
                 _reportPanelId = 0;
             }
             _completed = false;
-            // EditorScript.Update() will resume normal flow since IsRunning=false and IsCompleted=false
+            _screenshotWidgetToStepIndex.Clear();
+        }
+
+        private static void CleanupScreenshots()
+        {
+            try
+            {
+                string[] files = System.IO.Directory.GetFiles("screenshots");
+                for (int i = 0; i < files.Length; i++)
+                {
+                    try
+                    {
+                        System.IO.File.Delete(files[i]);
+                    }
+                    catch { }
+                }
+                Log.Info("UITest", "Cleaned up " + files.Length + " screenshot files");
+            }
+            catch (Exception ex)
+            {
+                Log.Error("UITest", "Failed to cleanup screenshots: " + ex.Message);
+            }
+        }
+
+        // === Screenshot Preview Dialog ===
+
+        private static void OnScreenshotClick(ulong widgetId)
+        {
+            if (!_screenshotWidgetToStepIndex.ContainsKey(widgetId)) return;
+            if (_previewDialogId != 0) return;
+            if (_cleanupDialogId != 0) return;
+
+            int stepIndex = _screenshotWidgetToStepIndex[widgetId];
+            TestStep step = _steps[stepIndex];
+
+            ulong rootId = UI.GetRootId();
+            float cs = UI.GetContentScale();
+            float dialogWidth = 500f * cs;
+            float dialogHeight = 100f * cs;
+
+            _previewDialogId = UI.CreateDialog(rootId, "Step #" + step.StepNumber + " Screenshot", dialogWidth, dialogHeight);
+            _previewDialogResultCallback = OnPreviewDialogResult;
+            UI.DialogSetOnResult(_previewDialogId, _previewDialogResultCallback);
+
+            ulong content = UI.CreateVStack(_previewDialogId, 8f * cs);
+
+            // Screenshot path
+            if (step.ScreenshotPath != null && step.ScreenshotPath.Length > 0)
+            {
+                UI.CreateLabel(content, dialogWidth - 40f * cs, 22f * cs, "Screenshot: " + step.ScreenshotPath);
+            }
+
+            // Click position
+            UI.CreateLabel(content, dialogWidth - 40f * cs, 22f * cs, "Click: (" + step.ClickX.ToString("F0") + ", " + step.ClickY.ToString("F0") + ")");
+
+            // Widget info
+            string widgetInfo = step.WidgetType;
+            if (step.WidgetId != 0) widgetInfo += "(id=" + step.WidgetId + ")";
+            UI.CreateLabel(content, dialogWidth - 40f * cs, 22f * cs, "Widget: " + widgetInfo);
+
+            // Widget path
+            if (step.WidgetPath != null && step.WidgetPath.Length > 0)
+            {
+                UI.CreateLabel(content, dialogWidth - 40f * cs, 22f * cs, "Path: " + step.WidgetPath);
+            }
+
+            // Status
+            string status = step.Success ? "PASS" : "FAIL";
+            if (step.WidgetType == "Engine Freeze") status = "TIMEOUT";
+            UI.CreateLabel(content, dialogWidth - 40f * cs, 22f * cs, "Status: " + status);
+
+            // Error message if present
+            if (!step.Success && step.ErrorMessage != null && step.ErrorMessage.Length > 0)
+            {
+                string err = step.ErrorMessage;
+                if (err.Length > 80) err = err.Substring(0, 80) + "...";
+                UI.CreateLabel(content, dialogWidth - 40f * cs, 22f * cs, "Error: " + err);
+            }
+
+            UI.DialogSetContent(_previewDialogId, content);
+            UI.DialogAddButton(_previewDialogId, "Close", 0);
+            UI.DialogShow(_previewDialogId);
+        }
+
+        private static void OnPreviewDialogResult(ulong dialogId, int result)
+        {
+            UI.DialogHide(_previewDialogId);
+            _previewDialogId = 0;
         }
 
         // === Utility ===
