@@ -5504,6 +5504,16 @@ pub fn process_events(&mut self) {
         self.camera_x = x;
         self.camera_y = y;
         self.camera_z = z;
+
+        // 相机移动时重置帧累积 — ray_tracing模式下accumulation buffer需要清空
+        if let Some(ref mut registry) = self.pipeline_registry {
+            if let Some(pipeline) = registry.active_pipeline_mut() {
+                let any_ref = pipeline.as_any_mut();
+                if let Some(rt_pipeline) = any_ref.downcast_mut::<hezhou_render_pipeline::RayTracePipeline>() {
+                    rt_pipeline.reset_accumulation();
+                }
+            }
+        }
     }
     
     pub fn set_game_state(&mut self, state: i32) {

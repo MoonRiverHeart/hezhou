@@ -69,7 +69,7 @@ struct EmissiveTriangle {
 //     float emissive_count; // offset 20, size 4 (原_pad1改为emissive三角形数量)
 //     vec2 viewport_size; // offset 24, size 8
 //     float fov;          // offset 32, size 4
-//     float _pad2;        // offset 36, size 4
+//     float frame_index;  // offset 36, size 4 (帧累积索引，相机移动时重置为0)
 // };
 // ```
 //
@@ -80,7 +80,7 @@ struct EmissiveTriangle {
 // - emissive_count(float): offset 20, size 4 ✓ (原_pad1字段，布局不变)
 // - viewport_size(vec2): offset 24, alignment 8 → 24 % 8 == 0 ✓
 // - fov(float): offset 32, size 4 ✓
-// - _pad2(float): offset 36, size 4 ✓
+// - frame_index(float): offset 36, size 4 ✓ (原_pad2字段，布局不变)
 // - 总计: 40 bytes, struct alignment 8 (vec2最大成员), 40 % 8 == 0 ✓
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default, Pod, Zeroable)]
@@ -103,9 +103,9 @@ pub struct RayTracePushConstant {
     /// 视场角（弧度） — GLSL float fov
     /// offset 32-35, 4 bytes
     pub fov: f32,
-    /// 对齐padding — GLSL float _pad2
-    /// offset 36-39, 4 bytes
-    pub _pad2: f32,
+    /// 帧累积索引 — GLSL float frame_index
+    /// offset 36-39, 4 bytes (原_pad2字段，相机移动时重置为0)
+    pub frame_index: f32,
 }
 
 /// RayTracePipeline — ray tracing compute shader管线
@@ -174,6 +174,14 @@ pub struct RayTracePipeline {
     /// 输出image view
     output_image_view: vk::ImageView,
 
+    // === Accumulation storage image (帧累积降噪) ===
+    /// 累积storage image (rgba32f) — 存储帧累积的HDR颜色
+    accumulation_image: vk::Image,
+    /// 累积image内存
+    accumulation_image_memory: vk::DeviceMemory,
+    /// 累积image view
+    accumulation_image_view: vk::ImageView,
+
     // === Preview (UI采样输出) ===
     /// Preview sampler（UI采样ray tracing输出）
     preview_sampler: vk::Sampler,
@@ -216,6 +224,10 @@ pub struct RayTracePipeline {
     /// 首帧标记：output_image刚创建或刚resize时，layout barrier必须用UNDEFINED作为old_layout
     /// 否则barrier误用SHADER_READ_ONLY_OPTIMAL → VK验证错误 → 崩溃
     first_frame: bool,
+
+    // === 帧累积 ===
+    /// 帧累积索引 — 每帧递增，相机移动或场景变化时重置为0
+    frame_index: u32,
 
     // === 延迟销毁列表 — resize时不能立即销毁的旧output image资源 ===
     /// GPU可能还在使用旧image（通过descriptor set引用），必须延迟到确认GPU空闲后再销毁
@@ -341,6 +353,10 @@ impl RayTracePipeline {
         let (output_image, output_image_memory, output_image_view) =
             Self::create_output_image(&device, &memory_properties, viewport_width, viewport_height);
 
+        // 7b. 创建accumulation storage image (rgba32f) — 帧累积降噪缓冲区
+        let (accumulation_image, accumulation_image_memory, accumulation_image_view) =
+            Self::create_accumulation_image(&device, &memory_properties, viewport_width, viewport_height);
+
         // 8. 创建descriptor pool + allocate descriptor sets
         let descriptor_pool = Self::create_descriptor_pool(&device);
         let (scene_descriptor_set, output_descriptor_set, preview_descriptor_set) =
@@ -373,6 +389,7 @@ impl RayTracePipeline {
             &device,
             output_descriptor_set,
             output_image_view,
+            accumulation_image_view,
         );
 
         // 10. 创建preview sampler + 更新preview descriptor set
@@ -420,6 +437,9 @@ impl RayTracePipeline {
             output_image,
             output_image_memory,
             output_image_view,
+            accumulation_image,
+            accumulation_image_memory,
+            accumulation_image_view,
             preview_sampler,
             preview_descriptor_set,
             preview_descriptor_set_layout,
@@ -436,6 +456,7 @@ impl RayTracePipeline {
             emissive_buffer_cap,
             memory_properties,
             first_frame: true,  // 初始帧output_image从UNDEFINED layout开始
+            frame_index: 0,    // 帧累积索引，初始为0
             deferred_destroy_image_views: Vec::new(),
             deferred_destroy_images: Vec::new(),
             deferred_destroy_memories: Vec::new(),
@@ -454,8 +475,18 @@ impl RayTracePipeline {
         self.deferred_destroy_images.push(self.output_image);
         self.deferred_destroy_memories.push(self.output_image_memory);
 
+        // 1b. 将旧accumulation image资源推入延迟销毁列表
+        self.deferred_destroy_image_views.push(self.accumulation_image_view);
+        self.deferred_destroy_images.push(self.accumulation_image);
+        self.deferred_destroy_memories.push(self.accumulation_image_memory);
+
         // 2. 创建新output image
         let (new_image, new_memory, new_view) = Self::create_output_image(
+            &self.device, &self.memory_properties, width, height,
+        );
+
+        // 2b. 创建新accumulation image
+        let (new_accum_image, new_accum_memory, new_accum_view) = Self::create_accumulation_image(
             &self.device, &self.memory_properties, width, height,
         );
 
@@ -463,10 +494,13 @@ impl RayTracePipeline {
         self.output_image = new_image;
         self.output_image_memory = new_memory;
         self.output_image_view = new_view;
+        self.accumulation_image = new_accum_image;
+        self.accumulation_image_memory = new_accum_memory;
+        self.accumulation_image_view = new_accum_view;
 
-        // 4. 更新output descriptor set（compute shader的STORAGE_IMAGE）
+        // 4. 更新output descriptor set（compute shader的STORAGE_IMAGE — output + accumulation）
         Self::update_output_descriptor_set(
-            &self.device, self.output_descriptor_set, self.output_image_view,
+            &self.device, self.output_descriptor_set, self.output_image_view, self.accumulation_image_view,
         );
 
         // 5. 更新preview descriptor set（UI的COMBINED_IMAGE_SAMPLER）
@@ -474,8 +508,9 @@ impl RayTracePipeline {
             &self.device, self.preview_descriptor_set, self.output_image_view, self.preview_sampler,
         );
 
-        // 6. 标记first_frame：新image从UNDEFINED layout开始，下一帧barrier必须用UNDEFINED old_layout
+        // 6. 标记first_frame + 重置frame_index：新image从UNDEFINED layout开始
         self.first_frame = true;
+        self.frame_index = 0;
     }
 
     /// 取出所有延迟销毁资源 — 转移到ui_vulkan_renderer的统一延迟销毁列表
@@ -488,6 +523,17 @@ impl RayTracePipeline {
         let imgs = self.deferred_destroy_images.drain(..).collect();
         let mems = self.deferred_destroy_memories.drain(..).collect();
         (ivs, imgs, mems)
+    }
+
+    /// 重置帧累积 — 相机移动或场景变化时调用
+    ///
+    /// 将frame_index重置为0，并标记first_frame=true，
+    /// 使accumulation buffer在下一帧从UNDEFINED layout开始（内容被清空）。
+    /// shader中frame_index=0时，累积公式 (prev * 0 + new) / 1 = new，
+    /// 即第一帧直接使用新采样值，不混合旧数据。
+    pub fn reset_accumulation(&mut self) {
+        self.frame_index = 0;
+        self.first_frame = true;
     }
 }
 
@@ -513,6 +559,11 @@ impl Drop for RayTracePipeline {
             self.device.destroy_image_view(self.output_image_view, None);
             self.device.destroy_image(self.output_image, None);
             self.device.free_memory(self.output_image_memory, None);
+
+            // Accumulation image + memory + view
+            self.device.destroy_image_view(self.accumulation_image_view, None);
+            self.device.destroy_image(self.accumulation_image, None);
+            self.device.free_memory(self.accumulation_image_memory, None);
 
             // 延迟销毁列表中的残留资源（resize后未被drain转移的旧资源）
             for iv in &self.deferred_destroy_image_views {
@@ -634,11 +685,21 @@ impl RayTracePipeline {
         }
     }
 
-    /// 创建output descriptor set layout (set 2)
+    /// 创建output descriptor set layout (set 2: output image + accumulation image)
     fn create_output_descriptor_set_layout(device: &ash::Device) -> vk::DescriptorSetLayout {
         let bindings = [
+            // binding 0: output storage image (rgba8)
             vk::DescriptorSetLayoutBinding {
                 binding: 0,
+                descriptor_type: vk::DescriptorType::STORAGE_IMAGE,
+                descriptor_count: 1,
+                stage_flags: vk::ShaderStageFlags::COMPUTE,
+                p_immutable_samplers: std::ptr::null(),
+                ..Default::default()
+            },
+            // binding 1: accumulation storage image (rgba32f)
+            vk::DescriptorSetLayoutBinding {
+                binding: 1,
                 descriptor_type: vk::DescriptorType::STORAGE_IMAGE,
                 descriptor_count: 1,
                 stage_flags: vk::ShaderStageFlags::COMPUTE,
@@ -832,6 +893,78 @@ impl RayTracePipeline {
         (image, image_memory, image_view)
     }
 
+    /// 创建accumulation storage image (rgba32f) — 帧累积降噪缓冲区
+    fn create_accumulation_image(
+        device: &ash::Device,
+        memory_properties: &vk::PhysicalDeviceMemoryProperties,
+        width: u32,
+        height: u32,
+    ) -> (vk::Image, vk::DeviceMemory, vk::ImageView) {
+        let image = unsafe {
+            device.create_image(
+                &vk::ImageCreateInfo {
+                    image_type: vk::ImageType::TYPE_2D,
+                    format: vk::Format::R32G32B32A32_SFLOAT,
+                    extent: vk::Extent3D { width, height, depth: 1 },
+                    mip_levels: 1,
+                    array_layers: 1,
+                    samples: vk::SampleCountFlags::TYPE_1,
+                    tiling: vk::ImageTiling::OPTIMAL,
+                    usage: vk::ImageUsageFlags::STORAGE
+                        | vk::ImageUsageFlags::TRANSFER_SRC,
+                    sharing_mode: vk::SharingMode::EXCLUSIVE,
+                    initial_layout: vk::ImageLayout::UNDEFINED,
+                    ..Default::default()
+                },
+                None,
+            ).expect("RayTracePipeline: 创建accumulation image失败")
+        };
+
+        let memory_requirements = unsafe { device.get_image_memory_requirements(image) };
+        let memory_type_index = Self::find_memory_type(
+            memory_properties,
+            memory_requirements.memory_type_bits,
+            vk::MemoryPropertyFlags::DEVICE_LOCAL,
+        );
+
+        let image_memory = unsafe {
+            device.allocate_memory(
+                &vk::MemoryAllocateInfo {
+                    allocation_size: memory_requirements.size,
+                    memory_type_index,
+                    ..Default::default()
+                },
+                None,
+            ).expect("RayTracePipeline: 分配accumulation image memory失败")
+        };
+
+        unsafe {
+            device.bind_image_memory(image, image_memory, 0)
+                .expect("RayTracePipeline: 绑定accumulation image memory失败");
+        }
+
+        let image_view = unsafe {
+            device.create_image_view(
+                &vk::ImageViewCreateInfo {
+                    image,
+                    view_type: vk::ImageViewType::TYPE_2D,
+                    format: vk::Format::R32G32B32A32_SFLOAT,
+                    subresource_range: vk::ImageSubresourceRange {
+                        aspect_mask: vk::ImageAspectFlags::COLOR,
+                        base_mip_level: 0,
+                        level_count: 1,
+                        base_array_layer: 0,
+                        layer_count: 1,
+                    },
+                    ..Default::default()
+                },
+                None,
+            ).expect("RayTracePipeline: 创建accumulation image view失败")
+        };
+
+        (image, image_memory, image_view)
+    }
+
     /// 创建descriptor pool
     fn create_descriptor_pool(device: &ash::Device) -> vk::DescriptorPool {
 let pool_sizes = [
@@ -841,7 +974,7 @@ let pool_sizes = [
             },
             vk::DescriptorPoolSize {
                 ty: vk::DescriptorType::STORAGE_IMAGE,
-                descriptor_count: 4,
+                descriptor_count: 6,  // output + accumulation + preview + resize备用
             },
             vk::DescriptorPoolSize {
                 ty: vk::DescriptorType::COMBINED_IMAGE_SAMPLER,
@@ -999,32 +1132,51 @@ let pool_sizes = [
         }
     }
 
-    /// 更新output descriptor set — 绑定storage image
+    /// 更新output descriptor set — 绑定output storage image + accumulation storage image
     fn update_output_descriptor_set(
         device: &ash::Device,
         descriptor_set: vk::DescriptorSet,
-        image_view: vk::ImageView,
+        output_image_view: vk::ImageView,
+        accumulation_image_view: vk::ImageView,
     ) {
-        let image_info = [
+        let image_infos = [
+            // binding 0: output image (rgba8)
             vk::DescriptorImageInfo {
                 image_layout: vk::ImageLayout::GENERAL,
-                image_view,
+                image_view: output_image_view,
+                sampler: vk::Sampler::null(),
+            },
+            // binding 1: accumulation image (rgba32f)
+            vk::DescriptorImageInfo {
+                image_layout: vk::ImageLayout::GENERAL,
+                image_view: accumulation_image_view,
                 sampler: vk::Sampler::null(),
             },
         ];
 
-        let write_descriptor = vk::WriteDescriptorSet {
-            dst_set: descriptor_set,
-            dst_binding: 0,
-            dst_array_element: 0,
-            descriptor_count: 1,
-            descriptor_type: vk::DescriptorType::STORAGE_IMAGE,
-            p_image_info: &image_info[0],
-            ..Default::default()
-        };
+        let writes = [
+            vk::WriteDescriptorSet {
+                dst_set: descriptor_set,
+                dst_binding: 0,
+                dst_array_element: 0,
+                descriptor_count: 1,
+                descriptor_type: vk::DescriptorType::STORAGE_IMAGE,
+                p_image_info: &image_infos[0],
+                ..Default::default()
+            },
+            vk::WriteDescriptorSet {
+                dst_set: descriptor_set,
+                dst_binding: 1,
+                dst_array_element: 0,
+                descriptor_count: 1,
+                descriptor_type: vk::DescriptorType::STORAGE_IMAGE,
+                p_image_info: &image_infos[1],
+                ..Default::default()
+            },
+        ];
 
         unsafe {
-            device.update_descriptor_sets(&[write_descriptor], &[]);
+            device.update_descriptor_sets(&writes, &[]);
         }
     }
 
@@ -1526,6 +1678,18 @@ impl RenderPipeline for RayTracePipeline {
             vk::AccessFlags::SHADER_READ
         };
 
+        // accumulation image: 首帧从UNDEFINED→GENERAL，后续帧保持GENERAL
+        let accum_old_layout = if self.first_frame {
+            vk::ImageLayout::UNDEFINED
+        } else {
+            vk::ImageLayout::GENERAL
+        };
+        let accum_src_access = if self.first_frame {
+            vk::AccessFlags::empty()
+        } else {
+            vk::AccessFlags::SHADER_WRITE | vk::AccessFlags::SHADER_READ
+        };
+
         let output_image_barrier = vk::ImageMemoryBarrier {
             old_layout: image_old_layout,
             new_layout: vk::ImageLayout::GENERAL,
@@ -1544,8 +1708,26 @@ impl RenderPipeline for RayTracePipeline {
             ..Default::default()
         };
 
+        let accumulation_image_barrier = vk::ImageMemoryBarrier {
+            old_layout: accum_old_layout,
+            new_layout: vk::ImageLayout::GENERAL,
+            src_queue_family_index: vk::QUEUE_FAMILY_IGNORED,
+            dst_queue_family_index: vk::QUEUE_FAMILY_IGNORED,
+            image: self.accumulation_image,
+            subresource_range: vk::ImageSubresourceRange {
+                aspect_mask: vk::ImageAspectFlags::COLOR,
+                base_mip_level: 0,
+                level_count: 1,
+                base_array_layer: 0,
+                layer_count: 1,
+            },
+            src_access_mask: accum_src_access,
+            dst_access_mask: vk::AccessFlags::SHADER_WRITE | vk::AccessFlags::SHADER_READ,
+            ..Default::default()
+        };
+
         unsafe {
-            // HOST→COMPUTE barrier + output image layout transition
+            // HOST→COMPUTE barrier + output image + accumulation image layout transition
             self.device.cmd_pipeline_barrier(
                 cmd_buffer,
                 vk::PipelineStageFlags::HOST | image_src_stage,
@@ -1553,7 +1735,7 @@ impl RenderPipeline for RayTracePipeline {
                 vk::DependencyFlags::empty(),
                 &[host_to_compute_barrier],
                 &[],
-                &[output_image_barrier],
+                &[output_image_barrier, accumulation_image_barrier],
             );
 
             // 3. Bind compute pipeline — 使用COMPUTE bind point
@@ -1589,7 +1771,7 @@ impl RenderPipeline for RayTracePipeline {
                 emissive_count: self.emissive_count as f32,
                 viewport_size: [width as f32, height as f32],
                 fov: ctx.camera.fov,
-                _pad2: 0.0,
+                frame_index: self.frame_index as f32,
             };
             self.device.cmd_push_constants(
                 cmd_buffer,
@@ -1629,19 +1811,41 @@ impl RenderPipeline for RayTracePipeline {
                 ..Default::default()
             };
 
+            // accumulation image保持GENERAL layout — compute shader每帧读写它
+            let accumulation_barrier = vk::ImageMemoryBarrier {
+                old_layout: vk::ImageLayout::GENERAL,
+                new_layout: vk::ImageLayout::GENERAL,
+                src_queue_family_index: vk::QUEUE_FAMILY_IGNORED,
+                dst_queue_family_index: vk::QUEUE_FAMILY_IGNORED,
+                image: self.accumulation_image,
+                subresource_range: vk::ImageSubresourceRange {
+                    aspect_mask: vk::ImageAspectFlags::COLOR,
+                    base_mip_level: 0,
+                    level_count: 1,
+                    base_array_layer: 0,
+                    layer_count: 1,
+                },
+                src_access_mask: vk::AccessFlags::SHADER_WRITE | vk::AccessFlags::SHADER_READ,
+                dst_access_mask: vk::AccessFlags::SHADER_WRITE | vk::AccessFlags::SHADER_READ,
+                ..Default::default()
+            };
+
             self.device.cmd_pipeline_barrier(
                 cmd_buffer,
                 vk::PipelineStageFlags::COMPUTE_SHADER,
-                vk::PipelineStageFlags::FRAGMENT_SHADER,
+                vk::PipelineStageFlags::FRAGMENT_SHADER | vk::PipelineStageFlags::COMPUTE_SHADER,
                 vk::DependencyFlags::empty(),
                 &[compute_to_fragment_barrier],
                 &[],
-                &[output_to_shader_read_barrier],
+                &[output_to_shader_read_barrier, accumulation_barrier],
             );
         }
 
         // 8. 重置first_frame标记（output_image已成功从UNDEFINED→GENERAL→SHADER_READ_ONLY）
         self.first_frame = false;
+
+        // 9. 递增frame_index（帧累积降噪）
+        self.frame_index += 1;
 
         // 9. 返回RenderPassOutput
         RenderPassOutput {

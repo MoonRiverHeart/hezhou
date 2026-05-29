@@ -1,6 +1,6 @@
 // raytrace.comp — 路径追踪(Path Tracing) compute shader
 // BVH栈遍历 + NEE(下一事件估计) + 蒙特卡洛积分 + 俄罗斯轮盘赌
-// 多bounce迭代式路径追踪，输出到storage image (rgba8)
+// 多bounce迭代式路径追踪 + 帧累积降噪，输出到storage image (rgba8)
 //
 // Push constant布局 (40 bytes, std430):
 //   offset 0:  camera_pos (vec3, 12 bytes)
@@ -9,7 +9,7 @@
 //   offset 20: emissive_count (float, 4 bytes) — 原_pad1改为emissive三角形数量
 //   offset 24: viewport_size (vec2, 8 bytes)
 //   offset 32: fov (float, 4 bytes)
-//   offset 36: _pad2 (float, 4 bytes)
+//   offset 36: frame_index (float, 4 bytes) — 帧累积索引，相机移动时重置为0
 //   总计: 40 bytes
 //
 // Descriptor bindings:
@@ -20,6 +20,7 @@
 //   set=0, binding=4: SSBO vec4[] colors (per-vertex RGBA, alpha>1.5=emissive)
 //   set=0, binding=5: SSBO EmissiveTriangle[] (std430, 80 bytes each)
 //   set=2, binding=0: storage image rgba8 (output)
+//   set=2, binding=1: storage image rgba32f (accumulation buffer)
 
 #version 450
 
@@ -33,7 +34,7 @@ layout(push_constant) uniform PushConstants {
     float emissive_count; // offset 20, 4 bytes — emissive三角形数量
     vec2 viewport_size;   // offset 24, 8 bytes
     float fov;            // offset 32, 4 bytes
-    float _pad2;          // offset 36, 4 bytes
+    float frame_index;    // offset 36, 4 bytes — 帧累积索引
 } pc;
 
 // === BvhNode (32 bytes, std430) ===
@@ -78,8 +79,9 @@ layout(std430, set = 0, binding = 5) readonly buffer EmissiveTriangles {
     EmissiveTriangle emissive_tris[];
 } emissive_buf;
 
-// === Descriptor set 2: 输出图像 ===
+// === Descriptor set 2: 输出图像 + 累积缓冲区 ===
 layout(set = 2, binding = 0, rgba8) writeonly uniform image2D output_image;
+layout(set = 2, binding = 1, rgba32f) uniform image2D accumulation_image;
 
 // === 常量 ===
 const uint LEAF_MARKER = 0xFFFFFFFFu;
@@ -361,7 +363,7 @@ void main() {
     // === 路径追踪主循环 ===
     vec3 throughput = vec3(1.0);    // 路径吞吐量，初始为1
     vec3 accumulated = vec3(0.0);   // 累积radiance
-    uint seed = pcg_hash(uint(pixel_coords.x) * 1000u + uint(pixel_coords.y) + 1u);
+    uint seed = pcg_hash(uint(pixel_coords.x) * 1000u + uint(pixel_coords.y) + 1u + uint(pc.frame_index) * 7919u);
 
     uint emissive_count_uint = uint(pc.emissive_count);
 
@@ -464,12 +466,16 @@ void main() {
         ray_origin = hit_point + hit.normal * EPSILON * 2.0;
     }
 
-    // === 输出颜色 — tone mapping + gamma校正 ===
-    // Reinhard tone mapping: 防止过曝
-    vec3 mapped = accumulated / (accumulated + vec3(1.0));
-    // Gamma校正: linear → sRGB
+    // === 帧累积降噪 ===
+    // 读取累积缓冲区之前的值
+    vec4 prev = imageLoad(accumulation_image, pixel_coords);
+    vec3 prev_color = prev.rgb;
+    int frame = int(pc.frame_index);
+    // 蒸汽混合公式: 新的平均值 = (旧均值 * N + 新值) / (N + 1)
+    vec3 new_color = (prev_color * frame + accumulated) / (frame + 1);
+    imageStore(accumulation_image, pixel_coords, vec4(new_color, 1.0));
+    // 输出: tone map + gamma校正
+    vec3 mapped = new_color / (new_color + vec3(1.0));
     mapped = pow(mapped, vec3(1.0 / 2.2));
-
-    vec4 output_color = vec4(mapped, 1.0);
-    imageStore(output_image, pixel_coords, output_color);
+    imageStore(output_image, pixel_coords, vec4(mapped, 1.0));
 }
