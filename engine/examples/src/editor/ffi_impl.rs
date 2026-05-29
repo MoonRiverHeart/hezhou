@@ -125,3 +125,79 @@ pub extern "C" fn capture_screenshot_to_file(path_ptr: *const i8) -> i32 {
         }
     }
 }
+
+pub extern "C" fn set_widget_visible(handle: hezhou_ui::ffi::WidgetTreeHandle, widget_id: u64, visible: bool) {
+    hezhou_ui::ffi::ui_set_widget_visible(handle, widget_id, visible);
+}
+
+// === Pipeline切换FFI函数 ===
+
+#[unsafe(no_mangle)]
+pub extern "C" fn get_pipeline_names(
+    _handle: hezhou_scripting::ffi_context::WidgetTreeHandle,
+    buffer: *mut std::ffi::c_char,
+    buffer_size: usize,
+) -> usize {
+    unsafe {
+        // 返回所有可用管线名（包括尚未注册的ray_tracing，switch_pipeline会懒注册）
+        let all_names = ["rasterization", "ray_tracing"];
+        let joined: String = all_names.join("\0");
+        let bytes = joined.as_bytes();
+        let copy_len = std::cmp::min(bytes.len(), buffer_size - 1);
+        if copy_len > 0 && !buffer.is_null() {
+            std::ptr::copy_nonoverlapping(bytes.as_ptr() as *const std::ffi::c_char, buffer, copy_len);
+            *buffer.add(copy_len) = 0;
+        }
+        dfx_info!("FFI", "get_pipeline_names: joined_len={}, copy_len={}, content={}", joined.len(), copy_len, joined.replace('\0', "|"));
+        copy_len
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn switch_pipeline(
+    _handle: hezhou_scripting::ffi_context::WidgetTreeHandle,
+    pipeline_name: *const std::ffi::c_char,
+) -> i32 {
+    unsafe {
+        if pipeline_name.is_null() {
+            return -1;
+        }
+        let name_str = std::ffi::CStr::from_ptr(pipeline_name).to_string_lossy().into_owned();
+        if let Some(renderer_ptr) = super::RENDERER {
+            if (*renderer_ptr).switch_pipeline(&name_str) {
+                0  // 成功
+            } else {
+                -1  // 失败
+            }
+        } else {
+            -1
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn get_active_pipeline_name(
+    _handle: hezhou_scripting::ffi_context::WidgetTreeHandle,
+    buffer: *mut std::ffi::c_char,
+    buffer_size: usize,
+) -> usize {
+    unsafe {
+        if let Some(renderer_ptr) = super::RENDERER {
+            let renderer = &mut *renderer_ptr;
+            if let Some(registry) = renderer.pipeline_registry() {
+                let name = registry.active_pipeline_name();
+                let bytes = name.as_bytes();
+                let copy_len = std::cmp::min(bytes.len(), buffer_size - 1);  // 保留1字节给末尾\0
+                if copy_len > 0 && !buffer.is_null() {
+                    std::ptr::copy_nonoverlapping(bytes.as_ptr() as *const std::ffi::c_char, buffer, copy_len);
+                    *buffer.add(copy_len) = 0;
+                }
+                copy_len
+            } else {
+                0
+            }
+        } else {
+            0
+        }
+    }
+}

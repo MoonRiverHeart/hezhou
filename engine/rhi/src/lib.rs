@@ -19,7 +19,8 @@ pub use framebuffer::FramebufferDesc;
 pub use handle::*;
 pub use pass::{AttachmentDesc, AttachmentLoadOp, AttachmentStoreOp, ImageLayout, RenderPassDesc};
 pub use pipeline::{
-    BlendState, DepthStencilState, PipelineDesc, PipelineLayout, RasterizationState, ShaderStage,
+    BlendState, DepthStencilState, PipelineDesc, PipelineLayout, PipelineType, RasterizationState,
+    ShaderStage,
 };
 pub use shader::{ShaderDesc, ShaderSource};
 pub use swapchain::{ColorSpace, PresentMode, SwapChainDesc};

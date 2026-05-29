@@ -5,7 +5,7 @@ use crate::ecs::Scene;
 
 #[unsafe(no_mangle)]
 pub extern "C" fn asset_library_get_category_count() -> usize {
-    get_asset_library().get_category_count()
+    get_asset_library().read().unwrap().get_category_count()
 }
 
 #[unsafe(no_mangle)]
@@ -14,7 +14,7 @@ pub extern "C" fn asset_library_get_category_name(index: usize, buffer: *mut c_c
         return false;
     }
     
-    let lib = get_asset_library();
+    let lib = get_asset_library().read().unwrap();
     if let Some(name) = lib.get_category_name(index) {
         let bytes = name.as_bytes();
         let copy_len = bytes.len().min(buffer_size - 1);
@@ -31,7 +31,7 @@ pub extern "C" fn asset_library_get_category_name(index: usize, buffer: *mut c_c
 
 #[unsafe(no_mangle)]
 pub extern "C" fn asset_library_get_asset_count(category_index: usize) -> usize {
-    get_asset_library().get_asset_count_in_category(category_index)
+    get_asset_library().read().unwrap().get_asset_count_in_category(category_index)
 }
 
 #[unsafe(no_mangle)]
@@ -49,7 +49,7 @@ pub extern "C" fn asset_library_get_asset_info(
         return false;
     }
     
-    let lib = get_asset_library();
+    let lib = get_asset_library().read().unwrap();
     if let Some(asset) = lib.get_asset_by_category_index(category_index, asset_index) {
         unsafe {
             *id_buffer = asset.id;
@@ -83,7 +83,7 @@ pub extern "C" fn asset_library_create_entity_from_template(scene: *mut Scene, t
         return 0;
     }
     
-    let lib = get_asset_library();
+    let lib = get_asset_library().read().unwrap();
     unsafe {
         match lib.create_entity_from_template(template_id, &mut *scene) {
             Some(entity) => entity.id,
@@ -99,11 +99,41 @@ pub extern "C" fn asset_library_create_mesh_entity(scene: *mut Scene, mesh_type:
     }
     
     let mesh = MeshType::from_index(mesh_type);
-    let lib = get_asset_library();
+    let lib = get_asset_library().read().unwrap();
     unsafe {
         let entity = lib.create_entity_with_mesh(mesh, &mut *scene);
         entity.id
     }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn asset_library_load_texture(path: *const c_char) -> u64 {
+    if path.is_null() {
+        return 0;
+    }
+    let path_str = unsafe { std::ffi::CStr::from_ptr(path).to_string_lossy().into_owned() };
+    let name = std::path::Path::new(&path_str)
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or("Texture")
+        .to_string();
+    let mut lib = get_asset_library().write().unwrap();
+    lib.add_custom_texture(&name, &path_str, &format!("Texture loaded from {}", path_str))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn asset_library_load_mesh(path: *const c_char) -> u64 {
+    if path.is_null() {
+        return 0;
+    }
+    let path_str = unsafe { std::ffi::CStr::from_ptr(path).to_string_lossy().into_owned() };
+    let name = std::path::Path::new(&path_str)
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or("Model")
+        .to_string();
+    let mut lib = get_asset_library().write().unwrap();
+    lib.add_custom_mesh(&name, &path_str, &format!("Model loaded from {}", path_str))
 }
 
 #[unsafe(no_mangle)]

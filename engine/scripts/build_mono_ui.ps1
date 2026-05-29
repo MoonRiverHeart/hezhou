@@ -35,6 +35,7 @@ $scriptsToCompile = @(
     "$ScriptDir/UI.ComplexWidgets.cs",
     "$ScriptDir/UI.NewWidgets.cs",
     "$ScriptDir/UI.Scene.cs",
+    "$ScriptDir/UI.Pipeline.cs",
     "$ScriptDir/UI.AssetProject.cs"
 )
 

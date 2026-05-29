@@ -52,6 +52,7 @@ pub struct GridView {
     content_scale: f32,
     hovered_index: Option<usize>,
     max_scroll_offset: f32,
+    all_text: String,
 }
 
 impl GridView {
@@ -76,6 +77,7 @@ impl GridView {
             content_scale: 1.0,
             hovered_index: None,
             max_scroll_offset: 0.0,
+            all_text: String::new(),
         }
     }
     
@@ -93,9 +95,17 @@ impl GridView {
         let item = GridItem::new(label, user_data);
         let index = self.items.len();
         self.items.push(item);
+        self.rebuild_all_text();
         self.calculate_layout();
         self.flags.dirty_render = true;
         index
+    }
+    
+    fn rebuild_all_text(&mut self) {
+        self.all_text.clear();
+        for item in &self.items {
+            self.all_text.push_str(&item.label);
+        }
     }
     
     pub fn remove_item(&mut self, index: usize) {
@@ -108,6 +118,7 @@ impl GridView {
                     self.selected_index = Some(sel - 1);
                 }
             }
+            self.rebuild_all_text();
             self.calculate_layout();
             self.flags.dirty_render = true;
         }
@@ -125,6 +136,7 @@ impl GridView {
     
     pub fn clear(&mut self) {
         self.items.clear();
+        self.all_text.clear();
         self.selected_index = None;
         self.scroll_offset = 0.0;
         self.columns = 0;
@@ -287,6 +299,10 @@ impl Widget for GridView {
     
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
         self
+    }
+    
+    fn get_text(&self) -> Option<&str> {
+        Some(&self.all_text)
     }
     
     fn flags(&self) -> WidgetFlags {

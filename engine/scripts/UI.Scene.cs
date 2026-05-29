@@ -59,7 +59,13 @@ namespace Hezhou
 
         public ulong CreateCube()
         {
-            return UI.SceneCreateCube(_scenePtr);
+            ulong entityId = UI.SceneCreateCube(_scenePtr);
+            if (entityId != 0)
+            {
+                var entity = new Entity { Id = entityId, Name = "Cube" };
+                _entities[entityId] = entity;
+            }
+            return entityId;
         }
 
         public ulong CreatePlane()
@@ -68,6 +74,17 @@ namespace Hezhou
             if (entityId != 0)
             {
                 var entity = new Entity { Id = entityId, Name = "Plane" };
+                _entities[entityId] = entity;
+            }
+            return entityId;
+        }
+
+        public ulong CreateCornellBox()
+        {
+            ulong entityId = UI.SceneCreateCornellBox(_scenePtr);
+            if (entityId != 0)
+            {
+                var entity = new Entity { Id = entityId, Name = "CornellBox" };
                 _entities[entityId] = entity;
             }
             return entityId;
@@ -302,6 +319,17 @@ UI.SceneSelectEntity(_scenePtr, entityId);
                 return 0;
             }
             var func = Marshal.GetDelegateForFunctionPointer<SceneCreatePlaneDelegate>(_ffi.scene_create_plane);
+            return func(scene);
+        }
+
+        public static ulong SceneCreateCornellBox(IntPtr scene)
+        {
+            if (_ffi.scene_create_cornell_box == IntPtr.Zero)
+            {
+                Log.Error("C#", "SceneCreateCornellBox函数指针为空");
+                return 0;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<SceneCreateCornellBoxDelegate>(_ffi.scene_create_cornell_box);
             return func(scene);
         }
 

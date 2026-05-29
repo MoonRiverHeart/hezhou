@@ -69,6 +69,7 @@ pub struct PopupMenu {
     position_y: f32,
     hovered_index: Option<usize>,
     content_scale: f32,
+    all_text: String,
 }
 
 impl PopupMenu {
@@ -93,22 +94,41 @@ impl PopupMenu {
             position_y: 0.0,
             hovered_index: None,
             content_scale: 1.0,
+            all_text: String::new(),
+        }
+    }
+    
+    fn rebuild_all_text(&mut self) {
+        self.all_text.clear();
+        for item in &self.items {
+            if !item.is_separator {
+                self.all_text.push_str(&item.text);
+                if let Some(shortcut) = &item.shortcut {
+                    self.all_text.push_str(shortcut);
+                }
+                if item.has_submenu {
+                    self.all_text.push_str(">");
+                }
+            }
         }
     }
     
     pub fn add_item(&mut self, text: String, shortcut: Option<String>, action_id: usize) {
         self.items.push(MenuItem::new(text, shortcut, action_id));
+        self.rebuild_all_text();
         self.flags.dirty_layout = true;
         self.flags.dirty_render = true;
     }
     
     pub fn add_separator(&mut self) {
         self.items.push(MenuItem::separator());
+        self.rebuild_all_text();
         self.flags.dirty_render = true;
     }
     
     pub fn clear(&mut self) {
         self.items.clear();
+        self.rebuild_all_text();
         self.flags.dirty_render = true;
     }
     
@@ -153,18 +173,6 @@ impl PopupMenu {
         let mut max_shortcut_width: f32 = 0.0;
         let font_size = 14.0 * self.content_scale;
         let shortcut_font_size = 12.0 * self.content_scale;
-        
-        // Ensure all menu item characters are rasterized before measuring.
-        // Without this, unrasterized chars (CJK, emoji, etc.) return 0 width,
-        // causing menu text truncation.
-        for item in &self.items {
-            if !item.is_separator {
-                crate::font_atlas::ensure_chars_rasterized(0, &item.text, font_size);
-                if let Some(shortcut) = &item.shortcut {
-                    crate::font_atlas::ensure_chars_rasterized(0, shortcut, shortcut_font_size);
-                }
-            }
-        }
         
         let font_atlas_guard = crate::font_atlas::get_font_atlas().lock();
         
@@ -464,5 +472,9 @@ impl Widget for PopupMenu {
         }
         point.x >= self.layout.x && point.x <= self.layout.x + self.layout.width &&
         point.y >= self.layout.y && point.y <= self.layout.y + self.layout.height
+    }
+    
+    fn get_text(&self) -> Option<&str> {
+        Some(&self.all_text)
     }
 }

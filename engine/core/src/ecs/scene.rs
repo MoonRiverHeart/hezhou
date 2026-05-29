@@ -84,6 +84,14 @@ impl Scene {
         self.create_render_entity("builtin://plane".to_string())
     }
     
+    pub fn create_bunny(&mut self) -> Entity {
+        self.create_render_entity("builtin://bunny".to_string())
+    }
+    
+    pub fn create_cornell_box(&mut self) -> Entity {
+        self.create_render_entity("builtin://cornell_box".to_string())
+    }
+    
     pub fn create_directional_light(&mut self) -> Entity {
         let entity = self.create_entity();
         self.world.add_component(entity, DirectionalLightComponent::default());

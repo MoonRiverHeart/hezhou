@@ -50,6 +50,7 @@ pub extern "C" fn ui_dropdown_set_options(
         return;
     }
     unsafe {
+        dfx_info!("FFI", "DropdownSetOptions ENTER: widget_id={}, options_count={}", widget_id, options_count);
         let arc = &*(handle as *const Arc<Mutex<WidgetTree>>);
         let mut tree = arc.lock();
         let id = WidgetId::from_raw(widget_id);
@@ -57,15 +58,25 @@ pub extern "C" fn ui_dropdown_set_options(
             if widget.widget_type() == "Dropdown" {
                 use crate::widgets::Dropdown;
                 if let Some(dropdown) = widget.as_any_mut().downcast_mut::<Dropdown>() {
-                    let options_str = CStr::from_ptr(options_ptr).to_string_lossy();
-                    let options: Vec<String> = options_str.split('\0')
-                        .filter(|s| !s.is_empty())
-                        .take(options_count)
-                        .map(|s| s.to_string())
-                        .collect();
+// CStr::from_ptr读到第一个\0就停止，但options用\0分隔多个字符串
+                    // 需要遍历options_ptr，逐个读\0分隔的字符串
+                    let mut options = Vec::new();
+                    let mut offset = 0isize;
+                    for i in 0..options_count {
+                        let ptr = options_ptr.add(offset as usize);
+                        let cstr = CStr::from_ptr(ptr);
+                        let s = cstr.to_string_lossy().into_owned();
+                        let bytes_len = cstr.to_bytes().len();
+                        dfx_info!("FFI", "DropdownSetOptions parse[{}]: offset={}, s={}, bytes_len={}", i, offset, s, bytes_len);
+                        if !s.is_empty() {
+                            options.push(s);
+                        }
+                        offset += bytes_len as isize + 1; // +1跳过\0分隔符
+                    }
                     let count = options.len();
+                    let options_display = options.join(",");
                     dropdown.set_options(options);
-                    dfx_debug!("FFI", "DropdownSetOptions: widget_id={}, count={}", widget_id, count);
+                    dfx_info!("FFI", "DropdownSetOptions: widget_id={}, count={}, options={}", widget_id, count, options_display);
                 }
             }
         }

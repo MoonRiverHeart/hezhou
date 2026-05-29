@@ -67,6 +67,8 @@ pub struct Dialog {
     pressed_button_index: Option<usize>,
     pub(crate) content_scale: f32,
     all_text: String,
+    // Dialog内边距（逻辑像素）— 内容与Dialog边界之间的距离
+    pub(crate) content_padding: f32,
 }
 
 impl Dialog {
@@ -92,6 +94,7 @@ impl Dialog {
             pressed_button_index: None,
             content_scale: 1.0,
             all_text: String::new(),
+            content_padding: 16.0,  // 逻辑像素内边距
         }
     }
     
@@ -110,9 +113,15 @@ impl Dialog {
     }
     
     pub fn with_size(mut self, width: f32, height: f32) -> Self {
+        let screen_size = crate::thunk::ui_get_screen_size();
+        let content_scale = crate::thunk::ui_get_content_scale();
+        // screen_size is physical pixels — convert to logical pixels for centering
+        // UI layout system uses logical coordinates, so x/y/width/height must all be logical
+        let logical_screen_w = screen_size.0 / content_scale;
+        let logical_screen_h = screen_size.1 / content_scale;
         self.layout = Layout::new(
-            (crate::thunk::ui_get_screen_size().0 - width) / 2.0,
-            (crate::thunk::ui_get_screen_size().1 - height) / 2.0,
+            (logical_screen_w - width) / 2.0,
+            (logical_screen_h - height) / 2.0,
             width,
             height,
         );
@@ -168,11 +177,12 @@ impl Dialog {
     fn get_content_rect(&self) -> Rect {
         let scaled_title_height = self.title_bar_height * self.content_scale;
         let scaled_button_height = self.button_height * self.content_scale;
+        let padding = self.content_padding * self.content_scale;
         Rect::new(
-            0.0,
-            scaled_title_height,
-            self.layout.width,
-            self.layout.height - scaled_title_height - scaled_button_height,
+            padding,
+            scaled_title_height + padding,
+            self.layout.width - padding * 2.0,
+            self.layout.height - scaled_title_height - scaled_button_height - padding * 2.0,
         )
     }
     

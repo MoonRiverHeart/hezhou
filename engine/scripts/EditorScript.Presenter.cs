@@ -49,8 +49,8 @@ namespace Hezhou
             
             if (_workingDirectorySet)
             {
-                CreateEditorLayout();
-                ScanScripts();
+                ScanScripts();            // Populate scripts BEFORE building UI
+                CreateEditorLayout();     // Now dropdown gets populated scripts
             }
         }
         
@@ -74,6 +74,21 @@ namespace Hezhou
                 {
                     _mouseDragging = false;
                     return;
+                }
+                
+                // 检查鼠标是否在预览窗范围内 — 防止拖出预览窗后仍能旋转视角
+                float[] previewBounds = UI.WidgetGetAbsoluteLayout(_previewWindowId);
+                if (previewBounds != null && previewBounds.Length >= 4)
+                {
+                    float px = previewBounds[0];
+                    float py = previewBounds[1];
+                    float pw = previewBounds[2];
+                    float ph = previewBounds[3];
+                    if (x < px || x > px + pw || y < py || y > py + ph)
+                    {
+                        _mouseDragging = false;
+                        return;
+                    }
                 }
                 
                 if (!_mouseDragging)
@@ -101,6 +116,21 @@ namespace Hezhou
                 {
                     _mouseDragging = false;
                     return;
+                }
+                
+                // 检查鼠标是否在预览窗范围内 — 防止拖出预览窗后仍能orbit(用绝对坐标匹配鼠标坐标)
+                float[] previewBounds = UI.WidgetGetAbsoluteLayout(_previewWindowId);
+                if (previewBounds != null && previewBounds.Length >= 4)
+                {
+                    float px = previewBounds[0];
+                    float py = previewBounds[1];
+                    float pw = previewBounds[2];
+                    float ph = previewBounds[3];
+                    if (x < px || x > px + pw || y < py || y > py + ph)
+                    {
+                        _mouseDragging = false;
+                        return;
+                    }
                 }
                 
                 if (!_mouseDragging)
@@ -236,7 +266,7 @@ namespace Hezhou
                 return;
             }
             
-            if (!selected) return;
+            if (!selected && currentState != GameState.Running) return;
             
             if (keycode == KEY_LEFT) _keyLeftPressed = pressed;
             if (keycode == KEY_RIGHT) _keyRightPressed = pressed;
@@ -252,14 +282,14 @@ namespace Hezhou
                 
                 if (currentState == GameState.Editing && _gameScene != null)
                 {
-                    // Use actual preview panel layout from SplitView (not fixed constants)
-                    float[] previewLayout = UI.WidgetGetLayout(_previewPanel.Id);
+                    // Use absolute preview window layout (screen coordinates match mouse coordinates)
+                    float[] previewLayout = UI.WidgetGetAbsoluteLayout(_previewWindowId);
                     if (previewLayout == null || previewLayout.Length < 4) return;
                     
-                    float previewX = previewLayout[0] + 10f;
-                    float previewY = previewLayout[1] + 40f;
-                    float previewWidth = previewLayout[2] - 20f;
-                    float previewHeight = previewLayout[3] - 50f;
+                    float previewX = previewLayout[0];
+                    float previewY = previewLayout[1];
+                    float previewWidth = previewLayout[2];
+                    float previewHeight = previewLayout[3];
                     
                     if (previewWidth <= 0 || previewHeight <= 0) return;
                     
@@ -651,7 +681,7 @@ namespace Hezhou
         {
             if (_projectTreeViewId != 0 && _entitiesNodeId != 0)
             {
-                ulong nodeId = UI.TreeViewAddNode(_projectTreeViewId, _entitiesNodeId, name, entityId, false);
+                ulong nodeId = UI.TreeViewAddNode(_projectTreeViewId, _entitiesNodeId, "🔷 " + name, entityId, false);
                 _entityNodeMap[entityId] = nodeId;
             }
         }
@@ -728,7 +758,7 @@ namespace Hezhou
             // Also check _fileItemPaths for script tree nodes
             if (_fileItemPaths.ContainsKey(widgetId))
             {
-                _contextMenuId = UI.CreatePopupMenu(_projectTreeViewId);
+                _contextMenuId = UI.CreatePopupMenu(0);
                 UI.PopupMenuAddItem(_contextMenuId, "Delete", "", 0);
                 _contextMenuTargetNodeId = widgetId;
                 _contextMenuTargetEntityId = 0;
@@ -745,7 +775,7 @@ namespace Hezhou
             // Show entity context menu if this is an entity node
             if (entityId != 0)
             {
-                _contextMenuId = UI.CreatePopupMenu(_projectTreeViewId);
+                _contextMenuId = UI.CreatePopupMenu(0);
                 UI.PopupMenuAddItem(_contextMenuId, "Delete Entity", "", 0);
                 _contextMenuTargetNodeId = widgetId;
                 _contextMenuTargetEntityId = entityId;
@@ -801,19 +831,22 @@ namespace Hezhou
             UI.GridViewAddItem(gridViewId, "Sphere", 2);
             UI.GridViewAddItem(gridViewId, "Plane", 3);
             UI.GridViewAddItem(gridViewId, "Cylinder", 4);
+            UI.GridViewAddItem(gridViewId, "CornellBox", 8);
         }
         
 private static void OnGridViewClick(ulong widgetId, int index, ulong userData)
         {
             if (_gameScene != null && userData != 0)
             {
-                // userData: 1=Cube, 2=Sphere, 3=Plane, 4=Cylinder
-                // MeshType index: 0=Cube, 1=Sphere, 2=Plane, 3=Cylinder
+                // userData: 1=Cube, 2=Sphere, 3=Plane, 4=Cylinder, 8=CornellBox
+                // MeshType index: 0=Cube, 1=Sphere, 2=Plane, 3=Cylinder, 7=CornellBox
                 int meshType = (int)userData - 1;
+                // Special case: CornellBox userData=8 → meshType=7
+                if (userData == 8) meshType = 7;
                 ulong entityId = _gameScene.CreateMeshEntity(meshType);
                 if (entityId != 0)
                 {
-                    string[] meshNames = { "Cube", "Sphere", "Plane", "Cylinder" };
+                    string[] meshNames = { "Cube", "Sphere", "Plane", "Cylinder", "Cone", "Custom", "Bunny", "CornellBox" };
                     string name = meshNames[meshType];
                     UI.SceneSetEntityName(_gameScene.ScenePtr, entityId, name);
                     AddEntityToTree(entityId, name);
@@ -895,13 +928,11 @@ UI.SetText(_runButtonId, "运行");
             {
                 if (_scriptEditorVisible)
                 {
-                    HideScriptEditor();
-                    ShowMainLayout();
+                    HideScriptEditor();  // 隐藏脚本编辑器，内部已调用ShowMainLayout
                 }
                 else
                 {
-                    HideMainLayout();
-                    ShowScriptEditor();
+                    ShowScriptEditor();  // 显示脚本编辑器，内部已调用HideMainLayout
                 }
             }
             finally
@@ -958,30 +989,8 @@ UI.SetText(_runButtonId, "运行");
                 
                 if (!_scriptEditorVisible)
                 {
-                    // Hide main layout (removes SplitView structure)
-                    HideMainLayout();
-                    
-                    ulong rootId = UI.GetRootId();
-                    float editorY = TOOLBAR_HEIGHT;
-                    float editorWidth = _screenWidth;
-                    float editorHeight = _screenHeight - TOOLBAR_HEIGHT - STATUS_BAR_HEIGHT;
-                    
-                    _scriptEditorPanel = new Panel(rootId, 0, editorY, editorWidth, editorHeight, 0.12f, 0.12f, 0.14f, 1.0f);
-                    
-                    var hotReloadBtn = new Button(_scriptEditorPanel.Id, 100f, 30f, "Hot Reload");
-                    UI.SetWidgetLayout(hotReloadBtn.Id, 10f, 10f, 100f, 30f);
-                    hotReloadBtn.SetOnClick(_hotReloadClickCallback);
-                    
-                    _scriptEditorLabel = new Label(_scriptEditorPanel.Id, 200f, 25f, fileName);
-                    UI.SetWidgetLayout(_scriptEditorLabel.Id, 120f, 10f, 300f, 25f);
-                    
-                    _scriptTextEditId = UI.CreateTextEdit(_scriptEditorPanel.Id, editorWidth - 20f, editorHeight - 50f);
-                    UI.SetTextEditShowLineNumbers(_scriptTextEditId, true);
-                    UI.SetWidgetLayout(_scriptTextEditId, 10f, 50f, editorWidth - 20f, editorHeight - 50f);
-                    
-                    _scriptEditorVisible = true;
-                    
-                    RefreshDirectoryTree();
+                    // Use ShowScriptEditor() to toggle visibility (no destroy/recreate)
+                    ShowScriptEditor();
                 }
                 
                 if (_scriptTextEditId != 0)
@@ -1102,6 +1111,31 @@ UI.SetText(_runButtonId, "运行");
             string[] tabNames = new string[] { "几何", "位置", "渲染", "运动", "物理" };
             string tabName = ((int)index < tabNames.Length) ? tabNames[(int)index] : "未知";
             _statusItem.Text = "属性页: " + tabName;
+        }
+        
+        // === Pipeline Selection Handler ===
+        
+        private static void OnPipelineSelected(ulong widgetId, ulong index)
+        {
+            if ((int)index < 0 || (int)index >= _pipelineNames.Length) return;
+            string selectedPipeline = _pipelineNames[(int)index];
+            
+            // 切换管线
+            bool success = UI.SwitchPipeline(selectedPipeline);
+            if (success)
+            {
+                _currentPipeline = selectedPipeline;
+                Log.Info("Editor", "管线切换成功: " + selectedPipeline);
+                // 更新管线信息Label
+                if (_pipelineInfoLabelId != 0)
+                {
+                    UI.SetText(_pipelineInfoLabelId, "当前管线: " + _currentPipeline);
+                }
+            }
+            else
+            {
+                Log.Warn("Editor", "管线切换失败: " + selectedPipeline);
+            }
         }
         
         private static void OnNewScriptClick(ulong widgetId)

@@ -8,6 +8,7 @@ mod scene;
 mod renderer;
 mod property;
 mod asset_project;
+mod pipeline;
 
 pub use types::*;
 pub use ui_system::*;
@@ -19,6 +20,7 @@ pub use scene::*;
 pub use renderer::*;
 pub use property::*;
 pub use asset_project::*;
+pub use pipeline::*;
 
 use std::ffi::c_void;
 
@@ -178,6 +180,7 @@ pub struct FfiContext {
     pub scene_destroy: SceneDestroyFn,
     pub scene_create_cube: SceneCreateCubeFn,
     pub scene_create_plane: SceneCreatePlaneFn,
+    pub scene_create_cornell_box: SceneCreateCornellBoxFn,
     pub scene_create_directional_light: SceneCreateDirectionalLightFn,
     pub scene_attach_script: SceneAttachScriptFn,
     pub scene_set_game_state: SceneSetGameStateFn,
@@ -241,6 +244,7 @@ pub struct FfiContext {
     pub ui_simulate_click_at: SimulateClickAtFn,
     pub ui_widget_get_type: WidgetGetTypeFn,
     pub ui_widget_get_layout: WidgetGetLayoutFn,
+    pub ui_widget_get_absolute_layout: WidgetGetAbsoluteLayoutFn,
     pub ui_widget_get_parent: WidgetGetParentFn,
     pub ui_widget_get_child_count: WidgetGetChildCountFn,
     pub ui_widget_get_child_id: WidgetGetChildIdFn,
@@ -253,6 +257,8 @@ pub struct FfiContext {
     pub asset_library_get_asset_info: AssetLibraryGetAssetInfoFn,
     pub asset_library_create_entity_from_template: AssetLibraryCreateEntityFromTemplateFn,
     pub asset_library_create_mesh_entity: AssetLibraryCreateMeshEntityFn,
+    pub asset_library_load_texture: AssetLibraryLoadTextureFn,
+    pub asset_library_load_mesh: AssetLibraryLoadMeshFn,
     pub project_create_new: ProjectCreateNewFn,
     pub project_load: ProjectLoadFn,
     pub project_save: ProjectSaveFn,
@@ -265,9 +271,13 @@ pub struct FfiContext {
     pub project_get_settings: ProjectGetSettingsFn,
     pub project_set_settings: ProjectSetSettingsFn,
     pub project_get_entity_info: ProjectGetEntityInfoFn,
-    pub project_add_entity: ProjectAddEntityFn,
-    pub project_remove_entity: ProjectRemoveEntityFn,
-}
+pub project_add_entity: ProjectAddEntityFn,
+        pub project_remove_entity: ProjectRemoveEntityFn,
+        pub ui_set_widget_visible: SetWidgetVisibleFn,
+        pub get_pipeline_names: GetPipelineNamesFn,
+        pub switch_pipeline: SwitchPipelineFn,
+        pub get_active_pipeline_name: GetActivePipelineNameFn,
+    }
 
 static mut FFI_CONTEXT: Option<Box<FfiContext>> = None;
 

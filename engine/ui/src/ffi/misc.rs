@@ -494,6 +494,34 @@ pub extern "C" fn ui_widget_get_layout(
     }
 }
 
+/// Get widget absolute layout (x, y, width, height) packed into a float array.
+/// Absolute layout includes parent chain offset, unlike ui_widget_get_layout which returns local coords.
+/// Caller provides a float[4] buffer. Returns 1 if widget found, 0 if not.
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_widget_get_absolute_layout(
+    handle: WidgetTreeHandle,
+    widget_id: u64,
+    out_layout: *mut f32, // must point to float[4]
+) -> u32 {
+    if handle.is_null() || out_layout.is_null() {
+        return 0;
+    }
+    unsafe {
+        let arc = &*(handle as *const Arc<Mutex<WidgetTree>>);
+        let tree = arc.lock();
+        let id = WidgetId::from_raw(widget_id);
+        if let Some(layout) = tree.get_absolute_layout(id) {
+            *out_layout = layout.x;
+            *out_layout.add(1) = layout.y;
+            *out_layout.add(2) = layout.width;
+            *out_layout.add(3) = layout.height;
+            1
+        } else {
+            0
+        }
+    }
+}
+
 /// Get the parent widget ID. Returns 0 if widget has no parent or is invalid.
 #[unsafe(no_mangle)]
 pub extern "C" fn ui_widget_get_parent(

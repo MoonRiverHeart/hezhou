@@ -54,12 +54,8 @@ namespace Hezhou
         {
             _gameScene = new Scene();
             
-            _testCubeId = _gameScene.CreateCube();
-            UI.SceneSetEntityName(_gameScene.ScenePtr, _testCubeId, "Cube");
-            
-            ulong planeId = _gameScene.CreatePlane();
-            UI.SceneSetEntityName(_gameScene.ScenePtr, planeId, "Plane");
-            
+            // 默认Scene为空 — 用户通过UI添加实体
+            // DirectionalLight保留 — 场景需要光源才能渲染
             ulong lightId = _gameScene.CreateDirectionalLight();
             UI.SceneSetEntityName(_gameScene.ScenePtr, lightId, "DirectionalLight");
             
@@ -159,7 +155,7 @@ namespace Hezhou
             
             _previewWindowId = UI.CreatePreviewWindow(_previewPanel.Id, 10f, 40f, initialPreviewWidth, initialPreviewHeight, 1);
             UI.SetWidgetLayer(_previewWindowId, 0);
-            UI.SetGamePreviewExtent((uint)initialPreviewWidth, (uint)initialPreviewHeight);
+            UI.SetGamePreviewExtent((uint)(initialPreviewWidth * UI.GetContentScale()), (uint)(initialPreviewHeight * UI.GetContentScale()));
 
             // === Asset Panel: TabWidget spanning left+center bottom ===
             _assetTabWidget = new TabWidget(_assetPanel.Id, 5f, 5f, 0, 0);
@@ -201,6 +197,45 @@ namespace Hezhou
             
             _renderTabContentId = UI.CreateScrollView(_propsTabWidget.Id, 0, 0, 0, 0);
             ulong renderVStack = UI.CreateVStack(_renderTabContentId, 5f);
+            
+            // === 管线选择区域 (渲染tab顶部) ===
+            UI.CreateLabel(renderVStack, RIGHT_PANEL_WIDTH - 40f, 20f, "管线选择:");
+            
+            ulong pipelineHStack = UI.CreateHStack(renderVStack, 5f);
+            _pipelineDropdownId = UI.CreateDropdown(pipelineHStack, RIGHT_PANEL_WIDTH - 70f, 25f);
+            
+// 设置Dropdown选项 — 通过FFI获取可用管线名
+            string[] names = UI.GetPipelineNames();
+            if (names.Length > 0)
+            {
+                _pipelineNames = names;
+            }
+            else
+            {
+                // Fallback: include both rasterization and ray_tracing even if not yet registered
+                _pipelineNames = new string[] { "rasterization", "ray_tracing" };
+            }
+            UI.DropdownSetOptions(_pipelineDropdownId, _pipelineNames);
+            
+            // 设置当前选中项 — 通过FFI获取当前活跃管线名
+            string current = UI.GetActivePipelineName();
+            _currentPipeline = current;
+            int selectedIndex = 0;
+            for (int i = 0; i < _pipelineNames.Length; i++)
+            {
+                if (_pipelineNames[i] == current) { selectedIndex = i; break; }
+            }
+            UI.DropdownSetSelected(_pipelineDropdownId, (ulong)selectedIndex);
+            
+            // 注册选择回调
+            _pipelineDropdownSelectCallback = new UI.DropdownSelectCallbackDelegate(OnPipelineSelected);
+            UI.DropdownSetOnSelect(_pipelineDropdownId, _pipelineDropdownSelectCallback);
+            
+            // 分隔Label
+            UI.CreateLabel(renderVStack, RIGHT_PANEL_WIDTH - 40f, 10f, "");
+            
+            // 当前管线信息Label
+            _pipelineInfoLabelId = UI.CreateLabel(renderVStack, RIGHT_PANEL_WIDTH - 40f, 20f, "当前管线: " + _currentPipeline);
             
             _motionTabContentId = UI.CreateVStack(_propsTabWidget.Id, 5f);
             
@@ -273,6 +308,44 @@ namespace Hezhou
             _projectItem = _statusItems.AddItem("项目: 未命名", true);
             UI.SetWidgetLayout(_projectItem.Id, 290f, 2f, 150f, itemHeight);
             UI.SetListItemFontSize(_projectItem.Id, fontSize);
+
+            // === Script Editor Panel (pre-created, initially hidden) ===
+            // Created under rootId at the same level as outerSplitView, toggled via SetWidgetVisible
+            float editorY = TOOLBAR_HEIGHT;
+            float editorHeight = mainHeight;
+            float editorWidth = _screenWidth;
+            
+            _scriptEditorPanel = new Panel(rootId, 0, editorY, editorWidth, editorHeight, 0.12f, 0.12f, 0.14f, 1.0f);
+            
+            // Toolbar: Hot Reload button + label
+            _scriptEditorHotReloadBtnId = UI.CreateButton(_scriptEditorPanel.Id, 100f, 30f, "Hot Reload");
+            UI.SetWidgetLayout(_scriptEditorHotReloadBtnId, 10f, 10f, 100f, 30f);
+            UI.SetOnClick(_scriptEditorHotReloadBtnId, _hotReloadClickCallback);
+            
+            _scriptEditorLabel = new Label(_scriptEditorPanel.Id, 200f, 25f, "Script Editor - NewScript.cs");
+            UI.SetWidgetLayout(_scriptEditorLabel.Id, 120f, 10f, 300f, 25f);
+            
+            // Horizontal SplitView: TreePanel(20%) | EditPanel(80%), below toolbar
+            _scriptEditorSplitViewId = UI.CreateSplitView(_scriptEditorPanel.Id, 0, 40f, editorWidth, editorHeight - 40f, 0);
+            UI.SplitViewSetSplitRatio(_scriptEditorSplitViewId, 0.2f);
+            UI.SplitViewSetMinRatio(_scriptEditorSplitViewId, 0.1f);
+            UI.SplitViewSetMaxRatio(_scriptEditorSplitViewId, 0.5f);
+            _scriptEditorSplitViewRatioCallback = new UI.SplitViewRatioChangeCallbackDelegate(OnScriptEditorSplitViewRatioChange);
+            UI.SplitViewSetOnRatioChange(_scriptEditorSplitViewId, _scriptEditorSplitViewRatioCallback);
+            
+            // Left pane: directory tree
+            _scriptEditorTreePanel = new Panel(_scriptEditorSplitViewId, 0, 0, 0, 0, 0.18f, 0.18f, 0.22f, 1.0f);
+            
+            // Right pane: TextEdit
+            _scriptEditorEditPanel = new Panel(_scriptEditorSplitViewId, 0, 0, 0, 0, 0.15f, 0.15f, 0.15f, 1.0f);
+            
+            _scriptTextEditId = UI.CreateTextEdit(_scriptEditorEditPanel.Id, editorWidth * 0.8f - 20f, editorHeight - 90f);
+            UI.SetTextEditShowLineNumbers(_scriptTextEditId, true);
+            UI.SetWidgetLayout(_scriptTextEditId, 10f, 10f, editorWidth * 0.8f - 20f, editorHeight - 90f);
+            UI.TextEditSetText(_scriptTextEditId, "// NewScript.cs\nusing System;\nusing Hezhou;\n\npublic class NewScript\n{\n    public void Start()\n    {\n        Console.WriteLine(\"NewScript started!\");\n    }\n    \n    public void Update(float deltaTime)\n    {\n        // Update logic here\n    }\n}");
+            
+            // Initially hidden — only shown when user clicks "编辑器" button
+            UI.SetWidgetVisible(_scriptEditorPanel.Id, false);
         }
 
         // === Build a single property widget into a target container ===
@@ -511,11 +584,22 @@ namespace Hezhou
             // Script editor overlay (if visible)
             if (_scriptEditorPanel != null && _scriptEditorVisible)
             {
-                float editorWidth = _screenWidth * 0.75f;
+                float editorWidth = _screenWidth;
                 float editorHeight = mainHeight;
                 UI.SetWidgetLayout(_scriptEditorPanel.Id, 0, mainY, editorWidth, editorHeight);
-                if (_scriptTextEditId != 0)
-                    UI.SetWidgetLayout(_scriptTextEditId, 10f, 50f, editorWidth - 20f, editorHeight - 50f);
+                // SplitView handles child panel sizing automatically
+                if (_scriptEditorSplitViewId != 0)
+                {
+                    UI.SetWidgetLayout(_scriptEditorSplitViewId, 0, 40f, editorWidth, editorHeight - 40f);
+                }
+                if (_scriptEditorHotReloadBtnId != 0)
+                {
+                    UI.SetWidgetLayout(_scriptEditorHotReloadBtnId, 10f, 10f, 100f, 30f);
+                }
+                if (_scriptEditorLabel != null)
+                {
+                    UI.SetWidgetLayout(_scriptEditorLabel.Id, 120f, 10f, 300f, 25f);
+                }
             }
         }
 
@@ -533,7 +617,10 @@ namespace Hezhou
                 if (previewHeight < 50f) previewHeight = 50f;
                 
                 UI.SetWidgetLayout(_previewWindowId, 10f, 40f, previewWidth, previewHeight);
-                UI.SetGamePreviewExtent((uint)previewWidth, (uint)previewHeight);
+                // Scale logical dimensions by content_scale to match physical pixel FBO size
+                uint physWidth = (uint)(previewWidth * UI.GetContentScale());
+                uint physHeight = (uint)(previewHeight * UI.GetContentScale());
+                UI.SetGamePreviewExtent(physWidth, physHeight);
             }
         }
 
@@ -557,155 +644,20 @@ namespace Hezhou
             UpdatePreviewExtent();
         }
 
+        private static void OnScriptEditorSplitViewRatioChange(ulong widgetId, float ratio)
+        {
+            // Script editor split changed: SplitView handles panel sizing automatically
+            // No manual TextEdit layout update needed — layout_panel_children will handle it
+        }
+
         // === Show/Hide Main Layout ===
 
         private static void ShowMainLayout()
         {
-            ulong rootId = UI.GetRootId();
-            float mainY = TOOLBAR_HEIGHT;
-            float mainHeight = _screenHeight - TOOLBAR_HEIGHT - STATUS_BAR_HEIGHT;
-            
-            // If SplitView structure was destroyed, recreate entire layout
-            if (_outerSplitViewId == 0 || UI.WidgetGetChildCount(_outerSplitViewId) < 2)
+            // Simply make the outerSplitView visible again (no recreate)
+            if (_outerSplitViewId != 0)
             {
-                // Recreate SplitView-based layout
-                _outerSplitViewId = UI.CreateSplitView(rootId, 0, mainY, _screenWidth, mainHeight, 0);
-                UI.SplitViewSetSplitRatio(_outerSplitViewId, 0.75f);
-                UI.SplitViewSetMinRatio(_outerSplitViewId, 0.4f);
-                UI.SplitViewSetMaxRatio(_outerSplitViewId, 0.9f);
-                UI.SplitViewSetOnRatioChange(_outerSplitViewId, _outerSplitViewRatioCallback);
-
-                _leftCenterPanel = new Panel(_outerSplitViewId, 0, 0, 0, 0, 0.18f, 0.18f, 0.22f, 1.0f);
-                _rightPanel = new Panel(_outerSplitViewId, 0, 0, 0, 0, 0.2f, 0.2f, 0.2f, 1.0f);
-
-                _leftCenterSplitViewId = UI.CreateSplitView(_leftCenterPanel.Id, 0, 0, 0, 0, 1);
-                UI.SplitViewSetSplitRatio(_leftCenterSplitViewId, 0.7f);
-                UI.SplitViewSetMinRatio(_leftCenterSplitViewId, 0.3f);
-                UI.SplitViewSetMaxRatio(_leftCenterSplitViewId, 0.85f);
-                UI.SplitViewSetOnRatioChange(_leftCenterSplitViewId, _leftCenterSplitViewRatioCallback);
-
-                _topPanel = new Panel(_leftCenterSplitViewId, 0, 0, 0, 0, 0.18f, 0.18f, 0.22f, 1.0f);
-                _assetPanel = new Panel(_leftCenterSplitViewId, 0, 0, 0, 0, 0.2f, 0.2f, 0.2f, 1.0f);
-
-                _innerHorizontalSplitViewId = UI.CreateSplitView(_topPanel.Id, 0, 0, 0, 0, 0);
-                UI.SplitViewSetSplitRatio(_innerHorizontalSplitViewId, 0.33f);
-                UI.SplitViewSetMinRatio(_innerHorizontalSplitViewId, 0.15f);
-                UI.SplitViewSetMaxRatio(_innerHorizontalSplitViewId, 0.5f);
-                UI.SplitViewSetOnRatioChange(_innerHorizontalSplitViewId, _innerHorizontalSplitViewRatioCallback);
-
-                // Project panel
-                _projectPanel = new Panel(_innerHorizontalSplitViewId, 0, 0, 0, 0, 0.2f, 0.2f, 0.2f, 1.0f);
-                UI.CreateLabel(_projectPanel.Id, 10f, 10f, 200f, 25f, "项目结构");
-                
-                if (_projectTreeViewId != 0)
-                {
-                    CreateProjectStructureTree();
-                }
-                else
-                {
-                    CreateProjectStructureTree();
-                }
-
-                // Preview panel
-                _previewPanel = new Panel(_innerHorizontalSplitViewId, 0, 0, 0, 0, 0.08f, 0.08f, 0.08f, 0.3f);
-                UI.CreateLabel(_previewPanel.Id, 10f, 10f, 200f, 25f, "游戏预览");
-                
-                float initialPreviewWidth = _screenWidth * 0.75f * 0.67f - 20f;
-                float initialPreviewHeight = mainHeight * 0.7f - 50f;
-                if (initialPreviewWidth < 100f) initialPreviewWidth = 100f;
-                if (initialPreviewHeight < 100f) initialPreviewHeight = 100f;
-                
-                _previewWindowId = UI.CreatePreviewWindow(_previewPanel.Id, 10f, 40f, initialPreviewWidth, initialPreviewHeight, 1);
-                UI.SetWidgetLayer(_previewWindowId, 0);
-                UI.SetGamePreviewExtent((uint)initialPreviewWidth, (uint)initialPreviewHeight);
-
-                // Asset panel with TabWidget
-                _assetTabWidget = new TabWidget(_assetPanel.Id, 5f, 5f, 0, 0);
-                
-                ulong modelTabContent = UI.CreateScrollView(_assetTabWidget.Id, 0, 0, 0, 0);
-                _assetModelGridViewId = UI.CreateGridView(modelTabContent, 5f, 5f, 0, 0, 64);
-                _assetGridViewId = _assetModelGridViewId; // Legacy alias
-                RefreshAssetGridView();
-                UI.GridViewSetOnClick(_assetModelGridViewId, _gridViewClickCallback);
-                
-                ulong materialTabContent = UI.CreateVStack(_assetTabWidget.Id, 5f);
-                UI.CreateLabel(materialTabContent, 200f, 25f, "材质列表 (待实现)");
-                
-                ulong scriptTabContent = UI.CreateVStack(_assetTabWidget.Id, 5f);
-                UI.CreateLabel(scriptTabContent, 200f, 25f, "脚本列表 (待实现)");
-                
-                ulong sceneTabContent = UI.CreateVStack(_assetTabWidget.Id, 5f);
-                UI.CreateLabel(sceneTabContent, 200f, 25f, "场景列表 (待实现)");
-                
-                _assetTabWidget.AddTab("模型", modelTabContent, false);
-                _assetTabWidget.AddTab("材质", materialTabContent, false);
-                _assetTabWidget.AddTab("脚本", scriptTabContent, false);
-                _assetTabWidget.AddTab("场景", sceneTabContent, false);
-
-                // Properties panel with 5-tab TabWidget
-                UI.CreateLabel(_rightPanel.Id, 10f, 10f, 200f, 25f, "属性编辑");
-                
-                float tabWidgetY = 40f;
-                float tabWidgetHeight = mainHeight - tabWidgetY - 10f;
-                
-                _propsTabWidget = new TabWidget(_rightPanel.Id, 5f, tabWidgetY, 0, tabWidgetHeight);
-                
-                _geometryTabContentId = UI.CreateScrollView(_propsTabWidget.Id, 0, 0, 0, 0);
-                ulong geometryVStack = UI.CreateVStack(_geometryTabContentId, 5f);
-                
-                _positionTabContentId = UI.CreateScrollView(_propsTabWidget.Id, 0, 0, 0, 0);
-                ulong positionVStack = UI.CreateVStack(_positionTabContentId, 5f);
-                
-                _renderTabContentId = UI.CreateScrollView(_propsTabWidget.Id, 0, 0, 0, 0);
-                ulong renderVStack = UI.CreateVStack(_renderTabContentId, 5f);
-                
-                _motionTabContentId = UI.CreateVStack(_propsTabWidget.Id, 5f);
-                
-                _physicsTabContentId = UI.CreateScrollView(_propsTabWidget.Id, 0, 0, 0, 0);
-                ulong physicsVStack = UI.CreateVStack(_physicsTabContentId, 5f);
-
-                // Rebuild property panels
-                _propertyDescriptors.Clear();
-                _propertyCallbacks.Clear();
-                _propertyInputFieldCallbacks.Clear();
-                
-                uint propCount = UI.EntityGetPropertyCount();
-                for (uint i = 0; i < propCount; i++)
-                {
-                    string name = UI.EntityGetPropertyName(i);
-                    uint type = UI.EntityGetPropertyType(i);
-                    string category = UI.EntityGetPropertyCategory(i);
-                    bool readOnly = UI.EntityGetPropertyReadOnly(i);
-                    
-                    int tabIndex = MapCategoryToTabIndex(category);
-                    ulong targetContainer;
-                    
-                    switch (tabIndex)
-                    {
-                        case 0: targetContainer = geometryVStack; break;
-                        case 1: targetContainer = positionVStack; break;
-                        case 2: targetContainer = renderVStack; break;
-                        case 3: targetContainer = _motionTabContentId; break;
-                        case 4: targetContainer = physicsVStack; break;
-                        default: targetContainer = positionVStack; break;
-                    }
-                    
-                    BuildSingleProperty(targetContainer, name, type, category, readOnly);
-                }
-                
-                BuildMotionTab(_motionTabContentId);
-                
-                UpdatePropertyScrollViewContentSize(_geometryTabContentId, geometryVStack);
-                UpdatePropertyScrollViewContentSize(_positionTabContentId, positionVStack);
-                UpdatePropertyScrollViewContentSize(_renderTabContentId, renderVStack);
-                UpdatePropertyScrollViewContentSize(_physicsTabContentId, physicsVStack);
-                
-                _propsTabWidget.AddTab("几何", _geometryTabContentId, false);
-                _propsTabWidget.AddTab("位置", _positionTabContentId, false);
-                _propsTabWidget.AddTab("渲染", _renderTabContentId, false);
-                _propsTabWidget.AddTab("运动", _motionTabContentId, false);
-                _propsTabWidget.AddTab("物理", _physicsTabContentId, false);
-                _propsTabWidget.SetOnSelect(_tabSelectCallback);
+                UI.SetWidgetVisible(_outerSplitViewId, true);
             }
             
             if (_toggleEditorBtn != null)
@@ -717,41 +669,18 @@ namespace Hezhou
             {
                 UpdatePropertiesPanel(_selectedEntityId);
             }
+            
+            // Restore preview extent after main layout is visible again
+            UpdatePreviewExtent();
         }
         
         private static void HideMainLayout()
         {
-            // Save expansion state before destroying
-            SaveTreeExpandState();
-            
-            // Remove entire SplitView structure (all children removed recursively)
+            // Simply make the outerSplitView invisible (no destroy)
             if (_outerSplitViewId != 0)
             {
-                UI.RemoveWidget(_outerSplitViewId);
-                _outerSplitViewId = 0;
+                UI.SetWidgetVisible(_outerSplitViewId, false);
             }
-            
-            // Clear all panel references
-            _leftCenterPanel = null;
-            _rightPanel = null;
-            _topPanel = null;
-            _projectPanel = null;
-            _previewPanel = null;
-            _assetPanel = null;
-            _propertiesPanel = null; // kept for backward compat, now null
-            _previewWindowId = 0;
-            _projectTreeViewId = 0;
-            _directoryTreeViewId = 0;
-            _fileItemPaths.Clear();
-            _dirItemPaths.Clear();
-            _entityNodeMap.Clear();
-            _nodeIdToName.Clear();
-            _leftCenterSplitViewId = 0;
-            _innerHorizontalSplitViewId = 0;
-            _propsTabWidget = null;
-            _assetTabWidget = null;
-            _assetModelGridViewId = 0;
-            _assetGridViewId = 0;
             
             if (_toggleEditorBtn != null)
             {
@@ -765,33 +694,18 @@ namespace Hezhou
         {
             if (_scriptEditorVisible) return;
             
-            // Remove main layout SplitView
+            // Hide main layout (make outerSplitView invisible)
             HideMainLayout();
             
-            ulong rootId = UI.GetRootId();
-            
-            float editorY = TOOLBAR_HEIGHT;
-            float editorHeight = _screenHeight - TOOLBAR_HEIGHT - STATUS_BAR_HEIGHT;
-            
-            // Script editor fills the entire main area (no SplitView)
-            _scriptEditorPanel = new Panel(rootId, 0, editorY, _screenWidth, editorHeight, 0.12f, 0.12f, 0.14f, 1.0f);
-            
-            var hotReloadBtn = new Button(_scriptEditorPanel.Id, 100f, 30f, "Hot Reload");
-            UI.SetWidgetLayout(hotReloadBtn.Id, 10f, 10f, 100f, 30f);
-            hotReloadBtn.SetOnClick(_hotReloadClickCallback);
-            
-            _scriptEditorLabel = new Label(_scriptEditorPanel.Id, 200f, 25f, "Script Editor - NewScript.cs");
-            UI.SetWidgetLayout(_scriptEditorLabel.Id, 120f, 10f, 300f, 25f);
-            
-            _scriptTextEditId = UI.CreateTextEdit(_scriptEditorPanel.Id, _screenWidth - 20f, editorHeight - 50f);
-            UI.SetTextEditShowLineNumbers(_scriptTextEditId, true);
-            UI.SetWidgetLayout(_scriptTextEditId, 10f, 50f, _screenWidth - 20f, editorHeight - 50f);
-            UI.TextEditSetText(_scriptTextEditId, "// NewScript.cs\nusing System;\nusing Hezhou;\n\npublic class NewScript\n{\n    public void Start()\n    {\n        Console.WriteLine(\"NewScript started!\");\n    }\n    \n    public void Update(float deltaTime)\n    {\n        // Update logic here\n    }\n}");
+            // Show the pre-created script editor panel
+            if (_scriptEditorPanel != null)
+            {
+                UI.SetWidgetVisible(_scriptEditorPanel.Id, true);
+            }
             
             _scriptEditorVisible = true;
             
-            // Create directory tree AFTER panel is created and _scriptEditorVisible is true
-            // so RefreshDirectoryTree can find the scriptEditorPanel as parent
+            // Refresh directory tree inside the script editor panel
             RefreshDirectoryTree();
         }
         
@@ -799,26 +713,16 @@ namespace Hezhou
         {
             if (!_scriptEditorVisible) return;
             
-            // Remove directory tree if it exists
-            if (_directoryTreeViewId != 0)
-            {
-                UI.RemoveWidget(_directoryTreeViewId);
-                _directoryTreeViewId = 0;
-            }
-            _fileItemPaths.Clear();
-            _dirItemPaths.Clear();
-            
+            // Hide the script editor panel
             if (_scriptEditorPanel != null)
             {
-                UI.RemoveWidget(_scriptEditorPanel.Id);
-                _scriptEditorPanel = null;
+                UI.SetWidgetVisible(_scriptEditorPanel.Id, false);
             }
+            
             _scriptEditorVisible = false;
             
-            if (_toggleEditorBtn != null)
-            {
-                _toggleEditorBtn.Text = "编辑器";
-            }
+            // Show main layout (make outerSplitView visible again)
+            ShowMainLayout();
         }
 
         // === Project Structure Tree UI Creation ===
@@ -831,10 +735,10 @@ namespace Hezhou
             
             _projectTreeViewId = UI.CreateTreeView(_projectPanel.Id, 10, 40, 200f, estimatedProjectHeight);
             
-            _assetsNodeId = UI.TreeViewAddNode(_projectTreeViewId, 0, "Assets", 0, true);
-            _scenesNodeId = UI.TreeViewAddNode(_projectTreeViewId, 0, "Scenes", 0, true);
-            _scriptsNodeId = UI.TreeViewAddNode(_projectTreeViewId, 0, "Scripts", 0, true);
-            _entitiesNodeId = UI.TreeViewAddNode(_projectTreeViewId, 0, "Entities", 0, true);
+            _assetsNodeId = UI.TreeViewAddNode(_projectTreeViewId, 0, "📦 Assets", 0, true);
+            _scenesNodeId = UI.TreeViewAddNode(_projectTreeViewId, 0, "🎬 Scenes", 0, true);
+            _scriptsNodeId = UI.TreeViewAddNode(_projectTreeViewId, 0, "📜 Scripts", 0, true);
+            _entitiesNodeId = UI.TreeViewAddNode(_projectTreeViewId, 0, "🧩 Entities", 0, true);
             
             _nodeIdToName[_assetsNodeId] = "Assets";
             _nodeIdToName[_scenesNodeId] = "Scenes";
@@ -843,7 +747,7 @@ namespace Hezhou
             
             foreach (var script in _availableScripts)
             {
-                ulong scriptNodeId = UI.TreeViewAddNode(_projectTreeViewId, _scriptsNodeId, script, 0, false);
+                ulong scriptNodeId = UI.TreeViewAddNode(_projectTreeViewId, _scriptsNodeId, "📝 " + script, 0, false);
                 _nodeIdToName[scriptNodeId] = script;
             }
             
@@ -854,7 +758,7 @@ namespace Hezhou
                 {
                     ulong entityId = _gameScene.GetEntityId(i);
                     string name = UI.SceneGetEntityName(_gameScene.ScenePtr, entityId);
-                    ulong nodeId = UI.TreeViewAddNode(_projectTreeViewId, _entitiesNodeId, name, entityId, false);
+                    ulong nodeId = UI.TreeViewAddNode(_projectTreeViewId, _entitiesNodeId, "🔷 " + name, entityId, false);
                     _entityNodeMap[entityId] = nodeId;
                     _nodeIdToName[nodeId] = name;
                 }
@@ -935,9 +839,9 @@ namespace Hezhou
             // Determine parent panel: use scriptEditorPanel when in script editor mode,
             // otherwise use projectPanel (main interface)
             ulong parentPanelId = 0;
-            if (_scriptEditorVisible && _scriptEditorPanel != null)
+            if (_scriptEditorVisible && _scriptEditorTreePanel != null)
             {
-                parentPanelId = _scriptEditorPanel.Id;
+                parentPanelId = _scriptEditorTreePanel.Id;  // TreeView goes into the SplitView's left pane
             }
             else if (_projectPanel != null)
             {
@@ -956,13 +860,16 @@ namespace Hezhou
             _dirItemPaths.Clear();
             
             float mainHeight = _screenHeight - TOOLBAR_HEIGHT - STATUS_BAR_HEIGHT;
-            _directoryTreeViewId = UI.CreateTreeView(parentPanelId, 10, 40, 200f, mainHeight - 50);
+            // In script editor mode, TreeView is inside treePanel (SplitView handles sizing)
+            // In main interface mode, TreeView has explicit size
+            float treeHeight = _scriptEditorVisible ? mainHeight - 40f : mainHeight - 50f;
+            _directoryTreeViewId = UI.CreateTreeView(parentPanelId, 10, 10, 200f, treeHeight);
             
-            _directoryRootNodeId = UI.TreeViewAddNode(_directoryTreeViewId, 0, "[D] " + _currentDirectory, 0, true);
+            _directoryRootNodeId = UI.TreeViewAddNode(_directoryTreeViewId, 0, "📁 " + _currentDirectory, 0, true);
             
             if (_currentDirectory != "scripts" && Directory.GetParent(_currentDirectory) != null)
             {
-                _directoryBackNodeId = UI.TreeViewAddNode(_directoryTreeViewId, _directoryRootNodeId, ".. 返回上级", 0, false);
+                _directoryBackNodeId = UI.TreeViewAddNode(_directoryTreeViewId, _directoryRootNodeId, "⬆️ 返回上级", 0, false);
                 _dirItemPaths[_directoryBackNodeId] = Directory.GetParent(_currentDirectory).FullName;
             }
             
@@ -979,6 +886,7 @@ namespace Hezhou
             }
             
             UI.TreeViewSetOnSelect(_directoryTreeViewId, _treeNodeSelectCallback);
+            UI.TreeViewSetOnToggle(_directoryTreeViewId, _treeNodeToggleCallback);
             UI.TreeViewExpandNode(_directoryTreeViewId, _directoryRootNodeId);
         }
         
@@ -990,7 +898,7 @@ namespace Hezhou
                 foreach (string dir in dirs)
                 {
                     string name = Path.GetFileName(dir);
-                    ulong nodeId = UI.TreeViewAddNode(treeViewId, parentNodeId, "[D] " + name, 0, true);
+                    ulong nodeId = UI.TreeViewAddNode(treeViewId, parentNodeId, "📁 " + name, 0, true);
                     _dirItemPaths[nodeId] = dir;
                     
                     AddDirectoryItems(treeViewId, nodeId, dir);
@@ -1002,7 +910,7 @@ namespace Hezhou
                     if (file.EndsWith(".cs") || file.EndsWith(".txt") || file.EndsWith(".json"))
                     {
                         string name = Path.GetFileName(file);
-                        ulong nodeId = UI.TreeViewAddNode(treeViewId, parentNodeId, "[F] " + name, 0, false);
+                        ulong nodeId = UI.TreeViewAddNode(treeViewId, parentNodeId, "📄 " + name, 0, false);
                         _fileItemPaths[nodeId] = file;
                     }
                 }

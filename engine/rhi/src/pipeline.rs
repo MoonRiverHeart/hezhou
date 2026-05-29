@@ -1,11 +1,28 @@
 use crate::ShaderHandle;
 use hezhou_geometry::{PrimitiveTopology, VertexLayout};
 
+/// 管线类型：图形管线或计算管线
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PipelineType {
+    Graphics,
+    Compute,
+}
+
+impl Default for PipelineType {
+    fn default() -> Self {
+        Self::Graphics
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct PipelineDesc {
     pub vertex_shader: ShaderHandle,
     pub fragment_shader: Option<ShaderHandle>,
     pub geometry_shader: Option<ShaderHandle>,
+    /// 计算着色器，仅 PipelineType::Compute 时使用
+    pub compute_shader: Option<ShaderHandle>,
+    /// 管线类型：Graphics 或 Compute
+    pub pipeline_type: PipelineType,
     pub vertex_layout: VertexLayout,
     pub primitive_topology: PrimitiveTopology,
     pub rasterization: RasterizationState,
@@ -15,11 +32,31 @@ pub struct PipelineDesc {
 }
 
 impl PipelineDesc {
+    /// 创建图形管线描述，必须指定顶点着色器
     pub fn new(vertex_shader: ShaderHandle) -> Self {
         Self {
             vertex_shader,
             fragment_shader: None,
             geometry_shader: None,
+            compute_shader: None,
+            pipeline_type: PipelineType::Graphics,
+            vertex_layout: VertexLayout::default(),
+            primitive_topology: PrimitiveTopology::TriangleList,
+            rasterization: RasterizationState::default(),
+            depth_stencil: DepthStencilState::default(),
+            blend: BlendState::default(),
+            layout: PipelineLayout::default(),
+        }
+    }
+
+    /// 创建计算管线描述，必须指定计算着色器
+    pub fn compute(compute_shader: ShaderHandle) -> Self {
+        Self {
+            vertex_shader: ShaderHandle::null(),
+            fragment_shader: None,
+            geometry_shader: None,
+            compute_shader: Some(compute_shader),
+            pipeline_type: PipelineType::Compute,
             vertex_layout: VertexLayout::default(),
             primitive_topology: PrimitiveTopology::TriangleList,
             rasterization: RasterizationState::default(),

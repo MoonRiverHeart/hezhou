@@ -67,6 +67,16 @@ namespace Hezhou
         {
             return UI.AssetLibraryCreateMeshEntity(scene, meshType);
         }
+        
+        public static ulong LoadTexture(string path)
+        {
+            return UI.AssetLibraryLoadTexture(path);
+        }
+        
+        public static ulong LoadMesh(string path)
+        {
+            return UI.AssetLibraryLoadMesh(path);
+        }
     }
     
     public static class Project
@@ -231,6 +241,26 @@ namespace Hezhou
             }
             var func = Marshal.GetDelegateForFunctionPointer<AssetLibraryCreateMeshEntityDelegate>(_ffi.asset_library_create_mesh_entity);
             return func(scene, (uint)meshType);
+        }
+
+        public static ulong AssetLibraryLoadTexture(string path)
+        {
+            if (_ffi.asset_library_load_texture == IntPtr.Zero)
+            {
+                return 0;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<AssetLibraryLoadTextureDelegate>(_ffi.asset_library_load_texture);
+            return func(path);
+        }
+
+        public static ulong AssetLibraryLoadMesh(string path)
+        {
+            if (_ffi.asset_library_load_mesh == IntPtr.Zero)
+            {
+                return 0;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<AssetLibraryLoadMeshDelegate>(_ffi.asset_library_load_mesh);
+            return func(path);
         }
 
         public static bool ProjectCreateNew(string name, string path)

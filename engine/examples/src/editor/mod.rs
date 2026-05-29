@@ -2,6 +2,7 @@ use hezhou_rhi_vulkan::UIVulkanRenderer;
 use hezhou_scripting::{MonoUIExecutor, ffi_context::{FfiContext, WidgetTreeHandle, EventDispatcherHandle, SetStatusTextFn, OnHotReloadCompleteFn}};
 use hezhou_ui::ffi as ui_ffi;
 use hezhou_dfx::*;
+use chrono::Local;
 use std::time::{Duration, Instant};
 use std::sync::atomic::{AtomicBool, Ordering};
 
@@ -10,12 +11,16 @@ pub mod ffi_impl;
 pub mod scene_ffi_impl;
 pub mod hot_reload;
 pub mod dfx_init;
+#[cfg(feature = "mcp")]
+pub mod mcp_init;
 
 static mut EXECUTOR: Option<MonoUIExecutor> = None;
 pub(crate) static HOT_RELOAD_REQUESTED: AtomicBool = AtomicBool::new(false);
 static mut RENDERER: Option<*mut UIVulkanRenderer> = None;
 pub(crate) static mut SCENE: Option<*mut hezhou_core::Scene> = None;
 pub(crate) static mut FFI_PTR: Option<*const FfiContext> = None;
+#[cfg(feature = "mcp")]
+pub(crate) static mut MCP_STARTED: bool = false;
 pub(crate) static mut STATUS_TEXT_CALLBACK: Option<SetStatusTextFn> = None;
 pub(crate) static mut HOT_RELOAD_COMPLETE_CALLBACK: Option<OnHotReloadCompleteFn> = None;
 
@@ -66,6 +71,9 @@ pub fn run() {
     let content_scale = renderer.get_content_scale();
     ui_ffi::ui_set_content_scale(content_scale);
     dfx_trace_end!("UI", "setup");
+    
+    // 启用管线系统 — 使编辑器走pipeline路径而非legacy路径
+    renderer.enable_pipeline_system();
 
     dfx_trace_begin!("Script", "compile");
     hot_reload::compile_editor_script();
@@ -234,6 +242,7 @@ ui_tree_view_set_on_select_thunk_ptr: unsafe { std::mem::transmute(ui_ffi::ui_tr
         scene_destroy: scene_ffi_impl::scene_destroy_editor,
         scene_create_cube: scene_ffi_impl::scene_create_cube_editor,
             scene_create_plane: scene_ffi_impl::scene_create_plane_editor,
+            scene_create_cornell_box: scene_ffi_impl::scene_create_cornell_box_editor,
             scene_create_directional_light: scene_ffi_impl::scene_create_directional_light_editor,
         scene_attach_script: scene_ffi_impl::scene_attach_script_editor,
         scene_set_game_state: scene_ffi_impl::scene_set_game_state_editor,
@@ -296,8 +305,9 @@ ui_tree_view_set_on_select_thunk_ptr: unsafe { std::mem::transmute(ui_ffi::ui_tr
         event_dispatcher_ptr: event_dispatcher_handle as *mut std::ffi::c_void,
         ui_simulate_click_at: unsafe { std::mem::transmute(ui_ffi::ui_simulate_click_at as *const std::ffi::c_void) },
         ui_widget_get_type: unsafe { std::mem::transmute(ui_ffi::ui_widget_get_type as *const std::ffi::c_void) },
-        ui_widget_get_layout: unsafe { std::mem::transmute(ui_ffi::ui_widget_get_layout as *const std::ffi::c_void) },
-        ui_widget_get_parent: unsafe { std::mem::transmute(ui_ffi::ui_widget_get_parent as *const std::ffi::c_void) },
+ui_widget_get_layout: unsafe { std::mem::transmute(ui_ffi::ui_widget_get_layout as *const std::ffi::c_void) },
+            ui_widget_get_absolute_layout: unsafe { std::mem::transmute(ui_ffi::ui_widget_get_absolute_layout as *const std::ffi::c_void) },
+            ui_widget_get_parent: unsafe { std::mem::transmute(ui_ffi::ui_widget_get_parent as *const std::ffi::c_void) },
         ui_widget_get_child_count: unsafe { std::mem::transmute(ui_ffi::ui_widget_get_child_count as *const std::ffi::c_void) },
         ui_widget_get_child_id: unsafe { std::mem::transmute(ui_ffi::ui_widget_get_child_id as *const std::ffi::c_void) },
         ui_widget_get_total_count: unsafe { std::mem::transmute(ui_ffi::ui_widget_get_total_count as *const std::ffi::c_void) },
@@ -309,6 +319,8 @@ ui_tree_view_set_on_select_thunk_ptr: unsafe { std::mem::transmute(ui_ffi::ui_tr
         asset_library_get_asset_info: hezhou_core::asset_library_get_asset_info,
         asset_library_create_entity_from_template: unsafe { std::mem::transmute(hezhou_core::asset_library_create_entity_from_template as *const std::ffi::c_void) },
         asset_library_create_mesh_entity: scene_ffi_impl::asset_library_create_mesh_entity_editor,
+        asset_library_load_texture: hezhou_core::asset_library_load_texture,
+        asset_library_load_mesh: hezhou_core::asset_library_load_mesh,
         project_create_new: hezhou_core::project_create_new,
         project_load: hezhou_core::project_load,
         project_save: hezhou_core::project_save,
@@ -323,6 +335,10 @@ ui_tree_view_set_on_select_thunk_ptr: unsafe { std::mem::transmute(ui_ffi::ui_tr
         project_get_entity_info: hezhou_core::project_get_entity_info,
         project_add_entity: hezhou_core::project_add_entity,
         project_remove_entity: hezhou_core::project_remove_entity,
+        ui_set_widget_visible: unsafe { std::mem::transmute(ffi_impl::set_widget_visible as *const std::ffi::c_void) },
+        get_pipeline_names: unsafe { std::mem::transmute(ffi_impl::get_pipeline_names as *const std::ffi::c_void) },
+        switch_pipeline: unsafe { std::mem::transmute(ffi_impl::switch_pipeline as *const std::ffi::c_void) },
+        get_active_pipeline_name: unsafe { std::mem::transmute(ffi_impl::get_active_pipeline_name as *const std::ffi::c_void) },
     };
     hezhou_scripting::ffi_context::set_ffi_context(ffi_ctx);
     let ffi_ptr = hezhou_scripting::ffi_context::get_ffi_context_ptr();
@@ -348,12 +364,7 @@ ui_tree_view_set_on_select_thunk_ptr: unsafe { std::mem::transmute(ui_ffi::ui_tr
     dfx_trace_end!("Mono", "initialize");
     dfx_trace_end!("Startup", "editor");
     
-    // Connect Scene to renderer for multi-entity rendering
-    unsafe {
-        if let Some(scene_ptr) = SCENE {
-            renderer.set_scene(scene_ptr);
-        }
-    }
+    // Scene will be created by C# when user clicks dialog button
 
     let screenshot_path = if screenshot_mode {
         args.iter().position(|a| a == "--output")
@@ -388,7 +399,7 @@ ui_tree_view_set_on_select_thunk_ptr: unsafe { std::mem::transmute(ui_ffi::ui_tr
         dfx_trace_begin!("Frame", "render");
         dfx.lock().get_perf_monitor().lock().begin_frame();
         
-        dfx_trace_begin!("ProcessEvents", "ui");
+dfx_trace_begin!("ProcessEvents", "ui");
         renderer.process_events();
         dfx_trace_end!("ProcessEvents", "ui");
         
@@ -448,6 +459,14 @@ ui_tree_view_set_on_select_thunk_ptr: unsafe { std::mem::transmute(ui_ffi::ui_tr
         }
 
         dfx_trace_begin!("DrawFrame", "render");
+        // MCP server启动: 检测Scene从None→Some时启动
+        #[cfg(feature = "mcp")]
+        {
+            if !unsafe { MCP_STARTED } && unsafe { SCENE.is_some() } && unsafe { FFI_PTR.is_some() } {
+                unsafe { MCP_STARTED = true; }
+                mcp_init::start_mcp_server();
+            }
+        }
         match renderer.draw_frame() {
             Ok(running) => {
                 dfx_trace_end!("DrawFrame", "render");
@@ -483,6 +502,19 @@ ui_tree_view_set_on_select_thunk_ptr: unsafe { std::mem::transmute(ui_ffi::ui_tr
                 dfx.lock().get_perf_monitor().lock().end_frame();
                 dfx_error!("Demo", "{}", e);
                 break;
+            }
+        }
+        
+        // P键截图：在draw_frame后调用，确保offscreen_image已渲染完成且layout正确
+        if renderer.is_p_pressed() {
+            renderer.consume_p_press();
+            std::fs::create_dir_all("screenshots").ok();
+            let screenshot_path = format!("screenshots/preview_{}.png", chrono::Local::now().format("%Y%m%d_%H%M%S"));
+            dfx_info!("Screenshot", "Taking preview screenshot to {}...", screenshot_path);
+            if let Err(e) = renderer.capture_preview_screenshot(&screenshot_path) {
+                dfx_error!("Screenshot", "Failed: {}", e);
+            } else {
+                dfx_info!("Screenshot", "Saved: {}", screenshot_path);
             }
         }
         

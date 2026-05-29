@@ -5,6 +5,9 @@ pub type AssetLibraryGetCategoryNameFn = extern "C" fn(usize, *mut c_char, usize
 pub type AssetLibraryGetAssetCountFn = extern "C" fn(usize) -> usize;
 pub type AssetLibraryGetAssetInfoFn = extern "C" fn(usize, usize, *mut u64, *mut c_char, usize, *mut u32, *mut c_char, usize) -> bool;
 pub type AssetLibraryCreateEntityFromTemplateFn = extern "C" fn(*mut c_void, u64) -> u64;
+pub type AssetLibraryCreateMeshEntityFn = extern "C" fn(*mut c_void, u32) -> u64;
+pub type AssetLibraryLoadTextureFn = extern "C" fn(*const c_char) -> u64;
+pub type AssetLibraryLoadMeshFn = extern "C" fn(*const c_char) -> u64;
 
 pub type ProjectCreateNewFn = extern "C" fn(*const c_char, *const c_char) -> bool;
 pub type ProjectLoadFn = extern "C" fn(*const c_char) -> bool;

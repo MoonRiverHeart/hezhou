@@ -16,6 +16,8 @@ pub struct InputField {
     state: WidgetState,
     text: String,
     placeholder: String,
+    /// all_text = text + placeholder，确保所有可能显示的字符都被预光栅化
+    all_text: String,
     cursor_position: usize,
     selection_start: usize,
     selection_end: usize,
@@ -39,6 +41,7 @@ impl InputField {
             state: WidgetState::Normal,
             text: String::new(),
             placeholder: String::new(),
+            all_text: String::new(),
             cursor_position: 0,
             selection_start: 0,
             selection_end: 0,
@@ -48,6 +51,10 @@ impl InputField {
             content_scale: 1.0,
             flags: crate::widget::WidgetFlags::default(),
         }
+    }
+
+    fn rebuild_all_text(&mut self) {
+        self.all_text = format!("{}{}", self.text, self.placeholder);
     }
     
     pub fn clear_selection(&mut self) {
@@ -96,12 +103,14 @@ impl InputField {
     
     pub fn with_placeholder(mut self, placeholder: &str) -> Self {
         self.placeholder = placeholder.to_string();
+        self.rebuild_all_text();
         self
     }
     
     pub fn set_text(&mut self, text: &str) {
         self.text = text.to_string();
         self.cursor_position = self.text.len();
+        self.rebuild_all_text();
         self.flags.dirty_render = true;
     }
     
@@ -111,6 +120,7 @@ impl InputField {
     
     pub fn set_placeholder(&mut self, placeholder: &str) {
         self.placeholder = placeholder.to_string();
+        self.rebuild_all_text();
         self.flags.dirty_render = true;
     }
     
@@ -147,6 +157,7 @@ impl InputField {
         let byte_pos = self.cursor_byte_position();
         self.text.insert(byte_pos, c);
         self.cursor_position += 1;
+        self.rebuild_all_text();
         self.trigger_on_change();
         self.flags.dirty_render = true;
     }
@@ -156,6 +167,7 @@ impl InputField {
             self.cursor_position -= 1;
             let byte_pos = self.cursor_byte_position();
             self.text.remove(byte_pos);
+            self.rebuild_all_text();
             self.trigger_on_change();
             self.flags.dirty_render = true;
         }
@@ -189,6 +201,7 @@ impl InputField {
             self.text.replace_range(start_byte..end_byte, "");
             self.cursor_position = start;
             self.clear_selection();
+            self.rebuild_all_text();
             self.trigger_on_change();
             self.flags.dirty_render = true;
         }
@@ -274,7 +287,7 @@ impl Widget for InputField {
     }
 
     fn get_text(&self) -> Option<&str> {
-        Some(&self.text)
+        Some(&self.all_text)
     }
     
     fn draw(&mut self, canvas: &mut Canvas) {

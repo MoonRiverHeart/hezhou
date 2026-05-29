@@ -117,7 +117,11 @@ namespace Hezhou
 
         // === Script Editor State ===
         private static Panel _scriptEditorPanel;
+        private static ulong _scriptEditorSplitViewId;      // Horizontal SplitView: TreePanel | EditPanel
+        private static Panel _scriptEditorTreePanel;        // Left pane: directory tree
+        private static Panel _scriptEditorEditPanel;        // Right pane: TextEdit + toolbar
         private static ulong _scriptTextEditId;
+        private static ulong _scriptEditorHotReloadBtnId;
         private static Label _scriptEditorLabel;
         private static bool _scriptEditorVisible = false;
         private static Button _toggleEditorBtn;
@@ -205,10 +209,18 @@ namespace Hezhou
         private static UI.OnHotReloadCompleteDelegate _hotReloadCompleteCallback;
         private static UI.TabSelectCallbackDelegate _tabSelectCallback;
 
+        // === Pipeline State ===
+        private static ulong _pipelineDropdownId;          // 管线选择Dropdown widget ID
+        private static string _currentPipeline = "raster"; // 当前管线名
+        private static string[] _pipelineNames = new string[] { "raster", "ray_tracing" }; // 可用管线列表
+        private static ulong _pipelineInfoLabelId;         // 管线信息Label widget ID
+        private static UI.DropdownSelectCallbackDelegate _pipelineDropdownSelectCallback;
+
         // === SplitView Ratio Change Callbacks (static fields to prevent GC) ===
         private static UI.SplitViewRatioChangeCallbackDelegate _outerSplitViewRatioCallback;
         private static UI.SplitViewRatioChangeCallbackDelegate _leftCenterSplitViewRatioCallback;
         private static UI.SplitViewRatioChangeCallbackDelegate _innerHorizontalSplitViewRatioCallback;
+        private static UI.SplitViewRatioChangeCallbackDelegate _scriptEditorSplitViewRatioCallback;
 
         // === Tree Toggle Callback ===
         private static UI.TreeNodeToggleCallbackDelegate _treeNodeToggleCallback;

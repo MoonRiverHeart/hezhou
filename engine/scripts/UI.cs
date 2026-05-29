@@ -191,7 +191,7 @@ namespace Hezhou
         public delegate ulong CreateDropdownDelegate(IntPtr handle, ulong parentId, float width, float height);
         
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-        public delegate void DropdownSetOptionsDelegate(IntPtr handle, ulong widgetId, string options, ulong count);
+        public delegate void DropdownSetOptionsDelegate(IntPtr handle, ulong widgetId, IntPtr options, ulong count);
         
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public delegate void DropdownSetSelectedDelegate(IntPtr handle, ulong widgetId, ulong index);
@@ -204,6 +204,16 @@ namespace Hezhou
         
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public delegate void DropdownSelectCallbackDelegate(ulong widgetId, ulong index);
+
+        // Pipeline FFI delegates
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate ulong GetPipelineNamesDelegate(IntPtr handle, IntPtr buffer, ulong bufferSize);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate int SwitchPipelineDelegate(IntPtr handle, string pipelineName);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate ulong GetActivePipelineNameDelegate(IntPtr handle, IntPtr buffer, ulong bufferSize);
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public delegate ulong CreateInputFieldDelegate(IntPtr handle, ulong parentId, float width, float height);
@@ -543,6 +553,9 @@ namespace Hezhou
         public delegate ulong SceneCreatePlaneDelegate(IntPtr scene);
         
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate ulong SceneCreateCornellBoxDelegate(IntPtr scene);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public delegate ulong SceneCreateDirectionalLightDelegate(IntPtr scene);
         
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
@@ -699,6 +712,12 @@ namespace Hezhou
         public delegate ulong AssetLibraryCreateMeshEntityDelegate(IntPtr scene, uint meshType);
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate ulong AssetLibraryLoadTextureDelegate([MarshalAs(UnmanagedType.LPStr)] string path);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate ulong AssetLibraryLoadMeshDelegate([MarshalAs(UnmanagedType.LPStr)] string path);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public delegate bool ProjectCreateNewDelegate([MarshalAs(UnmanagedType.LPStr)] string name, [MarshalAs(UnmanagedType.LPStr)] string path);
         
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
@@ -743,6 +762,9 @@ namespace Hezhou
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public delegate bool ProjectRemoveEntityDelegate(ulong entityId);
 
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void SetWidgetVisibleDelegate(IntPtr handle, ulong widgetId, bool visible);
+
         // Automated UI Testing delegates
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public delegate ulong SimulateClickAtDelegate(IntPtr widgetTree, IntPtr eventDispatcher, float x, float y);
@@ -752,6 +774,8 @@ namespace Hezhou
         
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public delegate uint WidgetGetLayoutDelegate(IntPtr handle, ulong widgetId, IntPtr outLayout);
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate uint WidgetGetAbsoluteLayoutDelegate(IntPtr handle, ulong widgetId, IntPtr outLayout);
         
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public delegate ulong WidgetGetParentDelegate(IntPtr handle, ulong widgetId);
@@ -953,6 +977,7 @@ namespace Hezhou
             public IntPtr scene_destroy;
             public IntPtr scene_create_cube;
             public IntPtr scene_create_plane;
+            public IntPtr scene_create_cornell_box;
             public IntPtr scene_create_directional_light;
             public IntPtr scene_attach_script;
             public IntPtr scene_set_game_state;
@@ -994,10 +1019,10 @@ namespace Hezhou
             public IntPtr ui_entity_get_property_read_only;
             public IntPtr ui_entity_get_property_value_float3;
             public IntPtr ui_entity_set_property_value_float3;
-            public IntPtr ui_entity_get_property_value_float;
-            public IntPtr ui_entity_set_property_value_float;
             public IntPtr ui_entity_get_property_value_string;
             public IntPtr ui_entity_set_property_value_string;
+            public IntPtr ui_entity_get_property_value_float;
+            public IntPtr ui_entity_set_property_value_float;
             public IntPtr widget_tree_ptr;
             public IntPtr dfx_handle;
             public IntPtr dfx_log;
@@ -1016,6 +1041,7 @@ namespace Hezhou
             public IntPtr ui_simulate_click_at;
             public IntPtr ui_widget_get_type;
             public IntPtr ui_widget_get_layout;
+            public IntPtr ui_widget_get_absolute_layout;
             public IntPtr ui_widget_get_parent;
             public IntPtr ui_widget_get_child_count;
             public IntPtr ui_widget_get_child_id;
@@ -1028,6 +1054,8 @@ namespace Hezhou
             public IntPtr asset_library_get_asset_info;
             public IntPtr asset_library_create_entity_from_template;
             public IntPtr asset_library_create_mesh_entity;
+            public IntPtr asset_library_load_texture;
+            public IntPtr asset_library_load_mesh;
             public IntPtr project_create_new;
             public IntPtr project_load;
             public IntPtr project_save;
@@ -1042,6 +1070,11 @@ namespace Hezhou
             public IntPtr project_get_entity_info;
             public IntPtr project_add_entity;
             public IntPtr project_remove_entity;
+            public IntPtr ui_set_widget_visible;
+            // Pipeline FFI
+            public IntPtr get_pipeline_names;
+            public IntPtr switch_pipeline;
+            public IntPtr get_active_pipeline_name;
         }
 
         public static void InitFromContext(IntPtr contextPtr)

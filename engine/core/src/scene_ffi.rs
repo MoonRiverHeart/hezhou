@@ -51,6 +51,17 @@ pub extern "C" fn scene_create_plane(scene: *mut Scene) -> u64 {
 }
 
 #[no_mangle]
+pub extern "C" fn scene_create_cornell_box(scene: *mut Scene) -> u64 {
+    if scene.is_null() {
+        return 0;
+    }
+    unsafe {
+        let entity = (*scene).create_cornell_box();
+        entity.id
+    }
+}
+
+#[no_mangle]
 pub extern "C" fn scene_create_directional_light(scene: *mut Scene) -> u64 {
     if scene.is_null() {
         return 0;

@@ -6,6 +6,7 @@ use crate::math::{Vec3, Quaternion};
 pub struct RenderableComponent {
     pub mesh_path: String,
     pub material_path: Option<String>,
+    pub texture_path: Option<String>,   // 纹理文件路径（PNG/JPEG），None=无纹理
     pub visible: bool,
     pub cast_shadow: bool,
     pub receive_shadow: bool,
@@ -21,6 +22,7 @@ impl Default for RenderableComponent {
         Self {
             mesh_path: String::new(),
             material_path: None,
+            texture_path: None,
             visible: true,
             cast_shadow: true,
             receive_shadow: true,

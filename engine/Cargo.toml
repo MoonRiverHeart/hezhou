@@ -12,6 +12,8 @@ members = [
     "rhi-vulkan",
     "physics",
     "ui",
+    "mcp",
+    "render-pipeline",
 ]
 
 [workspace.package]

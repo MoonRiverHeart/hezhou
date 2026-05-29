@@ -657,3 +657,26 @@ pub extern "C" fn ui_widget_set_cross_axis_fill(
         }
     }
 }
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_set_widget_visible(
+    handle: WidgetTreeHandle,
+    widget_id: u64,
+    visible: bool,
+) {
+    if handle.is_null() {
+        return;
+    }
+    unsafe {
+        let arc = &*(handle as *const Arc<Mutex<WidgetTree>>);
+        let mut tree = arc.lock();
+        let id = WidgetId::from_raw(widget_id);
+        if let Some(widget) = tree.get_widget_mut(id) {
+            let mut flags = widget.flags();
+            flags.visible = visible;
+            flags.dirty_render = true;
+            flags.dirty_layout = true;
+            widget.set_flags(flags);
+        }
+    }
+}

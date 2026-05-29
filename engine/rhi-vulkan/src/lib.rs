@@ -3,6 +3,7 @@ pub mod context;
 pub mod swapchain;
 pub mod pipeline;
 pub mod buffer;
+pub mod command_buffer;
 pub mod demo;
 pub mod triangle_demo;
 pub mod renderer;
@@ -10,6 +11,7 @@ pub mod rotation_renderer;
 pub mod ui_renderer;
 pub mod ui_vulkan_renderer;
 pub mod primitive_meshes;
+pub mod mesh_loader;
 
 #[cfg(feature = "mono")]
 pub mod mono_rotation_renderer;
@@ -21,6 +23,5 @@ pub use renderer::VulkanRenderer;
 pub use rotation_renderer::RotationRenderer;
 pub use ui_renderer::VulkanUIRenderer;
 pub use ui_vulkan_renderer::UIVulkanRenderer;
-
-#[cfg(feature = "mono")]
-pub use mono_rotation_renderer::MonoRotationRenderer;
+pub use command_buffer::VulkanCommandBuffer;
+pub use pipeline::VulkanComputePipeline;

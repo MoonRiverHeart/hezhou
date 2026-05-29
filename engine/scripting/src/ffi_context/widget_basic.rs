@@ -18,3 +18,4 @@ pub type CreateListItemFn = extern "C" fn(WidgetTreeHandle, *const c_char) -> u6
 pub type CreateListItemInParentFn = extern "C" fn(WidgetTreeHandle, u64, *const c_char, u32) -> u64;
 pub type ListItemSetTextFn = extern "C" fn(WidgetTreeHandle, u64, *const c_char);
 pub type ListItemSetFontSizeFn = extern "C" fn(WidgetTreeHandle, u64, f32);
+pub type SetWidgetVisibleFn = extern "C" fn(WidgetTreeHandle, u64, bool);

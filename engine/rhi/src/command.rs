@@ -74,6 +74,9 @@ pub trait CommandBuffer {
         dst_offset: Vec3u,
         extent: Vec3u,
     );
+
+    /// 计算着色器 dispatch：执行 (group_count_x × group_count_y × group_count_z) 个工作组
+    fn dispatch(&mut self, group_count_x: u32, group_count_y: u32, group_count_z: u32);
 }
 
 #[derive(Clone, Copy, Debug)]

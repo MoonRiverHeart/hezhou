@@ -351,6 +351,8 @@ impl Project {
             "Plane" => "builtin://plane",
             "Cylinder" => "builtin://cylinder",
             "Cone" => "builtin://cone",
+            "Bunny" => "builtin://bunny",
+            "CornellBox" => "builtin://cornell_box",
             _ => mesh_type,
         }.to_string()
     }
@@ -362,6 +364,8 @@ impl Project {
             "builtin://plane" => "Plane",
             "builtin://cylinder" => "Cylinder",
             "builtin://cone" => "Cone",
+            "builtin://bunny" => "Bunny",
+            "builtin://cornell_box" => "CornellBox",
             _ => path,
         }.to_string()
     }

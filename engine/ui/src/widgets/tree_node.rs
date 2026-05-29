@@ -411,16 +411,10 @@ impl Widget for TreeNode {
                 return EventResult::Handled;
             }
 
-            EventType::MouseLeave => {
+EventType::MouseLeave => {
                 self.set_state(WidgetState::Normal);
+                self.flags.dirty_render = true;
                 return EventResult::Handled;
-            }
-
-            EventType::RightClick => {
-                if let EventData::Mouse(mouse) = &event.data {
-                    self.right_click(mouse.x, mouse.y);
-                    return EventResult::Handled;
-                }
             }
 
             _ => {}

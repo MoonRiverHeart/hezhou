@@ -73,6 +73,7 @@ impl FileBrowser {
         self.all_text.clear();
         self.all_text.push_str(&self.current_path);
         self.all_text.push('↑');
+        self.all_text.push_str("📁📄"); // 目录和文件图标emoji
         for item in &self.items {
             self.all_text.push_str(&item.name);
         }

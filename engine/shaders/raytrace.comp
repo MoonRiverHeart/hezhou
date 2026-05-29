@@ -1,0 +1,508 @@
+// raytrace.comp — ray tracing compute shader
+// BVH栈遍历 + ray-AABB intersection + Möller-Trumbore ray-triangle intersection
+// 简单漫反射光照计算，输出到storage image (rgba8)
+//
+// Push constant布局 (40 bytes, std430):
+//   offset 0:  camera_pos (vec3, 12 bytes)
+//   offset 12: camera_yaw (float, 4 bytes)
+//   offset 16: camera_pitch (float, 4 bytes)
+//   offset 20: _pad1 (float, 4 bytes)
+//   offset 24: viewport_size (vec2, 8 bytes)
+//   offset 32: fov (float, 4 bytes)
+//   offset 36: _pad2 (float, 4 bytes)
+//   总计: 40 bytes
+//
+// Descriptor bindings:
+//   set=0, binding=0: SSBO BvhNode[] (std430, 32 bytes each)
+//   set=0, binding=1: SSBO vec4[] vertices (position.xyz + pad)
+//   set=0, binding=2: SSBO uint[] indices
+//   set=0, binding=3: SSBO vec4[] light_data (2 vec4s: dir+pad, color+intensity)
+//   set=2, binding=0: storage image rgba8 (output)
+
+#version 450
+
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+
+// === Push constants (40 bytes, std430) ===
+layout(push_constant) uniform PushConstants {
+    vec3 camera_pos;    // offset 0, 12 bytes
+    float camera_yaw;   // offset 12, 4 bytes
+    float camera_pitch; // offset 16, 4 bytes
+    float _pad1;        // offset 20, 4 bytes
+    vec2 viewport_size; // offset 24, 8 bytes
+    float fov;          // offset 32, 4 bytes
+    float _pad2;        // offset 36, 4 bytes
+} pc;
+
+// === BvhNode (32 bytes, std430) ===
+struct BvhNode {
+    vec3 boundsMin;   // offset 0, 12 bytes
+    uint leftChild;   // offset 12, 4 bytes — LEAF_MARKER=0xFFFFFFFF表示叶子节点
+    vec3 boundsMax;   // offset 16, 12 bytes
+    uint rightChild;  // offset 28, 4 bytes — 叶子节点时存储三角形起始索引
+};
+
+// === Descriptor set 0: 场景数据 ===
+layout(std430, set = 0, binding = 0) readonly buffer BvhNodes {
+    BvhNode nodes[];
+} bvh;
+
+layout(std430, set = 0, binding = 1) readonly buffer Vertices {
+    vec4 verts[];      // position.xyz + pad
+} vertex_buf;
+
+layout(std430, set = 0, binding = 2) readonly buffer Indices {
+    uint indices[];
+} index_buf;
+
+layout(std430, set = 0, binding = 3) readonly buffer LightData {
+    vec4 light_entries[];  // [0]: dir.xyz + pad, [1]: color.xyz + intensity
+} light_buf;
+
+layout(std430, set = 0, binding = 4) readonly buffer Colors {
+    vec4 colors[];  // per-vertex RGBA, alpha>1.5=emissive
+} color_buf;
+
+// === Descriptor set 2: 输出图像 ===
+layout(set = 2, binding = 0, rgba8) writeonly uniform image2D output_image;
+
+// === 常量 ===
+const uint LEAF_MARKER = 0xFFFFFFFFu;
+const uint BVH_STACK_SIZE = 32;
+const float EPSILON = 1e-6;
+const float INF = 1e30;
+
+// === ray-AABB intersection (slab method) ===
+bool intersect_aabb(vec3 ray_origin, vec3 ray_dir, vec3 bounds_min, vec3 bounds_max) {
+    float t_min = 0.0;
+    float t_max = INF;
+
+    for (int i = 0; i < 3; i++) {
+        if (abs(ray_dir[i]) < EPSILON) {
+            // ray平行于此轴 — 如果origin不在slab内则无交点
+            if (ray_origin[i] < bounds_min[i] || ray_origin[i] > bounds_max[i]) {
+                return false;
+            }
+        } else {
+            float inv_d = 1.0 / ray_dir[i];
+            float t1 = (bounds_min[i] - ray_origin[i]) * inv_d;
+            float t2 = (bounds_max[i] - ray_origin[i]) * inv_d;
+            if (inv_d < 0.0) {
+                // ray方向为负，交换t1/t2
+                float tmp = t1;
+                t1 = t2;
+                t2 = tmp;
+            }
+            t_min = max(t_min, t1);
+            t_max = min(t_max, t2);
+            if (t_min > t_max) return false;
+        }
+    }
+    return t_max >= 0.0;
+}
+
+// === Hit信息结构体 ===
+struct HitInfo {
+    float t;       // 交点距离
+    float u, v;    // barycentric坐标
+};
+
+HitInfo intersect_triangle_bary(vec3 ray_origin, vec3 ray_dir,
+                                  vec3 v0, vec3 v1, vec3 v2) {
+    vec3 edge1 = v1 - v0;
+    vec3 edge2 = v2 - v0;
+    vec3 h = cross(ray_dir, edge2);
+    float a = dot(edge1, h);
+
+    // ray平行于三角形平面
+    if (abs(a) < EPSILON) return HitInfo(-1.0, 0.0, 0.0);
+
+    float f = 1.0 / a;
+    vec3 s = ray_origin - v0;
+    float u = f * dot(s, h);
+    if (u < 0.0 || u > 1.0) return HitInfo(-1.0, 0.0, 0.0);
+
+    vec3 q = cross(s, edge1);
+    float v = f * dot(ray_dir, q);
+    if (v < 0.0 || u + v > 1.0) return HitInfo(-1.0, 0.0, 0.0);
+
+    float t = f * dot(edge2, q);
+    if (t > EPSILON) return HitInfo(t, u, v);
+
+    return HitInfo(-1.0, 0.0, 0.0);
+}
+
+// === 伪随机数生成 (PCG hash) ===
+uint pcg_hash(uint seed_in) {
+    uint state = seed_in * 747796405u + 2891336453u;
+    uint word = ((state >> ((state >> 28u) + 4u)) ^ state) * 277803737u;
+    return (word >> 22u) ^ word;
+}
+
+float random_float(uint seed) {
+    return float(pcg_hash(seed)) / 4294967295.0;
+}
+
+// === Cosine-weighted半球采样 ===
+// 在normal方向的半球内生成随机方向，cosine权重使靠近normal的方向概率更高
+vec3 cosine_hemisphere_sample(vec3 normal, uint seed) {
+    float r1 = random_float(seed);
+    float r2 = random_float(pcg_hash(seed));
+
+    float phi = 2.0 * 3.14159265 * r1;
+    float cos_theta = sqrt(r2);
+    float sin_theta = sqrt(1.0 - r2);
+
+    // 局部半球坐标
+    vec3 local_dir = vec3(sin_theta * cos(phi), sin_theta * sin(phi), cos_theta);
+
+    // 从normal构建tangent frame
+    vec3 up = abs(normal.y) < 0.99 ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0);
+    vec3 tangent = normalize(cross(up, normal));
+    vec3 bitangent = cross(normal, tangent);
+
+    return normalize(tangent * local_dir.x + bitangent * local_dir.y + normal * local_dir.z);
+}
+
+// === 间接光线追踪结果 ===
+struct IndirectHit {
+    vec3 color;       // 命中表面的颜色
+    vec3 normal;      // 命中表面的法线（三角形面法线）
+    float emissive;   // emissive标志(alpha>1.5)
+    float distance;   // 命中距离
+    bool hit;         // 是否命中
+};
+
+// === BVH光线追踪函数（用于间接光线）===
+// 返回命中表面的颜色和emissive标志，用于间接光照计算
+IndirectHit trace_ray(vec3 origin, vec3 direction) {
+    uint t_stack[BVH_STACK_SIZE];
+    int t_sp = 0;
+    t_stack[t_sp] = 0u;
+
+    float closest_t = INF;
+    uint closest_i0 = 0u;
+    uint closest_i1 = 0u;
+    uint closest_i2 = 0u;
+    float closest_u = 0.0;
+    float closest_v = 0.0;
+    bool found = false;
+
+    while (t_sp >= 0) {
+        uint node_idx = t_stack[t_sp];
+        t_sp--;
+
+        BvhNode node = bvh.nodes[node_idx];
+        if (!intersect_aabb(origin, direction, node.boundsMin, node.boundsMax)) continue;
+
+        if (node.leftChild == LEAF_MARKER) {
+            uint tri_start = node.rightChild;
+            uint i0 = index_buf.indices[tri_start + 0u];
+            uint i1 = index_buf.indices[tri_start + 1u];
+            uint i2 = index_buf.indices[tri_start + 2u];
+
+            vec3 v0 = vertex_buf.verts[i0].xyz;
+            vec3 v1 = vertex_buf.verts[i1].xyz;
+            vec3 v2 = vertex_buf.verts[i2].xyz;
+
+            HitInfo hit_info = intersect_triangle_bary(origin, direction, v0, v1, v2);
+            float t = hit_info.t;
+            if (t > EPSILON && t < closest_t) {
+                closest_t = t;
+                found = true;
+                closest_i0 = i0;
+                closest_i1 = i1;
+                closest_i2 = i2;
+                closest_u = hit_info.u;
+                closest_v = hit_info.v;
+            }
+        } else {
+            t_sp++;
+            if (t_sp >= BVH_STACK_SIZE) break;
+            t_stack[t_sp] = node.rightChild;
+            t_sp++;
+            if (t_sp >= BVH_STACK_SIZE) break;
+            t_stack[t_sp] = node.leftChild;
+        }
+    }
+
+    IndirectHit result;
+    result.hit = found;
+    result.distance = closest_t;
+
+    if (found) {
+        vec4 c0 = color_buf.colors[closest_i0];
+        vec4 c1 = color_buf.colors[closest_i1];
+        vec4 c2 = color_buf.colors[closest_i2];
+        result.color = (1.0 - closest_u - closest_v) * c0.xyz + closest_u * c1.xyz + closest_v * c2.xyz;
+        result.emissive = (1.0 - closest_u - closest_v) * c0.w + closest_u * c1.w + closest_v * c2.w;
+        // 计算命中三角形面法线: cross(v1-v0, v2-v0)
+        vec3 v0 = vertex_buf.verts[closest_i0].xyz;
+        vec3 v1 = vertex_buf.verts[closest_i1].xyz;
+        vec3 v2 = vertex_buf.verts[closest_i2].xyz;
+        vec3 face_normal = normalize(cross(v1 - v0, v2 - v0));
+        // 确保法线朝向射线来源方向（与ray_dir反向）
+        if (dot(face_normal, direction) > 0.0) {
+            face_normal = -face_normal;
+        }
+        result.normal = face_normal;
+    } else {
+        result.color = vec3(0.0);
+        result.normal = vec3(0.0);
+        result.emissive = 0.0;
+    }
+
+    return result;
+}
+
+void main() {
+    // 像素坐标
+    ivec2 pixel_coords = ivec2(gl_GlobalInvocationID.xy);
+    int width = int(pc.viewport_size.x);
+    int height = int(pc.viewport_size.y);
+
+    // 超出视口范围的像素不处理
+    if (pixel_coords.x >= width || pixel_coords.y >= height) {
+        return;
+    }
+
+    // === 计算camera ray ===
+    // UV坐标: 将像素映射到[-1, 1]范围
+    // Y轴翻转: 屏幕上方=正Y（Vulkan屏幕坐标Y向下，但ray方向Y向上）
+    vec2 uv = vec2(
+        (float(pixel_coords.x) + 0.5) / float(width) * 2.0 - 1.0,
+        -((float(pixel_coords.y) + 0.5) / float(height) * 2.0 - 1.0)
+    );
+
+    float aspect = float(width) / float(height);
+    float tanHalfFov = tan(pc.fov / 2.0);
+
+    // 与rotation.vert一致的camera向量计算
+    // forward = vec3(sin(yaw)*cos(pitch), sin(pitch), -cos(yaw)*cos(pitch))
+    // right = vec3(cos(yaw), 0, sin(yaw))  — right.z = +sin(yaw)
+    // up = cross(right, forward)             — up.z = -cos(yaw)*sin(pitch)
+    vec3 forward = vec3(sin(pc.camera_yaw) * cos(pc.camera_pitch),
+                        sin(pc.camera_pitch),
+                        -cos(pc.camera_yaw) * cos(pc.camera_pitch));
+    vec3 right = vec3(cos(pc.camera_yaw), 0.0, sin(pc.camera_yaw));
+    vec3 up = cross(right, forward);
+
+    vec3 ray_dir = normalize(forward + right * uv.x * aspect * tanHalfFov + up * uv.y * tanHalfFov);
+    vec3 ray_origin = pc.camera_pos;
+
+    // === BVH栈遍历 ===
+    uint stack[BVH_STACK_SIZE];
+    int stack_ptr = 0;
+    stack[stack_ptr] = 0u; // 根节点索引
+
+    float closest_t = INF;
+    vec3 hit_normal = vec3(0.0, 1.0, 0.0);
+    vec3 hit_point = vec3(0.0);
+    uint hit_i0 = 0u;
+    uint hit_i1 = 0u;
+    uint hit_i2 = 0u;
+    float hit_u = 0.0;
+    float hit_v = 0.0;
+    bool hit_found = false;
+
+    while (stack_ptr >= 0) {
+        uint node_idx = stack[stack_ptr];
+        stack_ptr--;
+
+        BvhNode node = bvh.nodes[node_idx];
+
+        // ray-AABB intersection测试
+        if (!intersect_aabb(ray_origin, ray_dir, node.boundsMin, node.boundsMax)) {
+            continue; // ray不经过此AABB，跳过
+        }
+
+        if (node.leftChild == LEAF_MARKER) {
+            // 叶子节点 — 测试三角形intersection
+            uint tri_start = node.rightChild;
+            // 叶子节点包含1个三角形（3个索引）
+            uint i0 = index_buf.indices[tri_start + 0u];
+            uint i1 = index_buf.indices[tri_start + 1u];
+            uint i2 = index_buf.indices[tri_start + 2u];
+
+            vec3 v0 = vertex_buf.verts[i0].xyz;
+            vec3 v1 = vertex_buf.verts[i1].xyz;
+            vec3 v2 = vertex_buf.verts[i2].xyz;
+
+            HitInfo hit_info = intersect_triangle_bary(ray_origin, ray_dir, v0, v1, v2);
+            float t = hit_info.t;
+            if (t > 0.0 && t < closest_t) {
+                closest_t = t;
+                hit_found = true;
+                hit_point = ray_origin + ray_dir * t;
+
+                // 计算三角形面法线
+                vec3 edge1 = v1 - v0;
+                vec3 edge2 = v2 - v0;
+                hit_normal = normalize(cross(edge1, edge2));
+                
+                // 确保法线朝向ray来的方向（如果法线朝内，翻转）
+                if (dot(hit_normal, ray_dir) > 0.0) {
+                    hit_normal = -hit_normal;
+                }
+
+                // 保存顶点索引和barycentric坐标用于颜色插值
+                hit_i0 = i0;
+                hit_i1 = i1;
+                hit_i2 = i2;
+                // 重新计算barycentric坐标(u, v)
+                vec3 h = cross(ray_dir, edge2);
+                float a = dot(edge1, h);
+                float f = 1.0 / a;
+                vec3 s = ray_origin - v0;
+                hit_u = f * dot(s, h);
+                vec3 q = cross(s, edge1);
+                hit_v = f * dot(ray_dir, q);
+            }
+        } else {
+            // 内部节点 — 将子节点推入栈（先右后左，保证左子节点先处理）
+            stack_ptr++;
+            if (stack_ptr >= BVH_STACK_SIZE) break; // 栈溢出保护
+            stack[stack_ptr] = node.rightChild;
+
+            stack_ptr++;
+            if (stack_ptr >= BVH_STACK_SIZE) break; // 栈溢出保护
+            stack[stack_ptr] = node.leftChild;
+        }
+    }
+
+    // === 光照计算 ===
+    vec4 output_color;
+
+    if (hit_found) {
+        // 用barycentric坐标插值per-vertex颜色
+        // hit_u, hit_v已在intersect_triangle中计算（但未保存）
+        // 使用简化方案: 取最近顶点颜色（避免重新计算barycentric）
+        vec4 c0 = color_buf.colors[hit_i0];
+        vec4 c1 = color_buf.colors[hit_i1];
+        vec4 c2 = color_buf.colors[hit_i2];
+        // barycentric插值: (1-u-v)*c0 + u*c1 + v*c2
+        vec3 object_color = (1.0 - hit_u - hit_v) * c0.xyz + hit_u * c1.xyz + hit_v * c2.xyz;
+        float emissive_flag = (1.0 - hit_u - hit_v) * c0.w + hit_u * c1.w + hit_v * c2.w;
+
+        // emissive表面（alpha>1.5）: 直接输出高亮度颜色
+        if (emissive_flag > 1.5) {
+            output_color = vec4(object_color * 8.0, 1.0); // 面光源亮度倍增
+        } else {
+            // 普通表面: 方向光漫反射 + 环境光
+            vec3 light_dir = normalize(-light_buf.light_entries[0].xyz);
+            vec3 light_color = light_buf.light_entries[1].xyz;
+            float light_intensity = light_buf.light_entries[1].w;
+
+            float NdotL = max(dot(hit_normal, light_dir), 0.0);
+
+            // 阴影射线: 向面光源方向采样，检查是否被遮挡
+            // 面光源中心位于约(2.75, 5.58, 2.75)
+            vec3 light_center = vec3(2.75, 5.58, 2.75);
+            vec3 to_light = light_center - hit_point;
+            float light_dist = length(to_light);
+            vec3 light_sample_dir = normalize(to_light);
+
+            // 检查阴影: 从交点向光源中心发射射线
+            bool in_shadow = false;
+            {
+                uint shadow_stack[BVH_STACK_SIZE];
+                int shadow_sp = 0;
+                shadow_stack[shadow_sp] = 0u;
+
+                while (shadow_sp >= 0) {
+                    uint snode_idx = shadow_stack[shadow_sp];
+                    shadow_sp--;
+                    BvhNode snode = bvh.nodes[snode_idx];
+                    if (!intersect_aabb(hit_point + hit_normal * EPSILON * 2.0, light_sample_dir, snode.boundsMin, snode.boundsMax)) continue;
+                    if (snode.leftChild == LEAF_MARKER) {
+                        uint si0 = index_buf.indices[snode.rightChild + 0u];
+                        uint si1 = index_buf.indices[snode.rightChild + 1u];
+                        uint si2 = index_buf.indices[snode.rightChild + 2u];
+float st = intersect_triangle_bary(hit_point + hit_normal * EPSILON * 2.0, light_sample_dir,
+                    vertex_buf.verts[si0].xyz, vertex_buf.verts[si1].xyz, vertex_buf.verts[si2].xyz).t;
+                        if (st > EPSILON && st < light_dist) {
+                            // 排除emissive表面自身（emissive面的alpha>1.5不遮挡光线）
+                            float shadow_alpha = color_buf.colors[si0].w;
+                            if (shadow_alpha <= 1.5) {
+                                in_shadow = true;
+                                break;
+                            }
+                        }
+                    } else {
+                        shadow_sp++;
+                        if (shadow_sp >= BVH_STACK_SIZE) break;
+                        shadow_stack[shadow_sp] = snode.rightChild;
+                        shadow_sp++;
+                        if (shadow_sp >= BVH_STACK_SIZE) break;
+                        shadow_stack[shadow_sp] = snode.leftChild;
+                    }
+                }
+            }
+
+            // 环境光 + 方向光漫反射 + 面光源直接光照
+            vec3 ambient = object_color * vec3(0.12);
+            vec3 directional_diffuse = object_color * light_color * light_intensity * NdotL;
+
+            // 面光源直接光照: 如果不在阴影中，添加面光源贡献
+            vec3 area_light_contrib = vec3(0.0);
+            if (!in_shadow) {
+                // 面光源面积约1.3×1.3=1.69m², 强度约15
+                // 衰减: 1/(dist²) × cos因子 × 面积
+                float NdotL_area = max(dot(hit_normal, light_sample_dir), 0.0);
+                float area_attenuation = 1.69 / (light_dist * light_dist + 0.01);
+                area_light_contrib = object_color * vec3(1.0, 1.0, 1.0) * 15.0 * NdotL_area * area_attenuation;
+                // 限制最大贡献避免过曝
+                area_light_contrib = min(area_light_contrib, vec3(2.0));
+            }
+
+            // === 间接光照 (1-bounce color bleeding) ===
+            // 从命中点发射8条随机方向的间接光线，采样附近表面颜色
+            // 红墙反射红光、绿墙反射绿光 → Cornell Box核心特征
+            // 8条光线保证color bleeding明显可见（2条概率太低）
+            vec3 indirect_light = vec3(0.0);
+            uint base_seed = pcg_hash(uint(pixel_coords.x) * 1000u + uint(pixel_coords.y) + 1u);
+            vec3 indirect_origin = hit_point + hit_normal * EPSILON * 2.0;
+
+            for (int i = 0; i < 8; i++) {
+                uint seed = pcg_hash(base_seed + uint(i) * 12345u + 7u);
+                vec3 indirect_dir = cosine_hemisphere_sample(hit_normal, seed);
+
+                IndirectHit ihit = trace_ray(indirect_origin, indirect_dir);
+
+                if (ihit.hit) {
+                    float NdotL_indirect = max(dot(hit_normal, indirect_dir), 0.0);
+                    // 距离衰减: Cornell Box空间小(~5.5m)，使用平方根衰减更柔和
+                    float dist_atten = 1.0 / (sqrt(ihit.distance) + 0.5);
+
+                    if (ihit.emissive > 1.5) {
+                        // 命中emissive面光源 — 间接路径到达光源
+                        indirect_light += ihit.color * 8.0 * NdotL_indirect * dist_atten * 0.5;
+                    } else {
+                        // 命中普通表面 — color bleeding! 墙壁颜色反射到物体上
+                        // 使用命中点法线计算radiance: albedo * max(dot(命中法线, 光源方向), 0) * light_intensity + 环境光
+                        // 这样红墙在光照下反射的是"被照亮的红色"，而非暗淡的albedo
+                        vec3 light_dir = normalize(-light_buf.light_entries[0].xyz);
+                        float ihit_NdotL = max(dot(ihit.normal, light_dir), 0.0);
+                        vec3 ihit_radiance = ihit.color * ihit_NdotL * light_buf.light_entries[1].w + ihit.color * 0.12;
+                        indirect_light += ihit_radiance * NdotL_indirect * dist_atten;
+                    }
+                }
+            }
+
+            // 间接光照 = 表面自身颜色 × 间接光贡献 / 采样数
+            // 除以8使多采样结果平均化，乘以1.0不抑制反射强度
+            vec3 indirect_contrib = object_color * indirect_light / 8.0 * 1.0;
+
+            vec3 final_color = ambient + directional_diffuse + area_light_contrib + indirect_contrib;
+            output_color = vec4(final_color, 1.0);
+        }
+    } else {
+        // 背景: 深蓝渐变
+        float t_bg = 0.5 * (ray_dir.y + 1.0);
+        vec3 bg_color = mix(vec3(0.05, 0.05, 0.1), vec3(0.2, 0.3, 0.6), t_bg);
+        output_color = vec4(bg_color, 1.0);
+    }
+
+    // 写入输出图像
+    imageStore(output_image, pixel_coords, output_color);
+}

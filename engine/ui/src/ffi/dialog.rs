@@ -24,13 +24,15 @@ pub extern "C" fn ui_create_dialog(
         
         let content_scale = crate::thunk::ui_get_content_scale();
         let screen_size = crate::thunk::ui_get_screen_size();
-        let x = (screen_size.0 - width) / 2.0;
-        let y = (screen_size.1 - height) / 2.0;
+        // Convert physical screen size to logical for centering in UI coordinate system
+        let logical_screen_w = screen_size.0 / content_scale;
+        let logical_screen_h = screen_size.1 / content_scale;
         
         let mut dialog = crate::widgets::Dialog::new()
             .with_title(&title_str)
             .with_size(width, height);
-        dialog.set_layout(Layout::new(x, y, width, height));
+        // with_size() already computes centered position in logical coordinates
+        // No need to override layout — with_size() set correct logical x/y
         dialog.set_content_scale(content_scale);
         
         let id = dialog.id();

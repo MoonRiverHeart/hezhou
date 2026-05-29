@@ -3,7 +3,7 @@ use crate::gesture::*;
 use crate::gesture_recognizer::*;
 use crate::types::*;
 use crate::widget_tree::*;
-use hezhou_dfx::{DfxSystem, dfx_debug};
+use hezhou_dfx::DfxSystem;
 use parking_lot::Mutex;
 use std::sync::Arc;
 
@@ -101,6 +101,15 @@ impl EventDispatcher {
                 
                 self.hovered_widget = new_hovered;
             }
+            
+            // 将MouseMove事件也dispatch给target widget（Dropdown需要MouseMove更新hovered_index）
+            if let Some(target_id) = new_hovered {
+                let mut move_event = event.clone();
+                move_event.target = target_id;
+                let path = self.widget_tree.lock().find_path(target_id);
+                self.dispatch_bubbling(&path, &mut move_event);
+            }
+            
             return;
         }
         
@@ -167,6 +176,25 @@ event.target = target.unwrap_or(WidgetId::invalid());
                     })
                     .collect();
                 
+                // Close any open Dropdown that was NOT the click target
+                // (click-outside dismiss behavior for dropdown popups)
+                let dropdown_ids_to_close: Vec<u64> = all_ids.iter()
+                    .filter_map(|wid| {
+                        if wid.id != g.target.id {
+                            if let Some(w) = tree.get_widget(*wid) {
+                                if w.widget_type() == "Dropdown" {
+                                    if let Some(dd) = w.as_any().downcast_ref::<crate::widgets::Dropdown>() {
+                                        if dd.is_open() {
+                                            return Some(wid.id);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        None
+                    })
+                    .collect();
+                
                 drop(tree);
                 
                 // Hide popup menus and notify C# that they closed
@@ -176,6 +204,17 @@ event.target = target.unwrap_or(WidgetId::invalid());
                         if let Some(pm) = w.as_any_mut().downcast_mut::<crate::widgets::PopupMenu>() {
                             pm.hide();
                             crate::thunk::queue_callback(crate::thunk::PendingCallback::PopupMenuClose { widget_id: popup_id });
+                        }
+                    }
+                    drop(tree);
+                }
+                
+                // Close open dropdowns
+                for dropdown_id in dropdown_ids_to_close {
+                    let mut tree = self.widget_tree.lock();
+                    if let Some(w) = tree.get_widget_mut(crate::WidgetId::from_raw(dropdown_id)) {
+                        if let Some(dd) = w.as_any_mut().downcast_mut::<crate::widgets::Dropdown>() {
+                            dd.close();
                         }
                     }
                     drop(tree);
@@ -312,25 +351,34 @@ fn dispatch_capturing(&mut self, path: &[WidgetId], event: &mut Event) {
                 tree.get_absolute_layout(*widget_id)
             };
             
-            // 如果是Touch事件且需要坐标转换，创建转换后的副本
-            let converted_event = if let Some(abs_layout) = abs_layout {
-                if let EventData::Touch(touch_data) = &event.data {
-                    let window_x = touch_data.x;
-                    let window_y = touch_data.y;
-                    let relative_x = window_x - abs_layout.x;
-                    let relative_y = window_y - abs_layout.y;
-                    
-                    dfx_debug!("Dispatch", "Widget {}: window ({}, {}) -> relative ({}, {})", 
-                             widget_id.id, window_x, window_y, relative_x, relative_y);
-                    
-                    let mut converted = event.clone();
-                    converted.data = EventData::Touch(TouchData::new(relative_x, relative_y, touch_data.pointer_id));
-                    Some(converted)
+            // RightClick事件保持绝对屏幕坐标（context menu定位需要屏幕位置）
+            // 其他Touch/Mouse事件做坐标转换（屏幕绝对坐标 → widget局部坐标）
+            let should_convert_coords = event.event_type != EventType::RightClick;
+            
+            let converted_event = if should_convert_coords {
+                if let Some(abs_layout) = abs_layout {
+                    match &event.data {
+                        EventData::Touch(touch_data) => {
+                            let relative_x = touch_data.x - abs_layout.x;
+                            let relative_y = touch_data.y - abs_layout.y;
+                            let mut converted = event.clone();
+                            converted.data = EventData::Touch(TouchData::new(relative_x, relative_y, touch_data.pointer_id));
+                            Some(converted)
+                        }
+                        EventData::Mouse(mouse_data) => {
+                            let relative_x = mouse_data.x - abs_layout.x;
+                            let relative_y = mouse_data.y - abs_layout.y;
+                            let mut converted = event.clone();
+                            converted.data = EventData::Mouse(MouseData::new(relative_x, relative_y, mouse_data.button));
+                            Some(converted)
+                        }
+                        _ => None
+                    }
                 } else {
                     None
                 }
             } else {
-                None
+                None  // RightClick: 保持绝对坐标不转换
             };
 
             let mut tree = self.widget_tree.lock();

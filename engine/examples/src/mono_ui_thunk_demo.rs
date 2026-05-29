@@ -16,6 +16,7 @@ pub extern "C" fn scene_create_stub() -> *mut std::ffi::c_void { std::ptr::null_
 pub extern "C" fn scene_destroy_stub(_scene: *mut std::ffi::c_void) {}
 pub extern "C" fn scene_create_cube_stub(_scene: *mut std::ffi::c_void) -> u64 { 0 }
 pub extern "C" fn scene_create_plane_stub(_scene: *mut std::ffi::c_void) -> u64 { 0 }
+pub extern "C" fn scene_create_cornell_box_stub(_scene: *mut std::ffi::c_void) -> u64 { 0 }
 pub extern "C" fn scene_create_directional_light_stub(_scene: *mut std::ffi::c_void) -> u64 { 0 }
 pub extern "C" fn scene_attach_script_stub(_scene: *mut std::ffi::c_void, _id: u64, _path: *const i8, _class: *const i8) {}
 pub extern "C" fn scene_set_game_state_stub(_scene: *mut std::ffi::c_void, _state: i32) {}
@@ -101,6 +102,7 @@ pub extern "C" fn dfx_perf_end_frame_stub(_system: *mut std::ffi::c_void) {}
 pub extern "C" fn ui_simulate_click_at_stub(_handle: *mut std::ffi::c_void, _ed: *mut std::ffi::c_void, _x: f32, _y: f32) -> u64 { 0 }
 pub extern "C" fn ui_widget_get_type_stub(_handle: *mut std::ffi::c_void, _id: u64, _buf: *mut u8, _len: u32) -> u32 { 0 }
 pub extern "C" fn ui_widget_get_layout_stub(_handle: *mut std::ffi::c_void, _id: u64, _out: *mut f32) -> u32 { 0 }
+pub extern "C" fn ui_widget_get_absolute_layout_stub(_handle: *mut std::ffi::c_void, _id: u64, _out: *mut f32) -> u32 { 0 }
 pub extern "C" fn ui_widget_get_parent_stub(_handle: *mut std::ffi::c_void, _id: u64) -> u64 { 0 }
 pub extern "C" fn ui_widget_get_child_count_stub(_handle: *mut std::ffi::c_void, _id: u64) -> u32 { 0 }
 pub extern "C" fn ui_widget_get_child_id_stub(_handle: *mut std::ffi::c_void, _id: u64, _index: u32) -> u64 { 0 }
@@ -302,6 +304,7 @@ fn main() {
         scene_destroy: scene_destroy_stub,
         scene_create_cube: scene_create_cube_stub,
         scene_create_plane: scene_create_plane_stub,
+        scene_create_cornell_box: scene_create_cornell_box_stub,
         scene_create_directional_light: scene_create_directional_light_stub,
         scene_attach_script: scene_attach_script_stub,
         scene_set_game_state: scene_set_game_state_stub,
@@ -365,6 +368,7 @@ fn main() {
         ui_simulate_click_at: unsafe { std::mem::transmute(ui_simulate_click_at_stub as *const std::ffi::c_void) },
         ui_widget_get_type: unsafe { std::mem::transmute(ui_widget_get_type_stub as *const std::ffi::c_void) },
         ui_widget_get_layout: unsafe { std::mem::transmute(ui_widget_get_layout_stub as *const std::ffi::c_void) },
+            ui_widget_get_absolute_layout: unsafe { std::mem::transmute(ui_widget_get_absolute_layout_stub as *const std::ffi::c_void) },
         ui_widget_get_parent: unsafe { std::mem::transmute(ui_widget_get_parent_stub as *const std::ffi::c_void) },
         ui_widget_get_child_count: unsafe { std::mem::transmute(ui_widget_get_child_count_stub as *const std::ffi::c_void) },
         ui_widget_get_child_id: unsafe { std::mem::transmute(ui_widget_get_child_id_stub as *const std::ffi::c_void) },
@@ -378,6 +382,8 @@ fn main() {
         asset_library_get_asset_info: stub_asset_library_get_asset_info,
         asset_library_create_entity_from_template: stub_asset_library_create_entity_from_template,
         asset_library_create_mesh_entity: stub_asset_library_create_mesh_entity,
+        asset_library_load_texture: stub_asset_library_load_texture,
+        asset_library_load_mesh: stub_asset_library_load_mesh,
         // Project stubs (not used in this demo)
         project_create_new: stub_project_create_new,
         project_load: stub_project_load,
@@ -393,6 +399,10 @@ fn main() {
         project_get_entity_info: stub_project_get_entity_info,
         project_add_entity: stub_project_add_entity,
         project_remove_entity: stub_project_remove_entity,
+        ui_set_widget_visible: unsafe { std::mem::transmute(stub_set_widget_visible as *const std::ffi::c_void) },
+        get_pipeline_names: unsafe { std::mem::transmute(stub_get_pipeline_names as *const std::ffi::c_void) },
+        switch_pipeline: unsafe { std::mem::transmute(stub_switch_pipeline as *const std::ffi::c_void) },
+        get_active_pipeline_name: unsafe { std::mem::transmute(stub_get_active_pipeline_name as *const std::ffi::c_void) },
     };
     hezhou_scripting::ffi_context::set_ffi_context(ffi_ctx);
     let ffi_ptr = hezhou_scripting::ffi_context::get_ffi_context_ptr();
@@ -469,6 +479,10 @@ extern "C" fn stub_asset_library_get_asset_info(_: usize, _: usize, _: *mut u64,
 extern "C" fn stub_asset_library_create_entity_from_template(_: *mut std::ffi::c_void, _: u64) -> u64 { 0 }
 #[unsafe(no_mangle)]
 extern "C" fn stub_asset_library_create_mesh_entity(_: *mut std::ffi::c_void, _: u32) -> u64 { 0 }
+#[unsafe(no_mangle)]
+extern "C" fn stub_asset_library_load_texture(_: *const std::ffi::c_char) -> u64 { 0 }
+#[unsafe(no_mangle)]
+extern "C" fn stub_asset_library_load_mesh(_: *const std::ffi::c_char) -> u64 { 0 }
 
 // Project stubs (not used in this demo)
 #[unsafe(no_mangle)]
@@ -499,6 +513,13 @@ extern "C" fn stub_project_get_entity_info(_: u64, _: *mut std::ffi::c_char, _: 
 extern "C" fn stub_project_add_entity(_: u64, _: *const std::ffi::c_char, _: f32, _: f32, _: f32, _: f32, _: f32, _: f32, _: f32, _: f32, _: f32, _: *const std::ffi::c_char) -> bool { false }
 #[unsafe(no_mangle)]
 extern "C" fn stub_project_remove_entity(_: u64) -> bool { false }
+#[unsafe(no_mangle)]
+extern "C" fn stub_set_widget_visible(_: hezhou_ui::ffi::WidgetTreeHandle, _: u64, _: bool) { }
+
+// Pipeline切换stub函数 — thunk demo不需要管线切换功能
+extern "C" fn stub_get_pipeline_names(_: hezhou_scripting::ffi_context::WidgetTreeHandle, _: *mut std::ffi::c_char, _: usize) -> usize { 0 }
+extern "C" fn stub_switch_pipeline(_: hezhou_scripting::ffi_context::WidgetTreeHandle, _: *const std::ffi::c_char) -> i32 { -1 }
+extern "C" fn stub_get_active_pipeline_name(_: hezhou_scripting::ffi_context::WidgetTreeHandle, _: *mut std::ffi::c_char, _: usize) -> usize { 0 }
 
 fn compile_csharp_script() {
     use std::process::Command;

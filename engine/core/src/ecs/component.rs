@@ -7,7 +7,7 @@ pub struct ComponentTypeInfo {
     pub name: *const std::os::raw::c_char,
 }
 
-pub trait Component: Sized {
+pub trait Component: Sized + Clone + 'static {
     fn type_id() -> ComponentTypeId;
     fn type_name() -> &'static str;
 }

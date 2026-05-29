@@ -28,6 +28,11 @@ pub struct TabWidget {
     hovered_tab_index: Option<usize>,
     pressed_tab_index: Option<usize>,
     content_scale: f32,
+    /// 缓存计算好的tab宽度（draw阶段计算，get_tab_rect和hit_test_tab使用）
+    cached_tab_width: f32,
+    measured_tab_text_widths: Vec<f32>,
+    /// 所有tab标题拼接的文本，用于预栅格化字体字形
+    all_text: String,
 }
 
 impl TabWidget {
@@ -48,6 +53,9 @@ impl TabWidget {
             hovered_tab_index: None,
             pressed_tab_index: None,
             content_scale: 1.0,
+            cached_tab_width: 0.0,
+            measured_tab_text_widths: Vec::new(),
+            all_text: String::new(),
         }
     }
 
@@ -66,6 +74,7 @@ impl TabWidget {
         if !self.children.contains(&content_id) {
             self.children.push(content_id);
         }
+        self.rebuild_all_text();
         dfx_debug!("TabWidget", "AddTab: index={}, title={}, content_id={}, closable={}", 
             index, title, content_id.id, closable);
         index
@@ -78,7 +87,15 @@ impl TabWidget {
             if self.active_index >= self.tabs.len() && !self.tabs.is_empty() {
                 self.active_index = self.tabs.len() - 1;
             }
+            self.rebuild_all_text();
             dfx_debug!("TabWidget", "RemoveTab: index={}, removed title={}", index, tab.title);
+        }
+    }
+
+    fn rebuild_all_text(&mut self) {
+        self.all_text.clear();
+        for tab in &self.tabs {
+            self.all_text.push_str(&tab.title);
         }
     }
 
@@ -119,10 +136,41 @@ impl TabWidget {
     }
 
     fn get_tab_rect(&self, index: usize) -> Rect {
-        let scaled_width = self.tab_width * self.content_scale;
         let scaled_height = self.tab_bar_height * self.content_scale;
+        let scaled_width = if self.cached_tab_width > 0.0 {
+            self.cached_tab_width
+        } else {
+            let tab_count = self.tabs.len().max(1);
+            let max_scaled_width = self.tab_width * self.content_scale;
+            f32::min(max_scaled_width, self.layout.width / tab_count as f32)
+        };
         let x = index as f32 * scaled_width;
         Rect::new(x, 0.0, scaled_width, scaled_height)
+    }
+
+    /// 截断文字并添加省略号（如果超出最大宽度）
+    /// 当宽度不足以显示省略号截断时，仍然显示原始文字（溢出比消失好）
+    fn truncate_text(text: &str, font_size: f32, text_width: f32) -> String {
+        if text_width <= 0.0 {
+            return text.to_string();
+        }
+        let ellipsis_width = font_size * 1.5;
+        let max_text_width = text_width - ellipsis_width;
+        if max_text_width <= 0.0 {
+            return text.to_string();
+        }
+        let mut result = String::new();
+        let mut current_width = 0.0;
+        for ch in text.chars() {
+            let ch_width = if ch.len_utf8() > 1 { font_size } else { font_size * 0.6 };
+            if current_width + ch_width > max_text_width {
+                result.push_str("...");
+                return result;
+            }
+            current_width += ch_width;
+            result.push(ch);
+        }
+        result
     }
 
     fn get_close_button_rect(&self, tab_rect: &Rect) -> Rect {
@@ -140,7 +188,12 @@ impl TabWidget {
         if local_y < 0.0 || local_y >= self.tab_bar_height * self.content_scale {
             return None;
         }
-        let scaled_width = self.tab_width * self.content_scale;
+        let scaled_width = if self.cached_tab_width > 0.0 {
+            self.cached_tab_width
+        } else {
+            let tab_count = self.tabs.len().max(1);
+            f32::min(self.tab_width * self.content_scale, self.layout.width / tab_count as f32)
+        };
         let index = (local_x / scaled_width) as usize;
         if index < self.tabs.len() {
             Some(index)
@@ -227,7 +280,7 @@ impl Widget for TabWidget {
         self.flags.dirty_render = true;
     }
 
-fn measure(&self, _font_atlas: &crate::font_atlas::FontAtlas) -> (f32, f32) {
+    fn measure(&self, _font_atlas: &crate::font_atlas::FontAtlas) -> (f32, f32) {
         let w = if self.layout.width > 0.0 { self.layout.width } else { 300.0 };
         let h = if self.layout.height > 0.0 { self.layout.height } else { 400.0 };
         (w, h)
@@ -245,6 +298,10 @@ fn measure(&self, _font_atlas: &crate::font_atlas::FontAtlas) -> (f32, f32) {
         self
     }
 
+    fn get_text(&self) -> Option<&str> {
+        Some(&self.all_text)
+    }
+
     fn flags(&self) -> WidgetFlags {
         self.flags
     }
@@ -257,7 +314,20 @@ fn measure(&self, _font_atlas: &crate::font_atlas::FontAtlas) -> (f32, f32) {
         let width = self.layout.width;
         let height = self.layout.height;
         let scaled_tab_bar_height = self.tab_bar_height * self.content_scale;
-        let scaled_tab_width = self.tab_width * self.content_scale;
+        let font_size = 14.0 * self.content_scale;
+        let tab_padding_x = 10.0 * self.content_scale;
+        let tab_count = self.tabs.len().max(1);
+        let max_scaled_width = self.tab_width * self.content_scale;
+        // 自适应：均分宽度，但保证至少能显示2个中文字
+        let min_tab_width = 2.0 * font_size + tab_padding_x;
+        let evenly = width / tab_count as f32;
+        let scaled_tab_width = if evenly >= min_tab_width {
+            f32::min(max_scaled_width, evenly)
+        } else {
+            f32::max(evenly, min_tab_width)
+        };
+        // 缓存tab宽度供get_tab_rect和hit_test_tab使用
+        self.cached_tab_width = scaled_tab_width;
 
         let tab_bar_style = Style::new()
             .with_background(Color::new(0.15, 0.15, 0.15, 1.0));
@@ -283,26 +353,22 @@ fn measure(&self, _font_atlas: &crate::font_atlas::FontAtlas) -> (f32, f32) {
             let fold_size = 6.0 * self.content_scale;
             let fold_x = tab_rect.x + tab_rect.width;
             let fold_y = tab_rect.y;
-            // Triangle: top-right corner, fold-back triangle
-            // p1 = top-right corner, p2 = along top edge, p3 = along right edge
             let fold_shadow_color = if i == self.active_index {
-                Color::new(0.18, 0.18, 0.18, 1.0)   // slightly darker shadow
+                Color::new(0.18, 0.18, 0.18, 1.0)
             } else {
                 Color::new(0.15, 0.15, 0.15, 1.0)
             };
             let fold_color = if i == self.active_index {
-                Color::new(0.35, 0.35, 0.35, 1.0)   // lighter fold for active
+                Color::new(0.35, 0.35, 0.35, 1.0)
             } else {
-                Color::new(0.28, 0.28, 0.28, 1.0)   // subtle fold for inactive
+                Color::new(0.28, 0.28, 0.28, 1.0)
             };
-            // Shadow triangle (slightly offset)
             canvas.draw_triangle(
                 Point::new(fold_x + 1.0 * self.content_scale, fold_y + 1.0 * self.content_scale),
                 Point::new(fold_x - fold_size + 1.0 * self.content_scale, fold_y + 1.0 * self.content_scale),
                 Point::new(fold_x + 1.0 * self.content_scale, fold_y + fold_size + 1.0 * self.content_scale),
                 fold_shadow_color,
             );
-            // Main fold triangle
             canvas.draw_triangle(
                 Point::new(fold_x, fold_y),
                 Point::new(fold_x - fold_size, fold_y),
@@ -310,7 +376,23 @@ fn measure(&self, _font_atlas: &crate::font_atlas::FontAtlas) -> (f32, f32) {
                 fold_color,
             );
 
-            let font_size = 14.0 * self.content_scale;
+            // 文字自适应：根据可用宽度截断文字并添加省略号
+            let text_available_width = if tab.closable {
+                tab_rect.width - 24.0 * self.content_scale - 5.0 * self.content_scale
+            } else {
+                tab_rect.width - tab_padding_x
+            };
+            
+            let display_text = Self::truncate_text(&tab.title, font_size, text_available_width);
+
+            // ===== 一次性诊断：输出每个tab的draw参数 =====
+            static TAB_DIAG_COUNT: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+            let tab_diag = TAB_DIAG_COUNT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            if tab_diag < 30 {
+                dfx_info!("TabDiag", "tab[{}] title='{}' display='{}' tab_rect=({:.1},{:.1},{:.1},{:.1}) text_avail_w={:.1} font_size={:.1}",
+                    i, tab.title, display_text, tab_rect.x, tab_rect.y, tab_rect.width, tab_rect.height, text_available_width, font_size);
+            }
+
             let text_style = TextStyle::new()
                 .with_size(font_size)
                 .with_color(Color::white())
@@ -319,13 +401,13 @@ fn measure(&self, _font_atlas: &crate::font_atlas::FontAtlas) -> (f32, f32) {
                     vertical: VerticalAlignment::Center,
                 });
 
-            let text_width = if tab.closable {
-                tab_rect.width - 24.0 * self.content_scale
-            } else {
-                tab_rect.width - 10.0 * self.content_scale
-            };
-            let text_rect = Rect::new(tab_rect.x + 5.0 * self.content_scale, tab_rect.y, text_width, tab_rect.height);
-            canvas.draw_text(text_rect, &tab.title, &text_style);
+            let text_rect = Rect::new(
+                tab_rect.x + 5.0 * self.content_scale,
+                tab_rect.y,
+                text_available_width,
+                tab_rect.height,
+            );
+            canvas.draw_text(text_rect, &display_text, &text_style);
 
             if tab.closable {
                 let close_rect = self.get_close_button_rect(&tab_rect);

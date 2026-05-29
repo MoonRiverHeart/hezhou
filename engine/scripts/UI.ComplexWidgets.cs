@@ -67,9 +67,14 @@ namespace Hezhou
                 Log.Error("C#", "DropdownSetOptions函数指针为空");
                 return;
             }
+            // 用\0分隔拼接，手动分配内存传递IntPtr（Mono marshalling会截断嵌入\0的string）
             string joined = string.Join("\0", options) + "\0";
+            byte[] bytes = System.Text.Encoding.ASCII.GetBytes(joined);
+            IntPtr buffer = Marshal.AllocHGlobal(bytes.Length);
+            Marshal.Copy(bytes, 0, buffer, bytes.Length);
             var func = Marshal.GetDelegateForFunctionPointer<DropdownSetOptionsDelegate>(_ffi.ui_dropdown_set_options);
-            func(_widgetTree, widgetId, joined, (ulong)options.Length);
+            func(_widgetTree, widgetId, buffer, (ulong)options.Length);
+            Marshal.FreeHGlobal(buffer);
         }
         
         public static void DropdownSetSelected(ulong widgetId, ulong index)

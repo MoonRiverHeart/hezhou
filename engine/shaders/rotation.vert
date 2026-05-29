@@ -2,6 +2,7 @@
 
 layout(location = 0) in vec3 inPosition;
 layout(location = 1) in vec3 inNormal;
+layout(location = 2) in vec2 inUV;
 
 layout(push_constant) uniform PushConstants {
     mat4 model;           // 64 bytes - per-entity model matrix
@@ -14,12 +15,18 @@ layout(push_constant) uniform PushConstants {
     float camera_yaw;     // 4 bytes
     float camera_pitch;   // 4 bytes
     float _pad2;          // 4 bytes - padding to round struct size
-    // Total: 128 bytes, within 128-byte limit
+    float has_texture;           // 4 bytes — 1.0 if entity has texture
+    float specular_strength;     // 4 bytes — 高光强度 (默认0.3)
+    float ambient_strength;      // 4 bytes — 环境光强度 (默认0.15)
+    float shininess;             // 4 bytes — 高光指数 (默认32.0)
+    // Total: 144 bytes
 } pc;
 
 layout(location = 0) out vec3 fragColor;
 layout(location = 1) out vec3 fragNormal;
 layout(location = 2) out float fragOutline;
+layout(location = 3) out vec3 fragPosition;
+layout(location = 4) out vec2 fragUV;
 
 mat4 viewMatrix() {
     float cy = cos(pc.camera_yaw);
@@ -27,8 +34,8 @@ mat4 viewMatrix() {
     float cp = cos(pc.camera_pitch);
     float sp = sin(pc.camera_pitch);
     vec3 forward = vec3(sy * cp, -sp, -cy * cp);
-    vec3 right = vec3(cy, 0, -sy);
-    vec3 up = vec3(sy * sp, cp, cy * sp);
+    vec3 right = vec3(cy, 0, sy);
+    vec3 up = vec3(sy * sp, cp, -cy * sp);
     vec3 eye = pc.camera_pos;
     
     // OpenGL/Vulkan convention: camera looks along -Z, so negate forward in view matrix
@@ -45,11 +52,12 @@ mat4 projectionMatrix(float aspect) {
     float near = 0.1;
     float far = 100.0;
     float f = 1.0 / tan(fov * 3.14159265 / 360.0);
+    // Vulkan convention: Y flipped (negative f for Y), depth range [0, 1]
     return mat4(
         f / aspect, 0, 0, 0,
-        0, f, 0, 0,
-        0, 0, (far + near) / (near - far), -1,
-        0, 0, 2 * far * near / (near - far), 0
+        0, -f, 0, 0,
+        0, 0, far / (near - far), -1,
+        0, 0, near * far / (near - far), 0
     );
 }
 
@@ -72,4 +80,6 @@ void main() {
     
     fragNormal = mat3(pc.model) * inNormal;
     fragOutline = pc.is_selected;
+    fragPosition = worldPos.xyz;
+    fragUV = inUV;
 }

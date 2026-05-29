@@ -110,6 +110,9 @@ impl WidgetTree {
             .map(|n| n.layer)
             .unwrap_or(RenderLayer::default());
 
+        let widget_type = widget.widget_type();
+        let parent_type = self.nodes.get(&parent).map(|n| n.widget.widget_type()).unwrap_or("?");
+
         self.nodes.insert(
             id,
             WidgetNode {
@@ -125,6 +128,15 @@ impl WidgetTree {
 
         if let Some(children) = self.children_map.get_mut(&parent) {
             children.push(id);
+            // 诊断： 当parent是VStack/ScrollView且child是Dropdown/HStack/Label时输出
+            if (parent_type == "VStack" || parent_type == "ScrollView" || parent_type == "HStack") 
+                && (widget_type == "Dropdown" || widget_type == "HStack" || widget_type == "Label") {
+                dfx_info!("AddWidget", "{} id={} → {} id={} parent_children_count={}",
+                    widget_type, id.id, parent_type, parent.id, children.len());
+            }
+        } else {
+            dfx_warn!("AddWidget", "parent {} type={} NOT in children_map! widget {} id={}",
+                parent.id, parent_type, widget_type, id.id);
         }
 
         if let Some(parent_node) = self.nodes.get_mut(&parent) {
@@ -178,7 +190,44 @@ impl WidgetTree {
     }
 
     pub fn hit_test(&self, point: Point) -> Option<WidgetId> {
+        // 优先检查open Dropdown — popup区域可能超出ScrollView/TreeView的ClipRect范围
+        // 常规hit_test从root递归，受每个parent的bounds限制，无法路由到超出parent bounds的popup
+        for node in self.nodes.values() {
+            if node.widget.as_ref().widget_type() == "Dropdown" {
+                if let Some(dropdown) = node.widget.as_ref().as_any().downcast_ref::<crate::widgets::Dropdown>() {
+                    if dropdown.is_open() {
+                        let layout = *node.widget.as_ref().layout();
+                        // 计算Dropdown的绝对位置（从parent chain累加）
+                        let (abs_x, abs_y) = self.compute_abs_position(node.widget.as_ref().id());
+                        let popup_height = dropdown.options_count() as f32 * layout.height;
+                        let popup_bounds = Rect::new(abs_x, abs_y, layout.width, layout.height + popup_height);
+                        if popup_bounds.contains(&point) {
+                            return Some(node.widget.as_ref().id());
+                        }
+                    }
+                }
+            }
+        }
+        // 没有open Dropdown命中，走常规递归hit_test
         self.hit_test_recursive(self.root?, point, 0.0, 0.0)
+    }
+    
+    /// 计算widget的绝对屏幕坐标（累加parent chain的layout.x/y）
+    fn compute_abs_position(&self, id: WidgetId) -> (f32, f32) {
+        let mut abs_x = 0.0;
+        let mut abs_y = 0.0;
+        let mut cur = id;
+        while let Some(pid) = self.parent_map.get(&cur).copied() {
+            if let Some(pnode) = self.nodes.get(&pid) {
+                let playout = *pnode.widget.as_ref().layout();
+                abs_x += playout.x;
+                abs_y += playout.y;
+                cur = pid;
+            } else {
+                break;
+            }
+        }
+        (abs_x, abs_y)
     }
     
     pub fn get_all_widget_ids(&self) -> Vec<WidgetId> {
@@ -187,6 +236,11 @@ impl WidgetTree {
 
     fn hit_test_recursive(&self, id: WidgetId, point: Point, parent_abs_x: f32, parent_abs_y: f32) -> Option<WidgetId> {
         if let Some(node) = self.nodes.get(&id) {
+            // Skip invisible widgets (visible=false set via ui_set_widget_visible)
+            if !node.widget.as_ref().flags().visible {
+                return None;
+            }
+
             // Skip hidden Dialog and its children
             if node.widget.as_ref().widget_type() == "Dialog" {
                 if let Some(dialog) = node.widget.as_ref().as_any().downcast_ref::<crate::widgets::Dialog>() {
@@ -200,7 +254,21 @@ impl WidgetTree {
             let abs_x = parent_abs_x + layout.x;
             let abs_y = parent_abs_y + layout.y;
             
-            let abs_bounds = Rect::new(abs_x, abs_y, layout.width, layout.height);
+            // Dropdown打开时，hit区域扩展到包含popup选项列表
+            let abs_bounds = if node.widget.as_ref().widget_type() == "Dropdown" {
+                if let Some(dropdown) = node.widget.as_ref().as_any().downcast_ref::<crate::widgets::Dropdown>() {
+                    if dropdown.is_open() {
+                        let popup_height = dropdown.options_count() as f32 * layout.height;
+                        Rect::new(abs_x, abs_y, layout.width, layout.height + popup_height)
+                    } else {
+                        Rect::new(abs_x, abs_y, layout.width, layout.height)
+                    }
+                } else {
+                    Rect::new(abs_x, abs_y, layout.width, layout.height)
+                }
+            } else {
+                Rect::new(abs_x, abs_y, layout.width, layout.height)
+            };
             if abs_bounds.contains(&point) {
                 // For TreeView widgets, only hit-test visible (expanded) nodes
                 let children: Vec<WidgetId> = {
@@ -290,8 +358,24 @@ impl WidgetTree {
         let font_index = 0; // Default font index
         let sizes: [f32; 13] = [48.0, 36.0, 32.0, 28.0, 24.0, 22.0, 20.0, 18.0, 16.0, 15.0, 14.0, 13.0, 12.0];
         
+        // 兜底：预光栅化常见特殊字符（emoji/方向符号等），确保不在get_text()中的字符也能显示
+        // 项目树emoji: 📦📦 🎬 📜 🧩 📝 🔷 | 目录树emoji: 📁 📄 ⬆️ | 其他UI: … ↑ ↓ ← → ✓ ✗ ★ ● ■ ▶ ◀
+        let common_chars: &[char] = &['…', '↑', '↓', '←', '→', '📁', '📄', '✓', '✗', '★', '●', '■', '▶', '◀', '📦', '🎬', '📜', '🧩', '📝', '🔷', '⬆'];
+        for size in &sizes {
+            let cached_size = font_atlas.get_nearest_cached_font_size(*size) as u32;
+            for c in common_chars {
+                font_atlas.rasterize_char_with_fallback(font_index, *c, cached_size as f32);
+            }
+        }
+        
         for node in self.nodes.values() {
+            let widget_type = node.widget.as_ref().widget_type();
             if let Some(text) = node.widget.as_ref().get_text() {
+                // Debug日志已禁用 — 仅在需要诊断字体光栅化问题时启用
+                // if widget_type == "InputField" || widget_type == "FileBrowser" || widget_type == "TabWidget" {
+                //     dfx_info!("FontAtlas", "ensure_text_rasterized: widget_type={} text_len={} text_sample={:.30}", 
+                //         widget_type, text.len(), text);
+                // }
                 for size in &sizes {
                     let cached_size = font_atlas.get_nearest_cached_font_size(*size) as u32;
                     for c in text.chars() {
@@ -339,6 +423,13 @@ pub fn perform_layout(&mut self, font_atlas: &FontAtlas) {
     }
     
     fn measure_and_layout(&mut self, id: WidgetId, font_atlas: &FontAtlas) -> (f32, f32) {
+        // Invisible widgets contribute zero size and don't participate in layout
+        if let Some(node) = self.nodes.get(&id) {
+            if !node.widget.as_ref().flags().visible {
+                return (0.0, 0.0);
+            }
+        }
+
         let children = self.get_children(id).to_vec();
 
         let mut child_sizes = Vec::new();
@@ -467,11 +558,13 @@ pub fn perform_layout(&mut self, font_atlas: &FontAtlas) {
         if let Some(node) = self.nodes.get_mut(&id) {
             let current_layout = *node.widget.layout();
             // HStack and VStack auto-size from children every frame (children sizes can change)
-            // SplitView and Dialog are parent-allocated containers — their size comes from the parent
+            // SplitView is parent-allocated — its size comes from the parent
+            // Dialog is NOT parent-allocated — it auto-sizes from content and centers on screen
             // Other widgets auto-size only on first frame (when width/height == 0)
             let auto_size_from_children = widget_type == "HStack" || widget_type == "VStack";
-            let is_parent_allocated = widget_type == "SplitView" || widget_type == "Dialog";
-            let should_auto_size = auto_size_from_children || (!is_parent_allocated && (current_layout.width == 0.0 || current_layout.height == 0.0));
+            let is_parent_allocated = widget_type == "SplitView";
+            // Dialog auto-sizes from content (layout_dialog_children handles sizing + centering)
+            let should_auto_size = auto_size_from_children || (!is_parent_allocated && widget_type != "Dialog" && (current_layout.width == 0.0 || current_layout.height == 0.0));
             if should_auto_size {
                 node.widget.set_layout(crate::layout::Layout::new(
                     current_layout.x,
@@ -847,8 +940,11 @@ pub fn perform_layout(&mut self, font_atlas: &FontAtlas) {
 
         match orientation {
             crate::widgets::SplitOrientation::Horizontal => {
-                let first_width = layout.width * ratio - thickness / 2.0;
-                let second_width = layout.width * (1.0 - ratio) - thickness / 2.0;
+                // Clamp child widths to minimum 0.0 — negative sizes cause
+                // layout_panel_children to skip propagation entirely, leaving
+                // PreviewWindow and other content invisible.
+                let first_width = f32::max(0.0, layout.width * ratio - thickness / 2.0);
+                let second_width = f32::max(0.0, layout.width * (1.0 - ratio) - thickness / 2.0);
                 let second_x = layout.width * ratio + thickness / 2.0;
 
                 if let Some(node) = self.nodes.get_mut(&children[0]) {
@@ -869,8 +965,8 @@ pub fn perform_layout(&mut self, font_atlas: &FontAtlas) {
                 }
             }
             crate::widgets::SplitOrientation::Vertical => {
-                let first_height = layout.height * ratio - thickness / 2.0;
-                let second_height = layout.height * (1.0 - ratio) - thickness / 2.0;
+                let first_height = f32::max(0.0, layout.height * ratio - thickness / 2.0);
+                let second_height = f32::max(0.0, layout.height * (1.0 - ratio) - thickness / 2.0);
                 let second_y = layout.height * ratio + thickness / 2.0;
 
                 if let Some(node) = self.nodes.get_mut(&children[0]) {
@@ -922,10 +1018,12 @@ pub fn perform_layout(&mut self, font_atlas: &FontAtlas) {
 
         for &child_id in &children {
             let child_type = self.nodes.get(&child_id).map(|n| n.widget.widget_type()).unwrap_or("");
-            if child_type == "SplitView" || child_type == "Dialog" {
-                // SplitView/Dialog that fills the Panel: always sync size to Panel dimensions.
-                // These are parent-allocated containers — their size must track the Panel
+            if child_type == "SplitView" {
+                // SplitView that fills the Panel: always sync size to Panel dimensions.
+                // SplitView is a parent-allocated container — its size must track the Panel
                 // even after initial creation, so drag-resize works correctly.
+                // Dialog is NOT parent-allocated — it should auto-size from content and
+                // center on screen, not fill the Panel.
                 if let Some(node) = self.nodes.get_mut(&child_id) {
                     let child_layout = *node.widget.layout();
                     // Compute the fill dimensions: if at (0,0) fill the whole Panel;
@@ -946,17 +1044,21 @@ pub fn perform_layout(&mut self, font_atlas: &FontAtlas) {
                 }
             } else if child_type == "TabWidget" || child_type == "ScrollView" || child_type == "PreviewWindow" || child_type == "TreeView" || child_type == "GridView" {
                 // Content containers: always fill remaining space within the Panel.
+                // TreeView now lives in its own Panel (inside SplitView), so it can safely
+                // fill both width and height without overlapping other widgets.
                 // These widgets display content that should scale with available space,
                 // not just when initially created (0×0). On SplitView drag the Panel
                 // changes size but these containers must re-fill to avoid invisible
                 // or un-clickable regions outside the old bounds.
+                // Clamp fill dimensions to minimum 1.0 instead of skipping entirely —
+                // skipping leaves stale layouts that make PreviewWindow invisible.
                 if let Some(node) = self.nodes.get_mut(&child_id) {
                     let child_layout = *node.widget.layout();
-                    let fill_width = panel_layout.width - child_layout.x;
-                    let fill_height = panel_layout.height - child_layout.y;
+                    let fill_width = f32::max(1.0, panel_layout.width - child_layout.x);
+                    let fill_height = f32::max(1.0, panel_layout.height - child_layout.y);
                     let needs_update = child_layout.width != fill_width 
                         || child_layout.height != fill_height;
-                    if needs_update && fill_width > 0.0 && fill_height > 0.0 {
+                    if needs_update {
                         node.widget.set_layout(crate::layout::Layout::new(
                             child_layout.x,
                             child_layout.y,
@@ -1060,9 +1162,7 @@ pub fn perform_layout(&mut self, font_atlas: &FontAtlas) {
         let mut max_content_width: f32 = 0.0;
         let mut child_sizes = Vec::new();
         for &child_id in &children {
-            let size = self.nodes.get(&child_id)
-                .map(|n| n.widget.as_ref().measure(font_atlas))
-                .unwrap_or((0.0, 0.0));
+            let size = self.measure_and_layout(child_id, font_atlas);
             child_sizes.push(size);
             total_content_height += size.1;
             max_content_width = max_content_width.max(size.0);
@@ -1075,12 +1175,22 @@ pub fn perform_layout(&mut self, font_atlas: &FontAtlas) {
             if let Some(node) = self.nodes.get_mut(&child_id) {
                 let child_layout = *node.widget.layout();
                 // Fill width to ScrollView width, position vertically with scroll offset
+                let new_width = sv_layout.width.max(w).max(child_layout.width);
+                // Child must fill at least the ScrollView viewport height —
+                // content-fill widgets (GridView, TreeView) need a non-zero height
+                // to render items; height=0 causes draw() to skip all items.
+                let new_height = h.max(child_layout.height).max(sv_layout.height);
+                let needs_remeasure = new_width != child_layout.width || new_height != child_layout.height;
                 node.widget.set_layout(crate::layout::Layout::new(
                     0.0,
                     current_y,
-                    sv_layout.width.max(w).max(child_layout.width),
-                    h.max(child_layout.height),
+                    new_width,
+                    new_height,
                 ));
+                // If the child's size changed, re-layout its children so they fill the new dimensions
+                if needs_remeasure {
+                    self.measure_and_layout(child_id, font_atlas);
+                }
             }
             current_y += h;
         }
@@ -1094,11 +1204,11 @@ pub fn perform_layout(&mut self, font_atlas: &FontAtlas) {
     }
 
     fn layout_dialog_children(&mut self, id: WidgetId, font_atlas: &crate::font_atlas::FontAtlas) {
-        // Get Dialog properties: content_id, title_bar_height, button_height, content_scale
+        // Get Dialog properties: content_id, title_bar_height, button_height, content_scale, content_padding
         let dialog_info = {
             if let Some(node) = self.nodes.get(&id) {
                 if let Some(dialog) = node.widget.as_any().downcast_ref::<crate::widgets::Dialog>() {
-                    (dialog.content_id, dialog.title_bar_height, dialog.button_height, dialog.content_scale, *dialog.layout())
+                    (dialog.content_id, dialog.title_bar_height, dialog.button_height, dialog.content_scale, dialog.content_padding, *dialog.layout())
                 } else {
                     return;
                 }
@@ -1107,11 +1217,12 @@ pub fn perform_layout(&mut self, font_atlas: &FontAtlas) {
             }
         };
 
-        let (content_id, title_bar_height, button_height, content_scale, dialog_layout) = dialog_info;
-        let scaled_title_height = title_bar_height * content_scale;
-        let scaled_button_height = button_height * content_scale;
-        // Button area has 10px padding above buttons
-        let button_area_height = scaled_button_height + 10.0 * content_scale;
+        let (content_id, title_bar_height, button_height, content_scale, content_padding, dialog_layout) = dialog_info;
+        // All calculations in logical pixel coordinates (content_scale applied in draw())
+        let title_height = title_bar_height;  // logical: 36
+        let button_height_logical = button_height;  // logical: 36
+        // Button area has 10px logical padding above buttons
+        let button_area_height = button_height_logical + 10.0;
 
         // Measure content children to compute required height for auto-sizing
         // Use measure() only (not measure_and_layout) to avoid recursive layout_dialog_children
@@ -1146,28 +1257,34 @@ pub fn perform_layout(&mut self, font_atlas: &FontAtlas) {
             };
             let required_content_height = children_total_height + spacing_total + padding.top + padding.bottom;
 
-            let content_y = scaled_title_height;
-            let content_width = dialog_layout.width;
+            // content positioned with padding inside Dialog
+            let content_y = title_height + content_padding;
+            let content_x = content_padding;
+            let content_width = dialog_layout.width - content_padding * 2.0;
 
-            // Auto-size: if dialog is too small for content, expand it
-            let min_dialog_height = required_content_height + scaled_title_height + button_area_height;
+            // Auto-size: if dialog is too small for content, expand it (all logical values)
+            let min_dialog_height = required_content_height + title_height + button_area_height + content_padding * 2.0;
             let dialog_height = if dialog_layout.height < min_dialog_height {
                 min_dialog_height
             } else {
                 dialog_layout.height
             };
 
-            let content_height = dialog_height - scaled_title_height - button_area_height;
+            let content_height = dialog_height - title_height - button_area_height - content_padding * 2.0;
 
             if content_height <= 0.0 {
                 return;
             }
 
-            // Update Dialog layout if height changed, and re-center it on screen
-            if dialog_height > dialog_layout.height {
-                let screen_size = crate::thunk::ui_get_screen_size();
-                let new_x = (screen_size.0 - dialog_layout.width) / 2.0;
-                let new_y = (screen_size.1 - dialog_height) / 2.0;
+// Update Dialog layout if height changed, and re-center it on screen (logical coordinates)
+                if dialog_height > dialog_layout.height {
+                    let screen_size = crate::thunk::ui_get_screen_size();
+                    let content_scale = crate::thunk::ui_get_content_scale();
+                    // Convert physical screen size to logical for centering in UI coordinate system
+                    let logical_screen_w = screen_size.0 / content_scale;
+                    let logical_screen_h = screen_size.1 / content_scale;
+                    let new_x = (logical_screen_w - dialog_layout.width) / 2.0;
+                    let new_y = (logical_screen_h - dialog_height) / 2.0;
                 if let Some(node) = self.nodes.get_mut(&id) {
                     node.widget.set_layout(crate::layout::Layout::new(
                         new_x,
@@ -1178,10 +1295,10 @@ pub fn perform_layout(&mut self, font_atlas: &FontAtlas) {
                 }
             }
 
-            // Position the content widget inside the content_rect area
+            // Position the content widget inside the content_rect area (with padding)
             if let Some(node) = self.nodes.get_mut(&content_widget_id) {
                 node.widget.set_layout(crate::layout::Layout::new(
-                    0.0,
+                    content_x,
                     content_y,
                     content_width,
                     content_height,
@@ -1260,10 +1377,9 @@ pub fn perform_layout(&mut self, font_atlas: &FontAtlas) {
         let mut render_data = Vec::new();
         
         if let Some(root_id) = self.root {
-            self.generate_render_data_recursive(root_id, 0.0, 0.0, &mut render_data, font_atlas);
+            self.generate_render_data_recursive(root_id, 0.0, 0.0, &mut render_data, font_atlas, None);
         }
         
-        render_data.sort_by_key(|r| r.layer);
         render_data
     }
     
@@ -1274,12 +1390,80 @@ pub fn perform_layout(&mut self, font_atlas: &FontAtlas) {
         parent_abs_y: f32,
         render_data: &mut Vec<RenderData>,
         font_atlas: &FontAtlas,
+        parent_clip: Option<Rect>,
     ) {
+        // Check if this widget is an open Dropdown — popup needs to escape parent ClipRect
+        let is_open_dropdown = self.nodes.get(&id)
+            .map(|n| {
+                if n.widget.as_ref().widget_type() == "Dropdown" {
+                    n.widget.as_ref().as_any().downcast_ref::<crate::widgets::Dropdown>()
+                        .map(|d| d.is_open())
+                        .unwrap_or(false)
+                } else {
+                    false
+                }
+            })
+            .unwrap_or(false);
+        
+        // 每10帧日志： Dropdown输出abs位置+parent_clip+parent chain深度4层（在mutable borrow之前计算parent信息）
+        let dropdown_parent_chain: Vec<String> = if is_open_dropdown || self.nodes.get(&id).map(|n| n.widget.as_ref().widget_type() == "Dropdown").unwrap_or(false) {
+            let mut chain = Vec::new();
+            let mut cur = id;
+            for _ in 0..4 {
+                if let Some(pid) = self.parent_map.get(&cur).copied() {
+                    if let Some(pt) = self.nodes.get(&pid).map(|pn| pn.widget.widget_type().to_string()) {
+                        chain.push(pt);
+                    }
+                    cur = pid;
+                } else { break; }
+            }
+            chain
+        } else { Vec::new() };
+
+        // If open Dropdown inside a ClipRect scope, insert ClearClip before its render_data
+        // so the popup area is not clipped by parent ScrollView/TreeView
+        if is_open_dropdown && parent_clip.is_some() {
+            render_data.push(RenderData {
+                draw_commands: vec![DrawCommand::ClearClip],
+                bounds: Rect::zero(),
+                z_index: 0,
+                layer: RenderLayer::Popup,
+                widget_id: id.id,
+            });
+        }
+
         if let Some(node) = self.nodes.get_mut(&id) {
+            // Skip invisible widgets entirely (visible=false set via ui_set_widget_visible)
+            if !node.widget.as_ref().flags().visible {
+                // If open Dropdown, restore ClipRect even when skipping
+                if is_open_dropdown && parent_clip.is_some() {
+                    let clip = parent_clip.unwrap();
+                    render_data.push(RenderData {
+                        draw_commands: vec![DrawCommand::ClipRect { rect: clip }],
+                        bounds: clip,
+                        z_index: 0,
+                        layer: RenderLayer::Content,
+                        widget_id: id.id,
+                    });
+                }
+                return;
+            }
+
             // Skip hidden Dialog and its children entirely
             if node.widget.as_ref().widget_type() == "Dialog" {
                 if let Some(dialog) = node.widget.as_ref().as_any().downcast_ref::<crate::widgets::Dialog>() {
                     if !dialog.is_visible() {
+                        // If open Dropdown, restore ClipRect even when skipping
+                        if is_open_dropdown && parent_clip.is_some() {
+                            let clip = parent_clip.unwrap();
+                            render_data.push(RenderData {
+                                draw_commands: vec![DrawCommand::ClipRect { rect: clip }],
+                                bounds: clip,
+                                z_index: 0,
+                                layer: RenderLayer::Content,
+                                widget_id: id.id,
+                            });
+                        }
                         return;
                     }
                 }
@@ -1289,7 +1473,12 @@ pub fn perform_layout(&mut self, font_atlas: &FontAtlas) {
                 let layout = *node.widget.as_ref().layout();
                 let abs_x = parent_abs_x + layout.x;
                 let abs_y = parent_abs_y + layout.y;
-                let layer = node.layer;
+                // Open Dropdown renders on Popup layer so it appears above other content
+                let layer = if is_open_dropdown {
+                    RenderLayer::Popup
+                } else {
+                    node.layer
+                };
                 
                 let mut canvas = Canvas::with_font_atlas(font_atlas as *const FontAtlas, 0);
                 node.widget.as_mut().draw(&mut canvas);
@@ -1299,6 +1488,10 @@ pub fn perform_layout(&mut self, font_atlas: &FontAtlas) {
                     .iter()
                     .map(|cmd| Self::offset_draw_command(cmd, abs_x, abs_y))
                     .collect();
+
+                // 每10帧日志： Dropdown输出abs位置+parent_clip+parent chain深度4层
+                if node.widget.as_ref().widget_type() == "Dropdown" {
+                    }
 
                 render_data.push(RenderData {
                     draw_commands: absolute_commands,
@@ -1312,9 +1505,25 @@ pub fn perform_layout(&mut self, font_atlas: &FontAtlas) {
             }
         }
 
-        // Check if this widget is a ScrollView — apply ClipRect + scroll offset to children
+        // If open Dropdown inside a ClipRect scope, restore ClipRect after its render_data
+        if is_open_dropdown && parent_clip.is_some() {
+            let clip = parent_clip.unwrap();
+            render_data.push(RenderData {
+                draw_commands: vec![DrawCommand::ClipRect { rect: clip }],
+                bounds: clip,
+                z_index: 0,
+                layer: RenderLayer::Content,
+                widget_id: id.id,
+            });
+        }
+
+// Check if this widget is a ScrollView — apply ClipRect + scroll offset to children
+        // Also update parent_clip for children so open Dropdowns can escape this clip
         let is_scroll_view = self.nodes.get(&id)
             .map(|n| n.widget.as_ref().widget_type() == "ScrollView")
+            .unwrap_or(false);
+        let is_tree_view = self.nodes.get(&id)
+            .map(|n| n.widget.as_ref().widget_type() == "TreeView")
             .unwrap_or(false);
         let scroll_offset_y = if is_scroll_view {
             self.nodes.get(&id)
@@ -1325,23 +1534,28 @@ pub fn perform_layout(&mut self, font_atlas: &FontAtlas) {
             0.0
         };
 
-        // For ScrollView: add ClipRect before children, then ClearClip after
-        if is_scroll_view {
-            let layout = self.nodes.get(&id).map(|n| *n.widget.layout()).unwrap_or_default();
-            let abs_x = parent_abs_x + layout.x;
-            let abs_y = parent_abs_y + layout.y;
+        // For ScrollView or TreeView: add ClipRect before children, update parent_clip
+        let new_parent_clip = if is_scroll_view || is_tree_view {
+            let clip_layout = self.nodes.get(&id).map(|n| *n.widget.layout()).unwrap_or_default();
+            let clip_abs_x = parent_abs_x + clip_layout.x;
+            let clip_abs_y = parent_abs_y + clip_layout.y;
+            let clip_rect = Rect::new(clip_abs_x, clip_abs_y, clip_layout.width, clip_layout.height);
             
-            // ClipRect: viewport area (clip children to ScrollView bounds)
+            // ScrollView ClipRect diagnostic
             render_data.push(RenderData {
                 draw_commands: vec![DrawCommand::ClipRect { 
-                    rect: Rect::new(abs_x, abs_y, layout.width, layout.height) 
+                    rect: clip_rect
                 }],
-                bounds: Rect::new(abs_x, abs_y, layout.width, layout.height),
+                bounds: Rect::new(clip_abs_x, clip_abs_y, clip_layout.width, clip_layout.height),
                 z_index: 0,
                 layer: self.nodes.get(&id).map(|n| n.layer).unwrap_or_default(),
                 widget_id: id.id,
             });
-        }
+            Some(clip_rect)
+        } else {
+            // No new clip from this widget — pass through parent's clip
+            parent_clip
+        };
 
         let layout = self.nodes.get(&id).map(|n| *n.widget.layout()).unwrap_or_default();
         let abs_x = parent_abs_x + layout.x;
@@ -1372,12 +1586,21 @@ pub fn perform_layout(&mut self, font_atlas: &FontAtlas) {
             abs_y
         };
         
+        // 每30帧日志： VStack/HStack在ScrollView内部时输出parent_clip传递状态
+        let wtype = self.nodes.get(&id).map(|n| n.widget.as_ref().widget_type()).unwrap_or("");
+        if wtype == "VStack" || wtype == "HStack" {
+            let ptype = self.parent_map.get(&id)
+                .and_then(|pid| self.nodes.get(pid))
+                .map(|pn| pn.widget.widget_type())
+                .unwrap_or("");
+            }
+
         for child in children {
-            self.generate_render_data_recursive(child, abs_x, child_abs_y, render_data, font_atlas);
+            self.generate_render_data_recursive(child, abs_x, child_abs_y, render_data, font_atlas, new_parent_clip);
         }
 
-        // For ScrollView: ClearClip after all children are rendered
-        if is_scroll_view {
+        // For ScrollView or TreeView: ClearClip after all children are rendered
+        if is_scroll_view || is_tree_view {
             render_data.push(RenderData {
                 draw_commands: vec![DrawCommand::ClearClip],
                 bounds: Rect::new(abs_x, abs_y, layout.width, layout.height),
@@ -1387,7 +1610,6 @@ pub fn perform_layout(&mut self, font_atlas: &FontAtlas) {
             });
         }
     }
-    
     fn offset_draw_command(cmd: &DrawCommand, offset_x: f32, offset_y: f32) -> DrawCommand {
         match cmd {
             DrawCommand::Rect { bounds, width, height, fill_color, stroke_color, stroke_width, border_radius } => {

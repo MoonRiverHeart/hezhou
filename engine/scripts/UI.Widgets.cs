@@ -309,6 +309,17 @@ public static ulong GetRootId()
             func(_widgetTree, widgetId, r, g, b, a);
         }
 
+        public static void SetWidgetVisible(ulong widgetId, bool visible)
+        {
+            if (_ffi.ui_set_widget_visible == IntPtr.Zero)
+            {
+                Log.Error("C#", "SetWidgetVisible函数指针为空");
+                return;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<SetWidgetVisibleDelegate>(_ffi.ui_set_widget_visible);
+            func(_widgetTree, widgetId, visible);
+        }
+
         public static void DebugPrintUITree()
         {
             if (_ffi.ui_debug_print_widget_tree == IntPtr.Zero)
@@ -410,6 +421,25 @@ public static ulong GetRootId()
             float[] buffer = new float[4];
             IntPtr outLayout = Marshal.AllocHGlobal(4 * 4); // float[4] = 16 bytes
             var func = Marshal.GetDelegateForFunctionPointer<WidgetGetLayoutDelegate>(_ffi.ui_widget_get_layout);
+            uint found = func(_widgetTree, widgetId, outLayout);
+            if (found == 1)
+            {
+                Marshal.Copy(outLayout, buffer, 0, 4);
+            }
+            Marshal.FreeHGlobal(outLayout);
+            return buffer;
+        }
+
+        public static float[] WidgetGetAbsoluteLayout(ulong widgetId)
+        {
+            if (_ffi.ui_widget_get_absolute_layout == IntPtr.Zero)
+            {
+                Log.Error("C#", "WidgetGetAbsoluteLayout函数指针为空");
+                return new float[] { 0, 0, 0, 0 };
+            }
+            float[] buffer = new float[4];
+            IntPtr outLayout = Marshal.AllocHGlobal(4 * 4); // float[4] = 16 bytes
+            var func = Marshal.GetDelegateForFunctionPointer<WidgetGetAbsoluteLayoutDelegate>(_ffi.ui_widget_get_absolute_layout);
             uint found = func(_widgetTree, widgetId, outLayout);
             if (found == 1)
             {

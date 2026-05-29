@@ -50,3 +50,17 @@ Each widget implements `Widget` trait (id, parent, children, layout, style, stat
 - NEVER call `create_font_atlas()` — use `crate::font_atlas::get_font_atlas()` (OnceLock)
 - NEVER call `calculate_size()` in `add_item()` — defer to `show()` or `measure()`
 - NEVER skip adding widget type to `widget_tree.rs measure_and_layout` match
+- NEVER treat Dialog as parent-allocated — Dialog不fill Panel，应自适应内容+居中
+
+## Bug Fix History
+
+### Dialog content_padding修复 (2026-05-30)
+**现象**: Dialog内容与边界之间没有间距，下、右边界贴着窗口边缘。
+**根因**: Dialog被当作parent-allocated容器强制fill Panel，没有content_padding。
+**修复**: 
+1. Dialog从`layout_panel_children`的fill-Panel列表移除(只保留SplitView)
+2. `is_parent_allocated`不再包含Dialog
+3. `widgets/dialog.rs`新增`content_padding: 16.0`(pub(crate)) — 16逻辑像素内边距
+4. `layout_dialog_children`用padding定位content(`content_x=padding`, `content_y=title+padding`)
+5. `get_content_rect()`使用content_padding计算带内边距的content区域
+**文件**: `widget_tree.rs` layout_panel_children + layout_dialog_children, `widgets/dialog.rs` content_padding + get_content_rect

@@ -1,10 +1,11 @@
 use crate::ecs::*;
+use std::any::Any;
 use std::collections::HashMap;
 
 pub struct World {
     next_entity_id: EntityId,
     entities: HashMap<EntityId, Entity>,
-    components: HashMap<ComponentTypeId, HashMap<EntityId, Vec<u8>>>,
+    components: HashMap<ComponentTypeId, HashMap<EntityId, Box<dyn Any>>>,
     scheduler: SystemScheduler,
     parent_map: HashMap<EntityId, Option<EntityId>>,
 }
@@ -44,34 +45,27 @@ impl World {
         self.entities.contains_key(&entity.id)
     }
 
-    pub fn add_component<T: Component>(&mut self, entity: Entity, component: T) {
+    pub fn add_component<T: Component + 'static>(&mut self, entity: Entity, component: T) {
         let type_id = T::type_id();
 
         if !self.components.contains_key(&type_id) {
             self.components.insert(type_id, HashMap::new());
         }
 
-        let component_data = unsafe {
-            let ptr = &component as *const T as *const u8;
-            std::slice::from_raw_parts(ptr, std::mem::size_of::<T>())
-        };
-
         self.components
             .get_mut(&type_id)
             .unwrap()
-            .insert(entity.id, component_data.to_vec());
+            .insert(entity.id, Box::new(component));
     }
 
-    pub fn get_component<T: Component + Clone>(&self, entity: Entity) -> Option<T> {
+    pub fn get_component<T: Component + Clone + 'static>(&self, entity: Entity) -> Option<T> {
         let type_id = T::type_id();
 
         self.components
             .get(&type_id)
             .and_then(|map| map.get(&entity.id))
-            .map(|data| unsafe {
-                let ptr = data.as_ptr() as *const T;
-                (*ptr).clone()
-            })
+            .and_then(|boxed| boxed.downcast_ref::<T>())
+            .cloned()
     }
 
     pub fn has_component<T: Component>(&self, entity: Entity) -> bool {

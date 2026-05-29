@@ -11,6 +11,7 @@ hezhou-platform = { path = "../platform" }
 parking_lot = "0.12"
 uuid = { version = "1.10", features = ["v4", "serde"] }
 fontdue = "0.9"
+swash = "0.2"
 unicode-segmentation = "1.13.2"
 arboard = "3.4"
 

@@ -51,6 +51,30 @@ pub extern "C" fn scene_create_plane_editor(scene: *mut std::ffi::c_void) -> u64
 }
 
 #[unsafe(no_mangle)]
+pub extern "C" fn scene_create_bunny_editor(scene: *mut std::ffi::c_void) -> u64 {
+    if scene.is_null() {
+        return 0;
+    }
+    unsafe {
+        let scene_ptr = scene as *mut hezhou_core::Scene;
+        let entity = (*scene_ptr).create_bunny();
+        entity.id
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn scene_create_cornell_box_editor(scene: *mut std::ffi::c_void) -> u64 {
+    if scene.is_null() {
+        return 0;
+    }
+    unsafe {
+        let scene_ptr = scene as *mut hezhou_core::Scene;
+        let entity = (*scene_ptr).create_cornell_box();
+        entity.id
+    }
+}
+
+#[unsafe(no_mangle)]
 pub extern "C" fn scene_create_directional_light_editor(scene: *mut std::ffi::c_void) -> u64 {
     if scene.is_null() {
         return 0;

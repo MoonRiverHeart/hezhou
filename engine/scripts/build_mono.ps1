@@ -27,6 +27,7 @@ $UiWidgetsFile = "$ScriptsDir/UI.Widgets.cs"
 $UiComplexWidgetsFile = "$ScriptsDir/UI.ComplexWidgets.cs"
 $UiNewWidgetsFile = "$ScriptsDir/UI.NewWidgets.cs"
 $UiSceneFile = "$ScriptsDir/UI.Scene.cs"
+$UiPipelineFile = "$ScriptsDir/UI.Pipeline.cs"
 $UiAssetProjectFile = "$ScriptsDir/UI.AssetProject.cs"
 $DfxFile = "$ScriptsDir/DFX.cs"
 $EditorFile = "$ScriptsDir/EditorScript.cs"
@@ -41,6 +42,7 @@ Write-Host "[Info] Including: $UiWidgetsFile"
 Write-Host "[Info] Including: $UiComplexWidgetsFile"
 Write-Host "[Info] Including: $UiNewWidgetsFile"
 Write-Host "[Info] Including: $UiSceneFile"
+Write-Host "[Info] Including: $UiPipelineFile"
 Write-Host "[Info] Including: $UiAssetProjectFile"
 Write-Host "[Info] Including: $DfxFile"
 Write-Host "[Info] Including: $EditorFile"
@@ -50,7 +52,7 @@ Write-Host "[Info] Including: $EditorPresenterFile"
 Write-Host "[Info] Including: $TestFile"
 Write-Host "[Info] Including: $UITestRunnerFile"
 
-$SourceFiles = @($SourceFile, $UiFile, $UiWidgetsFile, $UiComplexWidgetsFile, $UiNewWidgetsFile, $UiSceneFile, $UiAssetProjectFile, $DfxFile, $EditorFile, $EditorStateFile, $EditorViewFile, $EditorPresenterFile, $TestFile, $UITestRunnerFile)
+$SourceFiles = @($SourceFile, $UiFile, $UiWidgetsFile, $UiComplexWidgetsFile, $UiNewWidgetsFile, $UiSceneFile, $UiPipelineFile, $UiAssetProjectFile, $DfxFile, $EditorFile, $EditorStateFile, $EditorViewFile, $EditorPresenterFile, $TestFile, $UITestRunnerFile)
 foreach ($file in $SourceFiles) {
     if (-not (Test-Path $file)) {
         Write-Host "[Error] Source file not found: $file" -ForegroundColor Red
