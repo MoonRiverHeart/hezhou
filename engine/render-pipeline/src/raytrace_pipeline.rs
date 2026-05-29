@@ -30,6 +30,34 @@ use crate::resource::{PipelineResources, PipelineResourceDesc};
 use crate::bvh::Bvh;
 use crate::raster_pipeline::LightUboData;
 
+// === EmissiveTriangle数据布局 — 80 bytes, vec4 packing, 严格匹配GLSL std430 ===
+//
+// GLSL EmissiveTriangle struct布局:
+// ```glsl
+// struct EmissiveTriangle {
+//     vec4 v0_area;    // v0.xyz + triangle_area (offset 0, 16 bytes)
+//     vec4 v1_pad;     // v1.xyz + 0(pad) (offset 16, 16 bytes)
+//     vec4 v2_pad;     // v2.xyz + 0(pad) (offset 32, 16 bytes)
+//     vec4 normal_pad; // normal.xyz + 0(pad) (offset 48, 16 bytes)
+//     vec4 color_int;  // color.xyz + intensity (offset 64, 16 bytes)
+// };
+// // 总计: 80 bytes per emissive triangle
+// ```
+#[repr(C)]
+#[derive(Clone, Copy, Pod, Zeroable)]
+struct EmissiveTriangle {
+    /// 顶点v0坐标 + 三角形面积 [v0.x, v0.y, v0.z, area]
+    v0_area: [f32; 4],
+    /// 顶点v1坐标 + padding [v1.x, v1.y, v1.z, 0.0]
+    v1_pad: [f32; 4],
+    /// 顶点v2坐标 + padding [v2.x, v2.y, v2.z, 0.0]
+    v2_pad: [f32; 4],
+    /// 面法线 + padding [normal.x, normal.y, normal.z, 0.0]
+    normal_pad: [f32; 4],
+    /// 光源颜色 + 强度 [color.x, color.y, color.z, intensity]
+    color_int: [f32; 4],
+}
+
 // === Push Constant数据布局 — 40 bytes, 严格匹配GLSL std430 ===
 //
 // GLSL PushConstants struct布局:
@@ -38,7 +66,7 @@ use crate::raster_pipeline::LightUboData;
 //     vec3 camera_pos;    // offset 0, size 12
 //     float camera_yaw;   // offset 12, size 4 (填充vec3→vec4空隙)
 //     float camera_pitch; // offset 16, size 4
-//     float _pad1;        // offset 20, size 4
+//     float emissive_count; // offset 20, size 4 (原_pad1改为emissive三角形数量)
 //     vec2 viewport_size; // offset 24, size 8
 //     float fov;          // offset 32, size 4
 //     float _pad2;        // offset 36, size 4
@@ -49,7 +77,7 @@ use crate::raster_pipeline::LightUboData;
 // - camera_pos(vec3): offset 0, size 12 ✓
 // - camera_yaw(float): offset 12, size 4 ✓ (填充vec3空隙)
 // - camera_pitch(float): offset 16, size 4 ✓
-// - _pad1(float): offset 20, size 4 ✓
+// - emissive_count(float): offset 20, size 4 ✓ (原_pad1字段，布局不变)
 // - viewport_size(vec2): offset 24, alignment 8 → 24 % 8 == 0 ✓
 // - fov(float): offset 32, size 4 ✓
 // - _pad2(float): offset 36, size 4 ✓
@@ -66,9 +94,9 @@ pub struct RayTracePushConstant {
     /// 摄像机pitch角度（弧度） — GLSL float camera_pitch
     /// offset 16-19, 4 bytes
     pub camera_pitch: f32,
-    /// 对齐padding — GLSL float _pad1
-    /// offset 20-23, 4 bytes
-    pub _pad1: f32,
+    /// emissive三角形数量 — GLSL float emissive_count
+    /// offset 20-23, 4 bytes (原_pad1字段，用于路径追踪NEE)
+    pub emissive_count: f32,
     /// 视口尺寸（像素） — GLSL vec2 viewport_size
     /// offset 24-31, 8 bytes
     pub viewport_size: [f32; 2],
@@ -133,6 +161,10 @@ pub struct RayTracePipeline {
     color_storage_buffer: vk::Buffer,
     /// 颜色buffer内存
     color_storage_buffer_memory: vk::DeviceMemory,
+    /// emissive三角形SSBO (EmissiveTriangle[]: 80 bytes each)
+    emissive_storage_buffer: vk::Buffer,
+    /// emissive buffer内存
+    emissive_storage_buffer_memory: vk::DeviceMemory,
 
     // === Output storage image ===
     /// 输出storage image (rgba8)
@@ -159,6 +191,10 @@ pub struct RayTracePipeline {
     mesh_indices: Vec<u32>,
     /// 平铺颜色数据: [r,g,b,a,r,g,b,a,...] — vec4格式, alpha>1.5=emissive
     mesh_colors_flat: Vec<f32>,
+    /// emissive三角形数据: EmissiveTriangle数组(80 bytes each)
+    emissive_triangles: Vec<EmissiveTriangle>,
+    /// emissive三角形数量
+    emissive_count: u32,
 
     // === Buffer容量追踪 — 动态resize时只增不减 ===
     /// BVH buffer当前分配容量（字节）
@@ -169,6 +205,8 @@ pub struct RayTracePipeline {
     index_buffer_cap: usize,
     /// Color buffer当前分配容量（字节）
     color_buffer_cap: usize,
+    /// Emissive buffer当前分配容量（字节）
+    emissive_buffer_cap: usize,
 
     // === Resize support ===
     /// 物理设备内存属性（resize output_image和storage buffer时需要分配新memory）
@@ -278,6 +316,7 @@ impl RayTracePipeline {
         let vertex_buffer_cap = (initial_vertex_count * 16).max(16);
         let index_buffer_cap = (initial_index_count * 4).max(4);
         let color_buffer_cap = (initial_vertex_count * 16).max(16);
+        let emissive_buffer_cap = 16; // 初始16字节，动态增长
 
         let (bvh_buffer, bvh_buffer_memory) = Self::create_storage_buffer(
             &device, &memory_properties, bvh_buffer_cap,
@@ -293,6 +332,9 @@ impl RayTracePipeline {
         );
         let (color_storage_buffer, color_storage_buffer_memory) = Self::create_storage_buffer(
             &device, &memory_properties, color_buffer_cap,
+        );
+        let (emissive_storage_buffer, emissive_storage_buffer_memory) = Self::create_storage_buffer(
+            &device, &memory_properties, emissive_buffer_cap,
         );
 
         // 7. 创建output storage image (rgba8)
@@ -324,6 +366,8 @@ impl RayTracePipeline {
             32,
             color_storage_buffer,
             color_buffer_cap,
+            emissive_storage_buffer,
+            emissive_buffer_cap,
         );
         Self::update_output_descriptor_set(
             &device,
@@ -344,8 +388,13 @@ impl RayTracePipeline {
         let mesh_vertices_flat: Vec<f32> = Vec::new();
         let mesh_indices: Vec<u32> = Vec::new();
         let mesh_colors_flat: Vec<f32> = Vec::new();
+        let emissive_triangles: Vec<EmissiveTriangle> = Vec::new();
+        let emissive_count: u32 = 0;
         let color_bytes = bytemuck::cast_slice(&mesh_colors_flat);
         Self::upload_to_buffer(&device, color_storage_buffer_memory, color_bytes);
+        // 上传初始emissive数据（空）
+        let emissive_bytes = bytemuck::cast_slice(&emissive_triangles);
+        Self::upload_to_buffer(&device, emissive_storage_buffer_memory, emissive_bytes);
 
         Self {
             compute_pipeline,
@@ -366,6 +415,8 @@ impl RayTracePipeline {
             light_ubo_memory,
             color_storage_buffer,
             color_storage_buffer_memory,
+            emissive_storage_buffer,
+            emissive_storage_buffer_memory,
             output_image,
             output_image_memory,
             output_image_view,
@@ -376,10 +427,13 @@ impl RayTracePipeline {
             mesh_vertices_flat,
             mesh_indices,
             mesh_colors_flat,
+            emissive_triangles,
+            emissive_count,
             bvh_buffer_cap,
             vertex_buffer_cap,
             index_buffer_cap,
             color_buffer_cap,
+            emissive_buffer_cap,
             memory_properties,
             first_frame: true,  // 初始帧output_image从UNDEFINED layout开始
             deferred_destroy_image_views: Vec::new(),
@@ -452,6 +506,8 @@ impl Drop for RayTracePipeline {
             self.device.free_memory(self.light_ubo_memory, None);
             self.device.destroy_buffer(self.color_storage_buffer, None);
             self.device.free_memory(self.color_storage_buffer_memory, None);
+            self.device.destroy_buffer(self.emissive_storage_buffer, None);
+            self.device.free_memory(self.emissive_storage_buffer_memory, None);
 
             // Output image + memory + view
             self.device.destroy_image_view(self.output_image_view, None);
@@ -535,6 +591,15 @@ impl RayTracePipeline {
             // binding 4: vertex colors SSBO
             vk::DescriptorSetLayoutBinding {
                 binding: 4,
+                descriptor_type: vk::DescriptorType::STORAGE_BUFFER,
+                descriptor_count: 1,
+                stage_flags: vk::ShaderStageFlags::COMPUTE,
+                p_immutable_samplers: std::ptr::null(),
+                ..Default::default()
+            },
+            // binding 5: emissive triangles SSBO
+            vk::DescriptorSetLayoutBinding {
+                binding: 5,
                 descriptor_type: vk::DescriptorType::STORAGE_BUFFER,
                 descriptor_count: 1,
                 stage_flags: vk::ShaderStageFlags::COMPUTE,
@@ -772,7 +837,7 @@ impl RayTracePipeline {
 let pool_sizes = [
             vk::DescriptorPoolSize {
                 ty: vk::DescriptorType::STORAGE_BUFFER,
-                descriptor_count: 5,
+                descriptor_count: 6,
             },
             vk::DescriptorPoolSize {
                 ty: vk::DescriptorType::STORAGE_IMAGE,
@@ -821,7 +886,7 @@ let pool_sizes = [
         (descriptor_sets[0], descriptor_sets[1], descriptor_sets[2])
     }
 
-    /// 更新scene descriptor set — 绑定BVH + vertices + indices + light + colors buffers
+    /// 更新scene descriptor set — 绑定BVH + vertices + indices + light + colors + emissive buffers
     fn update_scene_descriptor_set(
         device: &ash::Device,
         descriptor_set: vk::DescriptorSet,
@@ -835,6 +900,8 @@ let pool_sizes = [
         light_size: usize,
         color_buffer: vk::Buffer,
         color_size: usize,
+        emissive_buffer: vk::Buffer,
+        emissive_size: usize,
     ) {
         let buffer_infos = [
             vk::DescriptorBufferInfo { buffer: bvh_buffer, offset: 0, range: bvh_size as u64 },
@@ -842,6 +909,7 @@ let pool_sizes = [
             vk::DescriptorBufferInfo { buffer: index_buffer, offset: 0, range: index_size as u64 },
             vk::DescriptorBufferInfo { buffer: light_buffer, offset: 0, range: light_size as u64 },
             vk::DescriptorBufferInfo { buffer: color_buffer, offset: 0, range: color_size as u64 },
+            vk::DescriptorBufferInfo { buffer: emissive_buffer, offset: 0, range: emissive_size as u64 },
         ];
 
         let writes = [
@@ -907,6 +975,20 @@ let pool_sizes = [
                 descriptor_type: vk::DescriptorType::STORAGE_BUFFER,
                 p_image_info: std::ptr::null(),
                 p_buffer_info: &buffer_infos[4],
+                p_texel_buffer_view: std::ptr::null(),
+                ..Default::default()
+            },
+            // binding 5: emissive triangles SSBO
+            vk::WriteDescriptorSet {
+                s_type: vk::StructureType::WRITE_DESCRIPTOR_SET,
+                p_next: std::ptr::null(),
+                dst_set: descriptor_set,
+                dst_binding: 5,
+                dst_array_element: 0,
+                descriptor_count: 1,
+                descriptor_type: vk::DescriptorType::STORAGE_BUFFER,
+                p_image_info: std::ptr::null(),
+                p_buffer_info: &buffer_infos[5],
                 p_texel_buffer_view: std::ptr::null(),
                 ..Default::default()
             },
@@ -1101,6 +1183,8 @@ let pool_sizes = [
         self.mesh_vertices_flat.clear();
         self.mesh_indices.clear();
         self.mesh_colors_flat.clear();
+        self.emissive_triangles.clear();
+        self.emissive_count = 0;
 
         if ctx.scene.is_null() {
             // Scene为空时不渲染任何几何体 — 不使用bunny回退
@@ -1185,6 +1269,93 @@ let pool_sizes = [
         } else {
             self.bvh_data = Bvh::empty();
         }
+
+        // 收集emissive三角形 — 遍历mesh_indices，每3个索引一个三角形
+        // 检查3个顶点的alpha(w分量)，如果任何一个>1.5 → emissive三角形
+        // 计算三角形面积、面法线、平均颜色，构建EmissiveTriangle数据
+        let tri_count = self.mesh_indices.len() / 3;
+        for tri_idx in 0..tri_count {
+            let i0 = self.mesh_indices[tri_idx * 3] as usize;
+            let i1 = self.mesh_indices[tri_idx * 3 + 1] as usize;
+            let i2 = self.mesh_indices[tri_idx * 3 + 2] as usize;
+
+            // 检查emissive标志: alpha > 1.5
+            let a0 = self.mesh_colors_flat[i0 * 4 + 3];
+            let a1 = self.mesh_colors_flat[i1 * 4 + 3];
+            let a2 = self.mesh_colors_flat[i2 * 4 + 3];
+            if a0 <= 1.5 && a1 <= 1.5 && a2 <= 1.5 {
+                continue; // 不是emissive三角形，跳过
+            }
+
+            // 获取三角形3个顶点位置
+            let v0 = [
+                self.mesh_vertices_flat[i0 * 4],
+                self.mesh_vertices_flat[i0 * 4 + 1],
+                self.mesh_vertices_flat[i0 * 4 + 2],
+            ];
+            let v1 = [
+                self.mesh_vertices_flat[i1 * 4],
+                self.mesh_vertices_flat[i1 * 4 + 1],
+                self.mesh_vertices_flat[i1 * 4 + 2],
+            ];
+            let v2 = [
+                self.mesh_vertices_flat[i2 * 4],
+                self.mesh_vertices_flat[i2 * 4 + 1],
+                self.mesh_vertices_flat[i2 * 4 + 2],
+            ];
+
+            // 计算三角形面积 = 0.5 * |cross(v1-v0, v2-v0)|
+            let edge1 = [v1[0] - v0[0], v1[1] - v0[1], v1[2] - v0[2]];
+            let edge2 = [v2[0] - v0[0], v2[1] - v0[1], v2[2] - v0[2]];
+            let cross = [
+                edge1[1] * edge2[2] - edge1[2] * edge2[1],
+                edge1[2] * edge2[0] - edge1[0] * edge2[2],
+                edge1[0] * edge2[1] - edge1[1] * edge2[0],
+            ];
+            let area = 0.5 * f32::sqrt(cross[0] * cross[0] + cross[1] * cross[1] + cross[2] * cross[2]);
+
+            // 计算面法线 = normalize(cross(v1-v0, v2-v0))
+            let normal_len = f32::sqrt(cross[0] * cross[0] + cross[1] * cross[1] + cross[2] * cross[2]);
+            let normal = if normal_len > 1e-6 {
+                [cross[0] / normal_len, cross[1] / normal_len, cross[2] / normal_len]
+            } else {
+                [0.0, 1.0, 0.0] // fallback
+            };
+
+            // 取3个顶点颜色的平均值作为光源颜色
+            let c0 = [
+                self.mesh_colors_flat[i0 * 4],
+                self.mesh_colors_flat[i0 * 4 + 1],
+                self.mesh_colors_flat[i0 * 4 + 2],
+            ];
+            let c1 = [
+                self.mesh_colors_flat[i1 * 4],
+                self.mesh_colors_flat[i1 * 4 + 1],
+                self.mesh_colors_flat[i1 * 4 + 2],
+            ];
+            let c2 = [
+                self.mesh_colors_flat[i2 * 4],
+                self.mesh_colors_flat[i2 * 4 + 1],
+                self.mesh_colors_flat[i2 * 4 + 2],
+            ];
+            let avg_color = [
+                (c0[0] + c1[0] + c2[0]) / 3.0,
+                (c0[1] + c1[1] + c2[1]) / 3.0,
+                (c0[2] + c1[2] + c2[2]) / 3.0,
+            ];
+
+            // emissive强度 = 8.0 (与现有emissive亮度一致)
+            let intensity = 8.0;
+
+            self.emissive_triangles.push(EmissiveTriangle {
+                v0_area: [v0[0], v0[1], v0[2], area],
+                v1_pad: [v1[0], v1[1], v1[2], 0.0],
+                v2_pad: [v2[0], v2[1], v2[2], 0.0],
+                normal_pad: [normal[0], normal[1], normal[2], 0.0],
+                color_int: [avg_color[0], avg_color[1], avg_color[2], intensity],
+            });
+        }
+        self.emissive_count = self.emissive_triangles.len() as u32;
     }
 }
 
@@ -1226,6 +1397,7 @@ impl RenderPipeline for RayTracePipeline {
         let vertex_required = (self.mesh_vertices_flat.len() * 4).max(16);
         let index_required = (self.mesh_indices.len() * 4).max(4);
         let color_required = (self.mesh_colors_flat.len() * 4).max(16);
+        let emissive_required = (self.emissive_triangles.len() * 80).max(16);
 
         // 4. 动态resize: 数据超出容量时重建buffer（容量只增不减）
         if bvh_required > self.bvh_buffer_cap {
@@ -1268,6 +1440,16 @@ impl RenderPipeline for RayTracePipeline {
             self.color_storage_buffer_memory = new_mem;
             self.color_buffer_cap = new_cap;
         }
+        if emissive_required > self.emissive_buffer_cap {
+            let (new_buf, new_mem, new_cap) = Self::ensure_buffer_capacity(
+                &self.device, &self.memory_properties,
+                self.emissive_storage_buffer, self.emissive_storage_buffer_memory,
+                self.emissive_buffer_cap, emissive_required,
+            );
+            self.emissive_storage_buffer = new_buf;
+            self.emissive_storage_buffer_memory = new_mem;
+            self.emissive_buffer_cap = new_cap;
+        }
 
         // 5. 上传数据到GPU storage buffers（resize后buffer handles已更新）
         let bvh_bytes = self.bvh_data.nodes_as_bytes();
@@ -1286,6 +1468,9 @@ impl RenderPipeline for RayTracePipeline {
         let color_bytes = bytemuck::cast_slice(&self.mesh_colors_flat);
         Self::upload_to_buffer(&self.device, self.color_storage_buffer_memory, color_bytes);
 
+        let emissive_bytes = bytemuck::cast_slice(&self.emissive_triangles);
+        Self::upload_to_buffer(&self.device, self.emissive_storage_buffer_memory, emissive_bytes);
+
         // 6. 更新descriptor sets（buffer handles和ranges可能因resize变化）
         Self::update_scene_descriptor_set(
             &self.device,
@@ -1300,6 +1485,8 @@ impl RenderPipeline for RayTracePipeline {
             32,
             self.color_storage_buffer,
             color_required,
+            self.emissive_storage_buffer,
+            emissive_required,
         );
     }
 
@@ -1399,7 +1586,7 @@ impl RenderPipeline for RayTracePipeline {
                 camera_pos: ctx.camera.position,
                 camera_yaw: ctx.camera.yaw,
                 camera_pitch: ctx.camera.pitch,
-                _pad1: 0.0,
+                emissive_count: self.emissive_count as f32,
                 viewport_size: [width as f32, height as f32],
                 fov: ctx.camera.fov,
                 _pad2: 0.0,

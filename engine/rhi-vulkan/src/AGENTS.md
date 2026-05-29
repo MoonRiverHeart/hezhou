@@ -162,6 +162,21 @@ has_texture_f, specular, ambient, shininess,  // offsets 120-132
 5. 最终乘数0.3→1.0(除以8取平均，每条贡献1/8)
 **修改文件**: `shaders/raytrace.comp`(IndirectHit+normal, 8条间接光线, 命中法线radiance, sqrt衰减), `shaders/raytrace.spv`(重编译)
 
+### 2026-05-30: 路径追踪重写 — NEE重要性采样+MC积分+俄罗斯轮盘赌+多bounce
+**现象**: 间接光照不可见 — 立方体发出的cosine半球采样光线难以命中天花板小光源(概率极低)。
+**根因**: 旧shader用8条cosine半球采样做间接光照，射线均匀散布在normal周围半球，命中天花板1.3×1.3m²光源概率极低(~1-2%)。且间接光照用命中法线dot光源方向计算radiance，是直接光照的重复计算而非真正的间接bounce。
+**修复**: 完整重写raytrace.comp为路径追踪(Path Tracing):
+1. **下一事件估计(NEE)**: 每bounce显式采样emissive三角形（光源表面）— 不是等随机射线碰运气。4次采样(N_LIGHT_SAMPLES=4)随机选emissive三角形+三角形表面随机采样点，计算G=cos(θ_hit)*cos(θ_light)/dist²和PDF=1/(N_emissive*area)，阴影射线检查遮挡
+2. **蒙特卡洛积分**: Lambert BRDF=albedo/π，cosine半球采样PDF=cos(θ)/π，间接bounce贡献简化为 throughput*=albedo（BRDF/PDF=1）
+3. **俄罗斯轮盘赌**: bounce>=2时，P_continue=max(0.2, luminance(throughput))，random>P_continue则终止路径，throughput/=P_continue补偿
+4. **多bounce迭代**: MAX_BOUNCES=4，迭代式路径追踪(compute shader无递归)
+5. **emissive命中**: bounce==0时累积光源颜色*brightness，bounce>0时NEE已覆盖不双重计算
+6. **Tone mapping**: Reinhard + gamma(1/2.2)输出
+7. **emissive三角形SSBO**: binding 5新增EmissiveTriangle(80 bytes, 5 vec4s: v0+area, v1+pad, v2+pad, normal+pad, color+intensity)
+8. **Push constant**: _pad1→emissive_count(offset 20)，总大小40 bytes不变
+**Rust端改动**: `raytrace_pipeline.rs`新增EmissiveTriangle struct+emissive_storage_buffer+collect_mesh_data收集emissive三角形(descriptor set layout binding 5+pool STORAGE_BUFFER count 6+update_scene_descriptor_set新增emissive+动态resize+Drop销毁)
+**修改文件**: `shaders/raytrace.comp`(475行路径追踪重写), `shaders/raytrace.comp.spv`(重编译), `render-pipeline/src/raytrace_pipeline.rs`(emissive SSBO+收集+descriptor)
+
 ### 2026-05-29: 管线切换崩溃 — ray_tracing→rasterization STATUS_ACCESS_VIOLATION
 **现象**: 切换ray_tracing→rasterization后立即崩溃(STATUS_ACCESS_VIOLATION 0xc0000005)，日志显示"管线切换成功:rasterization"。
 **根因**: `switch_pipeline` 中只保存/恢复了 offscreen/depth/fxaa 资源（8项），遗漏了 `vertex_buffer`, `vertex_buffer_memory`, `index_buffer`, `index_buffer_memory`（4项）。`std::mem::take(&mut active_resources)` 把这些buffer带走 → `mark_for_destroy` 销毁 → 新 `allocate_resources` 分配null handle → `RasterPipeline.record()` 用null的vertex_buffer → ACCESS_VIOLATION。
