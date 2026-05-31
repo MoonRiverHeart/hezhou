@@ -1,4 +1,4 @@
-use hezhou_rhi_vulkan::MonoRotationRenderer;
+use hezhou_rhi_vulkan::RotationRenderer;
 
 fn main() {
     println!("=== Mono JIT 三角形旋转 + 热更新 Demo ===\n");
@@ -11,7 +11,7 @@ fn main() {
     println!("  - 自动重新编译并 reload\n");
 
     println!("[1] 创建 Vulkan + Mono Renderer...");
-    let mut renderer = MonoRotationRenderer::new(800, 600, "Mono Triangle - Press R to HotReload")
+    let mut renderer = RotationRenderer::new(800, 600, "Mono Triangle - Press R to HotReload")
         .expect("Failed to create renderer");
     println!("    Renderer 初始化成功!\n");
 
