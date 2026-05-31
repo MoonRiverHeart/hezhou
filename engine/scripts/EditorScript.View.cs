@@ -563,6 +563,13 @@ namespace Hezhou
             info.InstanceId = (long)instanceId;
             info.WidgetType = descriptor.Widget;
 
+            // 读取.cs文件中的config值（覆盖DLL descriptor，因为Mono缓存导致descriptor可能是旧值）
+            ExposeConfigValues csConfig = ReadExposeConfigFromCsFile(scriptType.Name, descriptor.Name);
+            float effectiveMin = csConfig.HasMin ? csConfig.Min : descriptor.Min;
+            float effectiveMax = csConfig.HasMax ? csConfig.Max : descriptor.Max;
+            float effectiveStep = csConfig.HasStep ? csConfig.Step : descriptor.Step;
+            float effectiveInitial = csConfig.HasInitial ? csConfig.Initial : descriptor.Initial;
+
             // 显示名: DisplayName优先，空则用字段名首字母大写
             string displayName = descriptor.DisplayName;
             if (displayName == null || displayName.Length == 0)
@@ -589,8 +596,8 @@ namespace Hezhou
             if (descriptor.Widget == "slider")
             {
                 mainWidgetId = UI.CreateSlider(parentId, 150f, 24f);
-                UI.SliderSetRange(mainWidgetId, descriptor.Min, descriptor.Max);
-                UI.SliderSetStep(mainWidgetId, descriptor.Step);
+                UI.SliderSetRange(mainWidgetId, effectiveMin, effectiveMax);
+                UI.SliderSetStep(mainWidgetId, effectiveStep);
                 UI.SliderSetValue(mainWidgetId, currentRuntimeValue);
             }
             else
@@ -608,34 +615,34 @@ namespace Hezhou
             // Min
             ulong minLabelId = UI.CreateLabel(configHStack, 30f, 20f, "Min:");
             ulong minInputId = UI.CreateInputField(configHStack, 50f, 24f);
-            UI.InputFieldSetText(minInputId, descriptor.Min.ToString());
+            UI.InputFieldSetText(minInputId, effectiveMin.ToString());
             UI.InputFieldSetPlaceholder(minInputId, "Min");
             info.MinInputId = minInputId;
-            info.CurrentMin = descriptor.Min;
+            info.CurrentMin = effectiveMin;
 
             // Max
             ulong maxLabelId = UI.CreateLabel(configHStack, 30f, 20f, "Max:");
             ulong maxInputId = UI.CreateInputField(configHStack, 50f, 24f);
-            UI.InputFieldSetText(maxInputId, descriptor.Max.ToString());
+            UI.InputFieldSetText(maxInputId, effectiveMax.ToString());
             UI.InputFieldSetPlaceholder(maxInputId, "Max");
             info.MaxInputId = maxInputId;
-            info.CurrentMax = descriptor.Max;
+            info.CurrentMax = effectiveMax;
 
             // Step
             ulong stepLabelId = UI.CreateLabel(configHStack, 30f, 20f, "Step:");
             ulong stepInputId = UI.CreateInputField(configHStack, 50f, 24f);
-            UI.InputFieldSetText(stepInputId, descriptor.Step.ToString());
+            UI.InputFieldSetText(stepInputId, effectiveStep.ToString());
             UI.InputFieldSetPlaceholder(stepInputId, "Step");
             info.StepInputId = stepInputId;
-            info.CurrentStep = descriptor.Step;
+            info.CurrentStep = effectiveStep;
 
             // Init
             ulong initLabelId = UI.CreateLabel(configHStack, 30f, 20f, "Init:");
             ulong initInputId = UI.CreateInputField(configHStack, 50f, 24f);
-            UI.InputFieldSetText(initInputId, descriptor.Initial.ToString());
+            UI.InputFieldSetText(initInputId, effectiveInitial.ToString());
             UI.InputFieldSetPlaceholder(initInputId, "Init");
             info.InitialInputId = initInputId;
-            info.CurrentInitial = descriptor.Initial;
+            info.CurrentInitial = effectiveInitial;
 
             // 注册 Min/Max/Step/Initial input → mainWidget 映射（回调路由用）
             _scriptMinMaxInitialToMainWidgetMap[minInputId] = mainWidgetId;

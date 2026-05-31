@@ -129,7 +129,16 @@ _bindScriptClickCallback = OnBindScriptClick;
             
             // === 脚本类型注册：className → Type ===
             // 每个脚本实体类需在此注册，以便编辑器UI通过反射发现属性并创建实例
-            _scriptTypeRegistry["RotatingEntity"] = typeof(RotatingEntity);
+            // ★ 关键：使用 Assembly.GetExecutingAssembly().GetType() 而非 typeof()
+            // 原因：Mono热重载时 typeof() 可能解析到旧assembly的类型（旧[Expose]属性值=初始值）
+            //       GetExecutingAssembly() 确保获取当前新assembly的类型，descriptor值与.cs一致
+            System.Reflection.Assembly currentAssembly = System.Reflection.Assembly.GetExecutingAssembly();
+            Type rotType = currentAssembly.GetType("HezhouScripts.RotatingEntity");
+            if (rotType != null)
+            {
+                HezhouScripts.ScriptEntityHelper.ReflectProperties(rotType);
+            }
+            _scriptTypeRegistry["RotatingEntity"] = rotType;
             
             // 保存配置文件（只保存workingDir，Scene指针通过Rust FFI获取）
             if (_workingDirectorySet)

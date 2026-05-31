@@ -250,6 +250,9 @@ namespace Hezhou
         private static ulong _pendingBindEntityId = 0;
         private static int _pendingBindScriptIndex = -1;
 
+        // === Bug2 fix: Restore期间阻止onChange回调写回.cs ===
+        private static bool _isRestoringPropertyValues = false;
+
         // === Property Descriptor (Model Type) ===
         private struct PropertyDescriptor
         {
