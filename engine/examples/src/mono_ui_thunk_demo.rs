@@ -179,6 +179,7 @@ fn main() {
         ui_create_preview_window: unsafe { std::mem::transmute(ui_ffi::ui_create_preview_window as *const std::ffi::c_void) },
         ui_set_preview_texture: unsafe { std::mem::transmute(ui_ffi::ui_set_preview_texture as *const std::ffi::c_void) },
         ui_get_root_id: unsafe { std::mem::transmute(ui_ffi::ui_get_root_id as *const std::ffi::c_void) },
+        ui_clear_widget_tree: unsafe { std::mem::transmute(ui_ffi::ui_clear_widget_tree as *const std::ffi::c_void) },
         ui_set_widget_layout: unsafe { std::mem::transmute(ui_ffi::ui_set_widget_layout as *const std::ffi::c_void) },
         ui_widget_set_position: unsafe { std::mem::transmute(ui_ffi::ui_widget_set_position as *const std::ffi::c_void) },
         ui_widget_set_size: unsafe { std::mem::transmute(ui_ffi::ui_widget_set_size as *const std::ffi::c_void) },
@@ -302,6 +303,9 @@ fn main() {
         ui_file_browser_set_on_double_click_thunk_ptr: unsafe { std::mem::transmute(ui_ffi::ui_file_browser_set_on_double_click_thunk_ptr as *const std::ffi::c_void) },
         scene_create: scene_create_stub,
         scene_destroy: scene_destroy_stub,
+        scene_get_existing_ptr: scene_get_existing_ptr_stub,
+        scene_root_entity_count: scene_root_entity_count_stub,
+        scene_get_root_entity_id_at: scene_get_root_entity_id_at_stub,
         scene_create_cube: scene_create_cube_stub,
         scene_create_plane: scene_create_plane_stub,
         scene_create_cornell_box: scene_create_cornell_box_stub,
@@ -331,6 +335,8 @@ fn main() {
         scene_get_script_binding_count: scene_get_script_binding_count_stub,
         scene_get_script_binding_info: scene_get_script_binding_info_stub,
         scene_set_script_binding_enabled: scene_set_script_binding_enabled_stub,
+        scene_set_script_binding_instance_id: scene_set_script_binding_instance_id_stub,
+        scene_get_script_binding_instance_id: scene_get_script_binding_instance_id_stub,
         scene_create_entity: scene_create_entity_stub,
         scene_get_entity_count: scene_get_entity_count_stub,
         scene_get_entity_id: scene_get_entity_id_stub,
@@ -360,10 +366,12 @@ fn main() {
         dfx_perf_end_frame: dfx_perf_end_frame_stub,
         set_status_text: set_status_text_stub,
         on_hot_reload_complete: on_hot_reload_complete_stub,
+        register_hot_reload_complete_callback: register_hot_reload_complete_callback_stub,
         ui_debug_print_widget_tree: unsafe { std::mem::transmute(ui_ffi::ui_debug_print_widget_tree as *const std::ffi::c_void) },
         ui_widget_set_flex_expand: unsafe { std::mem::transmute(ui_ffi::ui_widget_set_flex_expand as *const std::ffi::c_void) },
         ui_widget_set_cross_axis_fill: unsafe { std::mem::transmute(ui_ffi::ui_widget_set_cross_axis_fill as *const std::ffi::c_void) },
         ui_widget_set_background_color: unsafe { std::mem::transmute(ui_ffi::ui_widget_set_background_color as *const std::ffi::c_void) },
+        ui_label_set_wrap_mode: unsafe { std::mem::transmute(ui_ffi::ui_label_set_wrap_mode as *const std::ffi::c_void) },
         event_dispatcher_ptr: std::ptr::null_mut(),
         ui_simulate_click_at: unsafe { std::mem::transmute(ui_simulate_click_at_stub as *const std::ffi::c_void) },
         ui_widget_get_type: unsafe { std::mem::transmute(ui_widget_get_type_stub as *const std::ffi::c_void) },
@@ -520,6 +528,14 @@ extern "C" fn stub_set_widget_visible(_: hezhou_ui::ffi::WidgetTreeHandle, _: u6
 extern "C" fn stub_get_pipeline_names(_: hezhou_scripting::ffi_context::WidgetTreeHandle, _: *mut std::ffi::c_char, _: usize) -> usize { 0 }
 extern "C" fn stub_switch_pipeline(_: hezhou_scripting::ffi_context::WidgetTreeHandle, _: *const std::ffi::c_char) -> i32 { -1 }
 extern "C" fn stub_get_active_pipeline_name(_: hezhou_scripting::ffi_context::WidgetTreeHandle, _: *mut std::ffi::c_char, _: usize) -> usize { 0 }
+
+// 新增stub函数 — Feature 1脚本绑定
+pub extern "C" fn scene_get_existing_ptr_stub() -> *mut std::ffi::c_void { std::ptr::null_mut() }
+pub extern "C" fn scene_root_entity_count_stub(_scene: *mut std::ffi::c_void) -> u32 { 0 }
+pub extern "C" fn scene_get_root_entity_id_at_stub(_scene: *mut std::ffi::c_void, _index: u32) -> u64 { 0 }
+pub extern "C" fn scene_set_script_binding_instance_id_stub(_scene: *mut std::ffi::c_void, _entity_id: u64, _index: usize, _instance_id: u64) {}
+pub extern "C" fn scene_get_script_binding_instance_id_stub(_scene: *mut std::ffi::c_void, _entity_id: u64, _index: usize) -> u64 { 0 }
+extern "C" fn register_hot_reload_complete_callback_stub(_callback: hezhou_scripting::ffi_context::OnHotReloadCompleteFn) {}
 
 fn compile_csharp_script() {
     use std::process::Command;
