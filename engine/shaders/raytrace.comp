@@ -349,10 +349,10 @@ void main() {
     );
 
     float aspect = float(width) / float(height);
-    float tanHalfFov = tan(pc.fov / 2.0);
+    float tanHalfFov = tan(pc.fov * 3.14159265 / 360.0);
 
     vec3 forward = vec3(sin(pc.camera_yaw) * cos(pc.camera_pitch),
-                        sin(pc.camera_pitch),
+                        -sin(pc.camera_pitch),
                         -cos(pc.camera_yaw) * cos(pc.camera_pitch));
     vec3 right = vec3(cos(pc.camera_yaw), 0.0, sin(pc.camera_yaw));
     vec3 up = cross(right, forward);

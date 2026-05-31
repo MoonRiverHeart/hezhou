@@ -228,6 +228,9 @@ pub struct RayTracePipeline {
     // === 帧累积 ===
     /// 帧累积索引 — 每帧递增，相机移动或场景变化时重置为0
     frame_index: u32,
+    /// 前一帧mesh数据签名 — 用于检测场景变化自动重置帧累积
+    /// 存储: [顶点数量, v0.x, v0.y, v0.z, v_last.x, v_last.y, v_last.z]
+    prev_mesh_signature: [f32; 7],
 
     // === 延迟销毁列表 — resize时不能立即销毁的旧output image资源 ===
     /// GPU可能还在使用旧image（通过descriptor set引用），必须延迟到确认GPU空闲后再销毁
@@ -457,6 +460,7 @@ impl RayTracePipeline {
             memory_properties,
             first_frame: true,  // 初始帧output_image从UNDEFINED layout开始
             frame_index: 0,    // 帧累积索引，初始为0
+            prev_mesh_signature: [0.0; 7],  // 前一帧mesh签名，初始为0
             deferred_destroy_image_views: Vec::new(),
             deferred_destroy_images: Vec::new(),
             deferred_destroy_memories: Vec::new(),
@@ -1361,7 +1365,7 @@ let pool_sizes = [
                 "builtin://cone" => MeshType::Cone,
                 "builtin://bunny" => MeshType::Bunny,
                 "builtin://cornell_box" => MeshType::CornellBox,
-                _ => MeshType::Custom,
+                _ => MeshType::Custom, // asset://xxx路径 → Custom mesh
             };
 
             let mesh_data = match mesh_type {
@@ -1372,7 +1376,43 @@ let pool_sizes = [
                 MeshType::Cone => MeshData::create_cone(),
                 MeshType::Bunny => MeshData::create_bunny(),
                 MeshType::CornellBox => MeshData::create_cornell_box(),
-                MeshType::Custom => MeshData::create_cube(), // Custom fallback为cube
+                MeshType::Custom => {
+                    // Custom mesh: 从OBJ文件加载，不再fallback为cube
+                    // mesh_path格式为"asset://path/to/model.obj"，需提取实际文件路径
+                    let obj_path = renderable.mesh_path.strip_prefix("asset://")
+                        .unwrap_or(&renderable.mesh_path);
+                    // 直接使用tobj加载OBJ文件（render-pipeline有自己的tobj依赖）
+                    match tobj::load_obj(obj_path, &tobj::LoadOptions {
+                        single_index: true,
+                        triangulate: true,
+                        ignore_lines: true,
+                        ignore_points: true,
+                    }) {
+                        Ok((models, _materials)) => {
+                            if models.is_empty() {
+                                eprintln!("RayTrace: OBJ文件{}无模型数据", obj_path);
+                                MeshData::new(Vec::new(), Vec::new())
+                            } else {
+                                // 使用第一个模型
+                                let mesh = &models[0].mesh;
+                                let vertices: Vec<hezhou_geometry::Vertex> = (0..mesh.positions.len() / 3)
+                                    .map(|i| hezhou_geometry::Vertex::new([
+                                        mesh.positions[i * 3],
+                                        mesh.positions[i * 3 + 1],
+                                        mesh.positions[i * 3 + 2],
+                                    ]))
+                                    .collect();
+                                let indices: Vec<u32> = mesh.indices.iter().map(|i| *i as u32).collect();
+                                MeshData::new(vertices, indices)
+                            }
+                        }
+                        Err(e) => {
+                            // OBJ加载失败时使用空mesh，不fallback为cube
+                            eprintln!("RayTrace: Custom mesh加载失败: {} — {}", obj_path, e);
+                            MeshData::new(Vec::new(), Vec::new())
+                        }
+                    }
+                }
             };
 
             let transform_opt = scene.world.get_component::<LocalTransform>(*entity);
@@ -1508,6 +1548,96 @@ let pool_sizes = [
             });
         }
         self.emissive_count = self.emissive_triangles.len() as u32;
+
+        // Bug3修复: 如果场景有DirectionalLight但没有emissive三角形，
+        // 为方向光创建一个远处的emissive面片作为NEE光源。
+        // 方向光没有mesh，NEE需要面积>0的emissive三角形才能采样光源。
+        if self.emissive_count == 0 && !ctx.scene.is_null() {
+            let scene = unsafe { &*ctx.scene };
+            for entity in &scene.root_entities {
+                if let Some(light_comp) = scene.world.get_component::<hezhou_core::DirectionalLightComponent>(*entity) {
+                    // 在光源方向远处创建一个大面片（模拟太阳）
+                    // direction是光照传播方向（从光源到场景），面片中心取反方向 = -direction * 100（太阳位置）
+                    // 面片面积 = 50.0 * 50.0 = 2500.0（足够大，确保NEE命中率高）
+                    let dir = light_comp.direction;
+                    let dir_len = f32::sqrt(dir.x * dir.x + dir.y * dir.y + dir.z * dir.z);
+                    let norm_dir = if dir_len > 1e-6 {
+                        [dir.x / dir_len, dir.y / dir_len, dir.z / dir_len]
+                    } else {
+                        [-0.577, -0.577, -0.577] // fallback方向
+                    };
+                    // 面片中心 = -光照传播方向 * 100（光源所在方向远处）
+                    // 默认direction=(-0.5,-1.0,-0.5)表示光从上方来，太阳位置在上方
+                    let center = [-norm_dir[0] * 100.0, -norm_dir[1] * 100.0, -norm_dir[2] * 100.0];
+                    let area = 2500.0; // 50x50面片
+
+                    // 计算面片的两个垂直轴（垂直于光照方向）
+                    // right = cross(norm_dir, world_up)，up = cross(right, norm_dir)
+                    let world_up = if f32::abs(norm_dir[1]) < 0.99 {
+                        [0.0, 1.0, 0.0]
+                    } else {
+                        [1.0, 0.0, 0.0] // 光照方向接近垂直时用world X
+                    };
+                    let right = [
+                        norm_dir[1] * world_up[2] - norm_dir[2] * world_up[1],
+                        norm_dir[2] * world_up[0] - norm_dir[0] * world_up[2],
+                        norm_dir[0] * world_up[1] - norm_dir[1] * world_up[0],
+                    ];
+                    let right_len = f32::sqrt(right[0] * right[0] + right[1] * right[1] + right[2] * right[2]);
+                    let norm_right = if right_len > 1e-6 {
+                        [right[0] / right_len, right[1] / right_len, right[2] / right_len]
+                    } else {
+                        [1.0, 0.0, 0.0]
+                    };
+                    let up = [
+                        norm_right[1] * norm_dir[2] - norm_right[2] * norm_dir[1],
+                        norm_right[2] * norm_dir[0] - norm_right[0] * norm_dir[2],
+                        norm_right[0] * norm_dir[1] - norm_right[1] * norm_dir[0],
+                    ];
+
+                    // 面片4个顶点（2个三角形）
+                    let half_size = 25.0; // 面片半边长
+                    let v0 = [center[0] - norm_right[0] * half_size - up[0] * half_size,
+                              center[1] - norm_right[1] * half_size - up[1] * half_size,
+                              center[2] - norm_right[2] * half_size - up[2] * half_size];
+                    let v1 = [center[0] + norm_right[0] * half_size - up[0] * half_size,
+                              center[1] + norm_right[1] * half_size - up[1] * half_size,
+                              center[2] + norm_right[2] * half_size - up[2] * half_size];
+                    let v2 = [center[0] - norm_right[0] * half_size + up[0] * half_size,
+                              center[1] - norm_right[1] * half_size + up[1] * half_size,
+                              center[2] - norm_right[2] * half_size + up[2] * half_size];
+                    let v3 = [center[0] + norm_right[0] * half_size + up[0] * half_size,
+                              center[1] + norm_right[1] * half_size + up[1] * half_size,
+                              center[2] + norm_right[2] * half_size + up[2] * half_size];
+
+                    // 面法线 = 光照传播方向norm_dir（面片发光面朝向场景方向）
+                    // norm_dir指向光照传播方向（从太阳到场景），面片发射面朝此方向=朝向场景
+                    let light_normal = [norm_dir[0], norm_dir[1], norm_dir[2]];
+                    // 光源颜色和强度
+                    let light_color = [light_comp.color.x, light_comp.color.y, light_comp.color.z];
+                    let light_intensity = light_comp.intensity;
+
+                    // Triangle 1: v0, v1, v2
+                    self.emissive_triangles.push(EmissiveTriangle {
+                        v0_area: [v0[0], v0[1], v0[2], area / 2.0],
+                        v1_pad: [v1[0], v1[1], v1[2], 0.0],
+                        v2_pad: [v2[0], v2[1], v2[2], 0.0],
+                        normal_pad: [light_normal[0], light_normal[1], light_normal[2], 0.0],
+                        color_int: [light_color[0], light_color[1], light_color[2], light_intensity],
+                    });
+                    // Triangle 2: v1, v3, v2
+                    self.emissive_triangles.push(EmissiveTriangle {
+                        v0_area: [v1[0], v1[1], v1[2], area / 2.0],
+                        v1_pad: [v3[0], v3[1], v3[2], 0.0],
+                        v2_pad: [v2[0], v2[1], v2[2], 0.0],
+                        normal_pad: [light_normal[0], light_normal[1], light_normal[2], 0.0],
+                        color_int: [light_color[0], light_color[1], light_color[2], light_intensity],
+                    });
+                    self.emissive_count = self.emissive_triangles.len() as u32;
+                    break; // 只处理第一个DirectionalLight
+                }
+            }
+        }
     }
 }
 
@@ -1540,6 +1670,22 @@ impl RenderPipeline for RayTracePipeline {
     fn prepare(&mut self, ctx: &RenderContext, _resources: &mut PipelineResources) {
         // 1. 收集mesh数据 + 构建BVH
         self.collect_mesh_data(ctx);
+
+        // 1b. 检测mesh数据变化（实体transform变化等） — 自动重置帧累积
+        let n = self.mesh_vertices_flat.len();
+        let mut sig: [f32; 7] = [n as f32, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
+        if n >= 3 {
+            sig[1] = self.mesh_vertices_flat[0]; // v0.x
+            sig[2] = self.mesh_vertices_flat[1]; // v0.y
+            sig[3] = self.mesh_vertices_flat[2]; // v0.z
+            sig[4] = self.mesh_vertices_flat[n - 4]; // v_last.x
+            sig[5] = self.mesh_vertices_flat[n - 3]; // v_last.y
+            sig[6] = self.mesh_vertices_flat[n - 2]; // v_last.z
+        }
+        if sig != self.prev_mesh_signature {
+            self.reset_accumulation();
+            self.prev_mesh_signature = sig;
+        }
 
         // 2. 收集light数据
         let light_data = self.collect_light_data(ctx);

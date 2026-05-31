@@ -13,3 +13,4 @@ hezhou-geometry = { path = "../geometry" }
 ash = { version = "0.38", features = ["loaded"] }
 bytemuck = { version = "1.14", features = ["derive"] }
 parking_lot = "0.12"
+tobj = "4.0"
