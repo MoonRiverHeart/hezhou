@@ -45,6 +45,43 @@ namespace Hezhou
                 throw new Exception("Failed to create scene");
             }
         }
+        
+        // 从已有Rust Scene指针恢复Scene对象（热重载后使用）
+        public Scene(IntPtr existingPtr)
+        {
+            if (existingPtr == IntPtr.Zero)
+            {
+                throw new Exception("Scene pointer is null — cannot restore");
+            }
+            _scenePtr = existingPtr;
+            
+            // 同步Rust侧的root_entities到C# _entities字典
+            uint count = UI.SceneRootEntityCount(_scenePtr);
+            Log.Info("Editor", "Scene恢复: 同步 " + count + " 个root entities");
+            for (uint i = 0; i < count; i++)
+            {
+                ulong eid = UI.SceneGetRootEntityIdAt(_scenePtr, i);
+                if (eid != 0)
+                {
+                    string name = UI.SceneGetEntityName(_scenePtr, eid);
+                    var entity = new Entity { Id = eid, Name = name };
+                    _entities[eid] = entity;
+                    
+                    // 同步ScriptBindings
+                    int bindingCount = (int)UI.SceneGetScriptBindingCount(_scenePtr, eid);
+                    for (int b = 0; b < bindingCount; b++)
+                    {
+                        ScriptBindingInfo info = UI.SceneGetScriptBindingInfo(_scenePtr, eid, (ulong)b);
+                        entity.Scripts.Add(new ScriptBinding 
+                        {
+                            ScriptPath = info.ScriptPath,
+                            ClassName = info.ClassName,
+                            Enabled = info.Enabled
+                        });
+                    }
+                }
+            }
+        }
 
         public IntPtr ScenePtr => _scenePtr;
 
@@ -298,6 +335,40 @@ UI.SceneSelectEntity(_scenePtr, entityId);
             }
             var func = Marshal.GetDelegateForFunctionPointer<SceneDestroyDelegate>(_ffi.scene_destroy);
             func(scene);
+        }
+        
+        // 获取当前已存在的Scene指针（热重载时用于恢复Scene，而非创建新Scene）
+        public static IntPtr SceneGetExistingPtr()
+        {
+            if (_ffi.scene_get_existing_ptr == IntPtr.Zero)
+            {
+                Log.Error("C#", "SceneGetExistingPtr函数指针为空");
+                return IntPtr.Zero;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<SceneGetExistingPtrDelegate>(_ffi.scene_get_existing_ptr);
+            return func();
+        }
+        
+        public static uint SceneRootEntityCount(IntPtr scene)
+        {
+            if (_ffi.scene_root_entity_count == IntPtr.Zero)
+            {
+                Log.Error("C#", "SceneRootEntityCount函数指针为空");
+                return 0;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<SceneRootEntityCountDelegate>(_ffi.scene_root_entity_count);
+            return func(scene);
+        }
+        
+        public static ulong SceneGetRootEntityIdAt(IntPtr scene, uint index)
+        {
+            if (_ffi.scene_get_root_entity_id_at == IntPtr.Zero)
+            {
+                Log.Error("C#", "SceneGetRootEntityIdAt函数指针为空");
+                return 0;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<SceneGetRootEntityIdAtDelegate>(_ffi.scene_get_root_entity_id_at);
+            return func(scene, index);
         }
 
         public static ulong SceneCreateCube(IntPtr scene)
@@ -645,6 +716,28 @@ UI.SceneSelectEntity(_scenePtr, entityId);
             }
             var func = Marshal.GetDelegateForFunctionPointer<SceneSetScriptBindingEnabledDelegate>(_ffi.scene_set_script_binding_enabled);
             func(scene, entityId, index, enabled);
+        }
+        
+        public static void SceneSetScriptBindingInstanceId(IntPtr scene, ulong entityId, ulong index, ulong instanceId)
+        {
+            if (_ffi.scene_set_script_binding_instance_id == IntPtr.Zero)
+            {
+                Log.Error("C#", "SceneSetScriptBindingInstanceId函数指针为空");
+                return;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<SceneSetScriptBindingInstanceIdDelegate>(_ffi.scene_set_script_binding_instance_id);
+            func(scene, entityId, index, instanceId);
+        }
+        
+        public static ulong SceneGetScriptBindingInstanceId(IntPtr scene, ulong entityId, ulong index)
+        {
+            if (_ffi.scene_get_script_binding_instance_id == IntPtr.Zero)
+            {
+                Log.Error("C#", "SceneGetScriptBindingInstanceId函数指针为空");
+                return 0;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<SceneGetScriptBindingInstanceIdDelegate>(_ffi.scene_get_script_binding_instance_id);
+            return func(scene, entityId, index);
         }
         
         public static ulong SceneCreateEntity(IntPtr scene)

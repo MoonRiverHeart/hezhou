@@ -243,6 +243,18 @@ public static ulong GetRootId()
             return func(_widgetTree);
         }
         
+        public static void ClearWidgetTree()
+        {
+            if (_ffi.ui_clear_widget_tree == IntPtr.Zero)
+            {
+                Log.Error("C#", "ClearWidgetTree函数指针为空");
+                return;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<ClearWidgetTreeDelegate>(_ffi.ui_clear_widget_tree);
+            func(_widgetTree);
+            Log.Info("C#", "ClearWidgetTree: 已清空widget树和回调");
+        }
+        
         public static void SetTextEditShowLineNumbers(ulong widgetId, bool show)
         {
             if (_ffi.ui_text_edit_show_line_numbers == IntPtr.Zero)
@@ -307,6 +319,19 @@ public static ulong GetRootId()
             }
             var func = Marshal.GetDelegateForFunctionPointer<SetWidgetBackgroundColorDelegate>(_ffi.ui_widget_set_background_color);
             func(_widgetTree, widgetId, r, g, b, a);
+        }
+
+        /// 设置Label的换行模式
+        /// mode: 0=None(单行), 1=Wrap(自动换行), 2=Truncate(截断)
+        public static void SetLabelWrapMode(ulong widgetId, int mode)
+        {
+            if (_ffi.ui_label_set_wrap_mode == IntPtr.Zero)
+            {
+                Log.Error("C#", "SetLabelWrapMode函数指针为空");
+                return;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<SetLabelWrapModeDelegate>(_ffi.ui_label_set_wrap_mode);
+            func(_widgetTree, widgetId, mode);
         }
 
         public static void SetWidgetVisible(ulong widgetId, bool visible)

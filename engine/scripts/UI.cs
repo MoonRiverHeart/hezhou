@@ -8,7 +8,7 @@ namespace Hezhou
     {
         private static IntPtr _widgetTree;
         private static IntPtr _eventDispatcher;
-        private static FfiContext _ffi;
+        public static FfiContext _ffi;
         
         private static ResizeCallbackDelegate _savedResizeCallback;
         private static GlobalClickCallbackDelegate _savedGlobalClickCallback;
@@ -81,6 +81,8 @@ namespace Hezhou
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public delegate ulong GetRootIdDelegate(IntPtr handle);
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void ClearWidgetTreeDelegate(IntPtr handle);
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public delegate void SetWidgetLayoutDelegate(IntPtr handle, ulong widgetId, float x, float y, float width, float height);
@@ -150,6 +152,9 @@ namespace Hezhou
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public delegate void SetWidgetBackgroundColorDelegate(IntPtr handle, ulong widgetId, float r, float g, float b, float a);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void SetLabelWrapModeDelegate(IntPtr handle, ulong widgetId, int mode);
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public delegate void RegisterHotReloadCompleteCallbackDelegate(IntPtr callbackPtr);
@@ -547,6 +552,15 @@ namespace Hezhou
         public delegate void SceneDestroyDelegate(IntPtr scene);
         
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate IntPtr SceneGetExistingPtrDelegate();
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate uint SceneRootEntityCountDelegate(IntPtr scene);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate ulong SceneGetRootEntityIdAtDelegate(IntPtr scene, uint index);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public delegate ulong SceneCreateCubeDelegate(IntPtr scene);
         
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
@@ -634,6 +648,12 @@ namespace Hezhou
         
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public delegate void SceneSetScriptBindingEnabledDelegate(IntPtr scene, ulong entityId, ulong index, bool enabled);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void SceneSetScriptBindingInstanceIdDelegate(IntPtr scene, ulong entityId, ulong index, ulong instanceId);
+        
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate ulong SceneGetScriptBindingInstanceIdDelegate(IntPtr scene, ulong entityId, ulong index);
         
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public delegate ulong SceneCreateEntityDelegate(IntPtr scene);
@@ -848,6 +868,7 @@ namespace Hezhou
             public IntPtr ui_create_preview_window;
             public IntPtr ui_set_preview_texture;
             public IntPtr ui_get_root_id;
+            public IntPtr ui_clear_widget_tree;
             public IntPtr ui_set_widget_layout;
             public IntPtr ui_widget_set_position;
             public IntPtr ui_widget_set_size;
@@ -975,6 +996,9 @@ namespace Hezhou
             public IntPtr ui_file_browser_set_on_double_click_thunk_ptr;
             public IntPtr scene_create;
             public IntPtr scene_destroy;
+            public IntPtr scene_get_existing_ptr;
+            public IntPtr scene_root_entity_count;
+            public IntPtr scene_get_root_entity_id_at;
             public IntPtr scene_create_cube;
             public IntPtr scene_create_plane;
             public IntPtr scene_create_cornell_box;
@@ -1004,6 +1028,8 @@ namespace Hezhou
             public IntPtr scene_get_script_binding_count;
             public IntPtr scene_get_script_binding_info;
             public IntPtr scene_set_script_binding_enabled;
+            public IntPtr scene_set_script_binding_instance_id;
+            public IntPtr scene_get_script_binding_instance_id;
             public IntPtr scene_create_entity;
             public IntPtr scene_get_entity_count;
             public IntPtr scene_get_entity_id;
@@ -1033,10 +1059,12 @@ namespace Hezhou
             public IntPtr dfx_perf_end_frame;
             public IntPtr set_status_text;
             public IntPtr on_hot_reload_complete;
+            public IntPtr register_hot_reload_complete_callback;
             public IntPtr ui_debug_print_widget_tree;
             public IntPtr ui_widget_set_flex_expand;
             public IntPtr ui_widget_set_cross_axis_fill;
             public IntPtr ui_widget_set_background_color;
+            public IntPtr ui_label_set_wrap_mode;
             public IntPtr event_dispatcher_ptr;
             public IntPtr ui_simulate_click_at;
             public IntPtr ui_widget_get_type;
@@ -1214,6 +1242,18 @@ public static void RegisterResizeCallback(ResizeCallbackDelegate callback)
         {
             _savedHotReloadCompleteCallback = callback;
             IntPtr callbackPtr = Marshal.GetFunctionPointerForDelegate(callback);
+            
+            // 注册回调到Rust侧（关键：让hot_reload.rs能调用C#的OnHotReloadComplete）
+            if (_ffi.register_hot_reload_complete_callback != IntPtr.Zero)
+            {
+                var func = Marshal.GetDelegateForFunctionPointer<RegisterHotReloadCompleteCallbackDelegate>(_ffi.register_hot_reload_complete_callback);
+                func(callbackPtr);
+                Log.Info("C#", "RegisterHotReloadCompleteCallback已注册到Rust侧: ptr=" + callbackPtr.ToInt64());
+            }
+            else
+            {
+                Log.Error("C#", "register_hot_reload_complete_callback函数指针为空 — 无法注册HotReloadComplete回调到Rust侧!");
+            }
         }
 
         public static void RegisterUpdateCallback(UpdateCallbackDelegate callback)
