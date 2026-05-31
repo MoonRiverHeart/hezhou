@@ -52,14 +52,37 @@ namespace Hezhou
 
         private static void CreateEditorLayout()
         {
-            _gameScene = new Scene();
-            
-            // 默认Scene为空 — 用户通过UI添加实体
-            // DirectionalLight保留 — 场景需要光源才能渲染
-            ulong lightId = _gameScene.CreateDirectionalLight();
-            UI.SceneSetEntityName(_gameScene.ScenePtr, lightId, "DirectionalLight");
-            
-            _gameScene.SetGameState(GameState.Editing);
+            // 热重载时从Rust全局SCENE指针恢复旧Scene(包含entity和binding)，首次初始化才创建新Scene
+            IntPtr existingPtr = UI.SceneGetExistingPtr();
+            Log.Info("Editor", "[CreateEditorLayout] SceneGetExistingPtr返回: " + existingPtr.ToInt64());
+            if (existingPtr != IntPtr.Zero)
+            {
+                try
+                {
+                    _gameScene = new Scene(existingPtr);
+                    Log.Info("Editor", "[CreateEditorLayout] 热重载恢复Scene成功: ptr=" + existingPtr.ToInt64() + ", _entities.Count=" + _gameScene.GetEntityCount() + ", ScenePtr=" + _gameScene.ScenePtr.ToInt64());
+                    uint rustEntityCount = UI.SceneRootEntityCount(_gameScene.ScenePtr);
+                    Log.Info("Editor", "[CreateEditorLayout] Rust侧root_entities数量: " + rustEntityCount);
+                }
+                catch (Exception ex)
+                {
+                    Log.Error("Editor", "[CreateEditorLayout] 恢复Scene失败: " + ex.Message + " — 创建新Scene");
+                    _gameScene = new Scene();
+                    ulong lightId = _gameScene.CreateDirectionalLight();
+                    UI.SceneSetEntityName(_gameScene.ScenePtr, lightId, "DirectionalLight");
+                    _gameScene.SetGameState(GameState.Editing);
+                }
+            }
+            else
+            {
+                Log.Info("Editor", "[CreateEditorLayout] 首次初始化 — 创建新Scene");
+                _gameScene = new Scene();
+                
+                ulong lightId = _gameScene.CreateDirectionalLight();
+                UI.SceneSetEntityName(_gameScene.ScenePtr, lightId, "DirectionalLight");
+                
+                _gameScene.SetGameState(GameState.Editing);
+            }
             
             float toolbarY = 0f;
             float mainY = TOOLBAR_HEIGHT;
@@ -361,7 +384,10 @@ namespace Hezhou
             
             if (type == 1) // Float3
             {
-                desc.LabelId = UI.CreateLabel(parentContainerId, RIGHT_PANEL_WIDTH - 40f, 20f, displayName + ":");
+                // Label独占一行(wrap模式)，然后HStack放3个InputField
+                desc.LabelId = UI.CreateLabel(parentContainerId, 0, 20f, displayName + ":");
+                UI.SetLabelWrapMode(desc.LabelId, 1); // 启用Wrap模式
+                
                 ulong hStackId = UI.CreateHStack(parentContainerId, 5f);
                 desc.WidgetIds = new ulong[3];
                 
@@ -390,7 +416,9 @@ namespace Hezhou
             }
             else if (type == 2) // String
             {
-                desc.LabelId = UI.CreateLabel(parentContainerId, RIGHT_PANEL_WIDTH - 40f, 20f, displayName + ":");
+                // Label独占一行(wrap模式)，InputField/ValueLabel独占另一行
+                desc.LabelId = UI.CreateLabel(parentContainerId, 0, 20f, displayName + ":");
+                UI.SetLabelWrapMode(desc.LabelId, 1); // 启用Wrap模式
                 
                 if (readOnly)
                 {
@@ -420,7 +448,9 @@ namespace Hezhou
             }
             else if (type == 4) // Int
             {
-                desc.LabelId = UI.CreateLabel(parentContainerId, RIGHT_PANEL_WIDTH - 40f, 20f, displayName + ":");
+                // Label独占一行(wrap模式)，InputField/ValueLabel独占另一行
+                desc.LabelId = UI.CreateLabel(parentContainerId, 0, 20f, displayName + ":");
+                UI.SetLabelWrapMode(desc.LabelId, 1); // 启用Wrap模式
                 
                 if (readOnly)
                 {
@@ -450,7 +480,9 @@ namespace Hezhou
             }
             else if (type == 0) // Float
             {
-                desc.LabelId = UI.CreateLabel(parentContainerId, RIGHT_PANEL_WIDTH - 40f, 20f, displayName + ":");
+                // Label独占一行(wrap模式)，InputField/ValueLabel独占另一行
+                desc.LabelId = UI.CreateLabel(parentContainerId, 0, 20f, displayName + ":");
+                UI.SetLabelWrapMode(desc.LabelId, 1); // 启用Wrap模式
                 
                 if (readOnly)
                 {
@@ -480,7 +512,9 @@ namespace Hezhou
             }
             else if (type == 3) // Bool
             {
-                desc.LabelId = UI.CreateLabel(parentContainerId, RIGHT_PANEL_WIDTH - 40f, 20f, displayName + ":");
+                // Label独占一行(wrap模式)，InputField/ValueLabel独占另一行
+                desc.LabelId = UI.CreateLabel(parentContainerId, 0, 20f, displayName + ":");
+                UI.SetLabelWrapMode(desc.LabelId, 1); // 启用Wrap模式
                 
                 if (readOnly)
                 {

@@ -2,6 +2,9 @@ using System;
 using System.IO;
 using System.Diagnostics;
 using System.Collections.Generic;
+using System.Reflection;
+using System.Text.RegularExpressions;
+using HezhouScripts;
 
 namespace Hezhou
 {
@@ -1053,6 +1056,7 @@ UI.SetText(_runButtonId, "运行");
         
         private static void OnBindScriptClick(ulong widgetId)
         {
+            Log.Info("Editor", "[OnBindScriptClick] _selectedEntityId=" + _selectedEntityId + ", _gameScene=" + (_gameScene != null ? "ptr=" + _gameScene.ScenePtr.ToInt64() : "null") + ", _sourceFilesModified=" + _sourceFilesModified);
             if (_selectedEntityId == 0 || _gameScene == null)
             {
                 Log.Error("Editor", "未选中Entity!");
@@ -1065,17 +1069,85 @@ UI.SetText(_runButtonId, "运行");
                 return;
             }
             
+            // Bug4 fix: 如果.cs源文件已被ModifyScriptSourceFile修改过，先触发hot reload再绑定
+            if (_sourceFilesModified)
+            {
+                _pendingBindEntityId = _selectedEntityId;
+                _pendingBindScriptIndex = _selectedScriptIndex;
+                
+                // 保存脚本编辑器内容到.cs文件（如果有内容）
+                if (_scriptTextEditId != 0)
+                {
+                    try
+                    {
+                        string scriptContent = UI.TextEditGetText(_scriptTextEditId);
+                        string saveScriptPath = "scripts/bin/Mono/EditorScript.cs";
+                        System.IO.Directory.CreateDirectory("scripts/bin/Mono");
+                        System.IO.File.WriteAllText(saveScriptPath, scriptContent);
+                    }
+                    catch (Exception ex)
+                    {
+                        Log.Error("Editor", "保存脚本编辑器内容失败: " + ex.Message);
+                    }
+                }
+                
+                if (_statusItem != null)
+                {
+                    _statusItem.Text = "正在热更新脚本，稍后自动绑定...";
+                }
+                
+                SaveAllScriptPropertyValues();
+                UI.TriggerHotReload();
+                return; // 不立即创建实例 — 等待OnHotReloadComplete回调
+            }
+            
             string scriptName = _availableScripts[_selectedScriptIndex];
             string scriptPath = "scripts/" + scriptName;
             string className = Path.GetFileNameWithoutExtension(scriptName);
             
+            // 1) Rust侧创建ScriptBinding(instance_id=0)
             _gameScene.AttachScriptBinding(_selectedEntityId, scriptPath, className);
             
+            // 2) 如果脚本类型在注册表中，创建C#实例并更新instance_id
+            if (_scriptTypeRegistry.TryGetValue(className, out Type scriptType))
+            {
+                // 设置Scene指针 — 脚本实例需要scenePtr来调用FFI旋转等方法
+                MethodInfo setScenePtrMethod = scriptType.GetMethod("SetScenePtr",
+                    BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
+                if (setScenePtrMethod != null)
+                {
+                    setScenePtrMethod.Invoke(null, new object[] { _gameScene.ScenePtr });
+                }
+                
+                // 创建C#实例 — 返回IntPtr(instanceKey)
+                MethodInfo createInstanceMethod = scriptType.GetMethod("CreateInstance",
+                    BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
+                if (createInstanceMethod != null)
+                {
+                    IntPtr instancePtr = (IntPtr)createInstanceMethod.Invoke(null, null);
+                    ulong instanceId = (ulong)instancePtr.ToInt64();
+                    
+                    // 获取刚创建的ScriptBinding的index（最后一个）
+                    int bindingIndex = _gameScene.GetScriptBindingCount(_selectedEntityId) - 1;
+                    
+                    // 更新Rust侧ScriptBinding的instance_id
+                    UI.SceneSetScriptBindingInstanceId(_gameScene.ScenePtr, _selectedEntityId, (ulong)bindingIndex, instanceId);
+                    
+                    Log.Info("Editor", "脚本实例创建: className=" + className + ", instanceId=" + instanceId + ", bindingIndex=" + bindingIndex);
+                }
+            }
+            
+            // 强制刷新属性面板 — 必须设_propertiesDirty=true才能绕过UpdatePropertiesPanel自身的缓存检查
+            _propertiesDirty = true;
+            _lastScriptBindingCount = -1;
             UpdatePropertiesPanel(_selectedEntityId);
         }
         
         private static void OnRemoveScriptClick(ulong widgetId)
         {
+            // Bug4 fix: 重置pending bind防止冲突
+            _pendingBindEntityId = 0;
+            
             if (_selectedEntityId == 0 || _gameScene == null)
             {
                 Log.Error("Editor", "未选中Entity!");
@@ -1084,14 +1156,212 @@ UI.SetText(_runButtonId, "运行");
             
             if (_removeScriptBtnIndices.TryGetValue(widgetId, out int index))
             {
+                // 销毁C#脚本实例（如果已注册且有有效instance_id）
+                var info = _gameScene.GetScriptBindingInfo(_selectedEntityId, index);
+                if (_scriptTypeRegistry.TryGetValue(info.ClassName, out Type scriptType))
+                {
+                    ulong instanceId = UI.SceneGetScriptBindingInstanceId(_gameScene.ScenePtr, _selectedEntityId, (ulong)index);
+                    if (instanceId != 0)
+                    {
+                        try
+                        {
+                            IntPtr instancePtr = new IntPtr((long)instanceId);
+                            
+                            MethodInfo destroyMethod = scriptType.GetMethod("DestroyInstance",
+                                BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
+                            if (destroyMethod != null)
+                            {
+                                destroyMethod.Invoke(null, new object[] { instancePtr });
+                                Log.Info("Editor", "脚本实例销毁: className=" + info.ClassName + ", instanceId=" + instanceId);
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            Log.Error("Editor", "脚本实例销毁失败: className=" + info.ClassName + ", instanceId=" + instanceId + ", 错误=" + ex.Message);
+                        }
+                    }
+                }
+                
                 _gameScene.RemoveScriptBinding(_selectedEntityId, index);
                 
+                // 强制刷新属性面板 — 必须设_propertiesDirty=true才能绕过UpdatePropertiesPanel自身的缓存检查
+                _propertiesDirty = true;
+                _lastScriptBindingCount = -1;
                 UpdatePropertiesPanel(_selectedEntityId);
             }
         }
         
+        // === 热重载属性值保存/恢复机制 ===
+
+        private static void SaveAllScriptPropertyValues()
+        {
+            if (_gameScene == null) return;
+
+            try
+            {
+                // 先删除旧文件
+                string tempFile = ".hezhou_hotreload_props";
+                if (File.Exists(tempFile))
+                {
+                    File.Delete(tempFile);
+                }
+
+                System.IO.StringWriter writer = new System.IO.StringWriter();
+                int entityCount = _gameScene.GetEntityCount();
+
+                for (int e = 0; e < entityCount; e++)
+                {
+                    ulong eid = _gameScene.GetEntityId(e);
+                    int bindingCount = _gameScene.GetScriptBindingCount(eid);
+
+                    for (int b = 0; b < bindingCount; b++)
+                    {
+                        var info = _gameScene.GetScriptBindingInfo(eid, b);
+                        ulong instId = UI.SceneGetScriptBindingInstanceId(_gameScene.ScenePtr, eid, (ulong)b);
+
+                        if (instId == 0) continue;
+                        if (!_scriptTypeRegistry.TryGetValue(info.ClassName, out Type scriptType)) continue;
+
+                        IntPtr instancePtr = new IntPtr((long)instId);
+
+                        // 获取属性描述符
+                        MethodInfo getDescMethod = scriptType.GetMethod("GetPropertyDescriptors",
+                            BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
+                        if (getDescMethod == null) continue;
+
+                        ScriptPropertyDescriptor[] descriptors = (ScriptPropertyDescriptor[])getDescMethod.Invoke(null, null);
+                        if (descriptors == null) continue;
+
+                        // 保存每个属性的运行时值
+                        MethodInfo getValMethod = scriptType.GetMethod("GetPropertyValue",
+                            BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
+                        if (getValMethod == null) continue;
+
+                        for (int p = 0; p < descriptors.Length; p++)
+                        {
+                            float value = (float)getValMethod.Invoke(null, new object[] { instancePtr, descriptors[p].Name });
+                            writer.WriteLine(eid + "|" + b + "|" + info.ClassName + "|" + descriptors[p].Name + "|" + value.ToString("G"));
+                        }
+                    }
+                }
+
+                File.WriteAllText(tempFile, writer.ToString());
+                Log.Info("Editor", "保存脚本属性值: " + writer.ToString().Split('\n').Length + " 条记录");
+            }
+            catch (Exception ex)
+            {
+                Log.Error("Editor", "SaveAllScriptPropertyValues失败: " + ex.Message);
+            }
+        }
+
+        private static void RecreateAllScriptInstances()
+        {
+            if (_gameScene == null) return;
+
+            int entityCount = _gameScene.GetEntityCount();
+
+            for (int e = 0; e < entityCount; e++)
+            {
+                ulong eid = _gameScene.GetEntityId(e);
+                int bindingCount = _gameScene.GetScriptBindingCount(eid);
+
+                for (int b = 0; b < bindingCount; b++)
+                {
+                    ulong instId = UI.SceneGetScriptBindingInstanceId(_gameScene.ScenePtr, eid, (ulong)b);
+                    if (instId != 0) continue; // 已有实例，跳过
+
+                    var info = _gameScene.GetScriptBindingInfo(eid, b);
+                    if (!_scriptTypeRegistry.TryGetValue(info.ClassName, out Type scriptType)) continue;
+
+                    // 设置Scene指针
+                    MethodInfo setScenePtrMethod = scriptType.GetMethod("SetScenePtr",
+                        BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
+                    if (setScenePtrMethod != null)
+                    {
+                        setScenePtrMethod.Invoke(null, new object[] { _gameScene.ScenePtr });
+                    }
+
+                    // 创建实例
+                    MethodInfo createInstanceMethod = scriptType.GetMethod("CreateInstance",
+                        BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
+                    if (createInstanceMethod != null)
+                    {
+                        IntPtr instancePtr = (IntPtr)createInstanceMethod.Invoke(null, null);
+                        ulong newInstanceId = (ulong)instancePtr.ToInt64();
+
+                        UI.SceneSetScriptBindingInstanceId(_gameScene.ScenePtr, eid, (ulong)b, newInstanceId);
+
+                        Log.Info("Editor", "热重载后重建实例: className=" + info.ClassName + ", entityId=" + eid + ", bindingIndex=" + b + ", instanceId=" + newInstanceId);
+                    }
+                }
+            }
+        }
+
+        private static void RestoreAllScriptPropertyValues()
+        {
+            if (_gameScene == null) return;
+
+            string tempFile = ".hezhou_hotreload_props";
+
+            try
+            {
+                if (!File.Exists(tempFile))
+                {
+                    Log.Info("Editor", "无保存的属性值文件，跳过恢复");
+                    return;
+                }
+
+                string content = File.ReadAllText(tempFile);
+                string[] lines = content.Split('\n');
+                int restoredCount = 0;
+
+                for (int i = 0; i < lines.Length; i++)
+                {
+                    string line = lines[i].Trim();
+                    if (line.Length == 0) continue;
+
+                    string[] parts = line.Split('|');
+                    if (parts.Length != 5) continue;
+
+                    ulong eid = ulong.Parse(parts[0]);
+                    int bindingIndex = int.Parse(parts[1]);
+                    string className = parts[2];
+                    string propertyName = parts[3];
+                    float value = float.Parse(parts[4]);
+
+                    // 获取当前instance_id（应该已被RecreateAllScriptInstances设置）
+                    ulong instId = UI.SceneGetScriptBindingInstanceId(_gameScene.ScenePtr, eid, (ulong)bindingIndex);
+                    if (instId == 0) continue;
+
+                    if (!_scriptTypeRegistry.TryGetValue(className, out Type scriptType)) continue;
+
+                    IntPtr instancePtr = new IntPtr((long)instId);
+
+                    MethodInfo setValMethod = scriptType.GetMethod("SetPropertyValue",
+                        BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
+                    if (setValMethod != null)
+                    {
+                        setValMethod.Invoke(null, new object[] { instancePtr, propertyName, value });
+                        restoredCount++;
+                    }
+                }
+
+                // 删除临时文件
+                File.Delete(tempFile);
+
+                Log.Info("Editor", "恢复脚本属性值: " + restoredCount + " 条记录");
+            }
+            catch (Exception ex)
+            {
+                Log.Error("Editor", "RestoreAllScriptPropertyValues失败: " + ex.Message);
+                // 即使失败也尝试删除临时文件
+                try { if (File.Exists(tempFile)) File.Delete(tempFile); } catch { }
+            }
+        }
+
         private static void OnHotReloadComplete()
         {
+            Log.Info("Editor", "[OnHotReloadComplete] _gameScene=" + (_gameScene != null ? "ptr=" + _gameScene.ScenePtr.ToInt64() + ",entityCount=" + _gameScene.GetEntityCount() : "null") + ", _pendingBindEntityId=" + _pendingBindEntityId + ", _selectedEntityId=" + _selectedEntityId);
             ScanScripts();
             
             if (_scriptDropdownId != 0)
@@ -1099,6 +1369,81 @@ UI.SetText(_runButtonId, "运行");
                 string[] scriptOptions = _availableScripts.Count > 0 ? _availableScripts.ToArray() : new string[] { "无可用脚本" };
                 UI.DropdownSetOptions(_scriptDropdownId, scriptOptions);
             }
+            
+            // ★ 无论是否pending bind，都要重建所有现有binding的C#实例并恢复属性值
+            RecreateAllScriptInstances();
+            RestoreAllScriptPropertyValues();
+            
+            // Bug4 fix: 如果有pending bind，在hot reload完成后执行绑定
+            if (_pendingBindEntityId != 0)
+            {
+                _selectedEntityId = _pendingBindEntityId;
+                _selectedScriptIndex = _pendingBindScriptIndex;
+                
+                if (_availableScripts.Count == 0 || _selectedScriptIndex >= _availableScripts.Count)
+                {
+                    Log.Error("Editor", "Hot reload后绑定失败: 无可用脚本!");
+                    _pendingBindEntityId = 0;
+                    _pendingBindScriptIndex = -1;
+                    _sourceFilesModified = false;
+                    if (_statusItem != null)
+                    {
+                        _statusItem.Text = "状态: 热更新后绑定失败";
+                    }
+                    return;
+                }
+                
+                string scriptName = _availableScripts[_selectedScriptIndex];
+                string scriptPath = "scripts/" + scriptName;
+                string className = Path.GetFileNameWithoutExtension(scriptName);
+                
+                // 1) Rust侧创建ScriptBinding(instance_id=0)
+                _gameScene.AttachScriptBinding(_selectedEntityId, scriptPath, className);
+                
+                // 2) 如果脚本类型在注册表中，创建C#实例并更新instance_id
+                if (_scriptTypeRegistry.TryGetValue(className, out Type scriptType))
+                {
+                    MethodInfo setScenePtrMethod = scriptType.GetMethod("SetScenePtr",
+                        BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
+                    if (setScenePtrMethod != null)
+                    {
+                        setScenePtrMethod.Invoke(null, new object[] { _gameScene.ScenePtr });
+                    }
+                    
+                    MethodInfo createInstanceMethod = scriptType.GetMethod("CreateInstance",
+                        BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
+                    if (createInstanceMethod != null)
+                    {
+                        IntPtr instancePtr = (IntPtr)createInstanceMethod.Invoke(null, null);
+                        ulong instanceId = (ulong)instancePtr.ToInt64();
+                        
+                        int bindingIndex = _gameScene.GetScriptBindingCount(_selectedEntityId) - 1;
+                        UI.SceneSetScriptBindingInstanceId(_gameScene.ScenePtr, _selectedEntityId, (ulong)bindingIndex, instanceId);
+                        
+                        Log.Info("Editor", "Hot reload后脚本实例创建: className=" + className + ", instanceId=" + instanceId + ", bindingIndex=" + bindingIndex);
+                    }
+                }
+                
+                // 重置pending状态
+                _pendingBindEntityId = 0;
+                _pendingBindScriptIndex = -1;
+                _sourceFilesModified = false;
+                
+                // 强制刷新属性面板
+                _propertiesDirty = true;
+                _lastScriptBindingCount = -1;
+                UpdatePropertiesPanel(_selectedEntityId);
+                
+                if (_statusItem != null)
+                {
+                    _statusItem.Text = "状态: 就绪 (脚本已热更新并绑定)";
+                }
+                return;
+            }
+            
+            // 非pending场景也要刷新属性面板
+            _propertiesDirty = true;
+            _lastScriptBindingCount = -1;
             
             if (_statusItem != null)
             {
@@ -1161,6 +1506,7 @@ UI.SetText(_runButtonId, "运行");
                     System.IO.File.WriteAllText(scriptPath, scriptContent);
                     
                     UI.SetStatusText("正在热更新脚本...");
+                    SaveAllScriptPropertyValues();
                     UI.TriggerHotReload();
                 }
                 catch (Exception ex)
@@ -1554,8 +1900,277 @@ UI.SetText(_runButtonId, "运行");
                     UI.SetWidgetBackgroundColor(widgetId, 0.8f, 0.2f, 0.2f, 1.0f);
                 }
                 
-                _statusItem.Text = newEnabled ? $"脚本已启用: {info.ClassName}" : $"脚本已禁用: {info.ClassName}";
+                _statusItem.Text = newEnabled ? "脚本已启用: " + info.ClassName : "脚本已禁用: " + info.ClassName;
             }
+        }
+        
+        // === Script Property Change Handlers ===
+        
+        private static void OnScriptPropertyInputChange(ulong widgetId, string text)
+        {
+            if (!_scriptPropertyInfoMap.TryGetValue(widgetId, out ScriptPropertyInfo propInfo))
+            {
+                return;
+            }
+            
+            if (!float.TryParse(text, out float value))
+            {
+                return;
+            }
+            
+            // 查找脚本类型并调用SetPropertyValue
+            if (_scriptTypeRegistry.TryGetValue(propInfo.ClassName, out Type scriptType))
+            {
+                IntPtr instancePtr = new IntPtr(propInfo.InstanceId);
+                
+                MethodInfo setValMethod = scriptType.GetMethod("SetPropertyValue",
+                    BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
+                if (setValMethod != null)
+                {
+                    setValMethod.Invoke(null, new object[] { instancePtr, propInfo.PropertyName, value });
+                    Log.Info("Editor", "脚本属性修改: " + propInfo.ClassName + "." + propInfo.PropertyName + "=" + value);
+                }
+                
+                // 刷新脚本属性UI显示 — 强制重建绑定列表以同步最新属性值
+                _lastScriptBindingCount = -1;
+                _propertiesDirty = true;
+            }
+        }
+        
+        private static void OnScriptPropertySliderChange(ulong widgetId, float value)
+        {
+            if (!_scriptPropertyInfoMap.TryGetValue(widgetId, out ScriptPropertyInfo propInfo))
+            {
+                return;
+            }
+            
+            // 查找脚本类型并调用SetPropertyValue
+            if (_scriptTypeRegistry.TryGetValue(propInfo.ClassName, out Type scriptType))
+            {
+                IntPtr instancePtr = new IntPtr(propInfo.InstanceId);
+                
+                MethodInfo setValMethod = scriptType.GetMethod("SetPropertyValue",
+                    BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
+                if (setValMethod != null)
+                {
+                    setValMethod.Invoke(null, new object[] { instancePtr, propInfo.PropertyName, value });
+                    Log.Info("Editor", "脚本属性Slider修改: " + propInfo.ClassName + "." + propInfo.PropertyName + "=" + value);
+                }
+                
+                // 修改后强制刷新属性面板显示值
+                _lastScriptBindingCount = -1;
+                _propertiesDirty = true;
+            }
+        }
+        
+        // === .cs源文件修改机制 ===
+        
+        private static string FindScriptSourceFile(string className)
+        {
+            // 优先: scripts/className.cs 直接匹配
+            string directPath = Path.Combine("scripts", className + ".cs");
+            if (File.Exists(directPath))
+            {
+                return directPath;
+            }
+            
+            // 回退: 扫描scripts/目录下所有.cs文件，查找class声明
+            if (!Directory.Exists("scripts"))
+            {
+                return null;
+            }
+            
+            string[] csFiles = Directory.GetFiles("scripts", "*.cs");
+            string classPattern = "class " + className;
+            
+            for (int i = 0; i < csFiles.Length; i++)
+            {
+                try
+                {
+                    string content = File.ReadAllText(csFiles[i]);
+                    if (content.Contains(classPattern))
+                    {
+                        return csFiles[i];
+                    }
+                }
+                catch
+                {
+                    // 读取失败则跳过该文件
+                }
+            }
+            
+            return null;
+        }
+        
+        private static string FormatFloatForAttribute(float value)
+        {
+            if (Math.Abs(value - (float)Math.Round(value)) < 0.001f)
+            {
+                return ((int)Math.Round(value)).ToString();
+            }
+            return value.ToString("F1") + "f";
+        }
+        
+        private static string FormatFloatForField(float value)
+        {
+            return value.ToString("F1") + "f";
+        }
+        
+        private static void ModifyScriptSourceFile(string className, string fieldName, string paramName, float newValue)
+        {
+            string filePath = FindScriptSourceFile(className);
+            if (filePath == null)
+            {
+                Log.Warn("Editor", "ModifyScriptSourceFile: 未找到脚本源文件 class=" + className);
+                return;
+            }
+            
+            string content = File.ReadAllText(filePath);
+            string[] lines = content.Split('\n');
+            
+            int exposeLineIndex = -1;
+            int fieldLineIndex = -1;
+            
+            // 查找[Expose]属性行和字段声明行
+            for (int i = 0; i < lines.Length; i++)
+            {
+                string line = lines[i].Trim();
+                
+                if (line.Contains(fieldName) && 
+                    (line.Contains("private") || line.Contains("public") || line.Contains("protected")) &&
+                    line.Contains("float"))
+                {
+                    fieldLineIndex = i;
+                    
+                    if (line.Contains("[Expose"))
+                    {
+                        exposeLineIndex = i;
+                    }
+                    else if (i > 0 && lines[i - 1].Trim().Contains("[Expose"))
+                    {
+                        exposeLineIndex = i - 1;
+                    }
+                    else
+                    {
+                        for (int j = i - 1; j >= 0; j--)
+                        {
+                            string prevLine = lines[j].Trim();
+                            if (prevLine.Contains("[Expose"))
+                            {
+                                exposeLineIndex = j;
+                                break;
+                            }
+                            if (!prevLine.StartsWith("[") && !prevLine.StartsWith(",") && prevLine.Length > 0)
+                            {
+                                break;
+                            }
+                        }
+                    }
+                    
+                    break;
+                }
+            }
+            
+            if (exposeLineIndex == -1 || fieldLineIndex == -1)
+            {
+                Log.Warn("Editor", "ModifyScriptSourceFile: 未找到[Expose]属性或字段声明 " + className + "." + fieldName);
+                return;
+            }
+            
+            // 修改[Expose]属性中的参数
+            string formattedAttrValue = FormatFloatForAttribute(newValue);
+            string paramPattern = paramName + @"\s*=\s*-?\d+\.?\d*f?";
+            Regex paramRegex = new Regex(paramPattern);
+            
+            int exposeStart = exposeLineIndex;
+            int exposeEnd = exposeLineIndex;
+            
+            for (int i = exposeStart; i < lines.Length; i++)
+            {
+                if (lines[i].Contains(")]"))
+                {
+                    exposeEnd = i;
+                    break;
+                }
+            }
+            
+            string exposeBlock = "";
+            for (int i = exposeStart; i <= exposeEnd; i++)
+            {
+                exposeBlock += lines[i];
+            }
+            
+            if (paramRegex.IsMatch(exposeBlock))
+            {
+                exposeBlock = paramRegex.Replace(exposeBlock, paramName + " = " + formattedAttrValue);
+            }
+            else
+            {
+                exposeBlock = exposeBlock.Replace(")]", ", " + paramName + " = " + formattedAttrValue + ")]");
+            }
+            
+            string[] newExposeLines = exposeBlock.Split('\n');
+            
+            string[] newLines = new string[lines.Length - (exposeEnd - exposeStart + 1) + newExposeLines.Length];
+            int destIdx = 0;
+            
+            for (int i = 0; i < exposeStart; i++)
+            {
+                newLines[destIdx++] = lines[i];
+            }
+            
+            for (int i = 0; i < newExposeLines.Length; i++)
+            {
+                newLines[destIdx++] = newExposeLines[i];
+            }
+            
+            for (int i = exposeEnd + 1; i < lines.Length; i++)
+            {
+                newLines[destIdx++] = lines[i];
+            }
+            
+            lines = newLines;
+            
+            // 重新查找fieldLineIndex
+            fieldLineIndex = -1;
+            for (int i = 0; i < lines.Length; i++)
+            {
+                string line = lines[i].Trim();
+                if (line.Contains(fieldName) &&
+                    (line.Contains("private") || line.Contains("public") || line.Contains("protected")) &&
+                    line.Contains("float"))
+                {
+                    fieldLineIndex = i;
+                    break;
+                }
+            }
+            
+            // 对于Initial参数，还需要修改字段默认值
+            if (paramName == "Initial" && fieldLineIndex != -1)
+            {
+                string formattedFieldValue = FormatFloatForField(newValue);
+                string fieldLine = lines[fieldLineIndex];
+                
+                Regex fieldDefaultRegex = new Regex(@"=\s*-?\d+\.?\d*f?\s*;");
+                
+                if (fieldDefaultRegex.IsMatch(fieldLine))
+                {
+                    fieldLine = fieldDefaultRegex.Replace(fieldLine, "= " + formattedFieldValue + ";");
+                }
+                else
+                {
+                    fieldLine = fieldLine.Replace(";", "= " + formattedFieldValue + ";");
+                }
+                
+                lines[fieldLineIndex] = fieldLine;
+            }
+            
+            // 写回文件
+            string modifiedContent = string.Join("\n", lines);
+            File.WriteAllText(filePath, modifiedContent);
+            
+            Log.Info("Editor", "ModifyScriptSourceFile: 已修改 " + filePath + " " + className + "." + fieldName + " " + paramName + "=" + formattedAttrValue);
+            _sourceFilesModified = true;
         }
     }
 }

@@ -1,5 +1,7 @@
 using System;
+using System.Reflection;
 using System.Runtime.InteropServices;
+using HezhouScripts;
 
 namespace Hezhou
 {
@@ -15,6 +17,15 @@ namespace Hezhou
         public static void Initialize(IntPtr contextPtr)
         {
             UI.InitFromContext(contextPtr);
+            
+            // 热重载时先清空旧的widget树和回调(在所有回调注册之前)
+            // 首次初始化时SceneGetExistingPtr返回0，不需要清空
+            IntPtr existingScenePtr = UI.SceneGetExistingPtr();
+            if (existingScenePtr != IntPtr.Zero)
+            {
+                UI.ClearWidgetTree();
+                Log.Info("Editor", "热重载: 已清空旧widget树和回调");
+            }
             
             UI.GetScreenSize(out _screenWidth, out _screenHeight);
             _contentScale = UI.GetContentScale();
@@ -45,6 +56,7 @@ _bindScriptClickCallback = OnBindScriptClick;
             _scriptToggleClickCallback = OnScriptToggleClick;
             _scriptDropdownSelectCallback = OnScriptDropdownSelect;
             _hotReloadCompleteCallback = OnHotReloadComplete;
+            UI.RegisterHotReloadCompleteCallback(_hotReloadCompleteCallback);
             _tabSelectCallback = OnTabSelect;
             _treeNodeToggleCallback = OnTreeNodeToggle;
             
@@ -68,7 +80,45 @@ _bindScriptClickCallback = OnBindScriptClick;
             
             UI.RegisterUpdateCallback(_updateCallback);
             
-            ShowWorkingDirectoryDialog();
+            // 读取配置文件：如果之前已设置工作目录（包括热重载后的恢复），跳过dialog
+            try
+            {
+                if (System.IO.File.Exists(".hezhou_config"))
+                {
+                    string configContent = System.IO.File.ReadAllText(".hezhou_config");
+                    string[] configLines = configContent.Split('\n');
+                    
+                    foreach (string line in configLines)
+                    {
+                        string trimmed = line.Trim();
+                        if (trimmed.StartsWith("workingDir="))
+                        {
+                            _currentDirectory = trimmed.Substring("workingDir=".Length);
+                            _workingDirectorySet = true;
+                            Log.Info("Editor", "从配置文件恢复工作目录: " + _currentDirectory);
+                        }
+                        else if (!trimmed.StartsWith("scenePtr=") && !trimmed.StartsWith("pid=") && trimmed.Length > 0 && !trimmed.StartsWith("#"))
+                        {
+                            // 旧格式兼容: 只有一行workingDir字符串（无前缀）
+                            _currentDirectory = trimmed;
+                            _workingDirectorySet = true;
+                            Log.Info("Editor", "从配置文件(旧格式)恢复工作目录: " + _currentDirectory);
+                            break;
+                        }
+                    }
+                }
+            }
+            catch (Exception) { }
+            
+            if (_workingDirectorySet)
+            {
+                ScanScripts();
+                CreateEditorLayout();
+            }
+            else
+            {
+                ShowWorkingDirectoryDialog();
+            }
             
             UI.RegisterResizeCallback(_resizeCallback);
             UI.RegisterGlobalClickCallback(_globalClickCallback);
@@ -76,6 +126,20 @@ _bindScriptClickCallback = OnBindScriptClick;
             UI.RegisterMouseMoveCallback(_mouseMoveCallback);
             UI.RegisterMouseWheelCallback(_mouseWheelCallback);
             UI.RegisterTreeNodeRightClickCallback(_treeNodeRightClickCallback);
+            
+            // === 脚本类型注册：className → Type ===
+            // 每个脚本实体类需在此注册，以便编辑器UI通过反射发现属性并创建实例
+            _scriptTypeRegistry["RotatingEntity"] = typeof(RotatingEntity);
+            
+            // 保存配置文件（只保存workingDir，Scene指针通过Rust FFI获取）
+            if (_workingDirectorySet)
+            {
+                try
+                {
+                    System.IO.File.WriteAllText(".hezhou_config", "workingDir=" + _currentDirectory);
+                }
+                catch (Exception) { }
+            }
         }
         
         public static void Update(float deltaTime)
@@ -91,7 +155,7 @@ _bindScriptClickCallback = OnBindScriptClick;
             {
                 try
                 {
-                    _fpsItem.Text = $"FPS: {((int)(1000f / deltaTime))}";
+                    _fpsItem.Text = "FPS: " + ((int)(1000f / deltaTime));
                     
                     bool selected = UI.IsPreviewWindowSelected(_previewWindowId);
                     
@@ -111,48 +175,86 @@ _bindScriptClickCallback = OnBindScriptClick;
                         UpdateStatusBar();
                     }
                     
-                    if (_previewSelected && _gameScene != null && _gameScene.GetGameState() == GameState.Running)
+                    // === 场景更新: 基于GameState，不依赖_previewSelected ===
+                    if (_gameScene != null && _gameScene.GetGameState() == GameState.Running)
                     {
-                        float speed = 2f * (deltaTime / 1000f);
-                        
-                        float sinYaw = (float)Math.Sin(_cameraYaw);
-                        float cosYaw = (float)Math.Cos(_cameraYaw);
-                        float sinPitch = (float)Math.Sin(_cameraPitch);
-                        float cosPitch = (float)Math.Cos(_cameraPitch);
-                        // forward包含pitch分量: 朝相机真正指向的方向前进
-                        float forwardX = sinYaw * cosPitch;
-                        float forwardY = sinPitch;
-                        float forwardZ = -cosYaw * cosPitch;
-                        // right保持水平(不含pitch): 左右平移
-                        float rightX = cosYaw;
-                        float rightZ = sinYaw;
-                        
-                        if (_keyUpPressed)
+                        // 相机控制: 仅在previewSelected时响应方向键
+                        if (_previewSelected)
                         {
-                            _cameraX += speed * forwardX;
-                            _cameraY += speed * forwardY;
-                            _cameraZ += speed * forwardZ;
-                        }
-                        if (_keyDownPressed)
-                        {
-                            _cameraX -= speed * forwardX;
-                            _cameraY -= speed * forwardY;
-                            _cameraZ -= speed * forwardZ;
-                        }
-                        if (_keyLeftPressed)
-                        {
-                            _cameraX -= speed * rightX;
-                            _cameraZ -= speed * rightZ;
-                        }
-                        if (_keyRightPressed)
-                        {
-                            _cameraX += speed * rightX;
-                            _cameraZ += speed * rightZ;
+                            float speed = 2f * (deltaTime / 1000f);
+                            
+                            float sinYaw = (float)Math.Sin(_cameraYaw);
+                            float cosYaw = (float)Math.Cos(_cameraYaw);
+                            float sinPitch = (float)Math.Sin(_cameraPitch);
+                            float cosPitch = (float)Math.Cos(_cameraPitch);
+                            float forwardX = sinYaw * cosPitch;
+                            float forwardY = sinPitch;
+                            float forwardZ = -cosYaw * cosPitch;
+                            float rightX = cosYaw;
+                            float rightZ = sinYaw;
+                            
+                            if (_keyUpPressed)
+                            {
+                                _cameraX += speed * forwardX;
+                                _cameraY += speed * forwardY;
+                                _cameraZ += speed * forwardZ;
+                            }
+                            if (_keyDownPressed)
+                            {
+                                _cameraX -= speed * forwardX;
+                                _cameraY -= speed * forwardY;
+                                _cameraZ -= speed * forwardZ;
+                            }
+                            if (_keyLeftPressed)
+                            {
+                                _cameraX -= speed * rightX;
+                                _cameraZ -= speed * rightZ;
+                            }
+                            if (_keyRightPressed)
+                            {
+                                _cameraX += speed * rightX;
+                                _cameraZ += speed * rightZ;
+                            }
                         }
                         
                         UI.SetCameraParams(_cameraYaw, _cameraPitch, _cameraX, _cameraY, _cameraZ);
                         
+                        // 场景更新和脚本更新: 无论previewSelected，只要GameState=Running就执行
                         _gameScene.Update(deltaTime / 1000f);
+                        
+                        // === 脚本实例每帧更新: 遍历所有Entity的ScriptBinding，反射调用UpdateInstance ===
+                        int entityCount = _gameScene.GetEntityCount();
+                        for (int e = 0; e < entityCount; e++)
+                        {
+                            ulong eid = _gameScene.GetEntityId(e);
+                            int bindingCount = _gameScene.GetScriptBindingCount(eid);
+                            for (int b = 0; b < bindingCount; b++)
+                            {
+                                var bindingInfo = _gameScene.GetScriptBindingInfo(eid, b);
+                                if (!bindingInfo.Enabled) continue;
+                                
+                                ulong instId = UI.SceneGetScriptBindingInstanceId(_gameScene.ScenePtr, eid, (ulong)b);
+                                if (instId == 0) continue;
+                                
+                                if (_scriptTypeRegistry.TryGetValue(bindingInfo.ClassName, out Type scriptType))
+                                {
+                                    try
+                                    {
+                                        IntPtr instancePtr = new IntPtr((long)instId);
+                                        MethodInfo updateMethod = scriptType.GetMethod("UpdateInstance",
+                                            BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
+                                        if (updateMethod != null)
+                                        {
+                                            updateMethod.Invoke(null, new object[] { instancePtr, deltaTime / 1000f, eid });
+                                        }
+                                    }
+                                    catch (Exception ex)
+                                    {
+                                        Log.Error("Editor", "脚本UpdateInstance失败: " + bindingInfo.ClassName + ", entityId=" + eid + ", 错误=" + ex.Message);
+                                    }
+                                }
+                            }
+                        }
                     }
                     else if (_gameScene != null && _gameScene.GetGameState() == GameState.Paused)
                     {
@@ -162,6 +264,52 @@ _bindScriptClickCallback = OnBindScriptClick;
                     else
                     {
                         // Editing mode: orbit camera
+                        // 方向键移动orbit target
+                        float orbitSpeed = 2f * (deltaTime / 1000f);
+                        bool anyKey = _keyLeftPressed || _keyRightPressed || _keyUpPressed || _keyDownPressed;
+                        if (anyKey)
+                        {
+                            if (_altPressed)
+                            {
+                                // Alt+方向键: 朝相机方向移动orbit target
+                                float sinYaw = (float)Math.Sin(_orbitYaw);
+                                float cosYaw = (float)Math.Cos(_orbitYaw);
+                                float forwardX = sinYaw;
+                                float forwardZ = -cosYaw;
+                                float rightX = cosYaw;
+                                float rightZ = sinYaw;
+                                if (_keyUpPressed)
+                                {
+                                    _orbitTargetX += orbitSpeed * forwardX;
+                                    _orbitTargetZ += orbitSpeed * forwardZ;
+                                }
+                                if (_keyDownPressed)
+                                {
+                                    _orbitTargetX -= orbitSpeed * forwardX;
+                                    _orbitTargetZ -= orbitSpeed * forwardZ;
+                                }
+                                if (_keyLeftPressed)
+                                {
+                                    _orbitTargetX -= orbitSpeed * rightX;
+                                    _orbitTargetZ -= orbitSpeed * rightZ;
+                                }
+                                if (_keyRightPressed)
+                                {
+                                    _orbitTargetX += orbitSpeed * rightX;
+                                    _orbitTargetZ += orbitSpeed * rightZ;
+                                }
+                            }
+                            else
+                            {
+                                // 无Alt: 朝世界坐标移动orbit target
+                                if (_keyUpPressed)    _orbitTargetZ -= orbitSpeed;
+                                if (_keyDownPressed)  _orbitTargetZ += orbitSpeed;
+                                if (_keyLeftPressed)  _orbitTargetX -= orbitSpeed;
+                                if (_keyRightPressed) _orbitTargetX += orbitSpeed;
+                            }
+                        }
+
+                        // 球坐标计算camera位置（围绕target旋转）
                         // 球坐标计算camera位置（围绕target旋转）
                         float camX = _orbitTargetX + _orbitDistance * (float)Math.Sin(_orbitYaw) * (float)Math.Cos(_orbitPitch);
                         float camY = _orbitTargetY + _orbitDistance * (float)Math.Sin(_orbitPitch);

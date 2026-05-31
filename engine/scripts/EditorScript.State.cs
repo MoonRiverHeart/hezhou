@@ -64,6 +64,17 @@ namespace Hezhou
         private static List<ulong> _scriptRowIds = new List<ulong>();
         private static Dictionary<ulong, int> _removeScriptBtnIndices = new Dictionary<ulong, int>();
         private static Dictionary<ulong, int> _scriptToggleBtnIndices = new Dictionary<ulong, int>();
+        
+        // === Script Instance Registry: className → Type ===
+        private static Dictionary<string, Type> _scriptTypeRegistry = new Dictionary<string, Type>();
+        
+        // === Script Property Widget State (per-binding, per-property) ===
+        private static Dictionary<ulong, UI.InputFieldChangeCallbackDelegate> _scriptPropertyInputCallbacks = new Dictionary<ulong, UI.InputFieldChangeCallbackDelegate>();
+        private static Dictionary<ulong, UI.SliderChangeCallbackDelegate> _scriptPropertySliderCallbacks = new Dictionary<ulong, UI.SliderChangeCallbackDelegate>();
+        // Maps slider/input widgetId → (entityId, bindingIndex, propertyName) for callback routing
+        private static Dictionary<ulong, ScriptPropertyInfo> _scriptPropertyInfoMap = new Dictionary<ulong, ScriptPropertyInfo>();
+        // Maps min/max/initial input widgetId → mainWidgetId (slider or input) for callback routing
+        private static Dictionary<ulong, ulong> _scriptMinMaxInitialToMainWidgetMap = new Dictionary<ulong, ulong>();
 
         // === Status Bar State ===
         private static Panel _statusBar;
@@ -178,6 +189,7 @@ namespace Hezhou
         private static bool _keyRightPressed = false;
         private static bool _keyUpPressed = false;
         private static bool _keyDownPressed = false;
+        private static bool _altPressed = false;
 
         // === Core Callback Delegates ===
         private static UI.UpdateCallbackDelegate _updateCallback;
@@ -229,6 +241,11 @@ namespace Hezhou
         private static bool _isTransitioning = false;
         private static int _selectedScriptIndex = 0;
 
+        // === Hot Reload Pending Bind State (Bug4 fix) ===
+        private static bool _sourceFilesModified = false;
+        private static ulong _pendingBindEntityId = 0;
+        private static int _pendingBindScriptIndex = -1;
+
         // === Property Descriptor (Model Type) ===
         private struct PropertyDescriptor
         {
@@ -242,5 +259,23 @@ namespace Hezhou
 
         // === Property Change Callback Delegate (Model Type) ===
         public delegate void PropertyChangeCallback(ulong widgetId, string text);
+        
+        // === Script Property Info (for callback routing) ===
+        private struct ScriptPropertyInfo
+        {
+            public ulong EntityId;
+            public int BindingIndex;
+            public string PropertyName;
+            public string ClassName;
+            public long InstanceId;
+            // Widget IDs
+            public ulong MainWidgetId;       // slider or input ID
+            public ulong MinInputId;          // min input field widget ID
+            public ulong MaxInputId;          // max input field widget ID
+            public ulong InitialInputId;       // initial value input widget ID
+            public float CurrentMin;
+            public float CurrentMax;
+            public float CurrentInitial;
+        }
     }
 }
