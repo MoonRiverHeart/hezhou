@@ -27,6 +27,42 @@ pub extern "C" fn scene_destroy_editor(scene: *mut std::ffi::c_void) {
 }
 
 #[unsafe(no_mangle)]
+pub extern "C" fn scene_get_existing_ptr_editor() -> *mut std::ffi::c_void {
+    unsafe {
+        match super::SCENE {
+            Some(ptr) => ptr as *mut std::ffi::c_void,
+            None => std::ptr::null_mut(),
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn scene_root_entity_count_editor(scene: *mut std::ffi::c_void) -> u32 {
+    if scene.is_null() {
+        return 0;
+    }
+    unsafe {
+        let scene_ptr = scene as *const hezhou_core::Scene;
+        (*scene_ptr).root_entities.len() as u32
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn scene_get_root_entity_id_at_editor(scene: *mut std::ffi::c_void, index: u32) -> u64 {
+    if scene.is_null() {
+        return 0;
+    }
+    unsafe {
+        let scene_ptr = scene as *const hezhou_core::Scene;
+        let root = &(*scene_ptr).root_entities;
+        if index as usize >= root.len() {
+            return 0;
+        }
+        root[index as usize].id
+    }
+}
+
+#[unsafe(no_mangle)]
 pub extern "C" fn scene_create_cube_editor(scene: *mut std::ffi::c_void) -> u64 {
     if scene.is_null() {
         return 0;
@@ -343,6 +379,30 @@ pub extern "C" fn scene_set_script_binding_enabled_editor(scene: *mut std::ffi::
         let scene_ptr = scene as *mut hezhou_core::Scene;
         let entity = hezhou_core::Entity::new(entity_id);
         (*scene_ptr).set_script_binding_enabled(entity, index, enabled);
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn scene_set_script_binding_instance_id_editor(scene: *mut std::ffi::c_void, entity_id: u64, index: usize, instance_id: u64) {
+    if scene.is_null() {
+        return;
+    }
+    unsafe {
+        let scene_ptr = scene as *mut hezhou_core::Scene;
+        let entity = hezhou_core::Entity::new(entity_id);
+        (*scene_ptr).set_script_binding_instance_id(entity, index, instance_id);
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn scene_get_script_binding_instance_id_editor(scene: *mut std::ffi::c_void, entity_id: u64, index: usize) -> u64 {
+    if scene.is_null() {
+        return 0;
+    }
+    unsafe {
+        let scene_ptr = scene as *const hezhou_core::Scene;
+        let entity = hezhou_core::Entity::new(entity_id);
+        (*scene_ptr).get_script_binding(entity, index).map(|b| b.instance_id).unwrap_or(0)
     }
 }
 

@@ -42,6 +42,7 @@ pub type GridViewGetSelectedUserDataFn = extern "C" fn(WidgetTreeHandle, u64) ->
 pub type GridViewClearFn = extern "C" fn(WidgetTreeHandle, u64);
 pub type GridViewItemCountFn = extern "C" fn(WidgetTreeHandle, u64) -> usize;
 pub type GridViewSetOnClickThunkPtrFn = extern "C" fn(WidgetTreeHandle, u64, *const c_void);
+pub type GridViewSetItemPaddingFn = extern "C" fn(WidgetTreeHandle, u64, f32, f32);
 
 pub type CreateDialogFn = extern "C" fn(WidgetTreeHandle, u64, *const c_char, f32, f32) -> u64;
 pub type DialogSetContentFn = extern "C" fn(WidgetTreeHandle, u64, u64);

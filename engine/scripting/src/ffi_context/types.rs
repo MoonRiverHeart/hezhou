@@ -3,6 +3,7 @@ use std::ffi::{c_void, c_char};
 pub type WidgetTreeHandle = *mut c_void;
 
 pub type GetRootIdFn = extern "C" fn(WidgetTreeHandle) -> u64;
+pub type ClearWidgetTreeFn = extern "C" fn(WidgetTreeHandle);
 pub type SetWidgetLayoutFn = extern "C" fn(WidgetTreeHandle, u64, f32, f32, f32, f32);
 pub type SetPositionFn = extern "C" fn(WidgetTreeHandle, u64, f32, f32);
 pub type SetSizeFn = extern "C" fn(WidgetTreeHandle, u64, f32, f32);
@@ -23,10 +24,12 @@ pub type DfxPerfBeginFrameFn = extern "C" fn(*mut c_void);
 pub type DfxPerfEndFrameFn = extern "C" fn(*mut c_void);
 pub type SetStatusTextFn = extern "C" fn(*const c_char);
 pub type OnHotReloadCompleteFn = extern "C" fn();
+pub type RegisterHotReloadCompleteCallbackFn = extern "C" fn(OnHotReloadCompleteFn);
 pub type DebugPrintWidgetTreeFn = extern "C" fn(WidgetTreeHandle);
 pub type SetFlexExpandFn = extern "C" fn(WidgetTreeHandle, u64, u32);
 pub type SetCrossAxisFillFn = extern "C" fn(WidgetTreeHandle, u64, u32);
 pub type SetWidgetBackgroundColorFn = extern "C" fn(WidgetTreeHandle, u64, f32, f32, f32, f32);
+pub type SetLabelWrapModeFn = extern "C" fn(WidgetTreeHandle, u64, u32);
 
 pub type EventDispatcherHandle = *mut c_void;
 
@@ -40,3 +43,5 @@ pub type WidgetGetChildIdFn = extern "C" fn(WidgetTreeHandle, u64, u32) -> u64;
 pub type WidgetGetTotalCountFn = extern "C" fn(WidgetTreeHandle) -> u32;
 pub type DebugDumpTreeToBufferFn = extern "C" fn(WidgetTreeHandle, *mut u8, u32) -> u32;
 pub type CaptureScreenshotToFileFn = extern "C" fn(*const c_char) -> i32;
+
+pub type GetFocusedInputFieldFn = extern "C" fn() -> u64;

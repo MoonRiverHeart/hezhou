@@ -22,6 +22,7 @@ pub struct ScriptBinding {
     pub script_path: String,
     pub class_name: String,
     pub enabled: bool,
+    pub instance_id: u64,
 }
 
 impl Default for ScriptBinding {
@@ -30,6 +31,7 @@ impl Default for ScriptBinding {
             script_path: String::new(),
             class_name: String::new(),
             enabled: true,
+            instance_id: 0,
         }
     }
 }
@@ -126,6 +128,7 @@ impl Scene {
             script_path: script_path.clone(),
             class_name: class_name.clone(),
             enabled: true,
+            instance_id: 0,
         };
         
         if !self.entity_bindings.contains_key(&entity.id) {
@@ -168,6 +171,14 @@ impl Scene {
         if let Some(scripts) = self.entity_scripts.get_mut(&entity.id) {
             if let Some(script) = scripts.get_mut(index) {
                 script.enabled = enabled;
+            }
+        }
+    }
+    
+    pub fn set_script_binding_instance_id(&mut self, entity: Entity, index: usize, instance_id: u64) {
+        if let Some(bindings) = self.entity_bindings.get_mut(&entity.id) {
+            if let Some(binding) = bindings.get_mut(index) {
+                binding.instance_id = instance_id;
             }
         }
     }

@@ -255,6 +255,30 @@ pub extern "C" fn scene_entity_count(scene: *const Scene) -> u32 {
 }
 
 #[no_mangle]
+pub extern "C" fn scene_root_entity_count(scene: *const Scene) -> u32 {
+    if scene.is_null() {
+        return 0;
+    }
+    unsafe {
+        (*scene).root_entities.len() as u32
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn scene_get_root_entity_id_at(scene: *const Scene, index: u32) -> u64 {
+    if scene.is_null() {
+        return 0;
+    }
+    unsafe {
+        let root = &(*scene).root_entities;
+        if index as usize >= root.len() {
+            return 0;
+        }
+        root[index as usize].id
+    }
+}
+
+#[no_mangle]
 pub extern "C" fn scene_remove_entity(scene: *mut Scene, entity_id: u64) {
     if scene.is_null() {
         return;
@@ -440,6 +464,28 @@ pub extern "C" fn scene_set_script_binding_enabled(scene: *mut Scene, entity_id:
     unsafe {
         let entity = Entity::new(entity_id);
         (*scene).set_script_binding_enabled(entity, index, enabled);
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn scene_set_script_binding_instance_id(scene: *mut Scene, entity_id: u64, index: usize, instance_id: u64) {
+    if scene.is_null() {
+        return;
+    }
+    unsafe {
+        let entity = Entity::new(entity_id);
+        (*scene).set_script_binding_instance_id(entity, index, instance_id);
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn scene_get_script_binding_instance_id(scene: *const Scene, entity_id: u64, index: usize) -> u64 {
+    if scene.is_null() {
+        return 0;
+    }
+    unsafe {
+        let entity = Entity::new(entity_id);
+        (*scene).get_script_binding(entity, index).map(|b| b.instance_id).unwrap_or(0)
     }
 }
 

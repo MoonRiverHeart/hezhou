@@ -2,6 +2,9 @@ use std::ffi::{c_void, c_char};
 
 pub type SceneCreateFn = extern "C" fn() -> *mut c_void;
 pub type SceneDestroyFn = extern "C" fn(*mut c_void);
+pub type SceneGetExistingPtrFn = extern "C" fn() -> *mut c_void;
+pub type SceneRootEntityCountFn = extern "C" fn(*mut c_void) -> u32;
+pub type SceneGetRootEntityIdAtFn = extern "C" fn(*mut c_void, u32) -> u64;
 pub type SceneCreateCubeFn = extern "C" fn(*mut c_void) -> u64;
 pub type SceneCreatePlaneFn = extern "C" fn(*mut c_void) -> u64;
 pub type SceneCreateCornellBoxFn = extern "C" fn(*mut c_void) -> u64;
@@ -29,6 +32,8 @@ pub type SceneRemoveScriptBindingFn = extern "C" fn(*mut c_void, u64, usize);
 pub type SceneGetScriptBindingCountFn = extern "C" fn(*mut c_void, u64) -> usize;
 pub type SceneGetScriptBindingInfoFn = extern "C" fn(*mut c_void, u64, usize, *mut c_char, usize, *mut c_char, usize, *mut bool) -> bool;
 pub type SceneSetScriptBindingEnabledFn = extern "C" fn(*mut c_void, u64, usize, bool);
+pub type SceneSetScriptBindingInstanceIdFn = extern "C" fn(*mut c_void, u64, usize, u64);
+pub type SceneGetScriptBindingInstanceIdFn = extern "C" fn(*mut c_void, u64, usize) -> u64;
 pub type SceneCreateEntityFn = extern "C" fn(*mut c_void) -> u64;
 pub type SceneGetEntityCountFn = extern "C" fn(*mut c_void) -> u64;
 pub type SceneGetEntityIdFn = extern "C" fn(*mut c_void, u64) -> u64;
