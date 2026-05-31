@@ -77,7 +77,8 @@ $AllSourceFiles = @(
     "$ScriptsDir/UITestRunner.cs",
     "$ScriptsDir/ExposeAttribute.cs",
     "$ScriptsDir/IScriptEntity.cs",
-    "$ScriptsDir/RotatingEntity.cs"
+    "$ScriptsDir/RotatingEntity.cs",
+    "$ScriptsDir/TestRunner.cs"
 )
 
 # UI相关脚本子集（用于快速编译UI模块）

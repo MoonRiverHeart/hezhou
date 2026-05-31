@@ -552,6 +552,103 @@ namespace Hezhou
             _propertyDescriptors.Add(desc);
         }
 
+        // === Build a single script property widget (Slider or InputField + Min/Max/Step/Initial) ===
+        private static ScriptPropertyInfo BuildSingleScriptProperty(ulong parentId, ScriptPropertyDescriptor descriptor, ulong entityId, int bindingIndex, ulong instanceId, Type scriptType)
+        {
+            ScriptPropertyInfo info = new ScriptPropertyInfo();
+            info.EntityId = entityId;
+            info.BindingIndex = bindingIndex;
+            info.PropertyName = descriptor.Name;
+            info.ClassName = scriptType.Name;
+            info.InstanceId = (long)instanceId;
+            info.WidgetType = descriptor.Widget;
+
+            // 显示名: DisplayName优先，空则用字段名首字母大写
+            string displayName = descriptor.DisplayName;
+            if (displayName == null || displayName.Length == 0)
+            {
+                displayName = descriptor.Name.Length > 0
+                    ? descriptor.Name.Substring(0, 1).ToUpper() + descriptor.Name.Substring(1)
+                    : descriptor.Name;
+            }
+
+            // 读取runtime当前值
+            float currentRuntimeValue = 0.0f;
+            if (instanceId != 0 && scriptType != null)
+            {
+                IntPtr instancePtr = new IntPtr((long)instanceId);
+                currentRuntimeValue = HezhouScripts.ScriptEntityHelper.GetFieldValue(instancePtr, descriptor.Name, scriptType);
+            }
+
+            // === Label (Wrap模式) ===
+            ulong labelId = UI.CreateLabel(parentId, 0, 20f, displayName + ":");
+            UI.SetLabelWrapMode(labelId, 1);
+
+            // === 主控件: Slider 或 InputField ===
+            ulong mainWidgetId = 0;
+            if (descriptor.Widget == "slider")
+            {
+                mainWidgetId = UI.CreateSlider(parentId, 150f, 24f);
+                UI.SliderSetRange(mainWidgetId, descriptor.Min, descriptor.Max);
+                UI.SliderSetStep(mainWidgetId, descriptor.Step);
+                UI.SliderSetValue(mainWidgetId, currentRuntimeValue);
+            }
+            else
+            {
+                // "input" 或其他 → InputField
+                mainWidgetId = UI.CreateInputField(parentId, 150f, 24f);
+                UI.InputFieldSetText(mainWidgetId, currentRuntimeValue.ToString());
+                UI.InputFieldSetPlaceholder(mainWidgetId, displayName);
+            }
+            info.MainWidgetId = mainWidgetId;
+
+            // === Min/Max/Step/Initial HStack ===
+            ulong configHStack = UI.CreateHStack(parentId, 5f);
+
+            // Min
+            ulong minLabelId = UI.CreateLabel(configHStack, 30f, 20f, "Min:");
+            ulong minInputId = UI.CreateInputField(configHStack, 50f, 24f);
+            UI.InputFieldSetText(minInputId, descriptor.Min.ToString());
+            UI.InputFieldSetPlaceholder(minInputId, "Min");
+            info.MinInputId = minInputId;
+            info.CurrentMin = descriptor.Min;
+
+            // Max
+            ulong maxLabelId = UI.CreateLabel(configHStack, 30f, 20f, "Max:");
+            ulong maxInputId = UI.CreateInputField(configHStack, 50f, 24f);
+            UI.InputFieldSetText(maxInputId, descriptor.Max.ToString());
+            UI.InputFieldSetPlaceholder(maxInputId, "Max");
+            info.MaxInputId = maxInputId;
+            info.CurrentMax = descriptor.Max;
+
+            // Step
+            ulong stepLabelId = UI.CreateLabel(configHStack, 30f, 20f, "Step:");
+            ulong stepInputId = UI.CreateInputField(configHStack, 50f, 24f);
+            UI.InputFieldSetText(stepInputId, descriptor.Step.ToString());
+            UI.InputFieldSetPlaceholder(stepInputId, "Step");
+            info.StepInputId = stepInputId;
+            info.CurrentStep = descriptor.Step;
+
+            // Init
+            ulong initLabelId = UI.CreateLabel(configHStack, 30f, 20f, "Init:");
+            ulong initInputId = UI.CreateInputField(configHStack, 50f, 24f);
+            UI.InputFieldSetText(initInputId, descriptor.Initial.ToString());
+            UI.InputFieldSetPlaceholder(initInputId, "Init");
+            info.InitialInputId = initInputId;
+            info.CurrentInitial = descriptor.Initial;
+
+            // 注册 Min/Max/Step/Initial input → mainWidget 映射（回调路由用）
+            _scriptMinMaxInitialToMainWidgetMap[minInputId] = mainWidgetId;
+            _scriptMinMaxInitialToMainWidgetMap[maxInputId] = mainWidgetId;
+            _scriptMinMaxInitialToMainWidgetMap[stepInputId] = mainWidgetId;
+            _scriptMinMaxInitialToMainWidgetMap[initInputId] = mainWidgetId;
+
+            // 注册 mainWidget → ScriptPropertyInfo 映射（回调路由用）
+            _scriptPropertyInfoMap[mainWidgetId] = info;
+
+            return info;
+        }
+
         // === Build Motion tab: script dropdown + 绑定 button + binding list ===
         private static void BuildMotionTab(ulong motionTabContentId)
         {

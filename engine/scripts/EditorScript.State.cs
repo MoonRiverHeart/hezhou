@@ -76,6 +76,10 @@ namespace Hezhou
         // Maps min/max/initial input widgetId → mainWidgetId (slider or input) for callback routing
         private static Dictionary<ulong, ulong> _scriptMinMaxInitialToMainWidgetMap = new Dictionary<ulong, ulong>();
 
+        // === Script Property Runtime→UI Sync State ===
+        private static int _updateFrameCount = 0;
+        private static Dictionary<ulong, float> _prevScriptPropertyValues = new Dictionary<ulong, float>();
+
         // === Status Bar State ===
         private static Panel _statusBar;
         private static List _statusItems;
@@ -272,10 +276,25 @@ namespace Hezhou
             public ulong MainWidgetId;       // slider or input ID
             public ulong MinInputId;          // min input field widget ID
             public ulong MaxInputId;          // max input field widget ID
+            public ulong StepInputId;          // step input field widget ID
             public ulong InitialInputId;       // initial value input widget ID
+            public string WidgetType;           // "slider" or "input" — 用于runtime→UI同步时选择正确的FFI调用
             public float CurrentMin;
             public float CurrentMax;
+            public float CurrentStep;
             public float CurrentInitial;
         }
+
+        // === Hot Reload值保存状态 ===
+        private struct SavedScriptPropertyValue
+        {
+            public ulong EntityId;
+            public int BindingIndex;
+            public string ClassName;
+            public string PropertyName;
+            public float RuntimeValue;  // 保存的runtime值
+            public ulong MainWidgetId;  // 用于Restore时直接查找propInfo
+        }
+        private static List<SavedScriptPropertyValue> _savedScriptPropertyValues = new List<SavedScriptPropertyValue>();
     }
 }

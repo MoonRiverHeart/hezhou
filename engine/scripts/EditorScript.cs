@@ -140,6 +140,9 @@ _bindScriptClickCallback = OnBindScriptClick;
                 }
                 catch (Exception) { }
             }
+
+            // 运行反射管线测试（TDD RED阶段验证）
+            TestRunner.RunAllTests();
         }
         
         public static void Update(float deltaTime)
@@ -323,6 +326,9 @@ _bindScriptClickCallback = OnBindScriptClick;
                         float fpsPitch = (float)Math.Atan2(-dy, (float)Math.Sqrt(dx * dx + dz * dz));  // shader: pitch正=向上看
                         UI.SetCameraParams(fpsYaw, fpsPitch, camX, camY, camZ);
                     }
+                    
+                    // === 脚本属性runtime值→UI同步 (每5帧) ===
+                    SyncScriptPropertyValuesToUI();
                 }
                 catch (Exception ex)
                 {

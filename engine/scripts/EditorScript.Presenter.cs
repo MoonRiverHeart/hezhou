@@ -419,6 +419,61 @@ namespace Hezhou
             UpdateScriptBindingsList(entityId);
         }
         
+        // === 脚本属性runtime值→UI同步 (每5帧执行一次) ===
+        // 防止循环更新: 仅值改变时更新UI, Slider/Input回调中同步更新_prevScriptPropertyValues
+        private static void SyncScriptPropertyValuesToUI()
+        {
+            _updateFrameCount++;
+            
+            // 每5帧执行一次同步, 减少FFI开销
+            if (_updateFrameCount % 5 != 0) return;
+            
+            // 仅在Editing状态 + 有选中Entity + 有脚本属性时执行
+            if (_selectedEntityId == 0 || _scriptPropertyInfoMap.Count == 0) return;
+            if (_gameScene == null || _gameScene.GetGameState() != GameState.Editing) return;
+            
+            foreach (KeyValuePair<ulong, ScriptPropertyInfo> entry in _scriptPropertyInfoMap)
+            {
+                ScriptPropertyInfo propInfo = entry.Value;
+                ulong mainWidgetId = propInfo.MainWidgetId;
+                
+                // 跳过未创建C#实例的属性(instanceId==0)
+                if (propInfo.InstanceId == 0) continue;
+                
+                // 跳过未注册类型
+                Type scriptType;
+                if (!_scriptTypeRegistry.TryGetValue(propInfo.ClassName, out scriptType)) continue;
+                
+                IntPtr instancePtr = new IntPtr(propInfo.InstanceId);
+                if (instancePtr == IntPtr.Zero) continue;
+                
+                // 读取当前runtime值
+                float runtimeValue = HezhouScripts.ScriptEntityHelper.GetFieldValue(instancePtr, propInfo.PropertyName, scriptType);
+                
+                // 与_prevScriptPropertyValues对比 — 值未变化时不更新(减少FFI开销)
+                float prevValue;
+                if (_prevScriptPropertyValues.TryGetValue(mainWidgetId, out prevValue))
+                {
+                    // 值相同则跳过(防止循环更新)
+                    if (runtimeValue == prevValue) continue;
+                }
+                
+                // 值变化 → 更新UI
+                if (propInfo.WidgetType == "slider")
+                {
+                    UI.SliderSetValue(mainWidgetId, runtimeValue);
+                }
+                else
+                {
+                    // "input" 或其他 → InputFieldSetText
+                    UI.InputFieldSetText(mainWidgetId, runtimeValue.ToString());
+                }
+                
+                // 更新_prevScriptPropertyValues
+                _prevScriptPropertyValues[mainWidgetId] = runtimeValue;
+            }
+        }
+        
         private static void ClearPropertiesPanel()
         {
             if (_propsTabWidget == null) return;
@@ -574,6 +629,9 @@ namespace Hezhou
             }
             _scriptRowIds.Clear();
             
+            // 重建脚本属性控件（清除旧的+创建新的Slider/Input）
+            BuildScriptPropertyWidgets(entityId);
+            
             if (scriptCount == 0)
             {
                 return;
@@ -607,6 +665,109 @@ namespace Hezhou
                 UI.SetOnClick(removeBtnId, _removeScriptClickCallback);
                 _removeScriptBtnIndices[removeBtnId] = i;
                 _scriptRowIds.Add(scriptRow);
+            }
+        }
+
+        // === Script Property Widget State (for removal tracking) ===
+        private static List<ulong> _scriptPropertyWidgetIds = new List<ulong>();
+
+        // === Build Script Property Widgets: 遍历Entity脚本绑定→反射[Expose]属性→创建Slider/Input控件 ===
+
+        private static void BuildScriptPropertyWidgets(ulong entityId)
+        {
+            // 移除旧的属性控件（Label, Slider/Input, ConfigHStack及其子控件）
+            for (int i = 0; i < _scriptPropertyWidgetIds.Count; i++)
+            {
+                UI.RemoveWidget(_scriptPropertyWidgetIds[i]);
+            }
+            _scriptPropertyWidgetIds.Clear();
+
+            // 清空属性数据字典（重建前必须清除旧数据）
+            _scriptPropertyInfoMap.Clear();
+            _scriptPropertySliderCallbacks.Clear();
+            _scriptPropertyInputCallbacks.Clear();
+            _scriptMinMaxInitialToMainWidgetMap.Clear();
+
+            if (_gameScene == null || _scriptsListContainerId == 0) return;
+
+            int scriptCount = _gameScene.GetScriptBindingCount(entityId);
+
+            for (int i = 0; i < scriptCount; i++)
+            {
+                ScriptBindingInfo bindingInfo = _gameScene.GetScriptBindingInfo(entityId, i);
+
+                // 查找脚本类型 — 未注册的类型跳过（无法反射属性）
+                Type scriptType = null;
+                if (!_scriptTypeRegistry.TryGetValue(bindingInfo.ClassName, out scriptType))
+                {
+                    continue;
+                }
+
+                // 获取instance_id（0表示尚未创建C#实例）
+                ulong instanceId = UI.SceneGetScriptBindingInstanceId(_gameScene.ScenePtr, entityId, (ulong)i);
+
+                // 反射[Expose]属性 → ScriptPropertyDescriptor[]
+                ScriptPropertyDescriptor[] descriptors = HezhouScripts.ScriptEntityHelper.ReflectProperties(scriptType);
+
+                for (int d = 0; d < descriptors.Length; d++)
+                {
+                    // 记录创建前的子控件数量，用于追踪新创建的属性控件
+                    uint childCountBefore = UI.WidgetGetChildCount(_scriptsListContainerId);
+
+                    // 创建属性控件（Label + Slider/Input + Min/Max/Step/Initial HStack）
+                    // BuildSingleScriptProperty内部填充_scriptPropertyInfoMap和_scriptMinMaxInitialToMainWidgetMap
+                    ScriptPropertyInfo propInfo = BuildSingleScriptProperty(
+                        _scriptsListContainerId, descriptors[d], entityId, i, instanceId, scriptType);
+
+                    // 追踪新创建的直接子控件（Label, MainWidget, ConfigHStack）
+                    // 移除这些直接子控件时，其嵌套子控件（HStack内的Label/Input）也会被移除
+                    uint childCountAfter = UI.WidgetGetChildCount(_scriptsListContainerId);
+                    for (uint c = childCountBefore; c < childCountAfter; c++)
+                    {
+                        ulong newChildId = UI.WidgetGetChildId(_scriptsListContainerId, c);
+                        _scriptPropertyWidgetIds.Add(newChildId);
+                    }
+
+                    // === 注册主控件回调 ===
+                    if (descriptors[d].Widget == "slider")
+                    {
+                        // Slider回调: void(ulong widgetId, float value)
+                        UI.SliderChangeCallbackDelegate sliderCallback =
+                            new UI.SliderChangeCallbackDelegate(OnScriptPropertySliderChange);
+                        _scriptPropertySliderCallbacks[propInfo.MainWidgetId] = sliderCallback;
+                        UI.SliderSetOnChange(propInfo.MainWidgetId, sliderCallback);
+                    }
+                    else
+                    {
+                        // InputField回调: void(ulong widgetId, string text)
+                        UI.InputFieldChangeCallbackDelegate inputCallback =
+                            new UI.InputFieldChangeCallbackDelegate(OnScriptPropertyInputChange);
+                        _scriptPropertyInputCallbacks[propInfo.MainWidgetId] = inputCallback;
+                        UI.InputFieldSetOnChange(propInfo.MainWidgetId, inputCallback);
+                    }
+
+                    // === 注册 Min/Max/Step/Initial InputField回调 ===
+                    // 配置参数修改回调 — Task 4将增强: ModifyScriptSourceFile + Slider范围更新
+                    UI.InputFieldChangeCallbackDelegate minCallback =
+                        new UI.InputFieldChangeCallbackDelegate(OnScriptPropertyConfigInputChange);
+                    _scriptPropertyInputCallbacks[propInfo.MinInputId] = minCallback;
+                    UI.InputFieldSetOnChange(propInfo.MinInputId, minCallback);
+
+                    UI.InputFieldChangeCallbackDelegate maxCallback =
+                        new UI.InputFieldChangeCallbackDelegate(OnScriptPropertyConfigInputChange);
+                    _scriptPropertyInputCallbacks[propInfo.MaxInputId] = maxCallback;
+                    UI.InputFieldSetOnChange(propInfo.MaxInputId, maxCallback);
+
+                    UI.InputFieldChangeCallbackDelegate stepCallback =
+                        new UI.InputFieldChangeCallbackDelegate(OnScriptPropertyConfigInputChange);
+                    _scriptPropertyInputCallbacks[propInfo.StepInputId] = stepCallback;
+                    UI.InputFieldSetOnChange(propInfo.StepInputId, stepCallback);
+
+                    UI.InputFieldChangeCallbackDelegate initialCallback =
+                        new UI.InputFieldChangeCallbackDelegate(OnScriptPropertyConfigInputChange);
+                    _scriptPropertyInputCallbacks[propInfo.InitialInputId] = initialCallback;
+                    UI.InputFieldSetOnChange(propInfo.InitialInputId, initialCallback);
+                }
             }
         }
 
@@ -1196,61 +1357,63 @@ UI.SetText(_runButtonId, "运行");
         private static void SaveAllScriptPropertyValues()
         {
             if (_gameScene == null) return;
+            if (_scriptPropertyInfoMap.Count == 0) return;
 
             try
             {
-                // 先删除旧文件
-                string tempFile = ".hezhou_hotreload_props";
-                if (File.Exists(tempFile))
+                // 清空内存存储
+                _savedScriptPropertyValues.Clear();
+
+                // 遍历_scriptPropertyInfoMap → 读取runtime值 → 保存到_savedScriptPropertyValues
+                // mcs兼容: 用foreach遍历Dictionary(避免Dictionary<K,V>.Enumerator)
+                foreach (KeyValuePair<ulong, ScriptPropertyInfo> entry in _scriptPropertyInfoMap)
                 {
-                    File.Delete(tempFile);
+                    ulong mainWidgetId = entry.Key;
+                    ScriptPropertyInfo propInfo = entry.Value;
+
+                    // 如果instanceId==0(尚未创建C#实例)，跳过(无法读取runtime值)
+                    if (propInfo.InstanceId == 0) continue;
+
+                    // 获取scriptType — 如果未注册类型，跳过
+                    if (!_scriptTypeRegistry.TryGetValue(propInfo.ClassName, out Type scriptType)) continue;
+                    if (scriptType == null) continue;
+
+                    IntPtr instancePtr = new IntPtr(propInfo.InstanceId);
+                    if (instancePtr == IntPtr.Zero) continue;
+
+                    // 用ScriptEntityHelper.GetFieldValue读取runtime值
+                    float runtimeValue = HezhouScripts.ScriptEntityHelper.GetFieldValue(instancePtr, propInfo.PropertyName, scriptType);
+
+                    SavedScriptPropertyValue saved = new SavedScriptPropertyValue();
+                    saved.EntityId = propInfo.EntityId;
+                    saved.BindingIndex = propInfo.BindingIndex;
+                    saved.ClassName = propInfo.ClassName;
+                    saved.PropertyName = propInfo.PropertyName;
+                    saved.RuntimeValue = runtimeValue;
+                    saved.MainWidgetId = mainWidgetId;
+                    _savedScriptPropertyValues.Add(saved);
                 }
 
-                System.IO.StringWriter writer = new System.IO.StringWriter();
-                int entityCount = _gameScene.GetEntityCount();
-
-                for (int e = 0; e < entityCount; e++)
+                // 写入临时文件 — 格式: entityId|bindingIndex|className|propertyName|runtimeValue|mainWidgetId
+                // mcs兼容: 使用StringWriter逐行写入(不使用LINQ)
+                string tempFile = ".hezhou_hotreload_property";
+                StringWriter writer = new StringWriter();
+                for (int i = 0; i < _savedScriptPropertyValues.Count; i++)
                 {
-                    ulong eid = _gameScene.GetEntityId(e);
-                    int bindingCount = _gameScene.GetScriptBindingCount(eid);
-
-                    for (int b = 0; b < bindingCount; b++)
-                    {
-                        var info = _gameScene.GetScriptBindingInfo(eid, b);
-                        ulong instId = UI.SceneGetScriptBindingInstanceId(_gameScene.ScenePtr, eid, (ulong)b);
-
-                        if (instId == 0) continue;
-                        if (!_scriptTypeRegistry.TryGetValue(info.ClassName, out Type scriptType)) continue;
-
-                        IntPtr instancePtr = new IntPtr((long)instId);
-
-                        // 获取属性描述符
-                        MethodInfo getDescMethod = scriptType.GetMethod("GetPropertyDescriptors",
-                            BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
-                        if (getDescMethod == null) continue;
-
-                        ScriptPropertyDescriptor[] descriptors = (ScriptPropertyDescriptor[])getDescMethod.Invoke(null, null);
-                        if (descriptors == null) continue;
-
-                        // 保存每个属性的运行时值
-                        MethodInfo getValMethod = scriptType.GetMethod("GetPropertyValue",
-                            BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
-                        if (getValMethod == null) continue;
-
-                        for (int p = 0; p < descriptors.Length; p++)
-                        {
-                            float value = (float)getValMethod.Invoke(null, new object[] { instancePtr, descriptors[p].Name });
-                            writer.WriteLine(eid + "|" + b + "|" + info.ClassName + "|" + descriptors[p].Name + "|" + value.ToString("G"));
-                        }
-                    }
+                    SavedScriptPropertyValue sv = _savedScriptPropertyValues[i];
+                    writer.WriteLine(sv.EntityId + "|" + sv.BindingIndex + "|" + sv.ClassName + "|" + sv.PropertyName + "|" + sv.RuntimeValue + "|" + sv.MainWidgetId);
                 }
-
                 File.WriteAllText(tempFile, writer.ToString());
-                Log.Info("Editor", "保存脚本属性值: " + writer.ToString().Split('\n').Length + " 条记录");
+                writer.Close();
+
+                Log.Info("Editor", "保存脚本属性值: " + _savedScriptPropertyValues.Count + " 条记录 → " + tempFile);
             }
             catch (Exception ex)
             {
                 Log.Error("Editor", "SaveAllScriptPropertyValues失败: " + ex.Message);
+                // 保存失败时删除临时文件+清空内存
+                try { File.Delete(".hezhou_hotreload_property"); } catch {}
+                _savedScriptPropertyValues.Clear();
             }
         }
 
@@ -1301,61 +1464,136 @@ UI.SetText(_runButtonId, "运行");
         {
             if (_gameScene == null) return;
 
-            string tempFile = ".hezhou_hotreload_props";
+            string tempFile = ".hezhou_hotreload_property";
 
             try
             {
-                if (!File.Exists(tempFile))
+                // 从临时文件读取_savedScriptPropertyValues
+                // 格式: entityId|bindingIndex|className|propertyName|runtimeValue|mainWidgetId
+                _savedScriptPropertyValues.Clear();
+
+                if (File.Exists(tempFile))
                 {
-                    Log.Info("Editor", "无保存的属性值文件，跳过恢复");
-                    return;
-                }
-
-                string content = File.ReadAllText(tempFile);
-                string[] lines = content.Split('\n');
-                int restoredCount = 0;
-
-                for (int i = 0; i < lines.Length; i++)
-                {
-                    string line = lines[i].Trim();
-                    if (line.Length == 0) continue;
-
-                    string[] parts = line.Split('|');
-                    if (parts.Length != 5) continue;
-
-                    ulong eid = ulong.Parse(parts[0]);
-                    int bindingIndex = int.Parse(parts[1]);
-                    string className = parts[2];
-                    string propertyName = parts[3];
-                    float value = float.Parse(parts[4]);
-
-                    // 获取当前instance_id（应该已被RecreateAllScriptInstances设置）
-                    ulong instId = UI.SceneGetScriptBindingInstanceId(_gameScene.ScenePtr, eid, (ulong)bindingIndex);
-                    if (instId == 0) continue;
-
-                    if (!_scriptTypeRegistry.TryGetValue(className, out Type scriptType)) continue;
-
-                    IntPtr instancePtr = new IntPtr((long)instId);
-
-                    MethodInfo setValMethod = scriptType.GetMethod("SetPropertyValue",
-                        BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
-                    if (setValMethod != null)
+                    string[] lines = File.ReadAllLines(tempFile);
+                    for (int i = 0; i < lines.Length; i++)
                     {
-                        setValMethod.Invoke(null, new object[] { instancePtr, propertyName, value });
-                        restoredCount++;
+                        string line = lines[i];
+                        if (string.IsNullOrEmpty(line)) continue;
+
+                        string[] parts = line.Split('|');
+                        if (parts.Length < 6) continue;
+
+                        SavedScriptPropertyValue sv = new SavedScriptPropertyValue();
+                        sv.EntityId = ulong.Parse(parts[0]);
+                        sv.BindingIndex = int.Parse(parts[1]);
+                        sv.ClassName = parts[2];
+                        sv.PropertyName = parts[3];
+                        sv.RuntimeValue = float.Parse(parts[4]);
+                        sv.MainWidgetId = ulong.Parse(parts[5]);
+                        _savedScriptPropertyValues.Add(sv);
                     }
                 }
 
-                // 删除临时文件
-                File.Delete(tempFile);
+                if (_savedScriptPropertyValues.Count == 0)
+                {
+                    Log.Info("Editor", "无保存的属性值，跳过恢复");
+                    // 删除临时文件 — 确保无残留
+                    try { File.Delete(tempFile); } catch {}
+                    return;
+                }
+
+                int restoredCount = 0;
+
+                for (int i = 0; i < _savedScriptPropertyValues.Count; i++)
+                {
+                    try
+                    {
+                        SavedScriptPropertyValue savedValue = _savedScriptPropertyValues[i];
+
+                        // 获取当前instanceId（已被RecreateAllScriptInstances重建）
+                        ulong instId = UI.SceneGetScriptBindingInstanceId(_gameScene.ScenePtr, savedValue.EntityId, (ulong)savedValue.BindingIndex);
+                        if (instId == 0) continue; // 尚未创建C#实例 → 跳过
+
+                        if (!_scriptTypeRegistry.TryGetValue(savedValue.ClassName, out Type scriptType)) continue;
+                        if (scriptType == null) continue; // scriptType为null → 跳过
+
+                        IntPtr instancePtr = new IntPtr((long)instId);
+                        if (instancePtr == IntPtr.Zero) continue; // instancePtr为Zero → 跳过
+
+                        // 从新assembly的descriptor读取config值(Min/Max/Step/Initial)
+                        ScriptPropertyDescriptor[] descriptors = HezhouScripts.ScriptEntityHelper.ReflectProperties(scriptType);
+                        ScriptPropertyDescriptor descriptor = new ScriptPropertyDescriptor();
+                        bool foundDescriptor = false;
+                        for (int d = 0; d < descriptors.Length; d++)
+                        {
+                            if (descriptors[d].Name == savedValue.PropertyName)
+                            {
+                                descriptor = descriptors[d];
+                                foundDescriptor = true;
+                                break;
+                            }
+                        }
+                        if (!foundDescriptor) continue; // 找不到descriptor → 跳过
+
+                        // clamp越界: runtime值不能超出新descriptor的Min/Max范围
+                        float clampedValue = savedValue.RuntimeValue;
+                        if (clampedValue > descriptor.Max) clampedValue = descriptor.Max;
+                        if (clampedValue < descriptor.Min) clampedValue = descriptor.Min;
+
+                        // 恢复runtime值到新实例
+                        HezhouScripts.ScriptEntityHelper.SetFieldValue(instancePtr, savedValue.PropertyName, clampedValue, scriptType);
+                        restoredCount++;
+
+                        // 通过MainWidgetId直接查找propInfo
+                        if (!_scriptPropertyInfoMap.TryGetValue(savedValue.MainWidgetId, out ScriptPropertyInfo propInfo)) continue;
+
+                        // 更新Slider/Input显示值
+                        UI.SliderSetValue(propInfo.MainWidgetId, clampedValue);
+
+                        // 更新Slider范围和步长（从新descriptor读取）
+                        UI.SliderSetRange(propInfo.MainWidgetId, descriptor.Min, descriptor.Max);
+                        UI.SliderSetStep(propInfo.MainWidgetId, descriptor.Step);
+
+                        // 更新Min/Max/Step/Initial输入框（从新descriptor读取）
+                        UI.InputFieldSetText(propInfo.MinInputId, descriptor.Min.ToString());
+                        UI.InputFieldSetText(propInfo.MaxInputId, descriptor.Max.ToString());
+                        UI.InputFieldSetText(propInfo.StepInputId, descriptor.Step.ToString());
+                        UI.InputFieldSetText(propInfo.InitialInputId, descriptor.Initial.ToString());
+
+                        // 更新propInfo的config值和InstanceId
+                        propInfo.CurrentMin = descriptor.Min;
+                        propInfo.CurrentMax = descriptor.Max;
+                        propInfo.CurrentStep = descriptor.Step;
+                        propInfo.CurrentInitial = descriptor.Initial;
+                        propInfo.InstanceId = (long)instId;
+
+                        // struct值类型 → 重新赋值回字典
+                        _scriptPropertyInfoMap[savedValue.MainWidgetId] = propInfo;
+                    }
+                    catch (Exception ex)
+                    {
+                        Log.Error("Editor", "恢复单个属性值失败: " + ex.Message);
+                    }
+                }
+
+                // 清空内存存储
+                _savedScriptPropertyValues.Clear();
+
+                // 删除临时文件 — 确保无残留
+                try { File.Delete(tempFile); } catch {}
+
+                // 重建属性面板（新descriptor值需要更新UI）
+                _lastScriptBindingCount = -1;
+                _propertiesDirty = true;
 
                 Log.Info("Editor", "恢复脚本属性值: " + restoredCount + " 条记录");
             }
             catch (Exception ex)
             {
                 Log.Error("Editor", "RestoreAllScriptPropertyValues失败: " + ex.Message);
-                // 即使失败也尝试删除临时文件
-                try { if (File.Exists(tempFile)) File.Delete(tempFile); } catch { }
+                // 恢复失败时删除临时文件+清空内存
+                try { File.Delete(tempFile); } catch {}
+                _savedScriptPropertyValues.Clear();
             }
         }
 
@@ -1373,6 +1611,10 @@ UI.SetText(_runButtonId, "运行");
             // ★ 无论是否pending bind，都要重建所有现有binding的C#实例并恢复属性值
             RecreateAllScriptInstances();
             RestoreAllScriptPropertyValues();
+            
+            // 重建属性面板（新descriptor值需要更新UI）
+            _lastScriptBindingCount = -1;
+            _propertiesDirty = true;
             
             // Bug4 fix: 如果有pending bind，在hot reload完成后执行绑定
             if (_pendingBindEntityId != 0)
@@ -1913,28 +2155,27 @@ UI.SetText(_runButtonId, "运行");
                 return;
             }
             
-            if (!float.TryParse(text, out float value))
+            Type scriptType;
+            if (!_scriptTypeRegistry.TryGetValue(propInfo.ClassName, out scriptType))
             {
                 return;
             }
             
-            // 查找脚本类型并调用SetPropertyValue
-            if (_scriptTypeRegistry.TryGetValue(propInfo.ClassName, out Type scriptType))
+            IntPtr instancePtr = new IntPtr(propInfo.InstanceId);
+            
+            if (!float.TryParse(text, out float value))
             {
-                IntPtr instancePtr = new IntPtr(propInfo.InstanceId);
-                
-                MethodInfo setValMethod = scriptType.GetMethod("SetPropertyValue",
-                    BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
-                if (setValMethod != null)
-                {
-                    setValMethod.Invoke(null, new object[] { instancePtr, propInfo.PropertyName, value });
-                    Log.Info("Editor", "脚本属性修改: " + propInfo.ClassName + "." + propInfo.PropertyName + "=" + value);
-                }
-                
-                // 刷新脚本属性UI显示 — 强制重建绑定列表以同步最新属性值
-                _lastScriptBindingCount = -1;
-                _propertiesDirty = true;
+                // TryParse失败时恢复原值
+                float currentValue = HezhouScripts.ScriptEntityHelper.GetFieldValue(instancePtr, propInfo.PropertyName, scriptType);
+                UI.InputFieldSetText(widgetId, currentValue.ToString());
+                return;
             }
+            
+            // InputField修改只改runtime值，不触发.cs写回
+            HezhouScripts.ScriptEntityHelper.SetFieldValue(instancePtr, propInfo.PropertyName, value, scriptType);
+            // 更新_prevScriptPropertyValues — 防止下一帧SyncScriptPropertyValuesToUI重复设置InputField值
+            _prevScriptPropertyValues[widgetId] = value;
+            Log.Info("Editor", "脚本属性Input修改(runtime): " + propInfo.ClassName + "." + propInfo.PropertyName + "=" + value);
         }
         
         private static void OnScriptPropertySliderChange(ulong widgetId, float value)
@@ -1944,23 +2185,89 @@ UI.SetText(_runButtonId, "运行");
                 return;
             }
             
-            // 查找脚本类型并调用SetPropertyValue
+            // Slider拖动只修改runtime值，不触发.cs写回
             if (_scriptTypeRegistry.TryGetValue(propInfo.ClassName, out Type scriptType))
             {
                 IntPtr instancePtr = new IntPtr(propInfo.InstanceId);
-                
-                MethodInfo setValMethod = scriptType.GetMethod("SetPropertyValue",
-                    BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
-                if (setValMethod != null)
-                {
-                    setValMethod.Invoke(null, new object[] { instancePtr, propInfo.PropertyName, value });
-                    Log.Info("Editor", "脚本属性Slider修改: " + propInfo.ClassName + "." + propInfo.PropertyName + "=" + value);
-                }
-                
-                // 修改后强制刷新属性面板显示值
-                _lastScriptBindingCount = -1;
-                _propertiesDirty = true;
+                HezhouScripts.ScriptEntityHelper.SetFieldValue(instancePtr, propInfo.PropertyName, value, scriptType);
+                // 更新_prevScriptPropertyValues — 防止下一帧SyncScriptPropertyValuesToUI重复设置Slider值
+                _prevScriptPropertyValues[widgetId] = value;
+                Log.Info("Editor", "脚本属性Slider修改(runtime): " + propInfo.ClassName + "." + propInfo.PropertyName + "=" + value);
             }
+        }
+        
+        // === 脚本属性配置参数(Min/Max/Step/Initial)修改回调 ===
+        // 路由: widgetId → _scriptMinMaxInitialToMainWidgetMap → mainWidgetId → _scriptPropertyInfoMap
+        // Task 4将增强: ModifyScriptSourceFile写回.cs + Slider范围/步长更新
+        
+        private static void OnScriptPropertyConfigInputChange(ulong widgetId, string text)
+        {
+            // 查找对应的mainWidgetId（Min/Max/Step/Initial input → main slider/input映射）
+            ulong mainWidgetId;
+            if (!_scriptMinMaxInitialToMainWidgetMap.TryGetValue(widgetId, out mainWidgetId))
+            {
+                return;
+            }
+            
+            // 查找属性信息
+            ScriptPropertyInfo propInfo;
+            if (!_scriptPropertyInfoMap.TryGetValue(mainWidgetId, out propInfo))
+            {
+                return;
+            }
+            
+            // 确定是哪个配置参数
+            string paramName = "";
+            if (widgetId == propInfo.MinInputId) paramName = "Min";
+            else if (widgetId == propInfo.MaxInputId) paramName = "Max";
+            else if (widgetId == propInfo.StepInputId) paramName = "Step";
+            else if (widgetId == propInfo.InitialInputId) paramName = "Initial";
+            
+            if (paramName == "")
+            {
+                return;
+            }
+            
+            // TryParse失败时恢复原值
+            if (!float.TryParse(text, out float value))
+            {
+                // 恢复当前config值到InputField
+                float currentConfigValue = 0.0f;
+                if (paramName == "Min") currentConfigValue = propInfo.CurrentMin;
+                else if (paramName == "Max") currentConfigValue = propInfo.CurrentMax;
+                else if (paramName == "Step") currentConfigValue = propInfo.CurrentStep;
+                else if (paramName == "Initial") currentConfigValue = propInfo.CurrentInitial;
+                UI.InputFieldSetText(widgetId, currentConfigValue.ToString());
+                return;
+            }
+            
+            // 写回.cs源文件
+            ModifyScriptSourceFile(propInfo.ClassName, propInfo.PropertyName, paramName, value);
+            
+            // 更新propInfo中的config值（struct是值类型，修改后必须重新赋值回字典）
+            if (paramName == "Min") propInfo.CurrentMin = value;
+            else if (paramName == "Max") propInfo.CurrentMax = value;
+            else if (paramName == "Step") propInfo.CurrentStep = value;
+            else if (paramName == "Initial") propInfo.CurrentInitial = value;
+            
+            // Min/Max修改: 更新Slider范围
+            if (paramName == "Min" || paramName == "Max")
+            {
+                UI.SliderSetRange(propInfo.MainWidgetId, propInfo.CurrentMin, propInfo.CurrentMax);
+            }
+            
+            // Step修改: 更新Slider步长
+            if (paramName == "Step")
+            {
+                UI.SliderSetStep(propInfo.MainWidgetId, propInfo.CurrentStep);
+            }
+            
+            // Initial修改: 不需要额外UI更新（Initial只是.cs文件中的默认值）
+            
+            // struct值类型 → 修改后必须重新赋值回字典
+            _scriptPropertyInfoMap[mainWidgetId] = propInfo;
+            
+            Log.Info("Editor", "脚本属性配置修改: " + propInfo.ClassName + "." + propInfo.PropertyName + " " + paramName + "=" + value);
         }
         
         // === .cs源文件修改机制 ===
