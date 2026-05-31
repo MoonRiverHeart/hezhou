@@ -220,6 +220,38 @@ event.target = target.unwrap_or(WidgetId::invalid());
                     drop(tree);
                 }
                 
+                // Auto-deselect PreviewWindow when clicking on anything that is NOT PreviewWindow
+                // (click-outside deselect behavior — PreviewWindow和InputField互斥)
+                let preview_ids_to_deselect: Vec<u64> = all_ids.iter()
+                    .filter_map(|wid| {
+                        if wid.id != g.target.id {
+                            let mut tree = self.widget_tree.lock();
+                            if let Some(w) = tree.get_widget(*wid) {
+                                if w.widget_type() == "PreviewWindow" {
+                                    if let Some(pw) = w.as_any().downcast_ref::<crate::widgets::PreviewWindow>() {
+                                        if pw.is_selected() {
+                                            drop(tree);
+                                            return Some(wid.id);
+                                        }
+                                    }
+                                }
+                            }
+                            drop(tree);
+                        }
+                        None
+                    })
+                    .collect();
+                
+                for preview_id in preview_ids_to_deselect {
+                    let mut tree2 = self.widget_tree.lock();
+                    if let Some(w) = tree2.get_widget_mut(crate::WidgetId::from_raw(preview_id)) {
+                        if let Some(pw) = w.as_any_mut().downcast_mut::<crate::widgets::PreviewWindow>() {
+                            pw.set_selected(false);
+                        }
+                    }
+                    drop(tree2);
+                }
+                
                 let mut tree = self.widget_tree.lock();
                 let widget_type = tree.get_widget(g.target)
                     .map(|w| w.widget_type())
@@ -248,7 +280,7 @@ event.target = target.unwrap_or(WidgetId::invalid());
                     // Widget types that handle their own click callbacks — skip global_click
                     const GLOBAL_CLICK_EXCLUDE: &[&str] = &[
                         "PopupMenu", "PreviewWindow", "Dialog",
-                        "TreeView", "GridView", "Dropdown", "InputField",
+                        "TreeView", "TreeNode", "GridView", "Dropdown", "InputField",
                         "ScrollView", "Label", "VStack", "HStack", "Panel",
                         "Checkbox", "Slider", "TextEdit", "TabWidget", "Image",
                     ];

@@ -133,6 +133,8 @@ impl Widget for PreviewWindow {
     fn on_event(&mut self, event: &Event) -> EventResult {
         if event.target.id == self.id.id && event.event_type == EventType::TouchBegin {
             self.selected = true;
+            // 点击预览窗时清除InputField焦点 — 互斥关系
+            crate::thunk::ui_clear_focused_input_field();
             return EventResult::Handled;
         }
         EventResult::Ignored
