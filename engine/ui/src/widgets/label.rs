@@ -5,6 +5,33 @@ use crate::style::*;
 use crate::types::*;
 use crate::widget::*;
 
+/// Label换行模式
+/// None=0: 单行，原有行为
+/// Wrap=1: 自动换行，接入TextLayoutModel
+/// Truncate=2: 截断+省略号
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum WrapMode {
+    None = 0,
+    Wrap = 1,
+    Truncate = 2,
+}
+
+impl Default for WrapMode {
+    fn default() -> Self {
+        WrapMode::None
+    }
+}
+
+impl From<u32> for WrapMode {
+    fn from(value: u32) -> Self {
+        match value {
+            1 => WrapMode::Wrap,
+            2 => WrapMode::Truncate,
+            _ => WrapMode::None,
+        }
+    }
+}
+
 pub struct Label {
     id: WidgetId,
     parent_id: WidgetId,
@@ -15,6 +42,8 @@ pub struct Label {
     flags: crate::widget::WidgetFlags,
     text: String,
     text_style: TextStyle,
+    /// 换行模式: None(单行), Wrap(自动换行), Truncate(截断)
+    wrap_mode: WrapMode,
 }
 
 impl Label {
@@ -29,6 +58,7 @@ impl Label {
             flags: crate::widget::WidgetFlags::default(),
             text: text.to_string(),
             text_style: TextStyle::new().with_size(16.0).with_color(Color::white()),
+            wrap_mode: WrapMode::None,
         }
     }
 
@@ -45,6 +75,23 @@ impl Label {
     pub fn set_font_size(&mut self, size: f32) {
         self.text_style.font_size = size;
         self.flags.dirty_render = true;
+    }
+
+    /// 设置换行模式
+    pub fn set_wrap_mode(&mut self, mode: WrapMode) {
+        self.wrap_mode = mode;
+        self.flags.dirty_render = true;
+        self.flags.dirty_layout = true;
+    }
+
+    /// 获取换行模式
+    pub fn get_wrap_mode(&self) -> WrapMode {
+        self.wrap_mode
+    }
+
+    /// 获取字体大小(用于外部measure_text计算)
+    pub fn get_font_size(&self) -> f32 {
+        self.text_style.font_size
     }
 
     pub fn get_text(&self) -> &str {

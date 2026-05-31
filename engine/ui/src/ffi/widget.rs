@@ -658,6 +658,31 @@ pub extern "C" fn ui_widget_set_cross_axis_fill(
     }
 }
 
+/// 设置Label的换行模式
+/// mode: 0=None(单行), 1=Wrap(自动换行), 2=Truncate(截断)
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_label_set_wrap_mode(
+    handle: WidgetTreeHandle,
+    widget_id: u64,
+    mode: u32,
+) {
+    if handle.is_null() {
+        return;
+    }
+    unsafe {
+        let arc = &*(handle as *const Arc<Mutex<WidgetTree>>);
+        let mut tree = arc.lock();
+        let id = WidgetId::from_raw(widget_id);
+        if let Some(widget) = tree.get_widget_mut(id) {
+            if widget.widget_type() == "Label" {
+                if let Some(label) = (widget.as_mut() as *mut dyn Widget as *mut crate::widgets::Label).as_mut() {
+                    label.set_wrap_mode(crate::widgets::label::WrapMode::from(mode));
+                }
+            }
+        }
+    }
+}
+
 #[unsafe(no_mangle)]
 pub extern "C" fn ui_set_widget_visible(
     handle: WidgetTreeHandle,

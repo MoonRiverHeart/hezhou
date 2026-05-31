@@ -401,8 +401,99 @@ impl WidgetTree {
 
 pub fn perform_layout(&mut self, font_atlas: &FontAtlas) {
         if let Some(root_id) = self.root {
+            // 两帧自适应Label宽度: 首帧收集所有Wrap模式label的text_width→max_label_width
+            // 次帧统一设置wrap_width=max_label_width，然后正常measure_and_layout
+            self.apply_label_wrap_width(root_id, font_atlas);
             let _ = self.measure_and_layout(root_id, font_atlas);
         }
+    }
+    
+    /// 两帧自适应Label宽度
+    /// 遍历widget树，收集所有wrap_mode=Wrap的Label的text_width
+    /// 计算max_label_width = clamp(max, 80.0, parent_panel_width * 0.45)
+    /// 设置所有Wrap Label的layout.width为max_label_width
+    fn apply_label_wrap_width(&mut self, id: WidgetId, font_atlas: &FontAtlas) {
+        // 递归收集所有Wrap模式Label的信息: (widget_id, text_width, parent_panel_width)
+        let mut wrap_labels: Vec<(WidgetId, f32, f32)> = Vec::new();
+        self.collect_wrap_labels(id, font_atlas, &mut wrap_labels);
+        
+        if wrap_labels.is_empty() {
+            return;
+        }
+        
+        // 计算max_label_width: 取所有text_width的最大值，clamp到合理范围
+        let max_text_width = wrap_labels.iter().map(|(_, tw, _)| *tw).fold(0.0f32, |a, b| a.max(b));
+        // 取parent_panel_width的平均值作为参考面板宽度
+        let panel_width = wrap_labels.iter().map(|(_, _, pw)| *pw).fold(0.0f32, |a, b| a.max(b));
+        // panel_width为0时使用默认250px
+        let effective_panel_width = if panel_width > 0.0 { panel_width } else { 250.0 };
+        // max_label_width = clamp(max_text_width, 80.0, panel_width * 0.45)
+        let max_label_width = max_text_width.max(80.0).min(effective_panel_width * 0.45);
+        
+        // 设置所有Wrap Label的layout.width为max_label_width
+        for (label_id, _, _) in &wrap_labels {
+            if let Some(node) = self.nodes.get_mut(label_id) {
+                let current_layout = *node.widget.layout();
+                // 只在width为0(auto-size)或小于max_label_width时设置
+                if current_layout.width == 0.0 || current_layout.width < max_label_width {
+                    node.widget.set_layout(crate::layout::Layout::new(
+                        current_layout.x,
+                        current_layout.y,
+                        max_label_width,
+                        current_layout.height,
+                    ));
+                }
+            }
+        }
+    }
+    
+    /// 递归收集所有wrap_mode=Wrap的Label信息
+    fn collect_wrap_labels(&self, id: WidgetId, font_atlas: &FontAtlas, result: &mut Vec<(WidgetId, f32, f32)>) {
+        let children = self.get_children(id).to_vec();
+        
+        for &child_id in &children {
+            if let Some(node) = self.nodes.get(&child_id) {
+                if !node.widget.as_ref().flags().visible {
+                    continue;
+                }
+                
+                let widget_type = node.widget.as_ref().widget_type();
+                
+                if widget_type == "Label" {
+                    // 检查是否是Wrap模式
+                    if let Some(label) = node.widget.as_ref().as_any().downcast_ref::<crate::widgets::Label>() {
+                        if label.get_wrap_mode() == crate::widgets::label::WrapMode::Wrap {
+                            // 计算text_width
+                            let (text_width, _) = font_atlas.measure_text(0, label.get_text(), label.get_font_size());
+                            // 获取parent的panel_width
+                            let parent_panel_width = self.get_parent_panel_width(child_id);
+                            result.push((child_id, text_width, parent_panel_width));
+                        }
+                    }
+                }
+                
+                // 递归子节点
+                self.collect_wrap_labels(child_id, font_atlas, result);
+            }
+        }
+    }
+    
+    /// 获取Label所在parent Panel的宽度
+    fn get_parent_panel_width(&self, label_id: WidgetId) -> f32 {
+        // 向上查找parent chain，找到最近的Panel并返回其width
+        let mut current = label_id;
+        while let Some(parent_id) = self.parent_map.get(&current).copied() {
+            if let Some(parent_node) = self.nodes.get(&parent_id) {
+                let parent_type = parent_node.widget.as_ref().widget_type();
+                if parent_type == "Panel" || parent_type == "ScrollView" {
+                    return parent_node.widget.as_ref().layout().width;
+                }
+                current = parent_id;
+            } else {
+                break;
+            }
+        }
+        0.0
     }
     
     pub fn get_absolute_layout(&self, id: WidgetId) -> Option<crate::layout::Layout> {

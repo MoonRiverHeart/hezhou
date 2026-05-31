@@ -35,6 +35,7 @@ pub use grid_view::GridItem;
 pub use hstack::HStack;
 pub use input_field::InputField;
 pub use label::Label;
+pub use label::WrapMode;
 pub use list::List;
 pub use list_item::ListItem;
 pub use panel::Panel;
