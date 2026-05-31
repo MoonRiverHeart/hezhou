@@ -106,4 +106,14 @@ impl MonoUIExecutor {
     pub fn shutdown(&mut self) {
         self.manager.shutdown();
     }
+
+    /// 卸载当前assembly但保留domain — 用于hot reload
+    /// shutdown()会清除domain导致reload失败(NotInitialized)
+    /// 此方法只卸载assembly和callbacks，domain保持活跃供reload使用
+    pub fn unload_current(&mut self) {
+        if !self.assembly_name.is_empty() {
+            self.manager.unload(&self.assembly_name);
+            self.assembly_name.clear();
+        }
+    }
 }

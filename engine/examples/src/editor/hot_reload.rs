@@ -1,4 +1,4 @@
-use hezhou_scripting::ffi_context::WidgetTreeHandle;
+use hezhou_scripting::ffi_context::{WidgetTreeHandle, OnHotReloadCompleteFn};
 use hezhou_ui::ffi as ui_ffi;
 use hezhou_dfx::*;
 use std::ffi::CString;
@@ -16,6 +16,7 @@ fn save_scene_bindings() -> Vec<super::SavedEntityBinding> {
                         script_path: b.script_path.clone(),
                         class_name: b.class_name.clone(),
                         enabled: b.enabled,
+                        instance_id: b.instance_id,
                     }).collect();
                     saved.push(super::SavedEntityBinding {
                         entity_id: entity.id,
@@ -45,6 +46,13 @@ fn restore_scene_bindings(saved: &[super::SavedEntityBinding]) {
                         let count = scene.get_script_binding_count(entity);
                         if count > 0 {
                             scene.set_script_binding_enabled(entity, count - 1, false);
+                        }
+                    }
+                    // 恢复instance_id
+                    if binding.instance_id != 0 {
+                        let count = scene.get_script_binding_count(entity);
+                        if count > 0 {
+                            scene.set_script_binding_instance_id(entity, count - 1, binding.instance_id);
                         }
                     }
                 }
@@ -81,6 +89,9 @@ pub fn compile_editor_script() {
             "scripts/AssetProjectTest.cs",
             "scripts/UITestRunner.cs",
             "scripts/DFX.cs",
+            "scripts/ExposeAttribute.cs",
+            "scripts/IScriptEntity.cs",
+            "scripts/RotatingEntity.cs",
         ])
         .output();
     
@@ -126,6 +137,9 @@ fn recompile_editor_script() -> bool {
             "scripts/AssetProjectTest.cs",
             "scripts/UITestRunner.cs",
             "scripts/DFX.cs",
+            "scripts/ExposeAttribute.cs",
+            "scripts/IScriptEntity.cs",
+            "scripts/RotatingEntity.cs",
         ])
         .output();
     
@@ -164,8 +178,10 @@ pub fn handle_hot_reload(widget_tree_handle: WidgetTreeHandle) -> bool {
             let saved_bindings = save_scene_bindings();
             super::SAVED_BINDINGS = saved_bindings;
             
-            dfx_info!("HotReload", "[2] 卸载当前assembly (保留UI widgets)...");
-            executor.shutdown();
+            dfx_info!("HotReload", "[2] 卸载当前assembly (保留domain，不调用shutdown以避免NotInitialized)");
+            // 不调用shutdown() — 它会清除domain导致reload失败(NotInitialized)
+            // reload()内部会自动移除旧assembly并加载新assembly到同一个domain
+            executor.unload_current();
             
             dfx_info!("HotReload", "[3] 重新编译C#脚本...");
             let compile_result = recompile_editor_script();
@@ -226,4 +242,15 @@ pub fn handle_hot_reload(widget_tree_handle: WidgetTreeHandle) -> bool {
     };
     
     skip_frame
+}
+
+/// 注册HotReloadComplete回调 — C#通过FfiContext调用此函数注册回调指针
+/// 回调在热重载完成后由Rust侧调用，通知C#执行OnHotReloadComplete
+pub type HotReloadCompleteFn = extern "C" fn();
+
+pub extern "C" fn register_hot_reload_complete_callback(callback: hezhou_scripting::ffi_context::OnHotReloadCompleteFn) {
+    unsafe {
+        super::HOT_RELOAD_COMPLETE_CALLBACK = Some(callback);
+        dfx_info!("HotReload", "register_hot_reload_complete_callback: 已注册回调");
+    }
 }
