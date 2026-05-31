@@ -35,8 +35,8 @@ namespace HezhouScripts
         // ===== 每实例属性（[Expose]标记，编辑器可见） =====
 
         /// <summary>旋转速度（度/秒），每个Entity独立控制</summary>
-        [Expose(DisplayName = "旋转速度", Category = "运动", Min = 0, Max = 400, Step = 1, Initial = 80, Widget = "slider")]
-        private float rotationSpeed = 80.0f;
+        [Expose(DisplayName = "旋转速度", Category = "运动", Min = 0, Max = 100, Step = 1, Initial = 10, Widget = "slider")]
+        private float rotationSpeed = 10.0f;
 
         /// <summary>旋转角度偏移（度），用于调整初始旋转方向</summary>
         [Expose(DisplayName = "旋转角度偏移", Category = "运动", Min = -360, Max = 360, Step = 1, Initial = 0.0f, Widget = "input")]

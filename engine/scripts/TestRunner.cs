@@ -192,20 +192,9 @@ namespace Hezhou
             bool maxChanged = modifiedContent.Contains("Max = 50");
             AssertTrue("ModifyScriptSourceFile", maxChanged, "Max参数已从400改为50");
 
-            // 恢复原始值: 将Max改回400
-            modifyMethod.Invoke(null, new object[] { "RotatingEntity", "rotationSpeed", "Max", 400f });
-
-            // 验证恢复成功
-            string restoredContent = File.ReadAllText(filePath);
-            bool maxRestored = restoredContent.Contains("Max = 400");
-            AssertTrue("ModifyScriptSourceFile", maxRestored, "Max参数已恢复为400");
-
-            // 安全兜底: 如果恢复失败，强制写回原始内容
-            if (!maxRestored)
-            {
-                File.WriteAllText(filePath, originalContent);
-                Log.Warn("TestRunner", "ModifyScriptSourceFile: 强制恢复原始文件内容");
-            }
+            // 恢复原始内容（保留用户可能已修改的值，如Max=300而非硬编码400）
+            File.WriteAllText(filePath, originalContent);
+            Log.Info("TestRunner", "ModifyScriptSourceFile: 已恢复原始文件内容（保留用户修改）");
         }
 
         // ===== Test 4: 值保存与恢复 =====
