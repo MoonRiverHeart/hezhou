@@ -6,6 +6,7 @@ use crate::types::*;
 use crate::widget::*;
 use crate::font_atlas::FontAtlas;
 use crate::types::Point;
+use hezhou_platform::KeyCode;
 
 pub struct InputField {
     id: WidgetId,
@@ -428,26 +429,36 @@ impl Widget for InputField {
                         let shift = (modifiers & 1) != 0;
                         let ctrl = (modifiers & 2) != 0;
                         
-                        if ctrl && keycode == 1 {
+                        if ctrl && keycode == KeyCode::A as u32 {
                             self.select_all();
                             return EventResult::Handled;
                         }
                         
-                        if keycode == 8 {
+                        // Backspace: delete character before cursor
+                        if keycode == KeyCode::Backspace as u32 {
                             if self.has_selection {
                                 self.delete_selection();
                             } else {
                                 self.delete_char();
                             }
                             return EventResult::Handled;
-                        } else if keycode == 13 {
-                            self.blur();
-                            return EventResult::Handled;
-                        } else if keycode >= 32 && keycode <= 126 {
+                        }
+                        // Delete: delete character after cursor (forward delete)
+                        if keycode == KeyCode::Delete as u32 {
                             if self.has_selection {
                                 self.delete_selection();
+                            } else if self.cursor_position < self.text.chars().count() {
+                                // Move cursor forward then delete (same as delete_char but forward)
+                                self.cursor_position += 1;
+                                let byte_pos = self.cursor_byte_position();
+                                self.text.remove(byte_pos);
+                                self.rebuild_all_text();
+                                self.trigger_on_change();
+                                self.flags.dirty_render = true;
                             }
-                            self.insert_char(keycode as u8 as char);
+                            return EventResult::Handled;
+                        } else if keycode == KeyCode::Enter as u32 {
+                            self.blur();
                             return EventResult::Handled;
                         } else if key_data.unicode_char > 0 {
                             if let Some(c) = char::from_u32(key_data.unicode_char) {
@@ -459,10 +470,10 @@ impl Widget for InputField {
                             }
                         }
                         
-                        let left_keycode = 80u32;
-                        let right_keycode = 79u32;
-                        let home_keycode = 74u32;
-                        let end_keycode = 77u32;
+                        let left_keycode = KeyCode::Left as u32;
+                        let right_keycode = KeyCode::Right as u32;
+                        let home_keycode = KeyCode::Home as u32;
+                        let end_keycode = KeyCode::End as u32;
                         
                         if keycode == left_keycode {
                             if self.cursor_position > 0 {

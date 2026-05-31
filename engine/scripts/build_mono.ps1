@@ -154,6 +154,14 @@ if ($LASTEXITCODE -eq 0) {
     Write-Host "  DLL大小: $DllSize 字节 ($([math]::Round($DllSize / 1024, 2)) KB)" -ForegroundColor DarkGray
     # 输出assembly名称供Rust热重载使用
     Write-Host "AssemblyName:$AssemblyName"
+
+    # 复制到编辑器加载路径 scripts/bin/Mono/EditorScript.dll
+    # 编辑器在 editor/mod.rs 中硬编码加载此路径
+    if (-not $UiOnly) {
+        $EditorDllPath = "$ScriptsDir/bin/Mono/EditorScript.dll"
+        Copy-Item -LiteralPath $OutputDll -Destination $EditorDllPath -Force
+        Write-Host "[部署] 已复制到编辑器加载路径: $EditorDllPath" -ForegroundColor Cyan
+    }
 } else {
     Write-Host "[错误] 编译失败:" -ForegroundColor Red
     if ($Output -is [System.Array]) {

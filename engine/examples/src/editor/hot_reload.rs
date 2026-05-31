@@ -89,9 +89,11 @@ pub fn compile_editor_script() {
             "scripts/AssetProjectTest.cs",
             "scripts/UITestRunner.cs",
             "scripts/DFX.cs",
+            "scripts/RotationScript.cs",
             "scripts/ExposeAttribute.cs",
             "scripts/IScriptEntity.cs",
             "scripts/RotatingEntity.cs",
+            "scripts/TestRunner.cs",
         ])
         .output();
     
@@ -137,9 +139,11 @@ fn recompile_editor_script() -> bool {
             "scripts/AssetProjectTest.cs",
             "scripts/UITestRunner.cs",
             "scripts/DFX.cs",
+            "scripts/RotationScript.cs",
             "scripts/ExposeAttribute.cs",
             "scripts/IScriptEntity.cs",
             "scripts/RotatingEntity.cs",
+            "scripts/TestRunner.cs",
         ])
         .output();
     
