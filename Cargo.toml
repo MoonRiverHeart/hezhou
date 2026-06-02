@@ -1,0 +1,14 @@
+[workspace]
+# 工作空间成员
+members = [
+    "engine/core",
+    "engine/dfx",
+    "client"
+]
+
+default-members = ["client"]
+
+resolver = "2"
+
+# 统一的依赖版本管理
+[workspace.dependencies]

@@ -38,3 +38,7 @@ obj/
 release/*.zip
 release/hezhou-editor/logs/
 release/hezhou-editor/traces/
+
+# Added by cargo
+
+/target
