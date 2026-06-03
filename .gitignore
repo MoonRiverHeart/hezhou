@@ -42,3 +42,4 @@ release/hezhou-editor/traces/
 # Added by cargo
 
 /target
+logs
