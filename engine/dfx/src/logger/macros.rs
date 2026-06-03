@@ -1,4 +1,5 @@
 // engine/dfx/src/logger/macros.rs
+use chrono::Local;
 
 // 基础宏
 #[macro_export]
@@ -74,5 +75,41 @@ macro_rules! log_error_file {
                 file!(),
                 &format!($($arg)*)
             )
+    };
+}
+
+// 内部日志宏，用于 AsyncLogger 自身的日志输出
+#[macro_export]
+macro_rules! internal_log {
+    ($level:expr, $($arg:tt)*) => {
+        let now = ::chrono::Local::now();
+        let thread_name = std::thread::current()
+            .name()
+            .unwrap_or("main")
+            .to_string();
+        let message = format!($($arg)*);
+        
+        match $level {
+            LogLevel::Error => {
+                eprintln!("\x1b[31m{} [AsyncLogger] [ERROR] [{}] {}\x1b[0m", 
+                    now.format("%Y-%m-%d %H:%M:%S%.3f"), thread_name, message);
+            }
+            LogLevel::Warn => {
+                println!("\x1b[33m{} [AsyncLogger] [WARN] [{}] {}\x1b[0m", 
+                    now.format("%Y-%m-%d %H:%M:%S%.3f"), thread_name, message);
+            }
+            LogLevel::Info => {
+                println!("\x1b[32m{} [AsyncLogger] [INFO] [{}] {}\x1b[0m", 
+                    now.format("%Y-%m-%d %H:%M:%S%.3f"), thread_name, message);
+            }
+            LogLevel::Debug => {
+                println!("\x1b[36m{} [AsyncLogger] [DEBUG] [{}] {}\x1b[0m", 
+                    now.format("%Y-%m-%d %H:%M:%S%.3f"), thread_name, message);
+            }
+            _ => {
+                println!("{} [AsyncLogger] [{}] {}", 
+                    now.format("%Y-%m-%d %H:%M:%S%.3f"), thread_name, message);
+            }
+        }
     };
 }

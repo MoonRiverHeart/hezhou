@@ -1,40 +1,63 @@
-// engine/dfx/src/logger/mod.rs
 use std::sync::Mutex;
 use once_cell::sync::OnceCell;
 use super::entry::LogEntry;
 use super::types::LogLevel;
+use super::async_logger::AsyncLogger;
+use super::file_writer::FileWriter;
+use crate::internal_log;
 
 static GLOBAL_LOGGER: OnceCell<Mutex<Logger>> = OnceCell::new();
 
-#[derive(Debug)]
-pub struct Logger {
-    min_level: LogLevel,
-    use_colors: bool,
-    format: LogFormat,
-    current_module: String,
-}
-
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum LogFormat {
-    Plain,      // 纯文本
-    Colored,    // 带颜色
-    Json,       // JSON 格式
+    Plain,
+    Colored,
+    Json,
+}
+
+#[derive(Debug, Clone)]
+pub struct LoggerConfig {
+    pub min_level: LogLevel,
+    pub format: LogFormat,
+    pub async_mode: bool,
+    pub log_file_path: Option<String>,
+}
+
+impl Default for LoggerConfig {
+    fn default() -> Self {
+        Self {
+            min_level: LogLevel::Info,
+            format: LogFormat::Colored,
+            async_mode: false,
+            log_file_path: None,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct Logger {
+    min_level: LogLevel,
+    format: LogFormat,
+    current_module: String,
+    async_logger: Option<AsyncLogger>,
+    log_file_path: Option<String>,
 }
 
 impl Logger {
-    pub fn new(min_level: LogLevel) -> Self {
+    pub fn new(config: LoggerConfig) -> Self {
+        let async_logger = if config.async_mode {
+            Some(AsyncLogger::new(config.log_file_path.clone()))
+        } else {
+            None
+        };
+        
         Self {
-            min_level,
-            use_colors: true,
-            format: LogFormat::Colored,
+            min_level: config.min_level,
+            format: config.format,
             current_module: String::new(),
+            async_logger,
+            log_file_path: config.log_file_path,
         }
-    }
-    
-    pub fn with_format(mut self, format: LogFormat) -> Self {
-        self.format = format;
-        self.use_colors = format == LogFormat::Colored;
-        self
     }
     
     pub fn with_module(mut self, module: &str) -> Self {
@@ -42,12 +65,7 @@ impl Logger {
         self
     }
     
-    pub fn set_module(&mut self, module: &str) {
-        self.current_module = module.to_string();
-    }
-    
     fn log(&self, level: LogLevel, message: &str) {
-        // 关键修复：改成 <= 因为 Error(1) 比 Debug(4) 更严重
         if level <= self.min_level {
             let entry = LogEntry::new(
                 level,
@@ -55,52 +73,67 @@ impl Logger {
                 self.current_module.clone(),
             );
             
-            let output = match self.format {
-                LogFormat::Plain => entry.format_plain(),
-                LogFormat::Colored => entry.format_colored(),
-                LogFormat::Json => entry.format_json(),
-            };
-            
-            println!("{}", output);
+            if let Some(async_logger) = &self.async_logger {
+                // 异步模式
+                async_logger.log(entry);
+            } else {
+                // 同步模式
+                self.log_sync(entry);
+            }
         }
     }
     
-    // 便捷方法
+    fn log_sync(&self, entry: LogEntry) {
+        let output = match self.format {
+            LogFormat::Plain => entry.format_plain(),
+            LogFormat::Colored => entry.format_colored(),
+            LogFormat::Json => entry.format_json(),
+        };
+        // 输出到控制台
+        // println!("{}", output);
+
+        // 创建 FileWriter（如果需要）
+        let file_writer = self.log_file_path.as_ref().and_then(|path| {
+            match FileWriter::new(path) {
+                Ok(writer) => {
+                    // internal_log!(LogLevel::Info, "[SyncLogger] 文件写入器创建成功: {}", path);
+                    Some(writer)
+                }
+                Err(e) => {
+                    internal_log!(LogLevel::Error, "[SyncLogger] 文件写入器创建失败: {}, 错误: {}", path, e);
+                    None
+                }
+            }
+        });
+        
+        // 输出到文件（纯文本）
+        if let Some(ref writer) = file_writer {
+            let output = match self.format {
+                LogFormat::Plain => entry.format_plain(),
+                LogFormat::Colored => entry.format_plain(),
+                LogFormat::Json => entry.format_json(),
+            };
+            if let Err(e) = writer.write(&output) {
+                internal_log!(LogLevel::Error, "[SyncLogger] 写入文件失败: {}", e);
+            }
+        }
+    }
+    
     pub fn error(&self, msg: &str) { self.log(LogLevel::Error, msg); }
     pub fn warn(&self, msg: &str)  { self.log(LogLevel::Warn, msg); }
     pub fn info(&self, msg: &str)  { self.log(LogLevel::Info, msg); }
     pub fn debug(&self, msg: &str) { self.log(LogLevel::Debug, msg); }
     pub fn trace(&self, msg: &str) { self.log(LogLevel::Trace, msg); }
     
-    // 带模块的日志
-    pub fn log_with_module(&self, level: LogLevel, module: &str, message: &str) {
-        // 关键修复：改成 <=
-        if level <= self.min_level {
-            let entry = LogEntry::new(
-                level,
-                message.to_string(),
-                module.to_string(),
-            );
-            
-            let output = match self.format {
-                LogFormat::Plain => entry.format_plain(),
-                LogFormat::Colored => entry.format_colored(),
-                LogFormat::Json => entry.format_json(),
-            };
-            
-            println!("{}", output);
+    pub fn flush(&self) {
+        if let Some(async_logger) = &self.async_logger {
+            async_logger.flush();
         }
-    }
-    
-    // 宏辅助方法
-    pub fn log_at(&self, level: LogLevel, module: &str, message: &str) {
-        self.log_with_module(level, module, message);
     }
 }
 
-// 全局日志实例
-pub fn init_global_logger(level: LogLevel) {
-    let logger = Logger::new(level);
+pub fn init_global_logger(config: LoggerConfig) {
+    let logger = Logger::new(config);
     GLOBAL_LOGGER.set(Mutex::new(logger)).unwrap();
 }
 

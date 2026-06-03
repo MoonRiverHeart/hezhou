@@ -1,0 +1,20 @@
+2026-06-04 01:20:27.562 [async_test] [INFO ] [async-logger] 异步日志消息 0
+2026-06-04 01:20:27.562 [async_test] [ERROR] [async-logger] 错误信息
+2026-06-04 01:20:27.562 [async_test] [INFO ] [async-logger] 异步日志消息 1
+2026-06-04 01:20:27.562 [async_test] [ERROR] [async-logger] 错误信息
+2026-06-04 01:20:27.562 [async_test] [INFO ] [async-logger] 异步日志消息 2
+2026-06-04 01:20:27.562 [async_test] [ERROR] [async-logger] 错误信息
+2026-06-04 01:20:27.562 [async_test] [INFO ] [async-logger] 异步日志消息 3
+2026-06-04 01:20:27.562 [async_test] [ERROR] [async-logger] 错误信息
+2026-06-04 01:20:27.562 [async_test] [INFO ] [async-logger] 异步日志消息 4
+2026-06-04 01:20:27.562 [async_test] [ERROR] [async-logger] 错误信息
+2026-06-04 01:20:27.562 [async_test] [INFO ] [async-logger] 异步日志消息 5
+2026-06-04 01:20:27.562 [async_test] [ERROR] [async-logger] 错误信息
+2026-06-04 01:20:27.562 [async_test] [INFO ] [async-logger] 异步日志消息 6
+2026-06-04 01:20:27.562 [async_test] [ERROR] [async-logger] 错误信息
+2026-06-04 01:20:27.562 [async_test] [INFO ] [async-logger] 异步日志消息 7
+2026-06-04 01:20:27.562 [async_test] [ERROR] [async-logger] 错误信息
+2026-06-04 01:20:27.562 [async_test] [INFO ] [async-logger] 异步日志消息 8
+2026-06-04 01:20:27.562 [async_test] [ERROR] [async-logger] 错误信息
+2026-06-04 01:20:27.562 [async_test] [INFO ] [async-logger] 异步日志消息 9
+2026-06-04 01:20:27.562 [async_test] [ERROR] [async-logger] 错误信息
