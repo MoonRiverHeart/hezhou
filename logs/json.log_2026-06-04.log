@@ -1,2 +1,0 @@
-{"timestamp":"2026-06-04 01:20:27.562","level":"INFO","module":"json_test","thread":"main","message":""JSON 格式日志""}
-{"timestamp":"2026-06-04 01:20:27.563","level":"ERROR","module":"json_test","thread":"main","message":""错误信息""}
