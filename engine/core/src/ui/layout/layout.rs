@@ -99,7 +99,6 @@ impl<T: TextMeasurer> LayoutEngine<T> {
         final_size
     }
     
-        /// 布局容器节点（单个子节点）
     fn layout_container(
         &mut self,
         tree: &mut WidgetTree,
@@ -109,15 +108,28 @@ impl<T: TextMeasurer> LayoutEngine<T> {
         let children = tree.get_children(node_id);
         if let Some(&child_id) = children.first() {
             let child_size = self.layout_node(tree, child_id, constraints);
-            
-            // 根据父节点的padding偏移子节点位置
             let padding = tree.get(node_id).style.padding;
+            
+            // 容器尺寸：至少是子节点+padding，但不小于约束的最小值
+            let container_w = (child_size.width + padding.left + padding.right)
+                .max(constraints.min_width);
+            let container_h = (child_size.height + padding.top + padding.bottom)
+                .max(constraints.min_height);
+            
+            // 内部可用空间
+            let inner_w = container_w - padding.left - padding.right;
+            let inner_h = container_h - padding.top - padding.bottom;
+            
+            // 在内部空间居中
+            let x = padding.left + (inner_w - child_size.width).max(0.0) / 2.0;
+            let y = padding.top + (inner_h - child_size.height).max(0.0) / 2.0;
+            
             if let Some(child_layout) = &mut tree.get_mut(child_id).layout {
-                child_layout.x += padding.left;
-                child_layout.y += padding.top;
+                child_layout.x = x;
+                child_layout.y = y;
             }
             
-            child_size
+            Size::new(container_w, container_h)
         } else {
             Size::default()
         }
@@ -137,7 +149,7 @@ impl<T: TextMeasurer> LayoutEngine<T> {
             return Size::default();
         }
         
-                // === 第一阶段：测量所有子节点 ===
+        // === 第一阶段：测量所有子节点 ===
         
         let mut measures = Vec::new();
         let mut total_main_size: f32 = 0.0;
@@ -146,21 +158,39 @@ impl<T: TextMeasurer> LayoutEngine<T> {
         let mut max_cross_size: f32 = 0.0;
         
         for &child_id in &children {
-            let child_style = tree.get(child_id).style.clone();
+            let mut child_style = tree.get(child_id).style.clone();
+            // 如果子节点是默认的Stretch，继承父节点的cross_alignment
+            if child_style.cross_alignment == Alignment::Stretch {
+                child_style.cross_alignment = tree.get(node_id).style.cross_alignment;
+            }
             
             // 创建子节点约束
             let child_constraints = match axis {
-                Axis::Horizontal => Constraints {
-                    min_width: 0.0,
-                    max_width: f32::INFINITY,
-                    min_height: constraints.min_height,
-                    max_height: constraints.max_height,
+                Axis::Horizontal => {
+                    let cross_min = if child_style.cross_alignment != Alignment::Stretch {
+                        0.0
+                    } else {
+                        constraints.min_height
+                    };
+                    Constraints {
+                        min_width: 0.0,
+                        max_width: f32::INFINITY,
+                        min_height: cross_min,
+                        max_height: constraints.max_height,
+                    }
                 },
-                Axis::Vertical => Constraints {
-                    min_width: constraints.min_width,
-                    max_width: constraints.max_width,
-                    min_height: 0.0,
-                    max_height: f32::INFINITY,
+                Axis::Vertical => {
+                    let cross_min = if child_style.cross_alignment != Alignment::Stretch {
+                        0.0
+                    } else {
+                        constraints.min_width
+                    };
+                    Constraints {
+                        min_width: cross_min,
+                        max_width: constraints.max_width,
+                        min_height: 0.0,
+                        max_height: f32::INFINITY,
+                    }
                 },
             };
             
@@ -296,10 +326,6 @@ impl<T: TextMeasurer> LayoutEngine<T> {
         for measure in &measures {
             let child_id = measure.id;
             let mut child_rect = Rect::new(0.0, 0.0, measure.size.width, measure.size.height);
-
-            // 加这行 debug
-            eprintln!("DEBUG child: cross_alignment={:?}, size={}x{}", 
-                measure.cross_alignment, measure.size.width, measure.size.height);
             
             match axis {
                 Axis::Horizontal => {
@@ -366,7 +392,7 @@ impl<T: TextMeasurer> LayoutEngine<T> {
         free_space: f32,
         total_flex_grow: f32,
         alignment: MainAlignment,
-        measures: &[ChildMeasure],
+        _measures: &[ChildMeasure],
         _axis: Axis,
     ) -> f32 {
         if total_flex_grow > 0.0 && free_space > 0.0 {

@@ -3,6 +3,8 @@
 members = [
     "engine/core",
     "engine/dfx",
+    "engine/rhi-gpu/rhi",
+    "engine/rhi-gpu/vulkan",
     "client"
 ]
 
@@ -13,3 +15,5 @@ resolver = "2"
 # 统一的依赖版本管理
 [workspace.dependencies]
 slotmap = "1.0"
+winit = { version = "0.30", features = ["rwh_06"] }
+raw-window-handle = "0.6"

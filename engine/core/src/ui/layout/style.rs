@@ -19,6 +19,10 @@ pub struct Style {
     pub main_alignment: MainAlignment,
     /// 交叉轴对齐
     pub cross_alignment: Alignment,
+    /// 字体大小
+    pub font_size: Option<f32>,
+    /// 背景色 (r, g, b)
+    pub background_color: Option<(u8, u8, u8)>,
 }
 
 impl Default for Style {
@@ -32,6 +36,8 @@ impl Default for Style {
             margin: EdgeInsets::zero(),
             main_alignment: MainAlignment::Start,
             cross_alignment: Alignment::Stretch,
+            font_size: None,
+            background_color: None,
         }
     }
 }
@@ -55,7 +61,7 @@ impl Style {
         self.flex_grow = grow;
         self
     }
-
+    
     pub fn flex_shrink(mut self, shrink: f32) -> Self {
         self.flex_shrink = shrink;
         self
@@ -73,6 +79,16 @@ impl Style {
     
     pub fn cross_alignment(mut self, alignment: Alignment) -> Self {
         self.cross_alignment = alignment;
+        self
+    }
+    
+    pub fn font_size(mut self, size: f32) -> Self {
+        self.font_size = Some(size);
+        self
+    }
+    
+    pub fn background(mut self, color: (u8, u8, u8)) -> Self {
+        self.background_color = Some(color);
         self
     }
 }

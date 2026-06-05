@@ -6,3 +6,7 @@ edition = "2024"
 [dependencies]
 core = { path = "../engine/core" }
 dfx = { path = "../engine/dfx" }
+rhi = { path = "../engine/rhi-gpu/rhi" }
+rhi-vulkan = { path = "../engine/rhi-gpu/vulkan" }
+winit = { workspace = true }
+raw-window-handle = { workspace = true }

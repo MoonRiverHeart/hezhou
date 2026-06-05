@@ -12,7 +12,7 @@ pub struct SimpleTextMeasurer;
 impl TextMeasurer for SimpleTextMeasurer {
     fn measure_text(&self, text: &str, font_size: f32, _max_width: f32) -> Size {
         // 简单估算：每个字符宽度约为字体大小的0.6倍
-        let char_width = font_size * 0.6;
+        let char_width = font_size * 1.0;
         let width = text.len() as f32 * char_width;
         let height = font_size * 1.2; // 行高
         
