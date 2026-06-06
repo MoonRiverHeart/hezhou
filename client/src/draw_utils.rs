@@ -53,11 +53,33 @@ fn build_draw_commands_impl(tree: &WidgetTree, node_id: WidgetId, parent_x: f32,
                     .map(|g| g.size.height)
                     .fold(0.0f32, f32::max);
                 
+                // 用第一个字形的比例作为统一缩放
+                let first_scale = if let Some(first) = glyphs.first() {
+                    (first.advance_x / first.size.width.max(1.0)).clamp(0.7, 1.0)
+                } else {
+                    1.0
+                };
+
+                // 用第一个字形的竖直中点作为基线
+                let first_mid_y = if let Some(first) = glyphs.first() {
+                    let scale = (first.advance_x / first.size.width.max(1.0)).clamp(0.5, 1.0);
+                    let gh = first.size.height * scale;
+                    abs_y + max_height - first.size.height + (first.size.height - gh) / 2.0 + gh / 2.0
+                } else {
+                    abs_y + max_height / 2.0
+                };
+                
                 for glyph in glyphs {
+                    let scale = glyph.advance_x / glyph.size.width.max(1.0);
+                    let scale = scale.clamp(0.5, 1.0);
+                    let gw = glyph.size.width * scale;
+                    let gh = glyph.size.height * scale;
+                    let offset_y = (glyph.size.height - gh) / 2.0;
+                    
                     let gx = cursor_x + glyph.bearing_x;
-                    let gy = abs_y + max_height - glyph.size.height;
-                    let gw = glyph.size.width;
-                    let gh = glyph.size.height;
+                    // let gy = abs_y + max_height - glyph.size.height + offset_y;
+                    let gy = first_mid_y - gh / 2.0;
+                    // let gy = abs_y + max_height - gh;
                     let uv = glyph.uv;
                     
                     commands.push(DrawCommand {
@@ -73,18 +95,6 @@ fn build_draw_commands_impl(tree: &WidgetTree, node_id: WidgetId, parent_x: f32,
                     });
                     
                     cursor_x += glyph.advance_x;
-                }
-            } else {
-                let font_size = data.font_size;
-                let char_width = font_size * 0.6;
-                for i in 0..data.content.len() {
-                    let x = abs_x + i as f32 * char_width;
-                    let y = abs_y;
-                    commands.push(DrawCommand::rect(
-                        x, y, char_width - 1.0, font_size * 1.2,
-                        1.0, 1.0, 1.0, 1.0,
-                        0.0,
-                    ));
                 }
             }
         }

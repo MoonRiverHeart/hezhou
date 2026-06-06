@@ -185,6 +185,12 @@ impl MsdfFont {
         let uv_y0 = atlas_y as f32 / self.atlas.height as f32;
         let uv_x1 = (atlas_x + msdf_size) as f32 / self.atlas.width as f32;
         let uv_y1 = (atlas_y + msdf_size) as f32 / self.atlas.height as f32;
+
+        let advance_x = if MsdfFont::is_cjk(ch) {
+            msdf_size as f32 * 0.8
+        } else {
+            metrics.advance_width
+        };
         
         GlyphInfo {
             character: ch,
@@ -192,7 +198,7 @@ impl MsdfFont {
             size: Size::new(msdf_size as f32, msdf_size as f32),
             bearing_x: metrics.xmin as f32 * scale_ratio,
             bearing_y: metrics.ymin as f32 * scale_ratio,
-            advance_x: metrics.advance_width * scale_ratio,
+            advance_x: advance_x, // 返回原始字体尺寸的 advance
             texture_index: 0,
         }
     }
