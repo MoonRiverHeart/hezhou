@@ -46,6 +46,8 @@ impl Theme {
         Style::new()
             .padding(EdgeInsets::symmetric(8.0, 16.0))
             .font_size(self.base_font_size)
+            .background(self.primary_color)
+            .border_radius(self.border_radius)  // 默认6.0，矩形小圆角
     }
     
     /// 次按钮样式

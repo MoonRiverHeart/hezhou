@@ -23,6 +23,8 @@ pub struct Style {
     pub font_size: Option<f32>,
     /// 背景色 (r, g, b)
     pub background_color: Option<(u8, u8, u8)>,
+    /// 圆角半径
+    pub border_radius: Option<f32>,
 }
 
 impl Default for Style {
@@ -38,6 +40,7 @@ impl Default for Style {
             cross_alignment: Alignment::Stretch,
             font_size: None,
             background_color: None,
+            border_radius: None,
         }
     }
 }
@@ -89,6 +92,11 @@ impl Style {
     
     pub fn background(mut self, color: (u8, u8, u8)) -> Self {
         self.background_color = Some(color);
+        self
+    }
+
+    pub fn border_radius(mut self, r: f32) -> Self {
+        self.border_radius = Some(r);
         self
     }
 }
