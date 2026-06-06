@@ -14,11 +14,15 @@ fn build_draw_commands_impl(tree: &WidgetTree, node_id: WidgetId, parent_x: f32,
     
     match &node.widget_type {
         WidgetType::Container | WidgetType::Row | WidgetType::Column => {
-            // 背景色
+            // 背景色（带圆角）
             if let Some(bg) = node.style.background_color {
+                // 圆角半径使用节点高度的一半，形成胶囊形状
+                // let radius = node.style.border_radius.unwrap_or(layout.height / 2.0);
+                let radius = layout.height / 2.0;
                 commands.push(DrawCommand::rect(
                     abs_x, abs_y, layout.width, layout.height,
                     bg.0 as f32 / 255.0, bg.1 as f32 / 255.0, bg.2 as f32 / 255.0, 1.0,
+                    radius,
                 ));
             }
             
@@ -53,6 +57,7 @@ fn build_draw_commands_impl(tree: &WidgetTree, node_id: WidgetId, parent_x: f32,
                 commands.push(DrawCommand::rect(
                     x, y, char_width - 1.0, font_size * 1.2,
                     1.0, 1.0, 1.0, 1.0,
+                    0.0,  // 文字方块无圆角
                 ));
             }
         }

@@ -11,6 +11,7 @@ pub struct Vertex {
     pub position: [f32; 2],
     pub color: [f32; 4],
     pub uv: [f32; 2],
+    pub border_radius: [f32; 4],  // 四个角的圆角半径: 左上、右上、右下、左下
 }
 
 /// 矩形
@@ -37,13 +38,13 @@ pub struct DrawCommand {
 
 impl DrawCommand {
     /// 创建纯色矩形绘制命令
-    pub fn rect(x: f32, y: f32, w: f32, h: f32, r: f32, g: f32, b: f32, a: f32) -> Self {
+    pub fn rect(x: f32, y: f32, w: f32, h: f32, r: f32, g: f32, b: f32, a: f32, radius: f32) -> Self {
         DrawCommand {
             vertices: vec![
-                Vertex { position: [x, y], color: [r, g, b, a], uv: [0.0, 0.0] },
-                Vertex { position: [x + w, y], color: [r, g, b, a], uv: [1.0, 0.0] },
-                Vertex { position: [x + w, y + h], color: [r, g, b, a], uv: [1.0, 1.0] },
-                Vertex { position: [x, y + h], color: [r, g, b, a], uv: [0.0, 1.0] },
+                Vertex { position: [x, y], color: [r, g, b, a], uv: [0.0, 0.0], border_radius: [radius; 4] },
+                Vertex { position: [x + w, y], color: [r, g, b, a], uv: [1.0, 0.0], border_radius: [radius; 4] },
+                Vertex { position: [x + w, y + h], color: [r, g, b, a], uv: [1.0, 1.0], border_radius: [radius; 4] },
+                Vertex { position: [x, y + h], color: [r, g, b, a], uv: [0.0, 1.0], border_radius: [radius; 4] },
             ],
             indices: Some(vec![0, 1, 2, 2, 3, 0]),
             clip_rect: None,
@@ -56,22 +57,22 @@ impl DrawCommand {
     pub fn rect_line(x: f32, y: f32, w: f32, h: f32, r: f32, g: f32, b: f32, a: f32) -> Self {
         let t = 1.0;
         let vertices = vec![
-            Vertex { position: [x, y], color: [r, g, b, a], uv: [0.0, 0.0] },
-            Vertex { position: [x + w, y], color: [r, g, b, a], uv: [1.0, 0.0] },
-            Vertex { position: [x + w, y + t], color: [r, g, b, a], uv: [1.0, 1.0] },
-            Vertex { position: [x, y + t], color: [r, g, b, a], uv: [0.0, 1.0] },
-            Vertex { position: [x, y + h - t], color: [r, g, b, a], uv: [0.0, 0.0] },
-            Vertex { position: [x + w, y + h - t], color: [r, g, b, a], uv: [1.0, 0.0] },
-            Vertex { position: [x + w, y + h], color: [r, g, b, a], uv: [1.0, 1.0] },
-            Vertex { position: [x, y + h], color: [r, g, b, a], uv: [0.0, 1.0] },
-            Vertex { position: [x, y], color: [r, g, b, a], uv: [0.0, 0.0] },
-            Vertex { position: [x + t, y], color: [r, g, b, a], uv: [1.0, 0.0] },
-            Vertex { position: [x + t, y + h], color: [r, g, b, a], uv: [1.0, 1.0] },
-            Vertex { position: [x, y + h], color: [r, g, b, a], uv: [0.0, 1.0] },
-            Vertex { position: [x + w - t, y], color: [r, g, b, a], uv: [0.0, 0.0] },
-            Vertex { position: [x + w, y], color: [r, g, b, a], uv: [1.0, 0.0] },
-            Vertex { position: [x + w, y + h], color: [r, g, b, a], uv: [1.0, 1.0] },
-            Vertex { position: [x + w - t, y + h], color: [r, g, b, a], uv: [0.0, 1.0] },
+            Vertex { position: [x, y], color: [r, g, b, a], uv: [0.0, 0.0], border_radius: [0.0; 4] },
+            Vertex { position: [x + w, y], color: [r, g, b, a], uv: [1.0, 0.0], border_radius: [0.0; 4] },
+            Vertex { position: [x + w, y + t], color: [r, g, b, a], uv: [1.0, 1.0], border_radius: [0.0; 4] },
+            Vertex { position: [x, y + t], color: [r, g, b, a], uv: [0.0, 1.0], border_radius: [0.0; 4] },
+            Vertex { position: [x, y + h - t], color: [r, g, b, a], uv: [0.0, 0.0], border_radius: [0.0; 4] },
+            Vertex { position: [x + w, y + h - t], color: [r, g, b, a], uv: [1.0, 0.0], border_radius: [0.0; 4] },
+            Vertex { position: [x + w, y + h], color: [r, g, b, a], uv: [1.0, 1.0], border_radius: [0.0; 4] },
+            Vertex { position: [x, y + h], color: [r, g, b, a], uv: [0.0, 1.0], border_radius: [0.0; 4] },
+            Vertex { position: [x, y], color: [r, g, b, a], uv: [0.0, 0.0], border_radius: [0.0; 4] },
+            Vertex { position: [x + t, y], color: [r, g, b, a], uv: [1.0, 0.0], border_radius: [0.0; 4] },
+            Vertex { position: [x + t, y + h], color: [r, g, b, a], uv: [1.0, 1.0], border_radius: [0.0; 4] },
+            Vertex { position: [x, y + h], color: [r, g, b, a], uv: [0.0, 1.0], border_radius: [0.0; 4] },
+            Vertex { position: [x + w - t, y], color: [r, g, b, a], uv: [0.0, 0.0], border_radius: [0.0; 4] },
+            Vertex { position: [x + w, y], color: [r, g, b, a], uv: [1.0, 0.0], border_radius: [0.0; 4] },
+            Vertex { position: [x + w, y + h], color: [r, g, b, a], uv: [1.0, 1.0], border_radius: [0.0; 4] },
+            Vertex { position: [x + w - t, y + h], color: [r, g, b, a], uv: [0.0, 1.0], border_radius: [0.0; 4] },
         ];
         let indices = vec![
             0,1,2, 2,3,0,

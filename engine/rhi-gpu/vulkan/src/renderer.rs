@@ -98,7 +98,6 @@ impl VulkanRenderer {
         let begin_info = vk::CommandBufferBeginInfo::default();
         unsafe { device.begin_command_buffer(cmd, &begin_info).unwrap(); }
         
-        // 懒初始化pipeline
         if self.pipeline.is_none() {
             self.pipeline = Some(Self::create_pipeline(
                 device,
@@ -113,23 +112,32 @@ impl VulkanRenderer {
         let height = context.framebuffer_height();
         let pipeline = self.pipeline.as_ref().unwrap();
         
-        // 收集顶点和索引
-        let mut all_vertices = Vec::new();
-        let mut all_indices = Vec::new();
+        // 收集所有顶点
+        let mut all_vertices: Vec<Vertex> = Vec::new();
+        let mut all_indices: Vec<u32> = Vec::new();
+        // 记录每个 command 的矩形信息
+        let mut cmd_rects: Vec<(f32, f32, f32, f32, f32)> = Vec::new(); // x, y, w, h, radius
         
         for cmd_data in commands {
+            if cmd_data.vertices.is_empty() { continue; }
+            
             let index_offset = all_vertices.len() as u32;
             all_vertices.extend_from_slice(&cmd_data.vertices);
+            
+            let min_x = cmd_data.vertices.iter().map(|v| v.position[0]).fold(f32::MAX, f32::min);
+            let min_y = cmd_data.vertices.iter().map(|v| v.position[1]).fold(f32::MAX, f32::min);
+            let max_x = cmd_data.vertices.iter().map(|v| v.position[0]).fold(f32::MIN, f32::max);
+            let max_y = cmd_data.vertices.iter().map(|v| v.position[1]).fold(f32::MIN, f32::max);
+            let radius = cmd_data.vertices[0].border_radius[0];
+            
             if let Some(ref indices) = cmd_data.indices {
                 all_indices.extend(indices.iter().map(|i| i + index_offset));
             }
+            cmd_rects.push((min_x, min_y, max_x - min_x, max_y - min_y, radius));
         }
         
         if !all_vertices.is_empty() {
-            let v0 = &all_vertices[0];
-            // println!("DEBUG first vertex: pos=({:.1},{:.1}), color=({:.1},{:.1},{:.1})", 
-            // v0.position[0], v0.position[1], v0.color[0], v0.color[1], v0.color[2]);
-            // println!("DEBUG push: w={:.1}, h={:.1}", width as f32, height as f32);
+            // 上传所有顶点
             let vertex_size = (all_vertices.len() * std::mem::size_of::<Vertex>()) as u64;
             unsafe {
                 std::ptr::copy_nonoverlapping(
@@ -138,7 +146,6 @@ impl VulkanRenderer {
                     vertex_size as usize,
                 );
             }
-            
             let copy_region = vk::BufferCopy::default().size(vertex_size);
             unsafe { device.cmd_copy_buffer(cmd, self.staging_buffer, self.vertex_buffer, &[copy_region]); }
             
@@ -151,8 +158,7 @@ impl VulkanRenderer {
                         index_size as usize,
                     );
                 }
-                let copy_region = vk::BufferCopy::default()
-                    .src_offset(vertex_size).size(index_size);
+                let copy_region = vk::BufferCopy::default().src_offset(vertex_size).size(index_size);
                 unsafe { device.cmd_copy_buffer(cmd, self.staging_buffer, self.index_buffer, &[copy_region]); }
             }
             
@@ -171,6 +177,7 @@ impl VulkanRenderer {
                 );
             }
             
+            // 一个 render pass，内部逐矩形 draw
             let clear_values = [vk::ClearValue {
                 color: vk::ClearColorValue { float32: [0.1, 0.1, 0.15, 1.0] },
             }];
@@ -199,39 +206,38 @@ impl VulkanRenderer {
                     .extent(vk::Extent2D { width, height });
                 device.cmd_set_scissor(cmd, 0, &[scissor]);
                 
-                let push_data: [f32; 4] = [width as f32, height as f32, 0.0, 0.0];
-                device.cmd_push_constants(
-                    cmd, pipeline.layout,
-                    vk::ShaderStageFlags::VERTEX, 0,
-                    bytemuck::cast::<[f32; 4], [u8; 16]>(push_data).as_slice(),
-                );
-                
                 device.cmd_bind_vertex_buffers(cmd, 0, &[self.vertex_buffer], &[0]);
                 
-                if all_indices.is_empty() {
-                    device.cmd_draw(cmd, all_vertices.len() as u32, 1, 0, 0);
-                } else {
-                    device.cmd_bind_index_buffer(cmd, self.index_buffer, 0, vk::IndexType::UINT32);
-                    device.cmd_draw_indexed(cmd, all_indices.len() as u32, 1, 0, 0, 0);
+                let mut index_offset = 0u32;
+                for (cmd_idx, (rx, ry, rw, rh, _radius)) in cmd_rects.iter().enumerate() {
+                    let push_data: [f32; 8] = [
+                        width as f32, height as f32, 0.0, 0.0,
+                        *rx, *ry, *rw, *rh,
+                    ];
+                    device.cmd_push_constants(
+                        cmd, pipeline.layout,
+                        vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT,
+                        0,
+                        bytemuck::cast::<[f32; 8], [u8; 32]>(push_data).as_slice(),
+                    );
+                    
+                    println!("DEBUG push: rect=({:.1},{:.1},{:.1}x{:.1})", rx, ry, rw, rh);
+
+                    // 计算这个 command 的顶点和索引范围
+                    let cmd_data = &commands[cmd_idx];
+                    let vertex_count = cmd_data.vertices.len() as u32;
+                    
+                    if let Some(ref idx) = cmd_data.indices {
+                        let index_count = idx.len() as u32;
+                        device.cmd_bind_index_buffer(cmd, self.index_buffer, (index_offset * 4) as u64, vk::IndexType::UINT32);
+                        device.cmd_draw_indexed(cmd, index_count, 1, 0, 0, 0);
+                        index_offset += index_count;
+                    } else {
+                        device.cmd_draw(cmd, vertex_count, 1, index_offset, 0);
+                        index_offset += vertex_count;
+                    }
                 }
                 
-                device.cmd_end_render_pass(cmd);
-            }
-        } else {
-            // 没有顶点数据时，至少走清屏
-            let clear_values = [vk::ClearValue {
-                color: vk::ClearColorValue { float32: [0.1, 0.1, 0.15, 1.0] },
-            }];
-            let render_pass_begin = vk::RenderPassBeginInfo::default()
-                .render_pass(context.render_pass())
-                .framebuffer(context.framebuffers()[image_index])
-                .render_area(vk::Rect2D {
-                    offset: vk::Offset2D { x: 0, y: 0 },
-                    extent: vk::Extent2D { width, height },
-                })
-                .clear_values(&clear_values);
-            unsafe {
-                device.cmd_begin_render_pass(cmd, &render_pass_begin, vk::SubpassContents::INLINE);
                 device.cmd_end_render_pass(cmd);
             }
         }
@@ -240,8 +246,8 @@ impl VulkanRenderer {
     }
     
     fn create_pipeline(device: &Device, render_pass: vk::RenderPass, width: u32, height: u32) -> Pipeline {
-        let vert_bytes = include_bytes!("../shaders/vert.spv");
-        let frag_bytes = include_bytes!("../shaders/frag.spv");
+        let vert_bytes = include_bytes!("../../../../assets/shader/vert.spv");
+        let frag_bytes = include_bytes!("../../../../assets/shader/frag.spv");
         
         let vert_module = Self::create_shader_module(device, vert_bytes);
         let frag_module = Self::create_shader_module(device, frag_bytes);
@@ -279,6 +285,10 @@ impl VulkanRenderer {
                 .binding(0).location(2)
                 .format(vk::Format::R32G32_SFLOAT)
                 .offset(24),
+            vk::VertexInputAttributeDescription::default()
+                .binding(0).location(3)
+                .format(vk::Format::R32G32B32A32_SFLOAT)
+                .offset(32),
         ];
         
         let vertex_input = vk::PipelineVertexInputStateCreateInfo::default()
@@ -338,9 +348,9 @@ impl VulkanRenderer {
             .dynamic_states(&dynamic_states);
         
         let push_constant_range = vk::PushConstantRange::default()
-            .stage_flags(vk::ShaderStageFlags::VERTEX)
+            .stage_flags(vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT)
             .offset(0)
-            .size(16);
+            .size(32);
         
         let push_constant_ranges = [push_constant_range];
         
