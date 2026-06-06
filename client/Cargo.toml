@@ -3,6 +3,13 @@ name = "client"
 version = "0.1.0"
 edition = "2024"
 
+[lib]
+path = "src/lib.rs"
+
+[[bin]]
+name = "client"
+path = "src/main.rs"
+
 [dependencies]
 core = { path = "../engine/core" }
 dfx = { path = "../engine/dfx" }

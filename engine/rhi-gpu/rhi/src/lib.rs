@@ -13,6 +13,15 @@ pub struct Vertex {
     pub uv: [f32; 2],
 }
 
+/// 矩形
+#[derive(Debug, Clone, Copy)]
+pub struct Rect {
+    pub x: f32,
+    pub y: f32,
+    pub width: f32,
+    pub height: f32,
+}
+
 /// 绘制命令
 #[derive(Debug, Clone)]
 pub struct DrawCommand {
@@ -26,13 +35,57 @@ pub struct DrawCommand {
     pub texture_id: u32,
 }
 
-/// 矩形
-#[derive(Debug, Clone, Copy)]
-pub struct Rect {
-    pub x: f32,
-    pub y: f32,
-    pub width: f32,
-    pub height: f32,
+impl DrawCommand {
+    /// 创建纯色矩形绘制命令
+    pub fn rect(x: f32, y: f32, w: f32, h: f32, r: f32, g: f32, b: f32, a: f32) -> Self {
+        DrawCommand {
+            vertices: vec![
+                Vertex { position: [x, y], color: [r, g, b, a], uv: [0.0, 0.0] },
+                Vertex { position: [x + w, y], color: [r, g, b, a], uv: [1.0, 0.0] },
+                Vertex { position: [x + w, y + h], color: [r, g, b, a], uv: [1.0, 1.0] },
+                Vertex { position: [x, y + h], color: [r, g, b, a], uv: [0.0, 1.0] },
+            ],
+            indices: Some(vec![0, 1, 2, 2, 3, 0]),
+            clip_rect: None,
+            texture_id: 0,
+        }
+    }
+
+    /// 创建矩形线框绘制命令（仅debug版本可用）
+    #[cfg(debug_assertions)]
+    pub fn rect_line(x: f32, y: f32, w: f32, h: f32, r: f32, g: f32, b: f32, a: f32) -> Self {
+        let t = 1.0;
+        let vertices = vec![
+            Vertex { position: [x, y], color: [r, g, b, a], uv: [0.0, 0.0] },
+            Vertex { position: [x + w, y], color: [r, g, b, a], uv: [1.0, 0.0] },
+            Vertex { position: [x + w, y + t], color: [r, g, b, a], uv: [1.0, 1.0] },
+            Vertex { position: [x, y + t], color: [r, g, b, a], uv: [0.0, 1.0] },
+            Vertex { position: [x, y + h - t], color: [r, g, b, a], uv: [0.0, 0.0] },
+            Vertex { position: [x + w, y + h - t], color: [r, g, b, a], uv: [1.0, 0.0] },
+            Vertex { position: [x + w, y + h], color: [r, g, b, a], uv: [1.0, 1.0] },
+            Vertex { position: [x, y + h], color: [r, g, b, a], uv: [0.0, 1.0] },
+            Vertex { position: [x, y], color: [r, g, b, a], uv: [0.0, 0.0] },
+            Vertex { position: [x + t, y], color: [r, g, b, a], uv: [1.0, 0.0] },
+            Vertex { position: [x + t, y + h], color: [r, g, b, a], uv: [1.0, 1.0] },
+            Vertex { position: [x, y + h], color: [r, g, b, a], uv: [0.0, 1.0] },
+            Vertex { position: [x + w - t, y], color: [r, g, b, a], uv: [0.0, 0.0] },
+            Vertex { position: [x + w, y], color: [r, g, b, a], uv: [1.0, 0.0] },
+            Vertex { position: [x + w, y + h], color: [r, g, b, a], uv: [1.0, 1.0] },
+            Vertex { position: [x + w - t, y + h], color: [r, g, b, a], uv: [0.0, 1.0] },
+        ];
+        let indices = vec![
+            0,1,2, 2,3,0,
+            4,5,6, 6,7,4,
+            8,9,10, 10,11,8,
+            12,13,14, 14,15,12,
+        ];
+        DrawCommand {
+            vertices,
+            indices: Some(indices),
+            clip_rect: None,
+            texture_id: 0,
+        }
+    }
 }
 
 /// RHI 初始化描述
