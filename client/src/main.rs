@@ -24,6 +24,7 @@ struct AppState {
     event_handlers: Vec<EventHandlerEntry>,
     msdf: Arc<Mutex<MsdfTextMeasurer>>,
     texture_uploaded: bool,
+    needs_rebuild: bool,
 }
 
 fn main() {
@@ -56,15 +57,24 @@ fn main() {
     };
     
     let rhi = VulkanRhi::init(&rhi_desc);
-    let layout_engine = LayoutEngine::new(SimpleTextMeasurer);
+    let mut layout_engine = LayoutEngine::new(SimpleTextMeasurer);
+    
+    // 初始构建 UI
+    let (mut init_tree, init_handlers) = {
+        let mut m = msdf.lock().unwrap();
+        build_ui(&button_text, &mut m)
+    };
+    let (w, h) = rhi.framebuffer_size();
+    layout_engine.calculate_layout(&mut init_tree, Size::new(w as f32, h as f32));
     
     *state.lock().unwrap() = Some(AppState {
         rhi,
-        tree: WidgetTree::new(),
+        tree: init_tree,
         layout_engine,
-        event_handlers: vec![],
+        event_handlers: init_handlers,
         msdf: msdf.clone(),
         texture_uploaded: false,
+        needs_rebuild: false,
     });
     
     let state_clone = state.clone();
@@ -87,6 +97,7 @@ fn main() {
                 winit::event::WindowEvent::Resized(size) => {
                     if let Some(ref mut app) = *state_clone.lock().unwrap() {
                         app.rhi.resize(size.width, size.height);
+                        app.needs_rebuild = true;
                     }
                 }
 
@@ -101,6 +112,7 @@ fn main() {
                             if let Some(root) = app.tree.root() {
                                 if let Some(hit_id) = hit_test(&app.tree, root, mx, my, 0.0, 0.0) {
                                     let mut target_id = hit_id;
+                                    let mut clicked = false;
                                     loop {
                                         let mut found = false;
                                         for entry in &app.event_handlers {
@@ -115,6 +127,7 @@ fn main() {
                                                 });
                                                 (entry.handler)(&event);
                                                 found = true;
+                                                clicked = true;
                                                 break;
                                             }
                                         }
@@ -125,6 +138,12 @@ fn main() {
                                             break;
                                         }
                                     }
+                                    // 点击后标记需要重建
+                                    if clicked {
+                                        if let Some(ref mut app) = *state_clone.lock().unwrap() {
+                                            app.needs_rebuild = true;
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -132,31 +151,34 @@ fn main() {
                 }
 
                 winit::event::WindowEvent::RedrawRequested => {
-                    let (mut new_tree, new_handlers) = {
-                        let mut m = msdf_clone.lock().unwrap();
-                        build_ui(&button_text_clone, &mut m)
-                    };
                     if let Some(ref mut app) = *state_clone.lock().unwrap() {
+                        // 按需重建 UI
+                        if app.needs_rebuild {
+                            let (mut new_tree, new_handlers) = {
+                                let mut m = msdf_clone.lock().unwrap();
+                                build_ui(&button_text_clone, &mut m)
+                            };
+                            let (w, h) = app.rhi.framebuffer_size();
+                            app.layout_engine.calculate_layout(&mut new_tree, Size::new(w as f32, h as f32));
+                            app.tree = new_tree;
+                            app.event_handlers = new_handlers;
+                            app.needs_rebuild = false;
+                        }
+                        
                         if !app.texture_uploaded {
                             let atlas = msdf_clone.lock().unwrap().font_atlas().clone();
                             app.rhi.upload_texture(&atlas.data, atlas.width, atlas.height);
                             app.texture_uploaded = true;
                         }
                         
-                        let (w, h) = app.rhi.framebuffer_size();
-                        app.layout_engine.calculate_layout(&mut new_tree, Size::new(w as f32, h as f32));
-                        
                         let mut commands = Vec::new();
-                        if let Some(root) = new_tree.root() {
-                            build_draw_commands(&new_tree, root, &mut commands);
+                        if let Some(root) = app.tree.root() {
+                            build_draw_commands(&app.tree, root, &mut commands);
                         }
                         
                         app.rhi.begin_frame();
                         app.rhi.draw(&commands);
                         app.rhi.end_frame();
-                        
-                        app.tree = new_tree;
-                        app.event_handlers = new_handlers;
                     }
                     window_clone.request_redraw();
                 }
@@ -225,19 +247,15 @@ fn build_ui(
     );
     ctx.add_child(btn_container_id, btn_text_id);
     ctx.add_child(root_id, btn_container_id);
-
+    
     // 巨大的测试文字
     let test_text = "你好，world！";
-    let font_size = 120.0;
-    let test_glyphs = msdf.layout_text(test_text, font_size, f32::MAX).glyphs;
-    let test_size = msdf.measure_text(test_text, font_size, f32::MAX);
-    let test_data = TextData::with_glyphs(test_text, font_size, test_glyphs);
+    let test_size = 360.0;
+    let test_glyphs = msdf.layout_text(test_text, test_size, f32::MAX).glyphs;
+    let test_data = TextData::with_glyphs(test_text, test_size, test_glyphs);
     let test_id = ctx.create_node(
         WidgetType::Text(test_data),
-        Style::new()
-            .cross_alignment(Alignment::Center)
-            .width(test_size.width)
-            .height(test_size.height),
+        Style::new().cross_alignment(Alignment::Center),
     );
     ctx.add_child(root_id, test_id);
     
