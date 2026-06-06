@@ -33,9 +33,8 @@ void main() {
     } else if (fragTextureId > 0.5) {
         vec4 texColor = texture(texSampler, fragUV);
         float dist = texColor.a;
-        // alpha=0 表示图集未使用区域，跳过
         if (dist < 0.01) discard;
-        float alpha = smoothstep(0.45, 0.55, dist);
+        float alpha = smoothstep(0.48, 0.52, dist);
         outColor = vec4(fragColor.rgb, fragColor.a * alpha);
     } else {
         outColor = fragColor;

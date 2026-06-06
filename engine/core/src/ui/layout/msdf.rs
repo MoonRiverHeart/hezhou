@@ -118,6 +118,15 @@ impl MsdfGenerator {
         MsdfGenerator { size, spread }
     }
     
+    fn is_clockwise(points: &[Point]) -> bool {
+        let mut sum = 0.0;
+        for i in 0..points.len() {
+            let j = (i + 1) % points.len();
+            sum += (points[j].x - points[i].x) * (points[j].y + points[i].y);
+        }
+        sum > 0.0
+    }
+
     pub fn generate(&self, font_data: &[u8], glyph_id: u16, px_size: f32) -> Vec<u8> {
         let face = Face::parse(font_data, 0).unwrap_or_else(|e| {
             panic!("Failed to parse font: {:?}", e);
@@ -164,20 +173,24 @@ impl MsdfGenerator {
             return vec![0u8; (self.size * self.size * 4) as usize];
         }
         
-        let scale_to_fit = scaled_size / glyph_w.max(glyph_h);
+        let scale_x = scaled_size / glyph_w;
+        let scale_y = scaled_size / glyph_h;
+        let scale_to_fit = scale_x.min(scale_y);
+        let offset_x = (scaled_size - glyph_w * scale_to_fit) / 2.0 + padding;
+        let offset_y = (scaled_size - glyph_h * scale_to_fit) / 2.0 + padding;
         
         let mut df = DistanceField::new(self.size, self.size);
         
+        // 第一遍：计算每个轮廓的最近距离（无符号）
         for contour in &collector.contours {
             let points: Vec<Point> = contour.iter().map(|p| Point {
-                x: (p.x * scale - min_x) * scale_to_fit + padding,
-                y: (p.y * scale - min_y) * scale_to_fit + padding,
+                x: (p.x * scale - min_x) * scale_to_fit + offset_x,
+                y: (p.y * scale - min_y) * scale_to_fit + offset_y,
             }).collect();
             
             for y in 0..self.size as i32 {
                 for x in 0..self.size as i32 {
                     let mut min_dist = f32::MAX;
-                    
                     for i in 0..points.len() - 1 {
                         let d = dist_to_segment(
                             x as f32, y as f32,
@@ -186,11 +199,30 @@ impl MsdfGenerator {
                         );
                         min_dist = min_dist.min(d);
                     }
-                    
-                    let inside = self.is_inside(x as f32, y as f32, &points);
-                    let signed_dist = if inside { -min_dist } else { min_dist };
-                    
-                    df.set(x as u32, y as u32, signed_dist);
+                    df.set(x as u32, y as u32, min_dist);
+                }
+            }
+        }
+        
+        // 第二遍：奇偶填充规则确定符号
+        for y in 0..self.size as i32 {
+            for x in 0..self.size as i32 {
+                let mut inside_count = 0;
+                for contour in &collector.contours {
+                    let points: Vec<Point> = contour.iter().map(|p| Point {
+                        x: (p.x * scale - min_x) * scale_to_fit + offset_x,
+                        y: (p.y * scale - min_y) * scale_to_fit + offset_y,
+                    }).collect();
+                    if self.is_inside(x as f32, y as f32, &points) {
+                        inside_count += 1;
+                    }
+                }
+                let idx = (y as u32 * self.size + x as u32) as usize;
+                let dist = df.data[idx];
+                if inside_count % 2 == 1 {
+                    df.data[idx] = -dist;
+                } else {
+                    df.data[idx] = dist;
                 }
             }
         }
@@ -198,7 +230,7 @@ impl MsdfGenerator {
         let mut msdf = vec![0u8; (self.size * self.size * 4) as usize];
         for y in 0..self.size {
             for x in 0..self.size {
-                let d = df.get(x as i32, y as i32);
+                let d = df.data[(y * self.size + x) as usize];
                 let normalized = (d / self.spread + 1.0) * 0.5;
                 let value = (normalized.clamp(0.0, 1.0) * 255.0) as u8;
                 let idx = ((y * self.size + x) * 4) as usize;
