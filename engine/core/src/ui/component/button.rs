@@ -3,8 +3,7 @@ use crate::ui::layout::widget::TextData;
 use crate::ui::layout::text::SimpleTextMeasurer;
 use crate::ui::layout::text::TextMeasurer;
 use crate::ui::layout::geometry::Alignment;
-use crate::ui::event::types::UIEvent;
-use crate::ui::event::mouse::MouseEventType;
+use std::sync::{Arc, Mutex};
 
 pub enum ButtonVariant {
     Primary,
@@ -12,8 +11,13 @@ pub enum ButtonVariant {
     Text,
 }
 
+pub enum ButtonLabel {
+    Static(String),
+    Dynamic(Arc<Mutex<String>>),
+}
+
 pub struct Button {
-    label: String,
+    label: ButtonLabel,
     variant: ButtonVariant,
     on_click: Option<Box<dyn Fn()>>,
     style: Option<Style>,
@@ -22,7 +26,16 @@ pub struct Button {
 impl Button {
     pub fn new(label: impl Into<String>) -> Self {
         Button {
-            label: label.into(),
+            label: ButtonLabel::Static(label.into()),
+            variant: ButtonVariant::Primary,
+            on_click: None,
+            style: None,
+        }
+    }
+    
+    pub fn dynamic(label: Arc<Mutex<String>>) -> Self {
+        Button {
+            label: ButtonLabel::Dynamic(label),
             variant: ButtonVariant::Primary,
             on_click: None,
             style: None,
@@ -43,6 +56,13 @@ impl Button {
         self.style = Some(style);
         self
     }
+    
+    fn get_label(&self) -> String {
+        match &self.label {
+            ButtonLabel::Static(s) => s.clone(),
+            ButtonLabel::Dynamic(arc) => arc.lock().unwrap().clone(),
+        }
+    }
 }
 
 impl Component for Button {
@@ -57,11 +77,10 @@ impl Component for Button {
         let font_size = style.font_size.unwrap_or(ctx.theme.base_font_size);
         let padding = style.padding;
         
-        // 测量文字尺寸
+        let label = self.get_label();
         let measurer = SimpleTextMeasurer;
-        let text_size = measurer.measure_text(&self.label, font_size, f32::MAX);
+        let text_size = measurer.measure_text(&label, font_size, f32::MAX);
         
-        // Container尺寸 = 文字尺寸 + padding + 额外空间
         let extra_h = font_size * 0.4;
         let extra_w = font_size * 0.6;
         let container_width = text_size.width + padding.left + padding.right + extra_w;
@@ -73,19 +92,14 @@ impl Component for Button {
         
         let container_id = ctx.create_node(WidgetType::Container, container_style);
         
-        let text_data = TextData::new(&self.label, font_size);
+        let text_data = TextData::new(&label, font_size);
         let text_style = Style::new().cross_alignment(Alignment::Center);
         let text_id = ctx.create_node(WidgetType::Text(text_data), text_style);
         ctx.add_child(container_id, text_id);
         
-        // 注册点击事件，移出 on_click 所有权
         if let Some(handler) = self.on_click.take() {
-            ctx.on_event(container_id, move |event| {
-                if let UIEvent::Mouse(mouse_event) = event {
-                    if mouse_event.event_type == MouseEventType::Clicked {
-                        handler();
-                    }
-                }
+            ctx.on_event(container_id, move |_| {
+                handler();
             });
         }
         

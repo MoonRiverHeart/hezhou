@@ -133,8 +133,8 @@ impl<T: TextMeasurer> LayoutEngine<T> {
             let x = padding.left + (inner_w - child_size.width).max(0.0) / 2.0;
             let y = padding.top + (inner_h - child_size.height).max(0.0) / 2.0;
             
-            println!("DEBUG container inner: inner_w={:.1}, child_w={:.1}, x_offset={:.1}, container_w={:.1}", 
-                inner_w, child_size.width, (inner_w - child_size.width).max(0.0) / 2.0, container_w);
+            // println!("DEBUG container inner: inner_w={:.1}, child_w={:.1}, x_offset={:.1}, container_w={:.1}", 
+            //     inner_w, child_size.width, (inner_w - child_size.width).max(0.0) / 2.0, container_w);
             
             if let Some(child_layout) = &mut tree.get_mut(child_id).layout {
                 child_layout.x = x;

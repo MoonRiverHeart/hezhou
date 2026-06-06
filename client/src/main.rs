@@ -17,8 +17,17 @@ use client::draw_utils::{build_draw_commands, hit_test};
 use std::sync::Arc;
 use std::sync::Mutex;
 
+struct AppState {
+    rhi: VulkanRhi,
+    tree: WidgetTree,
+    layout_engine: LayoutEngine<SimpleTextMeasurer>,
+    event_handlers: Vec<EventHandlerEntry>,
+}
+
 fn main() {
-    let state = Arc::new(Mutex::new(None::<(VulkanRhi, WidgetTree, LayoutEngine<SimpleTextMeasurer>, Vec<EventHandlerEntry>)>));
+    let button_text = Arc::new(Mutex::new("按钮".to_string()));
+    
+    let state = Arc::new(Mutex::new(None::<AppState>));
     let mouse_pos = Arc::new(Mutex::new((0.0f32, 0.0f32)));
     
     let event_loop = winit::event_loop::EventLoop::new().unwrap();
@@ -44,42 +53,29 @@ fn main() {
     };
     
     let rhi = VulkanRhi::init(&rhi_desc);
-    
-    let mut ctx = BuildContext::new(Theme::default());
-    let root_id = VStack::new()
-        .spacing(16.0)
-        .child(Text::title("标题"))
-        .child(Button::new("按钮").on_click(|| println!("按钮被点击了！")))
-        .build(&mut ctx);
-    ctx.set_root(root_id);
-
-    let event_handlers = ctx.take_event_handlers();
-    let tree = ctx.build();
     let layout_engine = LayoutEngine::new(SimpleTextMeasurer);
     
-    *state.lock().unwrap() = Some((rhi, tree, layout_engine, event_handlers));
+    *state.lock().unwrap() = Some(AppState { rhi, tree: WidgetTree::new(), layout_engine, event_handlers: vec![] });
     
     let state_clone = state.clone();
     let window_clone = window.clone();
     let mouse_pos_clone = mouse_pos.clone();
+    let button_text_clone = button_text.clone();
     
     event_loop.run(move |event, window_target| {
         match event {
             winit::event::Event::WindowEvent { event, .. } => match event {
                 winit::event::WindowEvent::CloseRequested => {
-                    if let Some((rhi, _, _, _)) = state_clone.lock().unwrap().take() {
-                        rhi.wait_idle();
-                        drop(rhi);
+                    if let Some(mut app) = state_clone.lock().unwrap().take() {
+                        app.rhi.wait_idle();
+                        drop(app);
                     }
                     window_target.exit();
                 }
 
                 winit::event::WindowEvent::Resized(size) => {
-                    if let Some((ref mut rhi, ref mut tree, _, _)) = *state_clone.lock().unwrap() {
-                        rhi.resize(size.width, size.height);
-                        if let Some(root) = tree.root() {
-                            tree.mark_dirty(root);
-                        }
+                    if let Some(ref mut app) = *state_clone.lock().unwrap() {
+                        app.rhi.resize(size.width, size.height);
                     }
                 }
 
@@ -90,13 +86,13 @@ fn main() {
                 winit::event::WindowEvent::MouseInput { state, button, .. } => {
                     if state == winit::event::ElementState::Pressed && button == winit::event::MouseButton::Left {
                         let (mx, my) = *mouse_pos_clone.lock().unwrap();
-                        if let Some((_, ref tree, _, ref handlers)) = *state_clone.lock().unwrap() {
-                            if let Some(root) = tree.root() {
-                                if let Some(hit_id) = hit_test(tree, root, mx, my, 0.0, 0.0) {
+                        if let Some(ref app) = *state_clone.lock().unwrap() {
+                            if let Some(root) = app.tree.root() {
+                                if let Some(hit_id) = hit_test(&app.tree, root, mx, my, 0.0, 0.0) {
                                     let mut target_id = hit_id;
                                     loop {
                                         let mut found = false;
-                                        for entry in handlers {
+                                        for entry in &app.event_handlers {
                                             if entry.widget_id == target_id {
                                                 let event = UIEvent::Mouse(MouseEvent {
                                                     timestamp: std::time::SystemTime::now(),
@@ -112,7 +108,7 @@ fn main() {
                                             }
                                         }
                                         if found { break; }
-                                        if let Some(parent) = tree.get(target_id).parent {
+                                        if let Some(parent) = app.tree.get(target_id).parent {
                                             target_id = parent;
                                         } else {
                                             break;
@@ -125,16 +121,23 @@ fn main() {
                 }
 
                 winit::event::WindowEvent::RedrawRequested => {
-                    if let Some((ref mut rhi, ref mut tree, ref mut layout_engine, _)) = *state_clone.lock().unwrap() {
-                        let (w, h) = rhi.framebuffer_size();
-                        layout_engine.calculate_layout(tree, Size::new(w as f32, h as f32));
+                    // 每次重绘时重建UI并布局
+                    let (mut new_tree, new_handlers) = build_ui(&button_text_clone);
+                    if let Some(ref mut app) = *state_clone.lock().unwrap() {
+                        let (w, h) = app.rhi.framebuffer_size();
+                        app.layout_engine.calculate_layout(&mut new_tree, Size::new(w as f32, h as f32));
                         
                         let mut commands = Vec::new();
-                        build_draw_commands(tree, tree.root().unwrap(), &mut commands);
+                        if let Some(root) = new_tree.root() {
+                            build_draw_commands(&new_tree, root, &mut commands);
+                        }
                         
-                        rhi.begin_frame();
-                        rhi.draw(&commands);
-                        rhi.end_frame();
+                        app.rhi.begin_frame();
+                        app.rhi.draw(&commands);
+                        app.rhi.end_frame();
+                        
+                        app.tree = new_tree;
+                        app.event_handlers = new_handlers;
                     }
                     window_clone.request_redraw();
                 }
@@ -146,4 +149,22 @@ fn main() {
             _ => {}
         }
     }).unwrap();
+}
+
+fn build_ui(button_text: &Arc<Mutex<String>>) -> (WidgetTree, Vec<EventHandlerEntry>) {
+    let mut ctx = BuildContext::new(Theme::default());
+    let btn_text = button_text.clone();  // clone Arc
+    let root_id = VStack::new()
+        .spacing(16.0)
+        .child(Text::title("标题"))
+        .child(Button::dynamic(btn_text).on_click({
+            let bt = button_text.clone();  // 再 clone 一个给闭包
+            move || {
+                *bt.lock().unwrap() = "按钮被点击了！".to_string();
+            }
+        }))
+        .build(&mut ctx);
+    ctx.set_root(root_id);
+    let handlers = ctx.take_event_handlers();
+    (ctx.build(), handlers)
 }
