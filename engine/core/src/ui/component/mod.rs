@@ -9,16 +9,18 @@ pub mod container;
 
 use crate::ui::layout::widget::*;
 use crate::ui::layout::style::*;
+use crate::ui::layout::msdf_measurer::MsdfTextMeasurer;
+use crate::ui::layout::text::TextMeasurer;
+use crate::ui::layout::text::GlyphInfo;
 use crate::ui::event::types::UIEvent;
-use crate::ui::event::mouse::MouseEventType;
-use crate::ui::event::keyboard::KeyboardEventType;
 use theme::Theme;
+use std::sync::{Arc, Mutex};
 
-/// 构建上下文
 pub struct BuildContext {
     pub theme: Theme,
     pub tree: WidgetTree,
     pub event_handlers: Vec<EventHandlerEntry>,
+    pub msdf: Option<Arc<Mutex<MsdfTextMeasurer>>>,
 }
 
 pub struct EventHandlerEntry {
@@ -32,6 +34,16 @@ impl BuildContext {
             theme,
             tree: WidgetTree::new(),
             event_handlers: Vec::new(),
+            msdf: None,
+        }
+    }
+    
+    pub fn with_msdf(theme: Theme, msdf: Arc<Mutex<MsdfTextMeasurer>>) -> Self {
+        BuildContext {
+            theme,
+            tree: WidgetTree::new(),
+            event_handlers: Vec::new(),
+            msdf: Some(msdf),
         }
     }
     
@@ -53,7 +65,7 @@ impl BuildContext {
             handler: Box::new(handler),
         });
     }
-
+    
     pub fn take_event_handlers(&mut self) -> Vec<EventHandlerEntry> {
         std::mem::take(&mut self.event_handlers)
     }
@@ -61,12 +73,17 @@ impl BuildContext {
     pub fn build(self) -> WidgetTree {
         self.tree
     }
+    
+    pub fn layout_text(&self, text: &str, font_size: f32) -> Option<Vec<GlyphInfo>> {
+        if let Some(ref msdf) = self.msdf {
+            let mut m = msdf.lock().unwrap();
+            Some(m.layout_text(text, font_size, f32::MAX).glyphs)
+        } else {
+            None
+        }
+    }
 }
 
 pub trait Component {
     fn build(&mut self, ctx: &mut BuildContext) -> WidgetId;
-}
-
-pub fn build_component(ctx: &mut BuildContext, component: &mut dyn Component) -> WidgetId {
-    component.build(ctx)
 }

@@ -76,7 +76,7 @@ fn build_draw_commands_impl(tree: &WidgetTree, node_id: WidgetId, parent_x: f32,
                     let gh = glyph.size.height * scale;
                     let offset_y = (glyph.size.height - gh) / 2.0;
                     
-                    let gx = cursor_x + glyph.bearing_x;
+                    let gx = cursor_x;
                     // let gy = abs_y + max_height - glyph.size.height + offset_y;
                     let gy = first_mid_y - gh / 2.0;
                     // let gy = abs_y + max_height - gh;

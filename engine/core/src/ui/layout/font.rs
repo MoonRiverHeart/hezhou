@@ -31,9 +31,9 @@ impl MsdfFont {
             secondary_data: secondary_data.to_vec(),
             glyph_cache: HashMap::new(),
             atlas: FontAtlas {
-                data: vec![255u8; 512 * 512 * 4], // 初始化为白色(255)，alpha=255表示未使用
-                width: 512,
-                height: 512,
+                data: vec![255u8; 1024 * 1024 * 4], // 初始化为白色(255)，alpha=255表示未使用
+                width: 1024,
+                height: 1024,
             },
             atlas_cursor_x: 0,
             atlas_cursor_y: 0,
@@ -145,10 +145,22 @@ impl MsdfFont {
         
         // 如果图集满了，重置游标（简单处理，旧缓存失效）
         if self.atlas_cursor_y + msdf_size > self.atlas.height {
+            let new_height = self.atlas.height * 2;
+            let old_height = self.atlas.height;
+            let mut new_data = vec![255u8; (self.atlas.width * new_height * 4) as usize];
+            let row_bytes = (self.atlas.width * 4) as usize;
+            for y in 0..old_height {
+                let src_start = (y as usize) * row_bytes;
+                let dst_start = (y as usize) * row_bytes;
+                new_data[dst_start..dst_start + row_bytes]
+                    .copy_from_slice(&self.atlas.data[src_start..src_start + row_bytes]);
+            }
+            self.atlas.data = new_data;
+            self.atlas.height = new_height;
             self.atlas_cursor_x = 0;
-            self.atlas_cursor_y = 0;
+            self.atlas_cursor_y = old_height;
             self.atlas_row_height = 0;
-            self.glyph_cache.clear();
+            println!("WARNING: Atlas expanded to {}x{}", self.atlas.width, self.atlas.height);
         }
         
         let atlas_x = self.atlas_cursor_x;
@@ -268,10 +280,22 @@ impl MsdfFont {
             self.atlas_row_height = 0;
         }
         if self.atlas_cursor_y + msdf_size > self.atlas.height {
+            let new_height = self.atlas.height * 2;
+            let old_height = self.atlas.height;
+            let mut new_data = vec![255u8; (self.atlas.width * new_height * 4) as usize];
+            let row_bytes = (self.atlas.width * 4) as usize;
+            for y in 0..old_height {
+                let src_start = (y as usize) * row_bytes;
+                let dst_start = (y as usize) * row_bytes;
+                new_data[dst_start..dst_start + row_bytes]
+                    .copy_from_slice(&self.atlas.data[src_start..src_start + row_bytes]);
+            }
+            self.atlas.data = new_data;
+            self.atlas.height = new_height;
             self.atlas_cursor_x = 0;
-            self.atlas_cursor_y = 0;
+            self.atlas_cursor_y = old_height;
             self.atlas_row_height = 0;
-            self.glyph_cache.clear();
+            println!("WARNING: Atlas expanded to {}x{}", self.atlas.width, self.atlas.height);
         }
         
         let atlas_x = self.atlas_cursor_x;

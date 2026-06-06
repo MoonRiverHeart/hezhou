@@ -50,19 +50,29 @@ impl Text {
             style: None,
         }
     }
+    
+    fn get_label(&self) -> String {
+        self.content.clone()
+    }
 }
 
 impl Component for Text {
     fn build(&mut self, ctx: &mut BuildContext) -> WidgetId {
         let font_size = self.font_size.unwrap_or(ctx.theme.base_font_size);
         let base_style = ctx.theme.body_text_style()
-            .cross_alignment(Alignment::Center);  // 加这行
+            .cross_alignment(Alignment::Center);
         let mut style = self.style.clone().unwrap_or(base_style);
         if style.font_size.is_none() {
             style.font_size = Some(font_size);
         }
         
-        let text_data = TextData::new(&self.content, font_size);
+        let label = self.get_label();
+        let text_data = if let Some(glyphs) = ctx.layout_text(&label, font_size) {
+            TextData::with_glyphs(&label, font_size, glyphs)
+        } else {
+            TextData::new(&label, font_size)
+        };
+        
         let id = ctx.create_node(WidgetType::Text(text_data), style);
         id
     }
