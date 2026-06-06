@@ -17,6 +17,15 @@ pub struct VulkanRenderer {
     staging_buffer: vk::Buffer,
     staging_buffer_memory: vk::DeviceMemory,
     staging_mapped: *mut u8,
+    // 纹理相关
+    texture_image: Option<vk::Image>,
+    texture_memory: Option<vk::DeviceMemory>,
+    texture_view: Option<vk::ImageView>,
+    texture_sampler: Option<vk::Sampler>,
+    descriptor_pool: Option<vk::DescriptorPool>,
+    descriptor_set: Option<vk::DescriptorSet>,
+    descriptor_layout: Option<vk::DescriptorSetLayout>,
+    texture_id_counter: u32,
 }
 
 impl VulkanRenderer {
@@ -88,6 +97,14 @@ impl VulkanRenderer {
             index_buffer, index_buffer_memory,
             staging_buffer, staging_buffer_memory,
             staging_mapped,
+            texture_image: None,
+            texture_memory: None,
+            texture_view: None,
+            texture_sampler: None,
+            descriptor_pool: None,
+            descriptor_set: None,
+            descriptor_layout: None,
+            texture_id_counter: 0,
         }
     }
     
@@ -104,6 +121,7 @@ impl VulkanRenderer {
                 context.render_pass(),
                 context.framebuffer_width(),
                 context.framebuffer_height(),
+                self.descriptor_layout,
             ));
         }
         
@@ -112,11 +130,9 @@ impl VulkanRenderer {
         let height = context.framebuffer_height();
         let pipeline = self.pipeline.as_ref().unwrap();
         
-        // 收集所有顶点
         let mut all_vertices: Vec<Vertex> = Vec::new();
         let mut all_indices: Vec<u32> = Vec::new();
-        // 记录每个 command 的矩形信息
-        let mut cmd_rects: Vec<(f32, f32, f32, f32, f32)> = Vec::new(); // x, y, w, h, radius
+        let mut cmd_rects: Vec<(f32, f32, f32, f32, f32)> = Vec::new();
         
         for cmd_data in commands {
             if cmd_data.vertices.is_empty() { continue; }
@@ -137,7 +153,6 @@ impl VulkanRenderer {
         }
         
         if !all_vertices.is_empty() {
-            // 上传所有顶点
             let vertex_size = (all_vertices.len() * std::mem::size_of::<Vertex>()) as u64;
             unsafe {
                 std::ptr::copy_nonoverlapping(
@@ -177,7 +192,6 @@ impl VulkanRenderer {
                 );
             }
             
-            // 一个 render pass，内部逐矩形 draw
             let clear_values = [vk::ClearValue {
                 color: vk::ClearColorValue { float32: [0.1, 0.1, 0.15, 1.0] },
             }];
@@ -194,6 +208,18 @@ impl VulkanRenderer {
             unsafe {
                 device.cmd_begin_render_pass(cmd, &render_pass_begin, vk::SubpassContents::INLINE);
                 device.cmd_bind_pipeline(cmd, vk::PipelineBindPoint::GRAPHICS, pipeline.pipeline);
+                
+                // 绑定纹理 descriptor set
+                if let Some(descriptor_set) = self.descriptor_set {
+                    device.cmd_bind_descriptor_sets(
+                        cmd,
+                        vk::PipelineBindPoint::GRAPHICS,
+                        pipeline.layout,
+                        0,
+                        &[descriptor_set],
+                        &[],
+                    );
+                }
                 
                 let viewport = vk::Viewport::default()
                     .x(0.0).y(0.0)
@@ -221,9 +247,6 @@ impl VulkanRenderer {
                         bytemuck::cast::<[f32; 8], [u8; 32]>(push_data).as_slice(),
                     );
                     
-                    // println!("DEBUG push: rect=({:.1},{:.1},{:.1}x{:.1})", rx, ry, rw, rh);
-
-                    // 计算这个 command 的顶点和索引范围
                     let cmd_data = &commands[cmd_idx];
                     let vertex_count = cmd_data.vertices.len() as u32;
                     
@@ -245,11 +268,237 @@ impl VulkanRenderer {
         unsafe { device.end_command_buffer(cmd).unwrap(); }
     }
 
-    pub fn upload_texture(&mut self, _context: &VulkanContext, _data: &[u8], _width: u32, _height: u32) -> u32 {
-        0
+    pub fn upload_texture(&mut self, context: &VulkanContext, data: &[u8], width: u32, height: u32) -> u32 {
+        let device = context.device();
+        let physical_device = context.physical_device();
+        let instance = context.instance();
+        
+        let mem_properties = unsafe {
+            instance.get_physical_device_memory_properties(physical_device)
+        };
+        
+        let image_size = (width * height * 4) as u64;
+        
+        let find_host_visible = |type_filter: u32| -> u32 {
+            for i in 0..mem_properties.memory_type_count {
+                if (type_filter & (1 << i)) != 0 &&
+                   mem_properties.memory_types[i as usize].property_flags
+                       .contains(vk::MemoryPropertyFlags::HOST_VISIBLE | vk::MemoryPropertyFlags::HOST_COHERENT)
+                {
+                    return i;
+                }
+            }
+            0
+        };
+        
+        // 创建 staging buffer 并上传数据
+        let (staging_buf, staging_mem) = Self::create_buffer(
+            device, image_size,
+            vk::BufferUsageFlags::TRANSFER_SRC,
+            &mem_properties, &find_host_visible,
+        );
+        
+        unsafe {
+            let ptr = device.map_memory(staging_mem, 0, image_size, vk::MemoryMapFlags::empty()).unwrap();
+            std::ptr::copy_nonoverlapping(data.as_ptr(), ptr as *mut u8, data.len());
+            device.unmap_memory(staging_mem);
+        }
+        
+        // 创建纹理 image
+        let image_info = vk::ImageCreateInfo::default()
+            .image_type(vk::ImageType::TYPE_2D)
+            .format(vk::Format::R8G8B8A8_UNORM)
+            .extent(vk::Extent3D { width, height, depth: 1 })
+            .mip_levels(1)
+            .array_layers(1)
+            .samples(vk::SampleCountFlags::TYPE_1)
+            .tiling(vk::ImageTiling::OPTIMAL)
+            .usage(vk::ImageUsageFlags::TRANSFER_DST | vk::ImageUsageFlags::SAMPLED)
+            .initial_layout(vk::ImageLayout::UNDEFINED);
+        
+        let texture_image = unsafe { device.create_image(&image_info, None).unwrap() };
+        
+        let requirements = unsafe { device.get_image_memory_requirements(texture_image) };
+        let find_device_local = |type_filter: u32| -> u32 {
+            for i in 0..mem_properties.memory_type_count {
+                if (type_filter & (1 << i)) != 0 &&
+                   mem_properties.memory_types[i as usize].property_flags
+                       .contains(vk::MemoryPropertyFlags::DEVICE_LOCAL)
+                {
+                    return i;
+                }
+            }
+            0
+        };
+        let memory_type_index = find_device_local(requirements.memory_type_bits);
+        let alloc_info = vk::MemoryAllocateInfo::default()
+            .allocation_size(requirements.size)
+            .memory_type_index(memory_type_index);
+        
+        let texture_memory = unsafe { device.allocate_memory(&alloc_info, None).unwrap() };
+        unsafe { device.bind_image_memory(texture_image, texture_memory, 0).unwrap(); }
+        
+        // 创建 image view
+        let view_info = vk::ImageViewCreateInfo::default()
+            .image(texture_image)
+            .view_type(vk::ImageViewType::TYPE_2D)
+            .format(vk::Format::R8G8B8A8_UNORM)
+            .subresource_range(vk::ImageSubresourceRange {
+                aspect_mask: vk::ImageAspectFlags::COLOR,
+                base_mip_level: 0,
+                level_count: 1,
+                base_array_layer: 0,
+                layer_count: 1,
+            });
+        let texture_view = unsafe { device.create_image_view(&view_info, None).unwrap() };
+        
+        // 创建 sampler
+        let sampler_info = vk::SamplerCreateInfo::default()
+            .mag_filter(vk::Filter::LINEAR)
+            .min_filter(vk::Filter::LINEAR)
+            .address_mode_u(vk::SamplerAddressMode::CLAMP_TO_EDGE)
+            .address_mode_v(vk::SamplerAddressMode::CLAMP_TO_EDGE)
+            .address_mode_w(vk::SamplerAddressMode::CLAMP_TO_EDGE);
+        let sampler = unsafe { device.create_sampler(&sampler_info, None).unwrap() };
+        
+        // 创建 descriptor set layout
+        let bindings = [vk::DescriptorSetLayoutBinding::default()
+            .binding(1)
+            .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
+            .descriptor_count(1)
+            .stage_flags(vk::ShaderStageFlags::FRAGMENT)];
+        let layout_info = vk::DescriptorSetLayoutCreateInfo::default().bindings(&bindings);
+        let descriptor_layout = unsafe { device.create_descriptor_set_layout(&layout_info, None).unwrap() };
+        
+        // 创建 descriptor pool
+        let pool_sizes = [vk::DescriptorPoolSize {
+            ty: vk::DescriptorType::COMBINED_IMAGE_SAMPLER,
+            descriptor_count: 1,
+        }];
+        let pool_info = vk::DescriptorPoolCreateInfo::default()
+            .max_sets(1)
+            .pool_sizes(&pool_sizes);
+        let descriptor_pool = unsafe { device.create_descriptor_pool(&pool_info, None).unwrap() };
+        
+        // 分配 descriptor set
+        let layouts = [descriptor_layout];
+        let alloc_info = vk::DescriptorSetAllocateInfo::default()
+            .descriptor_pool(descriptor_pool)
+            .set_layouts(&layouts);
+        let descriptor_set = unsafe { device.allocate_descriptor_sets(&alloc_info).unwrap()[0] };
+        
+        // 更新 descriptor set
+        let image_info = vk::DescriptorImageInfo::default()
+            .image_layout(vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL)
+            .image_view(texture_view)
+            .sampler(sampler);
+        
+        let image_infos = [image_info];
+        let write = vk::WriteDescriptorSet::default()
+            .dst_set(descriptor_set)
+            .dst_binding(1)
+            .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
+            .image_info(&image_infos);
+        unsafe { device.update_descriptor_sets(&[write], &[]); }
+        
+        // 转换 image layout: UNDEFINED -> TRANSFER_DST
+        let cmd = context.current_command_buffer();
+        let begin_info = vk::CommandBufferBeginInfo::default();
+        unsafe {
+            device.begin_command_buffer(cmd, &begin_info).unwrap();
+            
+            let barrier = vk::ImageMemoryBarrier::default()
+                .old_layout(vk::ImageLayout::UNDEFINED)
+                .new_layout(vk::ImageLayout::TRANSFER_DST_OPTIMAL)
+                .image(texture_image)
+                .subresource_range(vk::ImageSubresourceRange {
+                    aspect_mask: vk::ImageAspectFlags::COLOR,
+                    base_mip_level: 0, level_count: 1,
+                    base_array_layer: 0, layer_count: 1,
+                })
+                .src_access_mask(vk::AccessFlags::empty())
+                .dst_access_mask(vk::AccessFlags::TRANSFER_WRITE);
+            
+            device.cmd_pipeline_barrier(
+                cmd,
+                vk::PipelineStageFlags::TOP_OF_PIPE,
+                vk::PipelineStageFlags::TRANSFER,
+                vk::DependencyFlags::empty(),
+                &[],
+                &[],
+                &[barrier],
+            );
+            
+            // 从 staging buffer 复制到 image
+            let copy_region = vk::BufferImageCopy::default()
+                .image_subresource(vk::ImageSubresourceLayers {
+                    aspect_mask: vk::ImageAspectFlags::COLOR,
+                    mip_level: 0,
+                    base_array_layer: 0,
+                    layer_count: 1,
+                })
+                .image_extent(vk::Extent3D { width, height, depth: 1 });
+            
+            device.cmd_copy_buffer_to_image(
+                cmd, staging_buf, texture_image,
+                vk::ImageLayout::TRANSFER_DST_OPTIMAL,
+                &[copy_region],
+            );
+            
+            // 转换 image layout: TRANSFER_DST -> SHADER_READ_ONLY
+            let barrier = vk::ImageMemoryBarrier::default()
+                .old_layout(vk::ImageLayout::TRANSFER_DST_OPTIMAL)
+                .new_layout(vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL)
+                .image(texture_image)
+                .subresource_range(vk::ImageSubresourceRange {
+                    aspect_mask: vk::ImageAspectFlags::COLOR,
+                    base_mip_level: 0, level_count: 1,
+                    base_array_layer: 0, layer_count: 1,
+                })
+                .src_access_mask(vk::AccessFlags::TRANSFER_WRITE)
+                .dst_access_mask(vk::AccessFlags::SHADER_READ);
+            
+            device.cmd_pipeline_barrier(
+                cmd,
+                vk::PipelineStageFlags::TRANSFER,
+                vk::PipelineStageFlags::FRAGMENT_SHADER,
+                vk::DependencyFlags::empty(),
+                &[],
+                &[],
+                &[barrier],
+            );
+            
+            device.end_command_buffer(cmd).unwrap();
+            
+            // 提交并等待完成
+            let cmd_buffers = [cmd];
+            let submit_info = vk::SubmitInfo::default()
+                .command_buffers(&cmd_buffers);
+            device.queue_submit(context.graphics_queue(), &[submit_info], vk::Fence::null()).unwrap();
+            device.queue_wait_idle(context.graphics_queue()).unwrap();
+        }
+        
+        // 清理 staging buffer
+        unsafe {
+            device.destroy_buffer(staging_buf, None);
+            device.free_memory(staging_mem, None);
+        }
+        
+        // 保存纹理资源
+        self.texture_image = Some(texture_image);
+        self.texture_memory = Some(texture_memory);
+        self.texture_view = Some(texture_view);
+        self.texture_sampler = Some(sampler);
+        self.descriptor_pool = Some(descriptor_pool);
+        self.descriptor_set = Some(descriptor_set);
+        self.descriptor_layout = Some(descriptor_layout);
+        
+        let id = self.texture_id_counter;
+        self.texture_id_counter += 1;
+        id
     }
     
-    fn create_pipeline(device: &Device, render_pass: vk::RenderPass, width: u32, height: u32) -> Pipeline {
+    fn create_pipeline(device: &Device, render_pass: vk::RenderPass, width: u32, height: u32, descriptor_layout: Option<vk::DescriptorSetLayout>) -> Pipeline {
         let vert_bytes = include_bytes!("../../../../assets/shader/vert.spv");
         let frag_bytes = include_bytes!("../../../../assets/shader/frag.spv");
         
@@ -358,8 +607,15 @@ impl VulkanRenderer {
         
         let push_constant_ranges = [push_constant_range];
         
+        let set_layouts: Vec<vk::DescriptorSetLayout> = if let Some(layout) = descriptor_layout {
+            vec![layout]
+        } else {
+            vec![]
+        };
+        
         let layout_info = vk::PipelineLayoutCreateInfo::default()
-            .push_constant_ranges(&push_constant_ranges);
+            .push_constant_ranges(&push_constant_ranges)
+            .set_layouts(&set_layouts);
         
         let layout = unsafe { device.create_pipeline_layout(&layout_info, None).unwrap() };
         
@@ -445,6 +701,25 @@ impl Drop for VulkanRenderer {
             self.device.free_memory(self.index_buffer_memory, None);
             self.device.destroy_buffer(self.staging_buffer, None);
             self.device.free_memory(self.staging_buffer_memory, None);
+            
+            if let Some(descriptor_pool) = self.descriptor_pool {
+                self.device.destroy_descriptor_pool(descriptor_pool, None);
+            }
+            if let Some(descriptor_layout) = self.descriptor_layout {
+                self.device.destroy_descriptor_set_layout(descriptor_layout, None);
+            }
+            if let Some(sampler) = self.texture_sampler {
+                self.device.destroy_sampler(sampler, None);
+            }
+            if let Some(view) = self.texture_view {
+                self.device.destroy_image_view(view, None);
+            }
+            if let Some(image) = self.texture_image {
+                self.device.destroy_image(image, None);
+            }
+            if let Some(memory) = self.texture_memory {
+                self.device.free_memory(memory, None);
+            }
         }
     }
 }

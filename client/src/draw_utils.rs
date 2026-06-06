@@ -1,4 +1,5 @@
 use rhi::DrawCommand;
+use rhi::Vertex;
 use core::ui::layout::widget::{WidgetTree, WidgetId, WidgetType};
 
 pub fn build_draw_commands(tree: &WidgetTree, node_id: WidgetId, commands: &mut Vec<DrawCommand>) {
@@ -14,10 +15,7 @@ fn build_draw_commands_impl(tree: &WidgetTree, node_id: WidgetId, parent_x: f32,
     
     match &node.widget_type {
         WidgetType::Container | WidgetType::Row | WidgetType::Column => {
-            // 背景色（带圆角）
             if let Some(bg) = node.style.background_color {
-                // 圆角半径使用节点高度的一半，形成胶囊形状
-                // let radius = node.style.border_radius.unwrap_or(layout.height / 2.0);
                 let radius = layout.height / 2.0;
                 commands.push(DrawCommand::rect(
                     abs_x, abs_y, layout.width, layout.height,
@@ -26,7 +24,6 @@ fn build_draw_commands_impl(tree: &WidgetTree, node_id: WidgetId, parent_x: f32,
                 ));
             }
             
-            // debug版本画红绿框
             #[cfg(debug_assertions)]
             {
                 let margin = node.style.margin;
@@ -49,16 +46,41 @@ fn build_draw_commands_impl(tree: &WidgetTree, node_id: WidgetId, parent_x: f32,
             }
         }
         WidgetType::Text(data) => {
-            let font_size = data.font_size;
-            let char_width = font_size * 0.6;
-            for i in 0..data.content.len() {
-                let x = abs_x + i as f32 * char_width;
-                let y = abs_y;
-                commands.push(DrawCommand::rect(
-                    x, y, char_width - 1.0, font_size * 1.2,
-                    1.0, 1.0, 1.0, 1.0,
-                    0.0,  // 文字方块无圆角
-                ));
+            if let Some(ref glyphs) = data.glyphs {
+                let mut cursor_x = abs_x;
+                for glyph in glyphs {
+                    let gx = cursor_x + glyph.bearing_x;
+                    let gy = abs_y + glyph.bearing_y;
+                    let gw = glyph.size.width;
+                    let gh = glyph.size.height;
+                    let uv = glyph.uv;
+                    
+                    commands.push(DrawCommand {
+                        vertices: vec![
+                            Vertex { position: [gx, gy], color: [1.0, 1.0, 1.0, 1.0], uv: [uv[0], uv[1]], border_radius: [0.0; 4] },
+                            Vertex { position: [gx + gw, gy], color: [1.0, 1.0, 1.0, 1.0], uv: [uv[2], uv[1]], border_radius: [0.0; 4] },
+                            Vertex { position: [gx + gw, gy + gh], color: [1.0, 1.0, 1.0, 1.0], uv: [uv[2], uv[3]], border_radius: [0.0; 4] },
+                            Vertex { position: [gx, gy + gh], color: [1.0, 1.0, 1.0, 1.0], uv: [uv[0], uv[3]], border_radius: [0.0; 4] },
+                        ],
+                        indices: Some(vec![0, 1, 2, 2, 3, 0]),
+                        clip_rect: None,
+                        texture_id: 1,
+                    });
+                    
+                    cursor_x += glyph.advance_x;
+                }
+            } else {
+                let font_size = data.font_size;
+                let char_width = font_size * 0.6;
+                for i in 0..data.content.len() {
+                    let x = abs_x + i as f32 * char_width;
+                    let y = abs_y;
+                    commands.push(DrawCommand::rect(
+                        x, y, char_width - 1.0, font_size * 1.2,
+                        1.0, 1.0, 1.0, 1.0,
+                        0.0,
+                    ));
+                }
             }
         }
         _ => {}
@@ -76,7 +98,6 @@ pub fn hit_test(tree: &WidgetTree, node_id: WidgetId, px: f32, py: f32, parent_x
     let abs_x = parent_x + layout.x;
     let abs_y = parent_y + layout.y;
     
-    // 检查是否在当前节点内
     let hit = px >= abs_x && px <= abs_x + layout.width 
            && py >= abs_y && py <= abs_y + layout.height;
     
@@ -84,7 +105,6 @@ pub fn hit_test(tree: &WidgetTree, node_id: WidgetId, px: f32, py: f32, parent_x
         return None;
     }
     
-    // 递归检查子节点（后序遍历，子节点优先）
     for &child_id in node.children.iter().rev() {
         if let Some(hit_id) = hit_test(tree, child_id, px, py, abs_x, abs_y) {
             return Some(hit_id);

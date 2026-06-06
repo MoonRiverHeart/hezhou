@@ -6,6 +6,8 @@ layout(location = 2) in vec4 fragBorderRadius;
 layout(location = 3) in vec2 fragPos;
 layout(location = 4) in vec4 fragRect;
 
+layout(binding = 1) uniform sampler2D texSampler;
+
 layout(location = 0) out vec4 outColor;
 
 float roundedRectSDF(vec2 p, vec2 center, vec2 halfSize, float r) {
@@ -14,12 +16,6 @@ float roundedRectSDF(vec2 p, vec2 center, vec2 halfSize, float r) {
 }
 
 void main() {
-    float r = fragBorderRadius.x;
-    if (r > 0.0) {
-        outColor = vec4(0.0, 1.0, 0.0, 1.0); // 绿色=有圆角值
-    } else {
-        outColor = vec4(1.0, 0.0, 0.0, 1.0); // 红色=无圆角
-    }
     vec2 rectPos = fragRect.xy;
     vec2 rectSize = fragRect.zw;
     vec2 center = rectPos + rectSize * 0.5;

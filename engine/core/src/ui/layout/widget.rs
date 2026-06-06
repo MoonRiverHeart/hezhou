@@ -1,6 +1,7 @@
 use slotmap::{SlotMap, new_key_type};
 use super::geometry::{Size, Rect, Axis};
 use super::style::Style;
+use super::text::GlyphInfo;
 
 new_key_type! {
     /// Widget节点的安全ID
@@ -25,6 +26,7 @@ pub enum WidgetType {
 pub struct TextData {
     pub content: String,
     pub font_size: f32,
+    pub glyphs: Option<Vec<GlyphInfo>>,  // 新增：字形信息
 }
 
 impl TextData {
@@ -32,6 +34,15 @@ impl TextData {
         TextData {
             content: content.into(),
             font_size,
+            glyphs: None,
+        }
+    }
+    
+    pub fn with_glyphs(content: impl Into<String>, font_size: f32, glyphs: Vec<GlyphInfo>) -> Self {
+        TextData {
+            content: content.into(),
+            font_size,
+            glyphs: Some(glyphs),
         }
     }
 }

@@ -8,28 +8,28 @@ use core::ui::component::button::Button;
 use core::ui::component::container::VStack;
 use core::ui::layout::layout::LayoutEngine;
 use core::ui::layout::text::SimpleTextMeasurer;
+use core::ui::layout::text::TextMeasurer;
 use core::ui::layout::geometry::Size;
 use core::ui::layout::widget::WidgetTree;
 use core::ui::event::types::UIEvent;
 use core::ui::event::mouse::{MouseEvent, MouseEventType, MouseButton, Point};
 use core::ui::event::modifier::Modifiers;
+use core::ui::layout::msdf_measurer::MsdfTextMeasurer;
 use client::draw_utils::{build_draw_commands, hit_test};
 use std::sync::Arc;
 use std::sync::Mutex;
-use core::ui::layout::msdf_measurer::MsdfTextMeasurer;
-use core::ui::layout::text::TextMeasurer;
 
 struct AppState {
     rhi: VulkanRhi,
     tree: WidgetTree,
     layout_engine: LayoutEngine<SimpleTextMeasurer>,
     event_handlers: Vec<EventHandlerEntry>,
+    msdf: MsdfTextMeasurer,
+    texture_uploaded: bool,
 }
 
 fn main() {
-    // 在 main() 函数开头加载字体
-    let text_measurer = MsdfTextMeasurer::from_system("simhei", "times");
-
+    let msdf = MsdfTextMeasurer::from_system("simhei", "times");
     let button_text = Arc::new(Mutex::new("按钮".to_string()));
     
     let state = Arc::new(Mutex::new(None::<AppState>));
@@ -59,9 +59,15 @@ fn main() {
     
     let rhi = VulkanRhi::init(&rhi_desc);
     let layout_engine = LayoutEngine::new(SimpleTextMeasurer);
-    // let layout_engine = LayoutEngine::new(text_measurer);
     
-    *state.lock().unwrap() = Some(AppState { rhi, tree: WidgetTree::new(), layout_engine, event_handlers: vec![] });
+    *state.lock().unwrap() = Some(AppState {
+        rhi,
+        tree: WidgetTree::new(),
+        layout_engine,
+        event_handlers: vec![],
+        msdf,
+        texture_uploaded: false,
+    });
     
     let state_clone = state.clone();
     let window_clone = window.clone();
@@ -127,9 +133,15 @@ fn main() {
                 }
 
                 winit::event::WindowEvent::RedrawRequested => {
-                    // 每次重绘时重建UI并布局
                     let (mut new_tree, new_handlers) = build_ui(&button_text_clone);
                     if let Some(ref mut app) = *state_clone.lock().unwrap() {
+                        // 首次上传MSDF纹理
+                        if !app.texture_uploaded {
+                            let atlas = app.msdf.font_atlas();
+                            app.rhi.upload_texture(&atlas.data, atlas.width, atlas.height);
+                            app.texture_uploaded = true;
+                        }
+                        
                         let (w, h) = app.rhi.framebuffer_size();
                         app.layout_engine.calculate_layout(&mut new_tree, Size::new(w as f32, h as f32));
                         
@@ -159,12 +171,12 @@ fn main() {
 
 fn build_ui(button_text: &Arc<Mutex<String>>) -> (WidgetTree, Vec<EventHandlerEntry>) {
     let mut ctx = BuildContext::new(Theme::default());
-    let btn_text = button_text.clone();  // clone Arc
+    let btn_text = button_text.clone();
     let root_id = VStack::new()
         .spacing(16.0)
         .child(Text::title("标题"))
         .child(Button::dynamic(btn_text).on_click({
-            let bt = button_text.clone();  // 再 clone 一个给闭包
+            let bt = button_text.clone();
             move || {
                 *bt.lock().unwrap() = "按钮被点击了！".to_string();
             }

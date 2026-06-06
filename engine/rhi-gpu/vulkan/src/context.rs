@@ -200,6 +200,7 @@ impl VulkanContext {
     pub fn current_image_index(&self) -> usize { self.current_frame }
     pub fn framebuffer_width(&self) -> u32 { self.framebuffer_width }
     pub fn framebuffer_height(&self) -> u32 { self.framebuffer_height }
+    pub fn graphics_queue(&self) -> vk::Queue { self.graphics_queue }
     
     fn create_instance(entry: &Entry, _desc: &RhiInitDesc) -> Instance {
         let app_name = CString::new("RHI Vulkan").unwrap();
