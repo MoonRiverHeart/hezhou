@@ -16,6 +16,8 @@ use core::ui::event::modifier::Modifiers;
 use client::draw_utils::{build_draw_commands, hit_test};
 use std::sync::Arc;
 use std::sync::Mutex;
+use core::ui::layout::msdf_measurer::MsdfTextMeasurer;
+use core::ui::layout::text::TextMeasurer;
 
 struct AppState {
     rhi: VulkanRhi,
@@ -25,6 +27,9 @@ struct AppState {
 }
 
 fn main() {
+    // 在 main() 函数开头加载字体
+    let text_measurer = MsdfTextMeasurer::from_system("simhei", "times");
+
     let button_text = Arc::new(Mutex::new("按钮".to_string()));
     
     let state = Arc::new(Mutex::new(None::<AppState>));
@@ -54,6 +59,7 @@ fn main() {
     
     let rhi = VulkanRhi::init(&rhi_desc);
     let layout_engine = LayoutEngine::new(SimpleTextMeasurer);
+    // let layout_engine = LayoutEngine::new(text_measurer);
     
     *state.lock().unwrap() = Some(AppState { rhi, tree: WidgetTree::new(), layout_engine, event_handlers: vec![] });
     

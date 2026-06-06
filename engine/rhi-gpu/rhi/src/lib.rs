@@ -130,4 +130,7 @@ pub trait Rhi: Send + Sync {
     
     /// 等待设备空闲
     fn wait_idle(&self);
+
+    /// 上传纹理数据
+    fn upload_texture(&mut self, data: &[u8], width: u32, height: u32) -> u32;
 }

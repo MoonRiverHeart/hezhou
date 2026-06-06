@@ -244,6 +244,10 @@ impl VulkanRenderer {
         
         unsafe { device.end_command_buffer(cmd).unwrap(); }
     }
+
+    pub fn upload_texture(&mut self, _context: &VulkanContext, _data: &[u8], _width: u32, _height: u32) -> u32 {
+        0
+    }
     
     fn create_pipeline(device: &Device, render_pass: vk::RenderPass, width: u32, height: u32) -> Pipeline {
         let vert_bytes = include_bytes!("../../../../assets/shader/vert.spv");

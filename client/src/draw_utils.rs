@@ -50,7 +50,7 @@ fn build_draw_commands_impl(tree: &WidgetTree, node_id: WidgetId, parent_x: f32,
         }
         WidgetType::Text(data) => {
             let font_size = data.font_size;
-            let char_width = font_size * 1.0;
+            let char_width = font_size * 0.6;
             for i in 0..data.content.len() {
                 let x = abs_x + i as f32 * char_width;
                 let y = abs_y;

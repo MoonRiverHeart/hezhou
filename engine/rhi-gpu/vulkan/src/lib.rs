@@ -44,4 +44,8 @@ impl Rhi for VulkanRhi {
     fn wait_idle(&self) {
         self.context.wait_idle();
     }
+
+    fn upload_texture(&mut self, data: &[u8], width: u32, height: u32) -> u32 {
+        self.renderer.upload_texture(&self.context, data, width, height)
+    }
 }
