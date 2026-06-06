@@ -206,8 +206,8 @@ fn build_ui(
     ctx.set_root(root_id);
     
     // 标题
-    let title_glyphs = msdf.layout_text("标题", 18.0, f32::MAX).glyphs;
-    let title_data = TextData::with_glyphs("标题", 18.0, title_glyphs);
+    let title_glyphs = msdf.layout_text("标题", 240.0, f32::MAX).glyphs;
+    let title_data = TextData::with_glyphs("标题", 240.0, title_glyphs);
     let title_id = ctx.create_node(
         WidgetType::Text(title_data),
         Style::new().cross_alignment(Alignment::Center),
@@ -223,11 +223,11 @@ fn build_ui(
     
     // 按钮
     let btn_label = button_text.lock().unwrap().clone();
-    let btn_glyphs = msdf.layout_text(&btn_label, 14.0, f32::MAX).glyphs;
-    let btn_data = TextData::with_glyphs(&btn_label, 14.0, btn_glyphs);
+    let btn_glyphs = msdf.layout_text(&btn_label, 160.0, f32::MAX).glyphs;
+    let btn_data = TextData::with_glyphs(&btn_label, 160.0, btn_glyphs);
     
     let padding = EdgeInsets::symmetric(8.0, 40.0);
-    let font_size = 14.0;
+    let font_size = 80.0;
     let text_size = msdf.measure_text(&btn_label, font_size, f32::MAX);
     let container_w = text_size.width + padding.left + padding.right + font_size * 0.6;
     let container_h = text_size.height + padding.top + padding.bottom + font_size * 0.4;
