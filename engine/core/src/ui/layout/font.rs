@@ -31,9 +31,9 @@ impl MsdfFont {
             secondary_data: secondary_data.to_vec(),
             glyph_cache: HashMap::new(),
             atlas: FontAtlas {
-                data: vec![255u8; 2048 * 2048 * 4], // 初始化为白色(255)，alpha=255表示未使用
-                width: 2048,
-                height: 2048,
+                data: vec![255u8; 512 * 512 * 4], // 初始化为白色(255)，alpha=255表示未使用
+                width: 512,
+                height: 512,
             },
             atlas_cursor_x: 0,
             atlas_cursor_y: 0,
@@ -124,7 +124,7 @@ impl MsdfFont {
         };
         
         // 根据字体大小动态调整 MSDF 分辨率和 spread
-        let msdf_size = (size.max(32) as f32 * 0.6) as u32;
+        let msdf_size = (size.max(32) as f32 * 0.6).min(32.0) as u32;
         let spread = msdf_size as f32 * 0.2;
         
         let glyph_index = self.get_glyph_index(ch);
@@ -199,6 +199,127 @@ impl MsdfFont {
             bearing_x: metrics.xmin as f32 * scale_ratio,
             bearing_y: metrics.ymin as f32 * scale_ratio,
             advance_x: advance_x, // 返回原始字体尺寸的 advance
+            texture_index: 0,
+        }
+    }
+
+    /// 并行生成 MSDF 数据，串行写入图集
+    pub fn get_or_create_glyphs_parallel(&mut self, chars: &[char], size: u32) -> Vec<GlyphInfo> {
+        use rayon::prelude::*;
+        
+        let needs_generate: Vec<char> = chars.iter()
+            .filter(|&&ch| !self.glyph_cache.contains_key(&(ch, size)))
+            .copied()
+            .collect();
+        
+        if !needs_generate.is_empty() {
+            let primary_data = &self.primary_data;
+            let secondary_data = &self.secondary_data;
+            let msdf_size = (size.max(32) as f32 * 0.5).min(96.0) as u32;
+            let spread = msdf_size as f32 * 0.15;
+            
+            println!("[perf] msdf_size={}, spread={}", msdf_size, spread);
+            
+            // 并行生成 MSDF 数据（不需要 Font）
+            let t_collect = std::time::Instant::now();
+            let msdf_results: Vec<(char, Vec<u8>)> = needs_generate
+                .par_iter()
+                .map(|&ch| {
+                    let font_data = if MsdfFont::is_cjk(ch) { primary_data } else { secondary_data };
+                    let face = ttf_parser::Face::parse(font_data, 0).unwrap();
+                    let glyph_id = face.glyph_index(ch).map(|g| g.0).unwrap_or(0);
+                    let generator = MsdfGenerator::new(msdf_size, spread);
+                    let msdf_data = generator.generate(font_data, glyph_id, size as f32);
+                    (ch, msdf_data)
+                })
+                .collect();
+            println!("[perf] parallel collect done: {:?} ({} glyphs)", t_collect.elapsed(), msdf_results.len());
+            
+            // 串行 rasterize + 写入图集
+            let t_write = std::time::Instant::now();
+            for (ch, msdf_data) in msdf_results {
+                let font = if MsdfFont::is_cjk(ch) { &self.primary_font } else { &self.secondary_font };
+                let small_size = size.min(64);
+                let (metrics_small, _) = font.rasterize(ch, small_size as f32);
+                let scale_ratio = size as f32 / small_size as f32;
+                let metrics = fontdue::Metrics {
+                    xmin: (metrics_small.xmin as f32 * scale_ratio) as i32,
+                    ymin: (metrics_small.ymin as f32 * scale_ratio) as i32,
+                    width: (metrics_small.width as f32 * scale_ratio) as usize,
+                    height: (metrics_small.height as f32 * scale_ratio) as usize,
+                    advance_width: metrics_small.advance_width * scale_ratio,
+                    advance_height: metrics_small.advance_height * scale_ratio,
+                    bounds: metrics_small.bounds,
+                };
+                let glyph = self.write_to_atlas(ch, size, msdf_size, &msdf_data, metrics);
+                self.glyph_cache.insert((ch, size), glyph);
+            }
+            println!("[perf] write_to_atlas done: {:?}", t_write.elapsed());
+        }
+        
+        chars.iter().map(|&ch| self.glyph_cache[&(ch, size)].clone()).collect()
+    }
+    
+    fn write_to_atlas(&mut self, ch: char, size: u32, msdf_size: u32, msdf_data: &[u8], metrics: fontdue::Metrics) -> GlyphInfo {
+        // 图集空间检查（和 rasterize_glyph 中一样）
+        if self.atlas_cursor_x + msdf_size > self.atlas.width {
+            self.atlas_cursor_x = 0;
+            self.atlas_cursor_y += self.atlas_row_height;
+            self.atlas_row_height = 0;
+        }
+        if self.atlas_cursor_y + msdf_size > self.atlas.height {
+            self.atlas_cursor_x = 0;
+            self.atlas_cursor_y = 0;
+            self.atlas_row_height = 0;
+            self.glyph_cache.clear();
+        }
+        
+        let atlas_x = self.atlas_cursor_x;
+        let atlas_y = self.atlas_cursor_y;
+        
+        // 填充和拷贝
+        for y in 0..msdf_size {
+            for x in 0..msdf_size {
+                let dst_idx = (((atlas_y + y) * self.atlas.width + atlas_x + x) * 4) as usize;
+                if dst_idx + 3 < self.atlas.data.len() {
+                    self.atlas.data[dst_idx] = 255;
+                    self.atlas.data[dst_idx + 1] = 255;
+                    self.atlas.data[dst_idx + 2] = 255;
+                    self.atlas.data[dst_idx + 3] = 0;
+                }
+            }
+        }
+        for y in 0..msdf_size {
+            for x in 0..msdf_size {
+                let src_idx = ((y * msdf_size + x) * 4) as usize;
+                let dst_idx = (((atlas_y + y) * self.atlas.width + atlas_x + x) * 4) as usize;
+                if dst_idx + 3 < self.atlas.data.len() && src_idx + 3 < msdf_data.len() {
+                    self.atlas.data[dst_idx..dst_idx+4].copy_from_slice(&msdf_data[src_idx..src_idx+4]);
+                }
+            }
+        }
+        
+        self.atlas_cursor_x += msdf_size;
+        self.atlas_row_height = self.atlas_row_height.max(msdf_size);
+        
+        let uv_x0 = atlas_x as f32 / self.atlas.width as f32;
+        let uv_y0 = atlas_y as f32 / self.atlas.height as f32;
+        let uv_x1 = (atlas_x + msdf_size) as f32 / self.atlas.width as f32;
+        let uv_y1 = (atlas_y + msdf_size) as f32 / self.atlas.height as f32;
+        
+        let advance_x = if MsdfFont::is_cjk(ch) {
+            msdf_size as f32 * 0.8
+        } else {
+            msdf_size as f32 * 0.55
+        };
+        
+        GlyphInfo {
+            character: ch,
+            uv: [uv_x0, uv_y0, uv_x1, uv_y1],
+            size: Size::new(msdf_size as f32, msdf_size as f32),
+            bearing_x: metrics.xmin as f32,
+            bearing_y: metrics.ymin as f32,
+            advance_x,
             texture_index: 0,
         }
     }

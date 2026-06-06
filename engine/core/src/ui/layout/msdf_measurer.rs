@@ -30,17 +30,14 @@ impl TextMeasurer for MsdfTextMeasurer {
     }
     
     fn layout_text(&mut self, text: &str, font_size: f32, _max_width: f32) -> TextLayout {
-        let scale = self.scale_for_size(font_size);
-        let mut glyphs = Vec::new();
-        let mut total_width = 0.0f32;
-        let mut max_height = 0.0f32;
+        let chars: Vec<char> = text.chars().collect();
+        let size = font_size as u32;
+        let glyphs = self.font.get_or_create_glyphs_parallel(&chars, size);
         
-        for ch in text.chars() {
-            let glyph = self.font.get_or_create_glyph(ch, scale as u32);
-            total_width += glyph.advance_x;
-            max_height = max_height.max(glyph.size.height);
-            glyphs.push(glyph);
-        }
+        let total_width: f32 = glyphs.iter().map(|g| g.advance_x).sum();
+        let max_height: f32 = glyphs.iter()
+            .map(|g| g.size.height)
+            .fold(0.0f32, f32::max);
         
         TextLayout {
             size: Size::new(total_width, max_height),

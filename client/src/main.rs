@@ -196,7 +196,10 @@ fn build_ui(
     button_text: &Arc<Mutex<String>>,
     msdf: &mut MsdfTextMeasurer,
 ) -> (WidgetTree, Vec<EventHandlerEntry>) {
+    let start = std::time::Instant::now();
+    
     let mut ctx = BuildContext::new(Theme::default());
+    println!("[perf] BuildContext created: {:?}", start.elapsed());
     
     let root_id = ctx.create_node(
         WidgetType::Column,
@@ -206,7 +209,10 @@ fn build_ui(
     ctx.set_root(root_id);
     
     // 标题
+    let t0 = std::time::Instant::now();
     let title_glyphs = msdf.layout_text("标题", 240.0, f32::MAX).glyphs;
+    println!("[perf] 标题 layout_text (240px): {:?}", t0.elapsed());
+    
     let title_data = TextData::with_glyphs("标题", 240.0, title_glyphs);
     let title_id = ctx.create_node(
         WidgetType::Text(title_data),
@@ -222,8 +228,11 @@ fn build_ui(
     ctx.add_child(root_id, spacer_id);
     
     // 按钮
+    let t1 = std::time::Instant::now();
     let btn_label = button_text.lock().unwrap().clone();
     let btn_glyphs = msdf.layout_text(&btn_label, 160.0, f32::MAX).glyphs;
+    println!("[perf] 按钮 layout_text (160px): {:?}", t1.elapsed());
+    
     let btn_data = TextData::with_glyphs(&btn_label, 160.0, btn_glyphs);
     
     let padding = EdgeInsets::symmetric(8.0, 40.0);
@@ -248,10 +257,13 @@ fn build_ui(
     ctx.add_child(btn_container_id, btn_text_id);
     ctx.add_child(root_id, btn_container_id);
     
-    // 巨大的测试文字
+    // 测试文字
+    let t2 = std::time::Instant::now();
     let test_text = "你好，world！";
     let test_size = 360.0;
     let test_glyphs = msdf.layout_text(test_text, test_size, f32::MAX).glyphs;
+    println!("[perf] 测试文字 layout_text (360px, {} chars): {:?}", test_text.chars().count(), t2.elapsed());
+    
     let test_data = TextData::with_glyphs(test_text, test_size, test_glyphs);
     let test_id = ctx.create_node(
         WidgetType::Text(test_data),
@@ -265,6 +277,11 @@ fn build_ui(
         *bt.lock().unwrap() = "被点击了".to_string();
     });
     
+    let t3 = std::time::Instant::now();
     let handlers = ctx.take_event_handlers();
-    (ctx.build(), handlers)
+    let tree = ctx.build();
+    println!("[perf] ctx.build: {:?}", t3.elapsed());
+    println!("[perf] TOTAL build_ui: {:?}", start.elapsed());
+    
+    (tree, handlers)
 }

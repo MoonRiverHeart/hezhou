@@ -7,3 +7,4 @@ edition = "2024"
 slotmap = { workspace = true }
 fontdue = { workspace = true }
 ttf-parser = { workspace = true }
+rayon = { workspace = true }
