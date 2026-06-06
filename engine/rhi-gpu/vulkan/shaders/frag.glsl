@@ -33,9 +33,9 @@ void main() {
     } else if (fragTextureId > 0.5) {
         vec4 texColor = texture(texSampler, fragUV);
         float dist = texColor.a;
-        if (dist < 0.01) discard;
-        float alpha = smoothstep(0.48, 0.52, dist);
-        outColor = vec4(fragColor.rgb, fragColor.a * alpha);
+        float alpha = 1.0 - smoothstep(0.45, 0.55, dist);
+        if (alpha < 0.1) discard;
+        outColor = vec4(fragColor.rgb, alpha);
     } else {
         outColor = fragColor;
     }

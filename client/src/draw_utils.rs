@@ -62,10 +62,10 @@ fn build_draw_commands_impl(tree: &WidgetTree, node_id: WidgetId, parent_x: f32,
                     
                     commands.push(DrawCommand {
                         vertices: vec![
-                            Vertex { position: [gx, gy], color: [1.0, 1.0, 1.0, 1.0], uv: [uv[0], uv[3]], border_radius: [0.0; 4] },
-                            Vertex { position: [gx + gw, gy], color: [1.0, 1.0, 1.0, 1.0], uv: [uv[2], uv[3]], border_radius: [0.0; 4] },
-                            Vertex { position: [gx + gw, gy + gh], color: [1.0, 1.0, 1.0, 1.0], uv: [uv[2], uv[1]], border_radius: [0.0; 4] },
-                            Vertex { position: [gx, gy + gh], color: [1.0, 1.0, 1.0, 1.0], uv: [uv[0], uv[1]], border_radius: [0.0; 4] },
+                            Vertex { position: [gx, gy], color: [0.0, 0.0, 0.0, 1.0], uv: [uv[0], uv[3]], border_radius: [0.0; 4] },
+                            Vertex { position: [gx + gw, gy], color: [0.0, 0.0, 0.0, 1.0], uv: [uv[2], uv[3]], border_radius: [0.0; 4] },
+                            Vertex { position: [gx + gw, gy + gh], color: [0.0, 0.0, 0.0, 1.0], uv: [uv[2], uv[1]], border_radius: [0.0; 4] },
+                            Vertex { position: [gx, gy + gh], color: [0.0, 0.0, 0.0, 1.0], uv: [uv[0], uv[1]], border_radius: [0.0; 4] },
                         ],
                         indices: Some(vec![0, 1, 2, 2, 3, 0]),
                         clip_rect: None,
