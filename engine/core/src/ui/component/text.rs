@@ -53,7 +53,7 @@ impl Text {
 }
 
 impl Component for Text {
-    fn build(&self, ctx: &mut BuildContext) -> WidgetId {
+    fn build(&mut self, ctx: &mut BuildContext) -> WidgetId {
         let font_size = self.font_size.unwrap_or(ctx.theme.base_font_size);
         let base_style = ctx.theme.body_text_style()
             .cross_alignment(Alignment::Center);  // 加这行

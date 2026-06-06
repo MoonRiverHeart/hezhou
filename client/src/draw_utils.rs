@@ -68,3 +68,28 @@ fn build_draw_commands_impl(tree: &WidgetTree, node_id: WidgetId, parent_x: f32,
         build_draw_commands_impl(tree, child_id, abs_x, abs_y, commands);
     }
 }
+
+pub fn hit_test(tree: &WidgetTree, node_id: WidgetId, px: f32, py: f32, parent_x: f32, parent_y: f32) -> Option<WidgetId> {
+    let node = tree.get(node_id);
+    let layout = node.layout?;
+    
+    let abs_x = parent_x + layout.x;
+    let abs_y = parent_y + layout.y;
+    
+    // 检查是否在当前节点内
+    let hit = px >= abs_x && px <= abs_x + layout.width 
+           && py >= abs_y && py <= abs_y + layout.height;
+    
+    if !hit {
+        return None;
+    }
+    
+    // 递归检查子节点（后序遍历，子节点优先）
+    for &child_id in node.children.iter().rev() {
+        if let Some(hit_id) = hit_test(tree, child_id, px, py, abs_x, abs_y) {
+            return Some(hit_id);
+        }
+    }
+    
+    Some(node_id)
+}

@@ -46,7 +46,7 @@ impl Button {
 }
 
 impl Component for Button {
-    fn build(&self, ctx: &mut BuildContext) -> WidgetId {
+    fn build(&mut self, ctx: &mut BuildContext) -> WidgetId {
         let base_style = match self.variant {
             ButtonVariant::Primary => ctx.theme.primary_button_style(),
             ButtonVariant::Secondary => ctx.theme.secondary_button_style(),
@@ -78,10 +78,12 @@ impl Component for Button {
         let text_id = ctx.create_node(WidgetType::Text(text_data), text_style);
         ctx.add_child(container_id, text_id);
         
-        if self.on_click.is_some() {
+        // 注册点击事件，移出 on_click 所有权
+        if let Some(handler) = self.on_click.take() {
             ctx.on_event(container_id, move |event| {
                 if let UIEvent::Mouse(mouse_event) = event {
                     if mouse_event.event_type == MouseEventType::Clicked {
+                        handler();
                     }
                 }
             });

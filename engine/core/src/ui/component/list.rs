@@ -51,11 +51,11 @@ impl List {
 }
 
 impl Component for List {
-    fn build(&self, ctx: &mut BuildContext) -> WidgetId {
+    fn build(&mut self, ctx: &mut BuildContext) -> WidgetId {
         let style = self.style.clone().unwrap_or_else(|| Style::new().width(300.0));
         let list_id = ctx.create_node(WidgetType::Column, style);
         
-        for (_index, item) in self.items.iter().enumerate() {
+        for (_index, item) in self.items.iter_mut().enumerate() {
             let item_style = ctx.theme.list_item_style();
             let item_container = ctx.create_node(WidgetType::Container, item_style);
             

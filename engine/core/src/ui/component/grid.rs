@@ -73,7 +73,7 @@ impl Grid {
 }
 
 impl Component for Grid {
-    fn build(&self, ctx: &mut BuildContext) -> WidgetId {
+    fn build(&mut self, ctx: &mut BuildContext) -> WidgetId {
         let style = self.style.clone().unwrap_or_default();
         let col_count = self.columns.len();
         let grid_id = ctx.create_node(WidgetType::Column, style);
@@ -96,7 +96,7 @@ impl Component for Grid {
                     break;
                 }
                 
-                let cell = &self.cells[cell_index];
+                let cell = &mut self.cells[cell_index];
                 let col_def = &self.columns[col];
                 
                 let mut cell_style = Style::new().flex_grow(col_def.flex);

@@ -221,7 +221,7 @@ impl VulkanRenderer {
                         bytemuck::cast::<[f32; 8], [u8; 32]>(push_data).as_slice(),
                     );
                     
-                    println!("DEBUG push: rect=({:.1},{:.1},{:.1}x{:.1})", rx, ry, rw, rh);
+                    // println!("DEBUG push: rect=({:.1},{:.1},{:.1}x{:.1})", rx, ry, rw, rh);
 
                     // 计算这个 command 的顶点和索引范围
                     let cmd_data = &commands[cmd_idx];

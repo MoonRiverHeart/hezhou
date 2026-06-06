@@ -37,7 +37,7 @@ impl TextInput {
 }
 
 impl Component for TextInput {
-    fn build(&self, ctx: &mut BuildContext) -> WidgetId {
+    fn build(&mut self, ctx: &mut BuildContext) -> WidgetId {
         let style = self.style.clone().unwrap_or_else(|| ctx.theme.input_style());
         
         let container_id = ctx.create_node(WidgetType::Container,

@@ -53,6 +53,10 @@ impl BuildContext {
             handler: Box::new(handler),
         });
     }
+
+    pub fn take_event_handlers(&mut self) -> Vec<EventHandlerEntry> {
+        std::mem::take(&mut self.event_handlers)
+    }
     
     pub fn build(self) -> WidgetTree {
         self.tree
@@ -60,9 +64,9 @@ impl BuildContext {
 }
 
 pub trait Component {
-    fn build(&self, ctx: &mut BuildContext) -> WidgetId;
+    fn build(&mut self, ctx: &mut BuildContext) -> WidgetId;
 }
 
-pub fn build_component(ctx: &mut BuildContext, component: &dyn Component) -> WidgetId {
+pub fn build_component(ctx: &mut BuildContext, component: &mut dyn Component) -> WidgetId {
     component.build(ctx)
 }

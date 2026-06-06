@@ -41,14 +41,14 @@ impl VStack {
 }
 
 impl Component for VStack {
-    fn build(&self, ctx: &mut BuildContext) -> WidgetId {
+    fn build(&mut self, ctx: &mut BuildContext) -> WidgetId {
         let style = self.style.clone().unwrap_or(
             Style::new().cross_alignment(Alignment::Center)
         );
         let column_id = ctx.create_node(WidgetType::Column, style);
         ctx.tree.get_mut(column_id).style.main_alignment = MainAlignment::Center;
         
-        for (i, child) in self.children.iter().enumerate() {
+        for (i, child) in self.children.iter_mut().enumerate() {
             if i > 0 && self.spacing > 0.0 {
                 let spacer_id = ctx.create_node(
                     WidgetType::Spacer(Size::new(0.0, self.spacing)),
@@ -99,11 +99,11 @@ impl HStack {
 }
 
 impl Component for HStack {
-    fn build(&self, ctx: &mut BuildContext) -> WidgetId {
+    fn build(&mut self, ctx: &mut BuildContext) -> WidgetId {
         let style = self.style.clone().unwrap_or_default();
         let row_id = ctx.create_node(WidgetType::Row, style);
         
-        for (i, child) in self.children.iter().enumerate() {
+        for (i, child) in self.children.iter_mut().enumerate() {
             if i > 0 && self.spacing > 0.0 {
                 let spacer_id = ctx.create_node(
                     WidgetType::Spacer(Size::new(self.spacing, 0.0)),
@@ -145,11 +145,11 @@ impl ZStack {
 }
 
 impl Component for ZStack {
-    fn build(&self, ctx: &mut BuildContext) -> WidgetId {
+    fn build(&mut self, ctx: &mut BuildContext) -> WidgetId {
         let style = self.style.clone().unwrap_or_default();
         let container_id = ctx.create_node(WidgetType::Container, style);
         
-        for child in &self.children {
+        for child in &mut self.children {
             let child_id = child.build(ctx);
             ctx.add_child(container_id, child_id);
         }
