@@ -107,22 +107,34 @@ impl<T: TextMeasurer> LayoutEngine<T> {
     ) -> Size {
         let children = tree.get_children(node_id);
         if let Some(&child_id) = children.first() {
-            let child_size = self.layout_node(tree, child_id, constraints);
+            // 给子节点松约束，让它自由决定尺寸
+            let loose_constraints = Constraints {
+                min_width: 0.0,
+                max_width: constraints.max_width,
+                min_height: 0.0,
+                max_height: constraints.max_height,
+            };
+            let child_size = self.layout_node(tree, child_id, loose_constraints);
+            
             let padding = tree.get(node_id).style.padding;
+            let style = tree.get(node_id).style.clone();
             
-            // 容器尺寸：至少是子节点+padding，但不小于约束的最小值
-            let container_w = (child_size.width + padding.left + padding.right)
-                .max(constraints.min_width);
-            let container_h = (child_size.height + padding.top + padding.bottom)
-                .max(constraints.min_height);
+            let min_w = (child_size.width + padding.left + padding.right)
+                .max(style.width.unwrap_or(0.0));
+            let min_h = (child_size.height + padding.top + padding.bottom)
+                .max(style.height.unwrap_or(0.0));
             
-            // 内部可用空间
+            let container_w = min_w.max(constraints.min_width);
+            let container_h = min_h.max(constraints.min_height);
+            
             let inner_w = container_w - padding.left - padding.right;
             let inner_h = container_h - padding.top - padding.bottom;
             
-            // 在内部空间居中
             let x = padding.left + (inner_w - child_size.width).max(0.0) / 2.0;
             let y = padding.top + (inner_h - child_size.height).max(0.0) / 2.0;
+            
+            println!("DEBUG container inner: inner_w={:.1}, child_w={:.1}, x_offset={:.1}, container_w={:.1}", 
+                inner_w, child_size.width, (inner_w - child_size.width).max(0.0) / 2.0, container_w);
             
             if let Some(child_layout) = &mut tree.get_mut(child_id).layout {
                 child_layout.x = x;

@@ -46,10 +46,7 @@ fn main() {
     let root_id = VStack::new()
         .spacing(16.0)
         .child(Text::title("标题"))
-        .child(
-            Button::new("按钮")
-                .style(Style::new().padding(EdgeInsets::symmetric(8.0, 40.0)))
-        )
+        .child(Button::new("按钮"))
         .build(&mut ctx);
     ctx.set_root(root_id);
     let tree = ctx.build();

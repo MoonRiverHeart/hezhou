@@ -1,8 +1,10 @@
 use super::*;
 use crate::ui::layout::widget::TextData;
+use crate::ui::layout::text::SimpleTextMeasurer;
+use crate::ui::layout::text::TextMeasurer;
+use crate::ui::layout::geometry::Alignment;
 use crate::ui::event::types::UIEvent;
 use crate::ui::event::mouse::MouseEventType;
-use crate::ui::layout::geometry::Alignment;
 
 pub enum ButtonVariant {
     Primary,
@@ -52,14 +54,27 @@ impl Component for Button {
         };
         
         let style = self.style.clone().unwrap_or(base_style);
-       let container_id = ctx.create_node(WidgetType::Container, 
-            style.clone().cross_alignment(Alignment::Stretch)  // 让Container被Column拉伸
-        );
-        
         let font_size = style.font_size.unwrap_or(ctx.theme.base_font_size);
+        let padding = style.padding;
+        
+        // 测量文字尺寸
+        let measurer = SimpleTextMeasurer;
+        let text_size = measurer.measure_text(&self.label, font_size, f32::MAX);
+        
+        // Container尺寸 = 文字尺寸 + padding + 额外空间
+        let extra_h = font_size * 0.4;
+        let extra_w = font_size * 0.6;
+        let container_width = text_size.width + padding.left + padding.right + extra_w;
+        let container_height = text_size.height + padding.top + padding.bottom + extra_h;
+        
+        let container_style = style.clone()
+            .width(container_width)
+            .height(container_height);
+        
+        let container_id = ctx.create_node(WidgetType::Container, container_style);
+        
         let text_data = TextData::new(&self.label, font_size);
-        let text_style = Style::new()
-            .cross_alignment(Alignment::Center);  // 交叉轴居中
+        let text_style = Style::new().cross_alignment(Alignment::Center);
         let text_id = ctx.create_node(WidgetType::Text(text_data), text_style);
         ctx.add_child(container_id, text_id);
         
