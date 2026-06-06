@@ -236,8 +236,9 @@ impl VulkanRenderer {
                 
                 let mut index_offset = 0u32;
                 for (cmd_idx, (rx, ry, rw, rh, _radius)) in cmd_rects.iter().enumerate() {
+                    let cmd_data = &commands[cmd_idx];
                     let push_data: [f32; 8] = [
-                        width as f32, height as f32, 0.0, 0.0,
+                        width as f32, height as f32, 0.0, cmd_data.texture_id as f32,
                         *rx, *ry, *rw, *rh,
                     ];
                     device.cmd_push_constants(
@@ -246,8 +247,6 @@ impl VulkanRenderer {
                         0,
                         bytemuck::cast::<[f32; 8], [u8; 32]>(push_data).as_slice(),
                     );
-                    
-                    let cmd_data = &commands[cmd_idx];
                     let vertex_count = cmd_data.vertices.len() as u32;
                     
                     if let Some(ref idx) = cmd_data.indices {

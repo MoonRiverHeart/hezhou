@@ -3,14 +3,12 @@ use rhi::{RhiInitDesc, WindowHandle};
 use rhi_vulkan::VulkanRhi;
 use core::ui::component::{BuildContext, Component, EventHandlerEntry};
 use core::ui::component::theme::Theme;
-use core::ui::component::text::Text;
-use core::ui::component::button::Button;
-use core::ui::component::container::VStack;
 use core::ui::layout::layout::LayoutEngine;
 use core::ui::layout::text::SimpleTextMeasurer;
 use core::ui::layout::text::TextMeasurer;
-use core::ui::layout::geometry::Size;
-use core::ui::layout::widget::WidgetTree;
+use core::ui::layout::geometry::{Size, EdgeInsets, Alignment};
+use core::ui::layout::style::{Style, MainAlignment};
+use core::ui::layout::widget::{WidgetTree, WidgetType, TextData};
 use core::ui::event::types::UIEvent;
 use core::ui::event::mouse::{MouseEvent, MouseEventType, MouseButton, Point};
 use core::ui::event::modifier::Modifiers;
@@ -24,12 +22,12 @@ struct AppState {
     tree: WidgetTree,
     layout_engine: LayoutEngine<SimpleTextMeasurer>,
     event_handlers: Vec<EventHandlerEntry>,
-    msdf: MsdfTextMeasurer,
+    msdf: Arc<Mutex<MsdfTextMeasurer>>,
     texture_uploaded: bool,
 }
 
 fn main() {
-    let msdf = MsdfTextMeasurer::from_system("simhei", "times");
+    let msdf = Arc::new(Mutex::new(MsdfTextMeasurer::from_system("simhei", "times")));
     let button_text = Arc::new(Mutex::new("按钮".to_string()));
     
     let state = Arc::new(Mutex::new(None::<AppState>));
@@ -65,7 +63,7 @@ fn main() {
         tree: WidgetTree::new(),
         layout_engine,
         event_handlers: vec![],
-        msdf,
+        msdf: msdf.clone(),
         texture_uploaded: false,
     });
     
@@ -73,6 +71,7 @@ fn main() {
     let window_clone = window.clone();
     let mouse_pos_clone = mouse_pos.clone();
     let button_text_clone = button_text.clone();
+    let msdf_clone = msdf.clone();
     
     event_loop.run(move |event, window_target| {
         match event {
@@ -133,11 +132,13 @@ fn main() {
                 }
 
                 winit::event::WindowEvent::RedrawRequested => {
-                    let (mut new_tree, new_handlers) = build_ui(&button_text_clone);
+                    let (mut new_tree, new_handlers) = {
+                        let mut m = msdf_clone.lock().unwrap();
+                        build_ui(&button_text_clone, &mut m)
+                    };
                     if let Some(ref mut app) = *state_clone.lock().unwrap() {
-                        // 首次上传MSDF纹理
                         if !app.texture_uploaded {
-                            let atlas = app.msdf.font_atlas();
+                            let atlas = msdf_clone.lock().unwrap().font_atlas().clone();
                             app.rhi.upload_texture(&atlas.data, atlas.width, atlas.height);
                             app.texture_uploaded = true;
                         }
@@ -169,20 +170,83 @@ fn main() {
     }).unwrap();
 }
 
-fn build_ui(button_text: &Arc<Mutex<String>>) -> (WidgetTree, Vec<EventHandlerEntry>) {
+fn build_ui(
+    button_text: &Arc<Mutex<String>>,
+    msdf: &mut MsdfTextMeasurer,
+) -> (WidgetTree, Vec<EventHandlerEntry>) {
     let mut ctx = BuildContext::new(Theme::default());
-    let btn_text = button_text.clone();
-    let root_id = VStack::new()
-        .spacing(16.0)
-        .child(Text::title("标题"))
-        .child(Button::dynamic(btn_text).on_click({
-            let bt = button_text.clone();
-            move || {
-                *bt.lock().unwrap() = "按钮被点击了！".to_string();
-            }
-        }))
-        .build(&mut ctx);
+    
+    let root_id = ctx.create_node(
+        WidgetType::Column,
+        Style::new().cross_alignment(Alignment::Center),
+    );
+    ctx.tree.get_mut(root_id).style.main_alignment = MainAlignment::Center;
     ctx.set_root(root_id);
+    
+    // 标题
+    let title_glyphs = msdf.layout_text("标题", 18.0, f32::MAX).glyphs;
+    let title_data = TextData::with_glyphs("标题", 18.0, title_glyphs);
+    let title_id = ctx.create_node(
+        WidgetType::Text(title_data),
+        Style::new().cross_alignment(Alignment::Center),
+    );
+    ctx.add_child(root_id, title_id);
+    
+    // 间距
+    let spacer_id = ctx.create_node(
+        WidgetType::Spacer(Size::new(0.0, 16.0)),
+        Style::default(),
+    );
+    ctx.add_child(root_id, spacer_id);
+    
+    // 按钮
+    let btn_label = button_text.lock().unwrap().clone();
+    let btn_glyphs = msdf.layout_text(&btn_label, 14.0, f32::MAX).glyphs;
+    let btn_data = TextData::with_glyphs(&btn_label, 14.0, btn_glyphs);
+    
+    let padding = EdgeInsets::symmetric(8.0, 40.0);
+    let font_size = 14.0;
+    let text_size = msdf.measure_text(&btn_label, font_size, f32::MAX);
+    let container_w = text_size.width + padding.left + padding.right + font_size * 0.6;
+    let container_h = text_size.height + padding.top + padding.bottom + font_size * 0.4;
+    
+    let btn_container_id = ctx.create_node(
+        WidgetType::Container,
+        Style::new()
+            .width(container_w)
+            .height(container_h)
+            .padding(padding)
+            .background(ctx.theme.primary_color),
+    );
+    
+    let btn_text_id = ctx.create_node(
+        WidgetType::Text(btn_data),
+        Style::new().cross_alignment(Alignment::Center),
+    );
+    ctx.add_child(btn_container_id, btn_text_id);
+    ctx.add_child(root_id, btn_container_id);
+
+    // 巨大的测试文字
+    let test_text = "你好，world！";
+    let font_size = 120.0;
+    let test_glyphs = msdf.layout_text(test_text, font_size, f32::MAX).glyphs;
+    let test_size = msdf.measure_text(test_text, font_size, f32::MAX);
+    let test_data = TextData::with_glyphs(test_text, font_size, test_glyphs);
+    let test_id = ctx.create_node(
+        WidgetType::Text(test_data),
+        Style::new()
+            .cross_alignment(Alignment::Center)
+            .width(test_size.width)
+            .height(test_size.height),
+    );
+    ctx.add_child(root_id, test_id);
+    
+    // 注册点击事件
+    let bt = button_text.clone();
+    ctx.on_event(btn_container_id, move |_| {
+        *bt.lock().unwrap() = "被点击了".to_string();
+    });
+    
     let handlers = ctx.take_event_handlers();
     (ctx.build(), handlers)
 }

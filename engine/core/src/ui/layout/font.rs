@@ -31,7 +31,7 @@ impl MsdfFont {
             secondary_data: secondary_data.to_vec(),
             glyph_cache: HashMap::new(),
             atlas: FontAtlas {
-                data: vec![0u8; 2048 * 2048 * 4],
+                data: vec![255u8; 2048 * 2048 * 4], // 初始化为白色(255)，alpha=255表示未使用
                 width: 2048,
                 height: 2048,
             },
@@ -123,17 +123,50 @@ impl MsdfFont {
             &self.secondary_data
         };
         
+        // 根据字体大小动态调整 MSDF 分辨率和 spread
+        let msdf_size = (size.max(32) as f32 * 0.6) as u32;
+        let spread = msdf_size as f32 * 0.2;
+        
         let glyph_index = self.get_glyph_index(ch);
-        let generator = MsdfGenerator::new(32, 8.0);
+        println!("DEBUG msdf glyph: ch='{}' index={}", ch, glyph_index);
+        let generator = MsdfGenerator::new(msdf_size, spread);
         let msdf_data = generator.generate(font_data, glyph_index, size as f32);
         
         let font = if Self::is_cjk(ch) { &self.primary_font } else { &self.secondary_font };
         let (metrics, _) = font.rasterize(ch, size as f32);
         
-        let msdf_size = 32u32;
+        // 检查图集是否还有空间
+        if self.atlas_cursor_x + msdf_size > self.atlas.width {
+            self.atlas_cursor_x = 0;
+            self.atlas_cursor_y += self.atlas_row_height;
+            self.atlas_row_height = 0;
+        }
+        
+        // 如果图集满了，重置游标（简单处理，旧缓存失效）
+        if self.atlas_cursor_y + msdf_size > self.atlas.height {
+            self.atlas_cursor_x = 0;
+            self.atlas_cursor_y = 0;
+            self.atlas_row_height = 0;
+            self.glyph_cache.clear();
+        }
+        
         let atlas_x = self.atlas_cursor_x;
         let atlas_y = self.atlas_cursor_y;
         
+        // 填充图集区域为黑色（alpha=0），覆盖旧数据
+        for y in 0..msdf_size {
+            for x in 0..msdf_size {
+                let dst_idx = (((atlas_y + y) * self.atlas.width + atlas_x + x) * 4) as usize;
+                if dst_idx + 3 < self.atlas.data.len() {
+                    self.atlas.data[dst_idx] = 255;
+                    self.atlas.data[dst_idx + 1] = 255;
+                    self.atlas.data[dst_idx + 2] = 255;
+                    self.atlas.data[dst_idx + 3] = 0; // alpha=0 表示无数据
+                }
+            }
+        }
+        
+        // 拷贝 MSDF 数据到图集
         for y in 0..msdf_size {
             for x in 0..msdf_size {
                 let src_idx = ((y * msdf_size + x) * 4) as usize;
@@ -146,11 +179,6 @@ impl MsdfFont {
         
         self.atlas_cursor_x += msdf_size;
         self.atlas_row_height = self.atlas_row_height.max(msdf_size);
-        if self.atlas_cursor_x + msdf_size > self.atlas.width {
-            self.atlas_cursor_x = 0;
-            self.atlas_cursor_y += self.atlas_row_height;
-            self.atlas_row_height = 0;
-        }
         
         let uv_x0 = atlas_x as f32 / self.atlas.width as f32;
         let uv_y0 = atlas_y as f32 / self.atlas.height as f32;

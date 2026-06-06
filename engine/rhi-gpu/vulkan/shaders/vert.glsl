@@ -9,7 +9,7 @@ layout(push_constant) uniform PushConstants {
     float screenWidth;
     float screenHeight;
     float offsetX;
-    float offsetY;
+    float textureId;
     float rectX;
     float rectY;
     float rectW;
@@ -20,7 +20,8 @@ layout(location = 0) out vec4 fragColor;
 layout(location = 1) out vec2 fragUV;
 layout(location = 2) out vec4 fragBorderRadius;
 layout(location = 3) out vec2 fragPos;
-layout(location = 4) out vec4 fragRect;  // 矩形 (x, y, w, h)
+layout(location = 4) out vec4 fragRect;
+layout(location = 5) out float fragTextureId;
 
 void main() {
     float x = (inPosition.x / pc.screenWidth) * 2.0 - 1.0;
@@ -32,4 +33,5 @@ void main() {
     fragBorderRadius = inBorderRadius;
     fragPos = inPosition;
     fragRect = vec4(pc.rectX, pc.rectY, pc.rectW, pc.rectH);
+    fragTextureId = pc.textureId;
 }

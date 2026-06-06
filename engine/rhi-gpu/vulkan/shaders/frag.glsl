@@ -5,6 +5,7 @@ layout(location = 1) in vec2 fragUV;
 layout(location = 2) in vec4 fragBorderRadius;
 layout(location = 3) in vec2 fragPos;
 layout(location = 4) in vec4 fragRect;
+layout(location = 5) in float fragTextureId;
 
 layout(binding = 1) uniform sampler2D texSampler;
 
@@ -28,6 +29,13 @@ void main() {
         float d = roundedRectSDF(fragPos, center, halfSize, maxRadius);
         if (d > 0.0) discard;
         float alpha = 1.0 - smoothstep(-1.0, 1.0, d);
+        outColor = vec4(fragColor.rgb, fragColor.a * alpha);
+    } else if (fragTextureId > 0.5) {
+        vec4 texColor = texture(texSampler, fragUV);
+        float dist = texColor.a;
+        // alpha=0 表示图集未使用区域，跳过
+        if (dist < 0.01) discard;
+        float alpha = smoothstep(0.45, 0.55, dist);
         outColor = vec4(fragColor.rgb, fragColor.a * alpha);
     } else {
         outColor = fragColor;

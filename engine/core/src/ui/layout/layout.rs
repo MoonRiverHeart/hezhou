@@ -75,11 +75,19 @@ impl<T: TextMeasurer> LayoutEngine<T> {
                 self.layout_flex(tree, node_id, Axis::Vertical, inner_constraints)
             }
             WidgetType::Text(text_data) => {
-                self.text_measurer.measure_text(
-                    &text_data.content,
-                    text_data.font_size,
-                    inner_constraints.max_width,
-                )
+                if let Some(ref glyphs) = text_data.glyphs {
+                    let total_width: f32 = glyphs.iter().map(|g| g.advance_x).sum();
+                    let max_height: f32 = glyphs.iter()
+                        .map(|g| (g.bearing_y + g.size.height).max(g.size.height))
+                        .fold(0.0f32, f32::max);
+                    Size::new(total_width, max_height)
+                } else {
+                    self.text_measurer.measure_text(
+                        &text_data.content,
+                        text_data.font_size,
+                        inner_constraints.max_width,
+                    )
+                }
             }
             WidgetType::Spacer(size) => *size,
         };
