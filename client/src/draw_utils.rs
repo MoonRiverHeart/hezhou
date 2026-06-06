@@ -45,22 +45,27 @@ fn build_draw_commands_impl(tree: &WidgetTree, node_id: WidgetId, parent_x: f32,
                 }
             }
         }
+
         WidgetType::Text(data) => {
             if let Some(ref glyphs) = data.glyphs {
                 let mut cursor_x = abs_x;
+                let max_height = glyphs.iter()
+                    .map(|g| g.size.height)
+                    .fold(0.0f32, f32::max);
+                
                 for glyph in glyphs {
                     let gx = cursor_x + glyph.bearing_x;
-                    let gy = abs_y + glyph.bearing_y;
+                    let gy = abs_y + max_height - glyph.size.height;
                     let gw = glyph.size.width;
                     let gh = glyph.size.height;
                     let uv = glyph.uv;
                     
                     commands.push(DrawCommand {
                         vertices: vec![
-                            Vertex { position: [gx, gy], color: [1.0, 1.0, 1.0, 1.0], uv: [uv[0], uv[3]], border_radius: [0.0; 4] },       // 左上
-                            Vertex { position: [gx + gw, gy], color: [1.0, 1.0, 1.0, 1.0], uv: [uv[2], uv[3]], border_radius: [0.0; 4] },   // 右上
-                            Vertex { position: [gx + gw, gy + gh], color: [1.0, 1.0, 1.0, 1.0], uv: [uv[2], uv[1]], border_radius: [0.0; 4] }, // 右下
-                            Vertex { position: [gx, gy + gh], color: [1.0, 1.0, 1.0, 1.0], uv: [uv[0], uv[1]], border_radius: [0.0; 4] },   // 左下
+                            Vertex { position: [gx, gy], color: [1.0, 1.0, 1.0, 1.0], uv: [uv[0], uv[3]], border_radius: [0.0; 4] },
+                            Vertex { position: [gx + gw, gy], color: [1.0, 1.0, 1.0, 1.0], uv: [uv[2], uv[3]], border_radius: [0.0; 4] },
+                            Vertex { position: [gx + gw, gy + gh], color: [1.0, 1.0, 1.0, 1.0], uv: [uv[2], uv[1]], border_radius: [0.0; 4] },
+                            Vertex { position: [gx, gy + gh], color: [1.0, 1.0, 1.0, 1.0], uv: [uv[0], uv[1]], border_radius: [0.0; 4] },
                         ],
                         indices: Some(vec![0, 1, 2, 2, 3, 0]),
                         clip_rect: None,
