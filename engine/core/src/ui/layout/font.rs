@@ -131,9 +131,10 @@ impl MsdfFont {
         println!("DEBUG msdf glyph: ch='{}' index={}", ch, glyph_index);
         let generator = MsdfGenerator::new(msdf_size, spread);
         let msdf_data = generator.generate(font_data, glyph_index, size as f32);
-        
+
         let font = if Self::is_cjk(ch) { &self.primary_font } else { &self.secondary_font };
         let (metrics, _) = font.rasterize(ch, size as f32);
+        let scale_ratio = msdf_size as f32 / size as f32;
         
         // 检查图集是否还有空间
         if self.atlas_cursor_x + msdf_size > self.atlas.width {
@@ -189,9 +190,9 @@ impl MsdfFont {
             character: ch,
             uv: [uv_x0, uv_y0, uv_x1, uv_y1],
             size: Size::new(msdf_size as f32, msdf_size as f32),
-            bearing_x: metrics.xmin as f32,
-            bearing_y: metrics.ymin as f32,
-            advance_x: metrics.advance_width,
+            bearing_x: metrics.xmin as f32 * scale_ratio,
+            bearing_y: metrics.ymin as f32 * scale_ratio,
+            advance_x: metrics.advance_width * scale_ratio,
             texture_index: 0,
         }
     }
