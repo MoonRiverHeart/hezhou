@@ -6,3 +6,4 @@ pub mod layout;
 pub mod builder;
 pub mod font;
 pub mod msdf_measurer;
+pub mod msdf;

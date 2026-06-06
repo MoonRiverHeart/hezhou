@@ -1,11 +1,15 @@
 use fontdue::Font;
+use ttf_parser::Face;
 use std::collections::HashMap;
 use super::text::{FontAtlas, GlyphInfo};
+use super::msdf::MsdfGenerator;
 use crate::ui::layout::geometry::Size;
 
 pub struct MsdfFont {
-    primary_font: Font,      // 主字体（中文）
-    secondary_font: Font,    // 副字体（英文）
+    primary_font: Font,
+    secondary_font: Font,
+    primary_data: Vec<u8>,
+    secondary_data: Vec<u8>,
     glyph_cache: HashMap<(char, u32), GlyphInfo>,
     pub atlas: FontAtlas,
     atlas_cursor_x: u32,
@@ -23,6 +27,8 @@ impl MsdfFont {
         MsdfFont {
             primary_font: primary,
             secondary_font: secondary,
+            primary_data: primary_data.to_vec(),
+            secondary_data: secondary_data.to_vec(),
             glyph_cache: HashMap::new(),
             atlas: FontAtlas {
                 data: vec![0u8; 2048 * 2048 * 4],
@@ -34,8 +40,12 @@ impl MsdfFont {
             atlas_row_height: 0,
         }
     }
-
-    /// 按字体文件名搜索系统字体
+    
+    pub fn from_file(path: &str) -> Self {
+        let data = std::fs::read(path).expect("Failed to read font file");
+        Self::new(&data, &data)
+    }
+    
     pub fn from_system(font_names: &[&str]) -> Self {
         let font_dirs = if cfg!(target_os = "windows") {
             vec![std::path::PathBuf::from("C:/Windows/Fonts")]
@@ -43,7 +53,6 @@ impl MsdfFont {
             vec![
                 std::path::PathBuf::from("/System/Library/Fonts"),
                 std::path::PathBuf::from("/Library/Fonts"),
-                std::path::PathBuf::from("~/Library/Fonts"),
             ]
         } else {
             vec![
@@ -54,7 +63,6 @@ impl MsdfFont {
         
         let find_font = |name: &str| -> Vec<u8> {
             for dir in &font_dirs {
-                // 不区分大小写搜索
                 if let Ok(entries) = std::fs::read_dir(dir) {
                     for entry in entries.flatten() {
                         let path = entry.path();
@@ -77,24 +85,26 @@ impl MsdfFont {
         MsdfFont::new(&primary_data, &secondary_data)
     }
     
-    /// 判断是否为中文字符
-    fn is_cjk(ch: char) -> bool {
-        ('\u{4E00}'..='\u{9FFF}').contains(&ch)   // CJK统一表意文字
-        || ('\u{3400}'..='\u{4DBF}').contains(&ch)  // CJK扩展A
-        || ('\u{20000}'..='\u{2A6DF}').contains(&ch) // CJK扩展B
-        || ('\u{F900}'..='\u{FAFF}').contains(&ch)   // CJK兼容汉字
-    }
-    
-    fn font_for_char(&self, ch: char) -> &Font {
-        if Self::is_cjk(ch) {
-            &self.primary_font
-        } else {
-            &self.secondary_font
-        }
+    pub fn is_cjk(ch: char) -> bool {
+        ('\u{4E00}'..='\u{9FFF}').contains(&ch)
+        || ('\u{3400}'..='\u{4DBF}').contains(&ch)
+        || ('\u{F900}'..='\u{FAFF}').contains(&ch)
+        || ('\u{3000}'..='\u{303F}').contains(&ch)
+        || ('\u{FF00}'..='\u{FFEF}').contains(&ch)
     }
     
     pub fn rasterize(&self, ch: char, size: f32) -> (fontdue::Metrics, Vec<u8>) {
-        self.font_for_char(ch).rasterize(ch, size)
+        if Self::is_cjk(ch) {
+            self.primary_font.rasterize(ch, size)
+        } else {
+            self.secondary_font.rasterize(ch, size)
+        }
+    }
+    
+    fn get_glyph_index(&self, ch: char) -> u16 {
+        let data = if Self::is_cjk(ch) { &self.primary_data } else { &self.secondary_data };
+        let face = Face::parse(data, 0).unwrap();
+        face.glyph_index(ch).map(|g| g.0).unwrap_or(0)
     }
     
     pub fn get_or_create_glyph(&mut self, ch: char, size: u32) -> GlyphInfo {
@@ -107,12 +117,20 @@ impl MsdfFont {
     }
     
     fn rasterize_glyph(&mut self, ch: char, size: u32) -> GlyphInfo {
+        let font_data = if Self::is_cjk(ch) {
+            &self.primary_data
+        } else {
+            &self.secondary_data
+        };
+        
+        let glyph_index = self.get_glyph_index(ch);
+        let generator = MsdfGenerator::new(32, 8.0);
+        let msdf_data = generator.generate(font_data, glyph_index, size as f32);
+        
         let font = if Self::is_cjk(ch) { &self.primary_font } else { &self.secondary_font };
-        let (metrics, bitmap) = font.rasterize(ch, size as f32);
+        let (metrics, _) = font.rasterize(ch, size as f32);
         
         let msdf_size = 32u32;
-        let msdf_data = self.generate_msdf(&bitmap, metrics.width as u32, metrics.height as u32, msdf_size);
-        
         let atlas_x = self.atlas_cursor_x;
         let atlas_y = self.atlas_cursor_y;
         
@@ -120,7 +138,9 @@ impl MsdfFont {
             for x in 0..msdf_size {
                 let src_idx = ((y * msdf_size + x) * 4) as usize;
                 let dst_idx = (((atlas_y + y) * self.atlas.width + atlas_x + x) * 4) as usize;
-                self.atlas.data[dst_idx..dst_idx+4].copy_from_slice(&msdf_data[src_idx..src_idx+4]);
+                if dst_idx + 3 < self.atlas.data.len() && src_idx + 3 < msdf_data.len() {
+                    self.atlas.data[dst_idx..dst_idx+4].copy_from_slice(&msdf_data[src_idx..src_idx+4]);
+                }
             }
         }
         
@@ -146,33 +166,5 @@ impl MsdfFont {
             advance_x: metrics.advance_width,
             texture_index: 0,
         }
-    }
-    
-    fn generate_msdf(&self, bitmap: &[u8], src_w: u32, src_h: u32, dst_size: u32) -> Vec<u8> {
-        let mut msdf = vec![0u8; (dst_size * dst_size * 4) as usize];
-        
-        if src_w == 0 || src_h == 0 {
-            return msdf;
-        }
-        
-        let scale_x = src_w as f32 / dst_size as f32;
-        let scale_y = src_h as f32 / dst_size as f32;
-        
-        for y in 0..dst_size {
-            for x in 0..dst_size {
-                let src_x = (x as f32 * scale_x) as u32;
-                let src_y = (y as f32 * scale_y) as u32;
-                let src_idx = (src_y * src_w + src_x) as usize;
-                let alpha = if src_idx < bitmap.len() { bitmap[src_idx] } else { 0 };
-                
-                let dst_idx = ((y * dst_size + x) * 4) as usize;
-                msdf[dst_idx] = 255;
-                msdf[dst_idx + 1] = 255;
-                msdf[dst_idx + 2] = 255;
-                msdf[dst_idx + 3] = alpha;
-            }
-        }
-        
-        msdf
     }
 }

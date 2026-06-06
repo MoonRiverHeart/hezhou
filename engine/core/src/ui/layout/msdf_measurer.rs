@@ -2,28 +2,14 @@ use super::text::{TextMeasurer, TextLayout, FontAtlas};
 use super::font::MsdfFont;
 use super::geometry::Size;
 
-/// MSDF 文本测量器
 pub struct MsdfTextMeasurer {
     font: MsdfFont,
-    scale: f32,
 }
 
 impl MsdfTextMeasurer {
-    pub fn from_files(cn_path: &str, en_path: &str) -> Self {
-        MsdfTextMeasurer {
-            font: MsdfFont::new(
-                &std::fs::read(cn_path).expect("Failed to read CN font"),
-                &std::fs::read(en_path).expect("Failed to read EN font"),
-            ),
-            scale: 1.0,
-        }
-    }
-
-    /// 从系统字体创建，传入字体文件名关键词
     pub fn from_system(cn_font: &str, en_font: &str) -> Self {
         MsdfTextMeasurer {
             font: MsdfFont::from_system(&[cn_font, en_font]),
-            scale: 1.0,
         }
     }
 }
@@ -67,6 +53,6 @@ impl TextMeasurer for MsdfTextMeasurer {
     }
     
     fn scale_for_size(&self, font_size: f32) -> f32 {
-        font_size * self.scale
+        font_size
     }
 }
