@@ -650,6 +650,26 @@ UI.SceneSelectEntity(_scenePtr, entityId);
             func(scene, entityId, angleDegrees);
         }
 
+        public static void SceneSetEntityMaterial(IntPtr scene, ulong entityId, string material)
+        {
+            if (_ffi.scene_set_entity_material == IntPtr.Zero) return;
+            var func = Marshal.GetDelegateForFunctionPointer<SceneSetEntityMaterialDelegate>(_ffi.scene_set_entity_material);
+            func(scene, entityId, material);
+        }
+
+        public static string SceneGetEntityMaterial(IntPtr scene, ulong entityId)
+        {
+            if (_ffi.scene_get_entity_material == IntPtr.Zero) return "";
+            var func = Marshal.GetDelegateForFunctionPointer<SceneGetEntityMaterialDelegate>(_ffi.scene_get_entity_material);
+            IntPtr buffer = Marshal.AllocHGlobal(256);
+            try
+            {
+                int len = func(scene, entityId, buffer, 256);
+                return len > 0 ? Marshal.PtrToStringAnsi(buffer, len) : "";
+            }
+            finally { Marshal.FreeHGlobal(buffer); }
+        }
+
         public static void SceneSetEntityName(IntPtr scene, ulong entityId, string name)
         {
             if (_ffi.scene_set_entity_name == IntPtr.Zero)

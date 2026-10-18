@@ -86,6 +86,7 @@ _bindScriptClickCallback = OnBindScriptClick;
             _treeNodeSelectCallback = OnTreeNodeSelect;
             _treeNodeRightClickCallback = OnTreeNodeRightClick;
             _gridViewClickCallback = OnGridViewClick;
+            _materialClickCallback = OnMaterialButtonClick;
             _fileBrowserSelectCallback = OnFileBrowserSelect;
             _workingDirectoryDialogResultCallback = OnWorkingDirectoryDialogResult;
             _deleteConfirmDialogResultCallback = OnDeleteConfirmDialogResult;

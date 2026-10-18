@@ -263,7 +263,9 @@ namespace Hezhou
                 {
                     AssetInfo materialInfo = AssetLibrary.GetAssetInfo(mc, mi);
                     string materialName = string.IsNullOrEmpty(materialInfo.Name) ? "(unnamed)" : materialInfo.Name;
-                    UI.CreateLabel(materialContentStack, 300f, 20f, "🎨 " + materialName);
+                    ulong materialButton = UI.CreateButton(materialContentStack, 300f, 26f, "🎨 " + materialName);
+                    UI.SetOnClick(materialButton, _materialClickCallback);
+                    _materialButtons[materialButton] = materialName;
                     materialTotal++;
                 }
             }

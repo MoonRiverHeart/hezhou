@@ -31,6 +31,7 @@ EXPECTED = [
     "17_hierarchy_drag.png",
     "18_material_tab.png",
     "19_gizmo_translate.png",
+    "20_material_assign.png",
 ]
 
 

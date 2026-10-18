@@ -576,3 +576,37 @@ pub extern "C" fn scene_get_child_id(scene: *const Scene, parent_id: u64, index:
         children.get(index).map(|c| c.id).unwrap_or(0)
     }
 }
+
+#[no_mangle]
+pub extern "C" fn scene_set_entity_material(scene: *mut Scene, entity_id: u64, material_ptr: *const i8) {
+    if scene.is_null() {
+        return;
+    }
+    let material = if material_ptr.is_null() {
+        None
+    } else {
+        Some(unsafe { std::ffi::CStr::from_ptr(material_ptr).to_string_lossy().into_owned() })
+    };
+    unsafe {
+        (*scene).set_renderable_material(Entity::new(entity_id), material);
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn scene_get_entity_material(scene: *const Scene, entity_id: u64, buffer_ptr: *mut i8, buffer_size: usize) -> usize {
+    if scene.is_null() || buffer_ptr.is_null() || buffer_size == 0 {
+        return 0;
+    }
+    unsafe {
+        if let Some(material) = (*scene).get_renderable_material(Entity::new(entity_id)) {
+            let bytes = material.as_bytes();
+            let copy_len = bytes.len().min(buffer_size - 1);
+            std::ptr::copy_nonoverlapping(bytes.as_ptr(), buffer_ptr as *mut u8, copy_len);
+            *buffer_ptr.add(copy_len) = 0;
+            copy_len
+        } else {
+            *buffer_ptr = 0;
+            0
+        }
+    }
+}

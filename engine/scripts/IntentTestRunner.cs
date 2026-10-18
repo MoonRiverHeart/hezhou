@@ -26,6 +26,7 @@ namespace Hezhou
             RunCase("intent.hierarchy_drag", HierarchyDrag);
             RunCase("intent.material_browser", MaterialBrowser);
             RunCase("intent.gizmo_translate", GizmoTranslate);
+            RunCase("intent.material_assign", MaterialAssign);
             RunCase("intent.console_open_close", ConsoleOpenClose);
             RunCase("intent.running_paused_editing", RunningPausedEditing);
         }
@@ -194,6 +195,17 @@ namespace Hezhou
                 throw new Exception("multi-select delete did not remove both entities");
             }
             return "2 entities selected, batch edit + multi-delete passed";
+        }
+
+        private static string MaterialAssign()
+        {
+            EditorScript.TestNewScene();
+            ulong cube = EditorScript.TestCreateMeshEntity(0);
+            EditorScript.TestSelectEntity(cube);
+            EditorScript.TestAssignMaterial("Default Material");
+            string material = EditorScript.TestGetEntityMaterial(cube);
+            if (material != "Default Material") throw new Exception("material not assigned: " + material);
+            return "material assigned";
         }
 
         private static string GizmoTranslate()

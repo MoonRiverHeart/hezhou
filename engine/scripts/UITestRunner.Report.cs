@@ -380,6 +380,7 @@ namespace Hezhou
             _visualSteps.Add(new VisualStep("17_hierarchy_drag", VisualHierarchyDrag, 10));
             _visualSteps.Add(new VisualStep("18_material_tab", VisualMaterialTab, 10));
             _visualSteps.Add(new VisualStep("19_gizmo_translate", VisualGizmoTranslate, 10));
+            _visualSteps.Add(new VisualStep("20_material_assign", VisualMaterialAssign, 10));
 
             RunNextVisualStep();
         }
@@ -469,6 +470,14 @@ namespace Hezhou
             ulong child = EditorScript.TestCreateMeshEntity(0);
             EditorScript.TestHierarchyDrop(child, parent);
             EditorScript.TestExpandHierarchy();
+        }
+
+        private static void VisualMaterialAssign()
+        {
+            EditorScript.TestNewScene();
+            ulong cube = EditorScript.TestCreateMeshEntity(0);
+            EditorScript.TestSelectEntity(cube);
+            EditorScript.TestAssignMaterial("Default Material");
         }
 
         private static void VisualGizmoTranslate()

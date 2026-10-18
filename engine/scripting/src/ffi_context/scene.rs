@@ -32,6 +32,8 @@ pub type SceneSetEntityScaleFn = extern "C" fn(*mut c_void, u64, f32, f32, f32);
 pub type SceneRotateEntityFn = extern "C" fn(*mut c_void, u64, f32);
 pub type SceneSetEntityNameFn = extern "C" fn(*mut c_void, u64, *const c_char);
 pub type SceneGetEntityNameFn = extern "C" fn(*mut c_void, u64, *mut c_char, usize) -> usize;
+pub type SceneSetEntityMaterialFn = extern "C" fn(*mut c_void, u64, *const c_char);
+pub type SceneGetEntityMaterialFn = extern "C" fn(*mut c_void, u64, *mut c_char, usize) -> usize;
 
 pub type SetSelectedEntityFn = extern "C" fn(u64, bool);
 

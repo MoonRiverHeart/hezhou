@@ -79,6 +79,26 @@ namespace Hezhou
         {
             if (_gameScene == null) return;
 
+            // === 材质拖拽 ===
+            if (dragging && _materialDragName == null)
+            {
+                string hoverMaterial = FindMaterialAtPoint(x, y);
+                if (hoverMaterial != null) _materialDragName = hoverMaterial;
+            }
+            if (_materialDragName != null)
+            {
+                if (dragging)
+                {
+                    if (_statusItem != null) _statusItem.Text = "拖拽材质: " + _materialDragName;
+                    return;
+                }
+                ulong dropTarget = FindEntityAtPoint(x, y);
+                if (dropTarget == 0) dropTarget = _selectedEntityId;
+                AssignMaterial(dropTarget, _materialDragName);
+                _materialDragName = null;
+                return;
+            }
+
             // === Gizmo 拖拽 ===
             if (_gizmoAxis != 0)
             {
@@ -1601,6 +1621,50 @@ namespace Hezhou
             RefreshAssetGridView();
         }
         
+        private static string FindMaterialAtPoint(float x, float y)
+        {
+            foreach (var entry in _materialButtons)
+            {
+                float[] layout = UI.WidgetGetAbsoluteLayout(entry.Key);
+                if (layout == null || layout.Length < 4) continue;
+                if (x >= layout[0] && x <= layout[0] + layout[2]
+                    && y >= layout[1] && y <= layout[1] + layout[3])
+                    return entry.Value;
+            }
+            return null;
+        }
+
+        private static void OnMaterialButtonClick(ulong widgetId)
+        {
+            string name;
+            if (!_materialButtons.TryGetValue(widgetId, out name)) return;
+            AssignMaterial(_selectedEntityId, name);
+        }
+
+        private static void AssignMaterial(ulong entityId, string materialName)
+        {
+            if (_gameScene == null || entityId == 0 || string.IsNullOrEmpty(materialName))
+            {
+                if (_statusItem != null) _statusItem.Text = "请先选择实体再赋材质";
+                return;
+            }
+            CaptureUndoSnapshot();
+            UI.SceneSetEntityMaterial(_gameScene.ScenePtr, entityId, materialName);
+            string entityName = UI.SceneGetEntityName(_gameScene.ScenePtr, entityId);
+            if (_statusItem != null) _statusItem.Text = "材质 " + materialName + " → " + entityName;
+        }
+
+        public static void TestAssignMaterial(string materialName)
+        {
+            AssignMaterial(_selectedEntityId, materialName);
+        }
+
+        public static string TestGetEntityMaterial(ulong entityId)
+        {
+            if (_gameScene == null) return "";
+            return UI.SceneGetEntityMaterial(_gameScene.ScenePtr, entityId);
+        }
+
         private static void RefreshMaterialGridView()
         {
             if (_assetMaterialGridViewId == 0) return;

@@ -433,6 +433,8 @@ fn main() {
         ui_icon_count: stub_icon_count,
         ui_grid_view_set_item_thumbnail: stub_grid_view_set_item_thumbnail,
         ui_text_edit_set_cursor_line: stub_text_edit_set_cursor_line,
+        scene_set_entity_material: stub_scene_set_entity_material,
+        scene_get_entity_material: stub_scene_get_entity_material,
     };
     hezhou_scripting::ffi_context::set_ffi_context(ffi_ctx);
     let ffi_ptr = hezhou_scripting::ffi_context::get_ffi_context_ptr();
@@ -587,6 +589,8 @@ extern "C" fn stub_icon_set_color(_: *mut std::ffi::c_void, _: u64, _: f32, _: f
 extern "C" fn stub_icon_count() -> u32 { 24 }
 extern "C" fn stub_grid_view_set_item_thumbnail(_: *mut std::ffi::c_void, _: u64, _: usize, _: *const std::ffi::c_char) {}
 extern "C" fn stub_text_edit_set_cursor_line(_: *mut std::ffi::c_void, _: u64, _: u32) {}
+extern "C" fn stub_scene_set_entity_material(_: *mut std::ffi::c_void, _: u64, _: *const std::ffi::c_char) {}
+extern "C" fn stub_scene_get_entity_material(_: *mut std::ffi::c_void, _: u64, _: *mut std::ffi::c_char, _: usize) -> usize { 0 }
 
 // 新增stub函数 — Feature 1脚本绑定
 pub extern "C" fn scene_get_existing_ptr_stub() -> *mut std::ffi::c_void { std::ptr::null_mut() }

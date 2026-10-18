@@ -1,5 +1,13 @@
 # Bug Fixes Log
 
+## 2026-10-18: 材质拖放/赋给实体
+
+- Scene 新增 renderable material 读写；FFI `scene_set_entity_material` / `scene_get_entity_material`，契约 278 字段。
+- 材质 Tab 使用按钮；点击赋给选中实体。
+- 全局拖拽：从材质按钮拖到实体节点/预览后赋材质。
+- intent `material_assign`（16/16）；visual `20_material_assign`。
+
+
 ## 2026-10-18: Gizmo v1 平移
 
 - 预览区叠加 X/Y/Z 三轴彩色条（layer 3）。

@@ -534,6 +534,22 @@ impl Scene {
         }
     }
     
+    pub fn set_renderable_material(&mut self, entity: Entity, material_path: Option<String>) -> bool {
+        if !self.world.entity_exists(entity) { return false; }
+        if let Some(mut renderable) = self.world.get_component::<RenderableComponent>(entity) {
+            renderable.material_path = material_path;
+            self.world.add_component(entity, renderable);
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn get_renderable_material(&self, entity: Entity) -> Option<String> {
+        self.world.get_component::<RenderableComponent>(entity)
+            .and_then(|r| r.material_path)
+    }
+
     // DirectionalLightComponent helpers
     pub fn set_light_direction(&mut self, entity: Entity, direction: Vec3) -> bool {
         if !self.world.entity_exists(entity) { return false; }
