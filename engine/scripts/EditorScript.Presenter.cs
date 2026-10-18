@@ -62,6 +62,17 @@ namespace Hezhou
             // File browser selection — UI feedback only, no log needed
         }
 
+        /// <summary>
+        /// 文件浏览器中可能只进入了目录而没有选中文件。
+        /// 优先使用选中项，否则回退到当前目录。
+        /// </summary>
+        private static string GetBrowserSelectedOrCurrent(ulong browserId)
+        {
+            string selected = UI.FileBrowserGetSelectedPath(browserId);
+            if (!string.IsNullOrEmpty(selected)) return selected;
+            return UI.FileBrowserGetCurrentPath(browserId);
+        }
+
         // === Input Event Handlers ===
 
         private static void OnMouseMove(float x, float y, bool dragging)
@@ -183,6 +194,9 @@ namespace Hezhou
             const uint KEY_UP = 47;
             const uint KEY_DOWN = 48;
             const uint KEY_D = 4;
+            const uint KEY_N = 14;
+            const uint KEY_O = 15;
+            const uint KEY_S = 19;
             const uint KEY_DELETE = 49;
             const uint KEY_F5 = 57;
             const uint KEY_F6 = 58;
@@ -190,6 +204,27 @@ namespace Hezhou
 
             bool ctrl = (modifiers & 2) != 0;
             bool shift = (modifiers & 1) != 0;
+
+            // 文件快捷键：Ctrl+S 保存、Ctrl+Shift+S 另存为、Ctrl+O 打开项目、Ctrl+N 新建场景
+            if (pressed && ctrl)
+            {
+                if (keycode == KEY_S)
+                {
+                    if (shift) ShowSaveAsDialog();
+                    else SaveCurrentProject();
+                    return;
+                }
+                if (keycode == KEY_O)
+                {
+                    ShowOpenProjectDialog();
+                    return;
+                }
+                if (keycode == KEY_N)
+                {
+                    NewScene();
+                    return;
+                }
+            }
 
             if (keycode == KEY_D && pressed && ctrl && shift)
             {
@@ -1085,14 +1120,14 @@ namespace Hezhou
             {
                 if (_contextMenuTargetEntityId != 0)
                 {
-                    // Delete entity from scene
+                    // 与 Delete 键保持一致：先选中目标实体，再弹出确认对话框。
                     if (_gameScene != null)
                     {
-                        _gameScene.RemoveEntity(_contextMenuTargetEntityId);
+                        _selectedEntityId = _contextMenuTargetEntityId;
+                        _gameScene.SelectEntity(_contextMenuTargetEntityId);
+                        UpdatePropertiesPanel(_contextMenuTargetEntityId);
+                        ShowDeleteConfirmDialog();
                     }
-                    // Remove from project tree
-                    UI.TreeViewRemoveNode(_projectTreeViewId, _contextMenuTargetNodeId);
-                    _entityNodeMap.Remove(_contextMenuTargetEntityId);
                 }
                 else if (_fileItemPaths.ContainsKey(_contextMenuTargetNodeId))
                 {
@@ -1937,6 +1972,8 @@ UI.SetText(_runButtonId, "运行");
                 _gameScene.ClearSelection();
                 ClearPropertiesPanel();
                 _selectedEntityId = 0;
+                _propertiesDirty = true;
+                _lastScriptBindingCount = -1;
                 _statusItem.Text = "已删除 Entity";
                 Log.Info("Editor", $"删除Entity: id={entityId}");
             }
@@ -1974,48 +2011,80 @@ UI.SetText(_runButtonId, "运行");
 
         // === Menu Action Handlers ===
 
+        /// <summary>
+        /// 清空当前场景并创建默认的 Cube + Plane + DirectionalLight。
+        /// 菜单“新建场景”和 Ctrl+N 共用该逻辑。
+        /// </summary>
+        private static void NewScene()
+        {
+            if (_gameScene == null) return;
+
+            // 先复制 key 列表，RemoveEntityFromTree 会修改 _entityNodeMap，
+            // 直接遍历 Keys 会抛 InvalidOperationException。
+            List<ulong> oldEntityIds = new List<ulong>(_entityNodeMap.Keys);
+            for (int i = 0; i < oldEntityIds.Count; i++)
+            {
+                RemoveEntityFromTree(oldEntityIds[i]);
+            }
+            _entityNodeMap.Clear();
+
+            int count = _gameScene.GetEntityCount();
+            for (int i = count - 1; i >= 0; i--)
+            {
+                ulong eid = _gameScene.GetEntityId(i);
+                _gameScene.RemoveEntity(eid);
+            }
+
+            ulong cubeId = _gameScene.CreateCube();
+            UI.SceneSetEntityName(_gameScene.ScenePtr, cubeId, "Cube");
+            AddEntityToTree(cubeId, "Cube");
+
+            ulong planeId = _gameScene.CreatePlane();
+            UI.SceneSetEntityName(_gameScene.ScenePtr, planeId, "Plane");
+            AddEntityToTree(planeId, "Plane");
+
+            ulong lightId = _gameScene.CreateDirectionalLight();
+            UI.SceneSetEntityName(_gameScene.ScenePtr, lightId, "DirectionalLight");
+            AddEntityToTree(lightId, "DirectionalLight");
+
+            _gameScene.ClearSelection();
+            ClearPropertiesPanel();
+            _selectedEntityId = 0;
+            _propertiesDirty = true;
+            _lastScriptBindingCount = -1;
+            _statusItem.Text = "新建场景完成";
+            Log.Info("Editor", "新建场景");
+        }
+
+        /// <summary>
+        /// 保存当前工程；未加载工程时转为“另存为”。
+        /// 菜单“保存场景”和 Ctrl+S 共用该逻辑。
+        /// </summary>
+        private static bool SaveCurrentProject()
+        {
+            if (_gameScene == null) return false;
+
+            if (!Project.IsLoaded())
+            {
+                _statusItem.Text = "未加载项目，请选择另存为";
+                Log.Info("Editor", "保存失败: 未加载项目");
+                ShowSaveAsDialog();
+                return false;
+            }
+
+            Project.SyncFromScene(_gameScene.ScenePtr);
+            bool success = Project.Save();
+            _statusItem.Text = success ? "项目已保存" : "保存失败";
+            Log.Info("Editor", "保存场景: " + success);
+            return success;
+        }
+
         private static void OnFileMenuClick(ulong widgetId, int actionId)
         {
             UI.PopupMenuHide(_fileMenuId);
             if (actionId == 1)
             {
-                // 新建场景: clear scene, create default Cube+Plane+Light
-                if (_gameScene != null)
-                {
-                    // Remove all entities from tree
-                    foreach (var entityId in _entityNodeMap.Keys)
-                    {
-                        RemoveEntityFromTree(entityId);
-                    }
-                    _entityNodeMap.Clear();
-                    
-                    // Remove all entities from scene
-                    int count = _gameScene.GetEntityCount();
-                    for (int i = count - 1; i >= 0; i--)
-                    {
-                        ulong eid = _gameScene.GetEntityId(i);
-                        _gameScene.RemoveEntity(eid);
-                    }
-                    
-                    // Create default entities
-                    ulong cubeId = _gameScene.CreateCube();
-                    UI.SceneSetEntityName(_gameScene.ScenePtr, cubeId, "Cube");
-                    AddEntityToTree(cubeId, "Cube");
-                    
-                    ulong planeId = _gameScene.CreatePlane();
-                    UI.SceneSetEntityName(_gameScene.ScenePtr, planeId, "Plane");
-                    AddEntityToTree(planeId, "Plane");
-                    
-                    ulong lightId = _gameScene.CreateDirectionalLight();
-                    UI.SceneSetEntityName(_gameScene.ScenePtr, lightId, "DirectionalLight");
-                    AddEntityToTree(lightId, "DirectionalLight");
-                    
-                    _gameScene.ClearSelection();
-                    ClearPropertiesPanel();
-                    _selectedEntityId = 0;
-                    _statusItem.Text = "新建场景完成";
-                    Log.Info("Editor", "新建场景");
-                }
+                NewScene();
             }
             else if (actionId == 2) OnNewScriptClick(0);
             else if (actionId == 3)
@@ -2047,19 +2116,7 @@ UI.SetText(_runButtonId, "运行");
             UI.PopupMenuHide(_saveMenuId);
             if (actionId == 1)
             {
-                // 保存场景: Project.Save current project
-                if (Project.IsLoaded())
-                {
-                    Project.SyncFromScene(_gameScene.ScenePtr);
-                    bool success = Project.Save();
-                    _statusItem.Text = success ? "保存成功" : "保存失败";
-                    Log.Info("Editor", $"保存场景: {success}");
-                }
-                else
-                {
-                    _statusItem.Text = "未加载项目，无法保存";
-                    Log.Info("Editor", "保存失败: 未加载项目");
-                }
+                SaveCurrentProject();
             }
             else if (actionId == 2) { }
             else if (actionId == 3)
@@ -2081,7 +2138,7 @@ UI.SetText(_runButtonId, "运行");
             UI.DialogSetOnResult(_openSceneDialogId, _openSceneDialogResultCallback);
             
             ulong contentId = UI.CreateVStack(_openSceneDialogId, 10f);
-            UI.CreateLabel(contentId, dialogWidth - 40f, 30f, "选择.project.json文件:");
+            UI.CreateLabel(contentId, dialogWidth - 40f, 30f, "选择 project.json 或 *.project.json:");
             _openSceneFileBrowserId = UI.CreateFileBrowser(contentId, 10f, 10f, dialogWidth - 60f, dialogHeight - 120f, ".");
             UI.FileBrowserSetFilter(_openSceneFileBrowserId, "*.json");
             UI.DialogSetContent(_openSceneDialogId, contentId);
@@ -2096,40 +2153,27 @@ UI.SetText(_runButtonId, "运行");
             
             if (result == 1)
             {
-                string selectedPath = UI.FileBrowserGetSelectedPath(_openSceneFileBrowserId);
-                if (!string.IsNullOrEmpty(selectedPath) && selectedPath.EndsWith(".project.json"))
+                string selectedPath = GetBrowserSelectedOrCurrent(_openSceneFileBrowserId);
+                if (!string.IsNullOrEmpty(selectedPath))
                 {
+                    // Project.Load 同时支持工程目录和直接传入 project.json / *.project.json
                     bool success = Project.Load(selectedPath);
                     if (success)
                     {
                         Project.SyncToScene(_gameScene.ScenePtr);
+                        RefreshSceneTreeAfterLoad();
                         _statusItem.Text = "场景加载成功";
-                        Log.Info("Editor", $"打开场景: {selectedPath}");
-                        
-                        // Refresh entity tree
-                        foreach (var entityId in _entityNodeMap.Keys)
-                        {
-                            RemoveEntityFromTree(entityId);
-                        }
-                        _entityNodeMap.Clear();
-                        
-                        int entityCount = _gameScene.GetEntityCount();
-                        for (int i = 0; i < entityCount; i++)
-                        {
-                            ulong eid = _gameScene.GetEntityId(i);
-                            string name = UI.SceneGetEntityName(_gameScene.ScenePtr, eid);
-                            AddEntityToTree(eid, name);
-                        }
+                        Log.Info("Editor", "打开场景: " + selectedPath);
                     }
                     else
                     {
                         _statusItem.Text = "场景加载失败";
-                        Log.Error("Editor", $"打开场景失败: {selectedPath}");
+                        Log.Error("Editor", "打开场景失败: " + selectedPath);
                     }
                 }
                 else
                 {
-                    _statusItem.Text = "请选择.project.json文件";
+                    _statusItem.Text = "请选择 project.json 文件或工程目录";
                 }
             }
         }
@@ -2159,58 +2203,63 @@ UI.SetText(_runButtonId, "运行");
             
             if (result == 1)
             {
-                string selectedPath = UI.FileBrowserGetSelectedPath(_openProjectFileBrowserId);
+                string selectedPath = GetBrowserSelectedOrCurrent(_openProjectFileBrowserId);
                 if (!string.IsNullOrEmpty(selectedPath))
                 {
-                    // Find .project.json in the selected directory
-                    string projectFile = System.IO.Path.Combine(selectedPath, "project.project.json");
-                    if (!System.IO.File.Exists(projectFile))
-                    {
-                        // Try finding any .project.json in the directory
-                        string[] files = System.IO.Directory.GetFiles(selectedPath, "*.project.json");
-                        if (files.Length > 0)
-                        {
-                            projectFile = files[0];
-                        }
-                    }
-                    
-                    bool success = Project.Load(projectFile);
+                    // Project.Load 支持工程目录和直接传入 json 文件。
+                    bool success = Project.Load(selectedPath);
                     if (success)
                     {
                         Project.SyncToScene(_gameScene.ScenePtr);
+                        RefreshSceneTreeAfterLoad();
                         _statusItem.Text = "项目加载成功: " + Project.GetName();
-                        Log.Info("Editor", $"打开项目: {projectFile}");
-                        
-                        // Refresh entity tree
-                        foreach (var entityId in _entityNodeMap.Keys)
-                        {
-                            RemoveEntityFromTree(entityId);
-                        }
-                        _entityNodeMap.Clear();
-                        
-                        int entityCount = _gameScene.GetEntityCount();
-                        for (int i = 0; i < entityCount; i++)
-                        {
-                            ulong eid = _gameScene.GetEntityId(i);
-                            string name = UI.SceneGetEntityName(_gameScene.ScenePtr, eid);
-                            AddEntityToTree(eid, name);
-                        }
-                        
-                        // Update project name in status bar
-                        if (_projectItem != null)
-                        {
-                            _projectItem.Text = "项目: " + Project.GetName();
-                        }
+                        Log.Info("Editor", "打开项目: " + selectedPath);
                     }
                     else
                     {
                         _statusItem.Text = "项目加载失败";
-                        Log.Error("Editor", $"打开项目失败: {projectFile}");
+                        Log.Error("Editor", "打开项目失败: " + selectedPath);
                     }
                 }
             }
         }
         
+        /// <summary>
+        /// 工程/场景加载后重建实体树，并清理旧的选中态与属性面板。
+        /// 加载会替换整个场景，旧的 entity id 已失效，不能继续保留在 UI 状态中。
+        /// </summary>
+        private static void RefreshSceneTreeAfterLoad()
+        {
+            if (_gameScene == null) return;
+
+            List<ulong> oldEntityIds = new List<ulong>(_entityNodeMap.Keys);
+            for (int i = 0; i < oldEntityIds.Count; i++)
+            {
+                RemoveEntityFromTree(oldEntityIds[i]);
+            }
+            _entityNodeMap.Clear();
+
+            _gameScene.ClearSelection();
+            _selectedEntityId = 0;
+            _lastPropertiesEntityId = 0;
+            _propertiesDirty = true;
+            _lastScriptBindingCount = -1;
+            ClearPropertiesPanel();
+
+            int entityCount = _gameScene.GetEntityCount();
+            for (int i = 0; i < entityCount; i++)
+            {
+                ulong eid = _gameScene.GetEntityId(i);
+                string name = UI.SceneGetEntityName(_gameScene.ScenePtr, eid);
+                AddEntityToTree(eid, name);
+            }
+
+            if (_projectItem != null && Project.IsLoaded())
+            {
+                _projectItem.Text = "项目: " + Project.GetName();
+            }
+        }
+
         private static void ShowSaveAsDialog()
         {
             ulong rootId = UI.GetRootId();
@@ -2236,19 +2285,39 @@ UI.SetText(_runButtonId, "运行");
             
             if (result == 1)
             {
-                string selectedPath = UI.FileBrowserGetSelectedPath(_saveAsFileBrowserId);
+                string selectedPath = GetBrowserSelectedOrCurrent(_saveAsFileBrowserId);
                 if (!string.IsNullOrEmpty(selectedPath))
                 {
-                    Project.SyncFromScene(_gameScene.ScenePtr);
-                    string savePath = System.IO.Path.Combine(selectedPath, "project.project.json");
-                    bool success = UI.ProjectCreateNew(Project.GetName(), savePath);
+                    // FileBrowser 选中的是目标父目录；工程会创建为 <父目录>/<工程名>/。
+                    if (!System.IO.Directory.Exists(selectedPath))
+                    {
+                        selectedPath = System.IO.Path.GetDirectoryName(selectedPath);
+                    }
+                    if (string.IsNullOrEmpty(selectedPath) || !System.IO.Directory.Exists(selectedPath))
+                    {
+                        _statusItem.Text = "另存为失败: 请选择目录";
+                        return;
+                    }
+
+                    string projectName = Project.IsLoaded() ? Project.GetName() : "";
+                    if (string.IsNullOrEmpty(projectName))
+                    {
+                        projectName = "UntitledProject";
+                    }
+
+                    bool success = UI.ProjectCreateNew(projectName, selectedPath);
                     if (success)
                     {
                         Project.SyncFromScene(_gameScene.ScenePtr);
                         success = Project.Save();
                     }
                     _statusItem.Text = success ? "另存为成功" : "另存为失败";
-                    Log.Info("Editor", $"另存为: {savePath}, success={success}");
+                    Log.Info("Editor", "另存为: " + selectedPath + ", success=" + success);
+
+                    if (success && _projectItem != null)
+                    {
+                        _projectItem.Text = "项目: " + Project.GetName();
+                    }
                 }
             }
         }

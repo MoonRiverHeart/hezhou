@@ -4,7 +4,9 @@ use std::fs;
 use serde::{Serialize, Deserialize};
 use chrono::{DateTime, Utc};
 use crate::math::{Vec3, Quaternion};
-use crate::ecs::{Entity, Scene, GameState, LocalTransform, RenderableComponent, BoundsComponent};
+use crate::ecs::{
+    DirectionalLightComponent, Entity, GameState, LocalTransform, RenderableComponent, Scene,
+};
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct ProjectSettings {
@@ -58,13 +60,41 @@ impl Default for ProjectScriptBinding {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct ProjectLight {
+    pub direction: [f32; 3],
+    pub color: [f32; 3],
+    pub intensity: f32,
+}
+
+impl Default for ProjectLight {
+    fn default() -> Self {
+        let light = DirectionalLightComponent::default();
+        Self {
+            direction: [light.direction.x, light.direction.y, light.direction.z],
+            color: [light.color.x, light.color.y, light.color.z],
+            intensity: light.intensity,
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct ProjectEntity {
     pub id: u64,
     pub name: String,
     pub transform: ProjectEntityTransform,
+    /// "Cube"/"Sphere"...；方向光为 "DirectionalLight"；空实体为 "None"。
     pub mesh_type: String,
     pub scripts: Vec<ProjectScriptBinding>,
     pub components: HashMap<String, serde_json::Value>,
+    #[serde(default = "default_visible")]
+    pub visible: bool,
+    /// 仅方向光实体使用；旧版工程文件缺少该字段时为 None。
+    #[serde(default)]
+    pub light: Option<ProjectLight>,
+}
+
+fn default_visible() -> bool {
+    true
 }
 
 impl Default for ProjectEntity {
@@ -76,6 +106,8 @@ impl Default for ProjectEntity {
             mesh_type: "Cube".to_string(),
             scripts: Vec::new(),
             components: HashMap::new(),
+            visible: true,
+            light: None,
         }
     }
 }
@@ -165,7 +197,10 @@ impl Default for ProjectFile {
 
 pub struct Project {
     file: ProjectFile,
+    /// 工程目录（用于展示、创建子目录）。
     project_path: PathBuf,
+    /// 实际工程 JSON 文件路径。加载单个 .json 文件时可能不在工程目录下。
+    project_file_path: PathBuf,
     is_loaded: bool,
 }
 
@@ -174,6 +209,7 @@ impl Default for Project {
         Self {
             file: ProjectFile::default(),
             project_path: PathBuf::new(),
+            project_file_path: PathBuf::new(),
             is_loaded: false,
         }
     }
@@ -182,6 +218,7 @@ impl Default for Project {
 impl Project {
     pub fn new(name: String, project_path: PathBuf) -> Self {
         let now = Utc::now();
+        let project_file_path = project_path.join("project.json");
         let file = ProjectFile {
             version: "1.0".to_string(),
             name,
@@ -198,12 +235,32 @@ impl Project {
         Self {
             file,
             project_path,
+            project_file_path,
             is_loaded: false,
         }
     }
     
+    /// 在 parent_path 下创建以 name 命名的工程目录。
+    /// 若调用方传入的是 .../*.json 文件路径，则直接以该文件作为工程文件，
+    /// 工程目录取其父目录（兼容旧的“另存为”调用方式）。
     pub fn create_new(name: String, parent_path: PathBuf) -> Result<Self, ProjectError> {
-        let project_path = parent_path.join(&name);
+        let is_json_file = parent_path
+            .extension()
+            .map(|ext| ext.to_string_lossy().eq_ignore_ascii_case("json"))
+            .unwrap_or(false);
+
+        let (project_path, project_file_path) = if is_json_file {
+            let dir = parent_path
+                .parent()
+                .filter(|p| !p.as_os_str().is_empty())
+                .unwrap_or_else(|| std::path::Path::new("."))
+                .to_path_buf();
+            (dir, parent_path)
+        } else {
+            let dir = parent_path.join(&name);
+            let file = dir.join("project.json");
+            (dir, file)
+        };
         
         fs::create_dir_all(&project_path)?;
         fs::create_dir_all(project_path.join("assets"))?;
@@ -216,13 +273,34 @@ impl Project {
         fs::create_dir_all(project_path.join("settings"))?;
         
         let mut project = Project::new(name, project_path);
+        project.project_file_path = project_file_path;
+        project.is_loaded = true;
         project.save()?;
         
         Ok(project)
     }
     
+    /// 加载工程。path 可以是工程目录（读取其中的 project.json），
+    /// 也可以直接是 .json 文件路径。
     pub fn load(path: PathBuf) -> Result<Self, ProjectError> {
-        let project_file_path = path.join("project.json");
+        let (project_path, project_file_path) = if path.is_dir() {
+            let file = path.join("project.json");
+            // 兼容旧版本使用 project.project.json 作为文件名的工程。
+            let file = if file.exists() {
+                file
+            } else {
+                let legacy = path.join("project.project.json");
+                if legacy.exists() { legacy } else { file }
+            };
+            (path, file)
+        } else {
+            let dir = path
+                .parent()
+                .filter(|p| !p.as_os_str().is_empty())
+                .unwrap_or_else(|| std::path::Path::new("."))
+                .to_path_buf();
+            (dir, path)
+        };
         
         if !project_file_path.exists() {
             return Err(ProjectError::FileNotFound(project_file_path.to_string_lossy().to_string()));
@@ -231,8 +309,9 @@ impl Project {
         let json = fs::read_to_string(&project_file_path)?;
         let file: ProjectFile = serde_json::from_str(&json)?;
         
-        let mut project = Project::new(file.name.clone(), path.clone());
+        let mut project = Project::new(file.name.clone(), project_path);
         project.file = file;
+        project.project_file_path = project_file_path;
         project.is_loaded = true;
         
         Ok(project)
@@ -241,9 +320,13 @@ impl Project {
     pub fn save(&mut self) -> Result<(), ProjectError> {
         self.file.modified_at = Utc::now();
         
-        let project_file_path = self.project_path.join("project.json");
+        if let Some(parent) = self.project_file_path.parent() {
+            if !parent.as_os_str().is_empty() {
+                fs::create_dir_all(parent)?;
+            }
+        }
         let json = serde_json::to_string_pretty(&self.file)?;
-        fs::write(&project_file_path, json)?;
+        fs::write(&self.project_file_path, json)?;
         
         Ok(())
     }
@@ -265,12 +348,15 @@ impl Project {
     }
     
     pub fn sync_to_scene(&self, scene: &mut Scene) {
+        // 加载是“替换”而不是“追加”：先清空旧场景，避免重复实体。
+        scene.clear();
+
         for project_entity in &self.file.entities {
-            let entity = scene.create_entity();
-            
-            let mesh_path = Self::mesh_type_to_path(&project_entity.mesh_type);
-            scene.world.add_component(entity, RenderableComponent::new(mesh_path));
-            scene.world.add_component(entity, BoundsComponent::cube(2.0));
+            let entity = match project_entity.mesh_type.as_str() {
+                "DirectionalLight" => scene.create_directional_light(),
+                "None" | "" => scene.create_entity(),
+                mesh_type => scene.create_render_entity(Self::mesh_type_to_path(mesh_type)),
+            };
             
             let mut transform = LocalTransform::new();
             transform.position = Vec3::new(
@@ -291,6 +377,22 @@ impl Project {
             scene.world.add_component(entity, transform);
             
             scene.set_entity_name(entity, project_entity.name.clone());
+
+            if let Some(light) = &project_entity.light {
+                scene.set_light_direction(
+                    entity,
+                    Vec3::new(light.direction[0], light.direction[1], light.direction[2]),
+                );
+                scene.set_light_color(
+                    entity,
+                    Vec3::new(light.color[0], light.color[1], light.color[2]),
+                );
+                scene.set_light_intensity(entity, light.intensity);
+            }
+
+            if !project_entity.visible {
+                scene.set_renderable_visible(entity, false);
+            }
             
             for script_binding in &project_entity.scripts {
                 scene.attach_script_binding(
@@ -301,6 +403,9 @@ impl Project {
                 scene.set_script_binding_enabled(entity, scene.get_script_binding_count(entity) - 1, script_binding.enabled);
             }
         }
+
+        // 工程加载后回到编辑模式，避免直接以运行态启动脚本。
+        scene.state = GameState::Editing;
     }
     
     pub fn sync_from_scene(&mut self, scene: &Scene) {
@@ -310,6 +415,7 @@ impl Project {
             if let Some(name) = scene.get_entity_name(*entity) {
                 let transform = scene.world.get_component::<LocalTransform>(*entity);
                 let renderable = scene.world.get_component::<RenderableComponent>(*entity);
+                let light = scene.world.get_component::<DirectionalLightComponent>(*entity);
                 
                 let project_entity = ProjectEntity {
                     id: entity.id,
@@ -323,13 +429,21 @@ impl Project {
                     } else {
                         ProjectEntityTransform::default()
                     },
-                    mesh_type: if let Some(r) = renderable {
+                    mesh_type: if let Some(ref r) = renderable {
                         Self::path_to_mesh_type(&r.mesh_path)
+                    } else if light.is_some() {
+                        "DirectionalLight".to_string()
                     } else {
-                        "Cube".to_string()
+                        "None".to_string()
                     },
                     scripts: Self::collect_scripts(scene, *entity),
                     components: HashMap::new(),
+                    visible: renderable.as_ref().map(|r| r.visible).unwrap_or(true),
+                    light: light.map(|l| ProjectLight {
+                        direction: [l.direction.x, l.direction.y, l.direction.z],
+                        color: [l.color.x, l.color.y, l.color.z],
+                        intensity: l.intensity,
+                    }),
                 };
                 
                 self.file.entities.push(project_entity);

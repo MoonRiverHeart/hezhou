@@ -224,3 +224,14 @@ glslc shaders/rotation.frag -o shaders/rotation.frag.spv
 **现象**: Entity mesh渲染只有颜色，没有纹理贴图
 **修复**: MeshVertex从8 floats(position+color)扩展到32 bytes(position+normal+uv)；rotation shader加texSampler采样；TextureCacheEntry支持per-entity texture
 **文件**: `render/src/mesh.rs`, `rhi-vulkan/src/ui_vulkan_renderer.rs`, `shaders/rotation.frag`
+
+### 13. 工程保存/加载往返修复 (2026-10-18)
+**现象**: 加载工程时旧Entity未清除导致重复；方向光/空Entity被保存成Cube；编辑器传入.json文件路径但`Project::load`只接受目录；Ctrl+S/Ctrl+O/Ctrl+N只在菜单里显示但不生效。
+**修复**:
+- `World::clear()` + `Scene::clear()`，`Project::sync_to_scene()`先清空再加载
+- `ProjectEntity`新增`visible`/`light`字段（serde default兼容旧工程），保存`"DirectionalLight"`/`"None"`类型
+- `Project::load()`同时接受工程目录和直接json文件；Project记录实际工程文件路径
+- 编辑器新增Ctrl+S/Shift+S/O/N，加载后刷新实体树/选中态/属性面板
+- 右键删除改为与Delete键相同的确认流程
+**测试**: `cargo test -p hezhou-core --offline`（`project_roundtrip.rs` 2个用例）；编辑器启动自检 `PASS=35, FAIL=0`
+**文件**: `core/src/project.rs`, `core/src/ecs/scene.rs`, `core/src/ecs/world.rs`, `scripts/EditorScript.Presenter.cs`

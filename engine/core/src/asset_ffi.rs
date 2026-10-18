@@ -361,6 +361,8 @@ pub extern "C" fn project_add_entity(
         mesh_type: mesh_type_str,
         scripts: Vec::new(),
         components: std::collections::HashMap::new(),
+        visible: true,
+        light: None,
     });
     true
 }

@@ -123,6 +123,14 @@ impl World {
     pub fn entity_count(&self) -> usize {
         self.entities.len()
     }
+
+    /// 清空所有实体及其组件、父子关系。
+    /// 保留 next_entity_id，避免旧引用与重新创建的实体 ID 冲突。
+    pub fn clear(&mut self) {
+        self.entities.clear();
+        self.components.clear();
+        self.parent_map.clear();
+    }
 }
 
 impl Default for World {

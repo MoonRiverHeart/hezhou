@@ -106,9 +106,9 @@ namespace Hezhou
             AssertTrue("ReflectProperties", speedDesc.Name == "rotationSpeed",
                 "rotationSpeed Name正确 (actual=" + speedDesc.Name + ")");
             AssertEqualFloat("ReflectProperties", 0f, speedDesc.Min, "rotationSpeed Min");
-            AssertEqualFloat("ReflectProperties", 400f, speedDesc.Max, "rotationSpeed Max");
+            AssertEqualFloat("ReflectProperties", 100f, speedDesc.Max, "rotationSpeed Max");
             AssertEqualFloat("ReflectProperties", 1f, speedDesc.Step, "rotationSpeed Step");
-            AssertEqualFloat("ReflectProperties", 80f, speedDesc.Initial, "rotationSpeed Initial");
+            AssertEqualFloat("ReflectProperties", 10f, speedDesc.Initial, "rotationSpeed Initial");
             AssertTrue("ReflectProperties", speedDesc.Widget == "slider",
                 "rotationSpeed Widget=slider (actual=" + speedDesc.Widget + ")");
             AssertTrue("ReflectProperties", speedDesc.Type == 0,
@@ -143,9 +143,9 @@ namespace Hezhou
 
             if (instancePtr == IntPtr.Zero) return;
 
-            // 读取初始值（rotationSpeed=80, angleOffset=0）
+            // 读取初始值（rotationSpeed=10, angleOffset=0）
             float initialSpeed = ScriptEntityHelper.GetFieldValue(instancePtr, "rotationSpeed", typeof(RotatingEntity));
-            AssertEqualFloat("GetSetFieldValue", 80f, initialSpeed, "初始rotationSpeed=80");
+            AssertEqualFloat("GetSetFieldValue", 10f, initialSpeed, "初始rotationSpeed=10");
 
             float initialOffset = ScriptEntityHelper.GetFieldValue(instancePtr, "angleOffset", typeof(RotatingEntity));
             AssertEqualFloat("GetSetFieldValue", 0f, initialOffset, "初始angleOffset=0");
@@ -184,13 +184,13 @@ namespace Hezhou
 
             string originalContent = File.ReadAllText(filePath);
 
-            // 调用ModifyScriptSourceFile: 将rotationSpeed的Max从400改为50
+            // 调用ModifyScriptSourceFile: 将rotationSpeed的Max写回为50
             modifyMethod.Invoke(null, new object[] { "RotatingEntity", "rotationSpeed", "Max", 50f });
 
             // 读取修改后的文件，验证Max参数变化
             string modifiedContent = File.ReadAllText(filePath);
             bool maxChanged = modifiedContent.Contains("Max = 50");
-            AssertTrue("ModifyScriptSourceFile", maxChanged, "Max参数已从400改为50");
+            AssertTrue("ModifyScriptSourceFile", maxChanged, "Max参数已写回为50");
 
             // 恢复原始内容（保留用户可能已修改的值，如Max=300而非硬编码400）
             File.WriteAllText(filePath, originalContent);

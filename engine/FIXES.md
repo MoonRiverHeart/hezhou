@@ -1,5 +1,53 @@
 # Bug Fixes Log
 
+## 2026-10-18: Project Save/Load Round-Trip + Editor File Shortcuts
+
+### Problems
+1. `Project::sync_to_scene()` appended entities to the current scene instead of
+   replacing it, so loading a project duplicated the existing scene.
+2. Directional lights and empty entities were saved as `"Cube"` and restored as
+   cube meshes. Light direction/color/intensity and `visible` were not persisted.
+3. `Project::load()` only accepted a directory and always appended
+   `project.json`; the editor passed a `.json` file path, so Open Scene/Project
+   failed.
+4. `Ctrl+S`/`Ctrl+O`/`Ctrl+N` were displayed in menus but not handled in `OnKey`.
+   “Save As” created a directory named `project.project.json` because the editor
+   passed a file path to `Project::create_new()`.
+5. Tree refresh code iterated `_entityNodeMap.Keys` while removing entries,
+   which could throw `InvalidOperationException` when loading/new-scene.
+6. Right-click “Delete Entity” bypassed the confirmation dialog and left stale
+   selection/property state.
+
+### Fixes
+- Added `World::clear()` + `Scene::clear()`; project load now replaces the scene.
+- Added `ProjectLight`, `visible` and `light` fields with serde defaults for
+  backward compatibility with old project files.
+- `sync_from_scene()` writes `"DirectionalLight"` / `"None"` for non-mesh
+  entities and persists light + visibility data.
+- `sync_to_scene()` recreates lights/empty entities/renderables and resets the
+  scene to `Editing`.
+- `Project::load()` accepts either a project directory or a direct JSON file;
+  `Project` now tracks the actual project file path, so Save works for both.
+- Editor: Ctrl+S save, Ctrl+Shift+S save-as, Ctrl+O open project, Ctrl+N new
+  scene. Save As now selects a parent directory and creates a project folder.
+- Loading refreshes the entity tree, selection and property panel; Delete from
+  the context menu now uses the same confirmation flow as the Delete key.
+- Added `engine/core/tests/project_roundtrip.rs` covering entity kinds,
+  transforms, visibility, lights, scripts, replacement-on-load, direct JSON
+  loading and Save-As file paths.
+- Updated `TestRunner.cs` expectations for the new `RotatingEntity` defaults
+  (`Max=100`, `Initial=10`); startup self-test now reports `PASS=35, FAIL=0`.
+
+### Verification
+```bash
+cd engine
+cargo test -p hezhou-core --offline   # 2 project round-trip tests pass
+cd scripts
+powershell -ExecutionPolicy Bypass -File build_mono.ps1   # C# compile passes
+```
+
+---
+
 ## 2026-05-20: Outline Winding Order Fix
 
 ### Problem

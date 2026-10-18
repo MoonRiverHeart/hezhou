@@ -333,6 +333,18 @@ impl Scene {
     pub fn entity_count(&self) -> usize {
         self.world.entity_count()
     }
+
+    /// 清空场景中的实体与场景级元数据（名称、脚本绑定、选中状态）。
+    /// 用于加载项目前重置场景，避免旧实体残留导致重复。
+    pub fn clear(&mut self) {
+        self.world.clear();
+        self.selected_entities.clear();
+        self.entity_scripts.clear();
+        self.entity_bindings.clear();
+        self.entity_names.clear();
+        self.root_entities.clear();
+        self.state = GameState::Editing;
+    }
     
     pub fn remove_entity(&mut self, entity: Entity) {
         if !self.world.entity_exists(entity) {
