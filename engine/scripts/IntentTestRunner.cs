@@ -175,7 +175,17 @@ namespace Hezhou
             {
                 throw new Exception("batch property edit did not apply to both entities");
             }
-            return "2 entities selected, position.x=42 applied to both";
+
+            int beforeDelete = EditorScript.TestGetEntityCount();
+            if (!EditorScript.TestDeleteSelectedEntity())
+            {
+                throw new Exception("multi-select delete failed");
+            }
+            if (EditorScript.TestGetEntityCount() != beforeDelete - 2)
+            {
+                throw new Exception("multi-select delete did not remove both entities");
+            }
+            return "2 entities selected, batch edit + multi-delete passed";
         }
 
         private static string ConsoleOpenClose()

@@ -263,6 +263,7 @@ glslc shaders/rotation.frag -o shaders/rotation.frag.spv
 - 加载工程前清理旧 C# 脚本实例（`CleanupScriptInstancesBeforeSceneReplace`）
 **P1 追加**:
 - 多选真正驱动 renderer outline：`scene_add_to_selection/remove/toggle` FFI + `Scene` additive selection API
+- 多选删除（单个撤销快照 + 删除数量确认）
 - 撤销/重做工具栏计数；项目树实体搜索；Console 级别过滤/搜索/30 帧自动刷新
 - CI：`.github/workflows/ci.yml`（Rust/FFI/fuzz harness/C#）
 **文件**: `scripts/{run_tests,run_autotest,check_ffi_contract,check_autotest_report}.*`, `docs/ai_intent_testing.md`, `core/src/{asset_ffi,project,scene_ffi}.rs`, `core/src/ecs/*`, `ui/src/ffi/misc.rs`, `scripts/*.cs`

@@ -4,6 +4,7 @@
 
 ### Added
 - Additive scene selection API: `Scene::{add_to_selection,remove_from_selection,toggle_selection,get_selected_entity_ids}` + 3 FFI functions, so multi-select now drives the renderer's real outline list (not only primary selection).
+- Multi-select delete removes all selected entities (single undo snapshot); confirmation dialog shows count.
 - Undo/redo toolbar buttons with operation counts; `Ctrl+Z/Y` still works.
 - Project tree search InputField; typing filters entities live (flat result list while searching).
 - Console panel:

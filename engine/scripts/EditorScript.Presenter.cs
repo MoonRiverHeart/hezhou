@@ -2274,7 +2274,11 @@ UI.SetText(_runButtonId, "运行");
             UI.DialogSetOnResult(_deleteConfirmDialogId, _deleteConfirmDialogResultCallback);
             
             ulong contentId = UI.CreateVStack(_deleteConfirmDialogId, 10f);
-            UI.CreateLabel(contentId, dialogWidth - 40f, 30f, "确定要删除选中的Entity吗?");
+            int deleteCount = GetSelectedEntityIdsForEdit().Count;
+            string prompt = deleteCount > 1
+                ? "确定要删除选中的 " + deleteCount + " 个Entity吗?"
+                : "确定要删除选中的Entity吗?";
+            UI.CreateLabel(contentId, dialogWidth - 40f, 30f, prompt);
             UI.DialogSetContent(_deleteConfirmDialogId, contentId);
             UI.DialogAddButton(_deleteConfirmDialogId, "确认", 1);
             UI.DialogAddButton(_deleteConfirmDialogId, "取消", 0);
@@ -2287,17 +2291,20 @@ UI.SetText(_runButtonId, "运行");
             
             if (result == 1 && _selectedEntityId != 0 && _gameScene != null)
             {
-                ulong entityId = _selectedEntityId;
+                List<ulong> targets = GetSelectedEntityIdsForEdit();
                 CaptureUndoSnapshot();
-                _gameScene.RemoveEntity(entityId);
+                for (int i = 0; i < targets.Count; i++)
+                {
+                    _gameScene.RemoveEntity(targets[i]);
+                }
                 RefreshEntityTree();
                 _gameScene.ClearSelection();
                 ClearPropertiesPanel();
                 _selectedEntityId = 0;
                 _propertiesDirty = true;
                 _lastScriptBindingCount = -1;
-                _statusItem.Text = "已删除 Entity";
-                Log.Info("Editor", $"删除Entity: id={entityId}");
+                _statusItem.Text = "已删除 " + targets.Count + " 个 Entity";
+                Log.Info("Editor", "删除Entity数量: " + targets.Count);
             }
         }
 
@@ -2904,9 +2911,12 @@ UI.SetText(_runButtonId, "运行");
         {
             if (_gameScene == null || _selectedEntityId == 0) return false;
 
-            ulong entityId = _selectedEntityId;
-            _gameScene.RemoveEntity(entityId);
-            RemoveEntityFromTree(entityId);
+            List<ulong> targets = GetSelectedEntityIdsForEdit();
+            for (int i = 0; i < targets.Count; i++)
+            {
+                _gameScene.RemoveEntity(targets[i]);
+            }
+            RefreshEntityTree();
             _gameScene.ClearSelection();
             ClearPropertiesPanel();
             _selectedEntityId = 0;
