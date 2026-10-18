@@ -1,5 +1,13 @@
 # Bug Fixes Log
 
+## 2026-10-18: Dock v2 浮动资产面板
+
+- Command Palette 新增“浮动资产面板”。
+- Dialog 浮动窗口展示资产网格与缩略图，可关闭。
+- intent `floating_panel`（20/20）；visual `25_floating_panel`、`26_floating_closed`。
+- 可拖拽停靠的浮动 Dock 仍未实现。
+
+
 ## 2026-10-18: Dock v2 面板收起/展开
 
 - 项目面板、资产面板支持收起/展开（SplitView ratio 1.0）。

@@ -367,3 +367,7 @@ glslc shaders/rotation.frag -o shaders/rotation.frag.spv
 ### 32. Dock v2 面板收起/展开 (2026-10-18)
 - 项目/资产面板收起与恢复，状态持久化；Command Palette 命令。
 - intent 19/19；visual 24 张；跨区域停靠/浮动未实现。
+
+### 33. Dock v2 浮动资产面板 (2026-10-18)
+- 浮动 Dialog 资产面板 + Command Palette 命令；intent 20/20；visual 26 张。
+- 可拖拽停靠的浮动 Dock 仍未实现。

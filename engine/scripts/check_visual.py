@@ -36,6 +36,8 @@ EXPECTED = [
     "22_tab_reorder.png",
     "23_asset_collapsed.png",
     "24_dock_restored_2.png",
+    "25_floating_panel.png",
+    "26_floating_closed.png",
 ]
 
 
