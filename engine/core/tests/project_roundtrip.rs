@@ -51,6 +51,7 @@ fn project_roundtrip_preserves_entity_kinds_and_properties() {
     scene.set_entity_position(cube, Vec3::new(1.0, 2.0, 3.0));
     scene.set_entity_scale(cube, Vec3::new(2.0, 2.0, 2.0));
     scene.set_renderable_visible(cube, false);
+    scene.set_renderable_material(cube, Some("Default Material".to_string()));
     scene.attach_script_binding(
         cube,
         "scripts/RotatingEntity.cs".to_string(),
@@ -110,6 +111,7 @@ fn project_roundtrip_preserves_entity_kinds_and_properties() {
         .expect("cube renderable");
     assert_eq!(renderable.mesh_path, "builtin://cube");
     assert!(!renderable.visible);
+    assert_eq!(renderable.material_path.as_deref(), Some("Default Material"));
     assert_eq!(target.get_script_binding_count(cube_entity), 1);
     assert!(!target.get_script_binding(cube_entity, 0).unwrap().enabled);
 

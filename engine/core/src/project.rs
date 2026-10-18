@@ -95,6 +95,9 @@ pub struct ProjectEntity {
     /// 父实体的工程 ID；None 表示根实体。旧版工程默认 None。
     #[serde(default)]
     pub parent_id: Option<u64>,
+    /// 渲染材质；None 表示未赋材质。旧版工程默认 None。
+    #[serde(default)]
+    pub material: Option<String>,
 }
 
 fn default_visible() -> bool {
@@ -113,6 +116,7 @@ impl Default for ProjectEntity {
             visible: true,
             light: None,
             parent_id: None,
+            material: None,
         }
     }
 }
@@ -382,6 +386,10 @@ impl Project {
                 }
             }
             
+            if let Some(material) = &project_entity.material {
+                scene.set_renderable_material(entity, Some(material.clone()));
+            }
+
             let mut transform = LocalTransform::new();
             transform.position = Vec3::new(
                 project_entity.transform.position[0],
@@ -505,6 +513,7 @@ impl Project {
                         intensity: l.intensity,
                     }),
                     parent_id: scene.get_parent(entity).map(|p| p.id),
+                    material: renderable.as_ref().and_then(|r| r.material_path.clone()),
                 };
                 
                 self.file.entities.push(project_entity);

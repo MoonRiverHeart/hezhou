@@ -379,3 +379,6 @@ glslc shaders/rotation.frag -o shaders/rotation.frag.spv
 ### 35. CI 本地镜像校验 (2026-10-18)
 - `scripts/ci_local.ps1` 本地复刻 CI 步骤（离线），执行通过。
 - GitHub runner 实跑仍待推送。
+
+### 36. 材质赋值持久化 (2026-10-18)
+- ProjectEntity.material 保存/加载；project_roundtrip 覆盖材质。

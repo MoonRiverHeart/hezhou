@@ -1,5 +1,12 @@
 # Bug Fixes Log
 
+## 2026-10-18: 材质赋值持久化
+
+- `ProjectEntity` 新增 `material` 字段（serde default 兼容旧工程）。
+- Project 保存/加载保留 `RenderableComponent.material_path`。
+- `project_roundtrip` 增加材质断言，core 测试通过。
+
+
 ## 2026-10-18: CI 本地镜像校验
 
 - 新增 `scripts/ci_local.ps1`：本地复刻 GitHub Actions 的 Rust 测试、FFI 契约、
