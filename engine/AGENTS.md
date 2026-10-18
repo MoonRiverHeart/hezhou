@@ -299,3 +299,8 @@ glslc shaders/rotation.frag -o shaders/rotation.frag.spv
 - 新增 `IconWidget`（矢量线段，按主题 tint，支持任意 DPI）
 - FFI: `ui_create_icon_in_parent` / `ui_icon_set_color` / `ui_icon_count`
 - 工具栏、游戏预览、属性面板标题已接入图标；FFI 274 字段
+
+### 18. P0 Widget Gallery (2026-10-18)
+- `EditorScript.WidgetGallery.cs` 整页展示 Buttons/Inputs/Icons/Tabs/Colors。
+- 打开时隐藏主 SplitView/状态栏，关闭恢复；不破坏 Scene/选中。
+- visual 扩展为 10 张截图，含 Dark/Light Gallery 与恢复验证。

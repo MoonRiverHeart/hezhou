@@ -447,6 +447,7 @@ _bindScriptClickCallback = OnBindScriptClick;
         private static void RebuildUIForTheme()
         {
             if (_gameScene == null) return;
+            _galleryPanelId = 0;
 
             ulong selected = _selectedEntityId;
             ulong savedPropertyTab = _propsTabWidget != null ? _propsTabWidget.GetActive() : 0;

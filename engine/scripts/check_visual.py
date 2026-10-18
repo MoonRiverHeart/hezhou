@@ -19,6 +19,9 @@ EXPECTED = [
     "05_multi_select.png",
     "06_theme_light.png",
     "07_theme_dark.png",
+    "08_widget_gallery_dark.png",
+    "09_widget_gallery_light.png",
+    "10_editor_restored.png",
 ]
 
 

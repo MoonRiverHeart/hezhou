@@ -1,5 +1,15 @@
 # Bug Fixes Log
 
+## 2026-10-18: P0 Widget Gallery（双主题控件基线）
+
+- 新增 `EditorScript.WidgetGallery.cs`：整页显示 Buttons/Inputs/Icons/Tabs/Theme Colors。
+- Gallery 隐藏主 SplitView/状态栏，关闭后恢复，不影响 Scene 与选中实体。
+- visual 新增 `08_widget_gallery_dark.png`、`09_widget_gallery_light.png`、
+  `10_editor_restored.png`，总计 10 张。
+- 修复下拉框中文选项显示 `??`：Gallery 使用英文分类项。
+- 控件画廊用于后续控件状态与布局回归。
+
+
 ## 2026-10-18: SVG 图标系统（P0）
 
 - 新增 `engine/assets/icons/*.svg`（24 个线性图标，16×16 viewBox）。

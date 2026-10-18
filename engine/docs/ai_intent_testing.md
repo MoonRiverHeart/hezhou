@@ -100,7 +100,10 @@ test-results/visual/visual/
 ├── 04_project_search.png
 ├── 05_multi_select.png
 ├── 06_theme_light.png
-└── 07_theme_dark.png
+├── 07_theme_dark.png
+├── 08_widget_gallery_dark.png
+├── 09_widget_gallery_light.png
+└── 10_editor_restored.png
 ```
 
 `visual` 模式通过真实编辑器渲染截图，适合验证：

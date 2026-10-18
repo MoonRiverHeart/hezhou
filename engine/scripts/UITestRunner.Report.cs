@@ -368,6 +368,9 @@ namespace Hezhou
             _visualSteps.Add(new VisualStep("05_multi_select", VisualMultiSelect));
             _visualSteps.Add(new VisualStep("06_theme_light", VisualLightTheme, 20));
             _visualSteps.Add(new VisualStep("07_theme_dark", VisualDarkTheme, 20));
+            _visualSteps.Add(new VisualStep("08_widget_gallery_dark", VisualGalleryDark, 10));
+            _visualSteps.Add(new VisualStep("09_widget_gallery_light", VisualGalleryLight, 10));
+            _visualSteps.Add(new VisualStep("10_editor_restored", VisualGalleryRestore, 10));
 
             RunNextVisualStep();
         }
@@ -407,6 +410,23 @@ namespace Hezhou
 
         private static void VisualDarkTheme()
         {
+            EditorScript.TestClickThemeButton();
+        }
+
+        private static void VisualGalleryDark()
+        {
+            EditorScript.TestShowWidgetGallery();
+        }
+
+        private static void VisualGalleryLight()
+        {
+            EditorScript.TestClickThemeButton();
+            EditorScript.TestShowWidgetGallery();
+        }
+
+        private static void VisualGalleryRestore()
+        {
+            EditorScript.TestHideWidgetGallery();
             EditorScript.TestClickThemeButton();
         }
 
