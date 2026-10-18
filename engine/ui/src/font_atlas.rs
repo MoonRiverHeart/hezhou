@@ -30,6 +30,16 @@ pub struct CharacterInfo {
     pub is_color: bool,
 }
 
+#[derive(Clone, Copy, Debug)]
+pub struct ImageRegion {
+    pub uv_x: f32,
+    pub uv_y: f32,
+    pub uv_w: f32,
+    pub uv_h: f32,
+    pub width: u32,
+    pub height: u32,
+}
+
 pub struct FontAtlas {
     fonts: Vec<Font>,
     font_data: Vec<Vec<u8>>,
@@ -44,6 +54,8 @@ pub struct FontAtlas {
     atlas_dirty: bool,
     swash_fonts: Vec<FontRef<'static>>,
     scale_context: ScaleContext,
+    image_regions: HashMap<u64, ImageRegion>,
+    next_image_id: u64,
 }
 
 const PREDEFINED_FONT_SIZES: [u32; 13] = [48, 36, 32, 28, 24, 22, 20, 18, 16, 15, 14, 13, 12];
@@ -64,6 +76,8 @@ atlas_width: 8192,
             atlas_dirty: true, // dirty on init so initial texture upload happens
             swash_fonts: Vec::new(),
             scale_context: ScaleContext::new(),
+            image_regions: HashMap::new(),
+            next_image_id: 1000,
         }
     }
     
@@ -505,6 +519,87 @@ atlas_width: 8192,
         }
     }
     
+    /// 解码 PNG（RGBA/RGB/灰度/调色板）并写入字体图集空闲区域。
+    /// 返回纹理 ID；绘制时用 `img:<id>` 缩略图或直接查询 UV。
+    pub fn load_png_image(&mut self, path: &str) -> Option<u64> {
+        let file = std::fs::File::open(path).ok()?;
+        let mut decoder = png::Decoder::new(std::io::BufReader::new(file));
+        decoder.set_transformations(png::Transformations::normalize_to_color8());
+        let mut reader = decoder.read_info().ok()?;
+        let buf_size = reader.output_buffer_size()?;
+        let mut buf = vec![0u8; buf_size];
+        let info = reader.next_frame(&mut buf).ok()?;
+        let (w, h) = (info.width, info.height);
+        if w == 0 || h == 0 { return None; }
+        let color = info.color_type;
+        let mut rgba = Vec::with_capacity((w * h * 4) as usize);
+        match color {
+            png::ColorType::Rgba => rgba.extend_from_slice(&buf[..(w * h * 4) as usize]),
+            png::ColorType::Rgb => {
+                for px in buf[..(w * h * 3) as usize].chunks_exact(3) {
+                    rgba.extend_from_slice(&[px[0], px[1], px[2], 255]);
+                }
+            }
+            png::ColorType::Grayscale => {
+                for &g in &buf[..(w * h) as usize] { rgba.extend_from_slice(&[g, g, g, 255]); }
+            }
+            png::ColorType::GrayscaleAlpha => {
+                for px in buf[..(w * h * 2) as usize].chunks_exact(2) {
+                    rgba.extend_from_slice(&[px[0], px[0], px[0], px[1]]);
+                }
+            }
+            png::ColorType::Indexed => return None,
+        }
+        self.register_image_rgba(w, h, &rgba)
+    }
+
+    pub fn register_image_rgba(&mut self, width: u32, height: u32, rgba: &[u8]) -> Option<u64> {
+        if width > 1024 || height > 1024 || rgba.len() < (width * height * 4) as usize {
+            return None;
+        }
+        if self.current_x + width > self.atlas_width {
+            self.current_x = 0;
+            self.current_y += self.row_height.max(height);
+            self.row_height = 0;
+        }
+        if self.current_y + height > self.atlas_height {
+            return None;
+        }
+        let atlas_w = self.atlas_width as usize;
+        for y in 0..height as usize {
+            for x in 0..width as usize {
+                let src = (y * width as usize + x) * 4;
+                let dst = ((self.current_y as usize + y) * atlas_w + self.current_x as usize + x) * 4;
+                if src + 3 < rgba.len() && dst + 3 < self.atlas_texture.len() {
+                    self.atlas_texture[dst] = rgba[src];
+                    self.atlas_texture[dst + 1] = rgba[src + 1];
+                    self.atlas_texture[dst + 2] = rgba[src + 2];
+                    self.atlas_texture[dst + 3] = rgba[src + 3];
+                }
+            }
+        }
+        let id = self.next_image_id;
+        self.next_image_id += 1;
+        let region = ImageRegion {
+            uv_x: self.current_x as f32 / self.atlas_width as f32,
+            uv_y: self.current_y as f32 / self.atlas_height as f32,
+            uv_w: width as f32 / self.atlas_width as f32,
+            uv_h: height as f32 / self.atlas_height as f32,
+            width,
+            height,
+        };
+        self.image_regions.insert(id, region);
+        image_regions().lock().insert(id, region);
+        self.current_x += width + 2;
+        self.row_height = self.row_height.max(height);
+        self.atlas_dirty = true;
+        Some(id)
+    }
+
+    pub fn image_region(&self, id: u64) -> Option<ImageRegion> {
+        self.image_regions.get(&id).copied()
+    }
+
     pub fn rasterize_char_direct(&mut self, font_index: usize, character: char, font_size: f32) {
         self.atlas_dirty = true;
         
@@ -1002,6 +1097,15 @@ impl Default for FontAtlas {
 }
 
 static GLOBAL_FONT_ATLAS: OnceLock<parking_lot::Mutex<FontAtlas>> = OnceLock::new();
+static GLOBAL_IMAGE_REGIONS: OnceLock<parking_lot::Mutex<HashMap<u64, ImageRegion>>> = OnceLock::new();
+
+fn image_regions() -> &'static parking_lot::Mutex<HashMap<u64, ImageRegion>> {
+    GLOBAL_IMAGE_REGIONS.get_or_init(|| parking_lot::Mutex::new(HashMap::new()))
+}
+
+pub fn get_image_region(id: u64) -> Option<ImageRegion> {
+    image_regions().lock().get(&id).copied()
+}
 
 pub fn get_font_atlas() -> &'static parking_lot::Mutex<FontAtlas> {
     GLOBAL_FONT_ATLAS.get_or_init(|| {

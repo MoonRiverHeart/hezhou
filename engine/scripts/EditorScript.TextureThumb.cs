@@ -7,6 +7,7 @@ namespace Hezhou
     public static partial class EditorScript
     {
         private static bool _sampleTextureLoaded;
+        private static readonly System.Collections.Generic.Dictionary<string, ulong> _uiTextureCache = new System.Collections.Generic.Dictionary<string, ulong>();
 
         private static void LoadSampleTextureOnce()
         {
@@ -22,11 +23,24 @@ namespace Hezhou
                 };
                 for (int i = 0; i < candidates.Length; i++)
                 {
-                    if (!File.Exists(candidates[i])) continue;
-                    if (HasTextureAsset("gradient")) return;
-                    AssetLibrary.LoadTexture(Path.GetFullPath(candidates[i]));
-                    Log.Info("Editor", "已加载示例纹理: " + candidates[i]);
-                    return;
+                    if (!File.Exists(candidates[i])) break;
+                    if (!HasTextureAsset("gradient"))
+                    {
+                        AssetLibrary.LoadTexture(Path.GetFullPath(candidates[i]));
+                        Log.Info("Editor", "已加载示例纹理: " + candidates[i]);
+                    }
+                    break;
+                }
+                string png = null;
+                foreach (string candidate in candidates)
+                {
+                    string pngPath = candidate.Replace("gradient.bmp", "spectrum.png");
+                    if (File.Exists(pngPath)) { png = pngPath; break; }
+                }
+                if (png != null && !HasTextureAsset("spectrum"))
+                {
+                    AssetLibrary.LoadTexture(Path.GetFullPath(png));
+                    Log.Info("Editor", "已加载 PNG 纹理: " + png);
                 }
             }
             catch (Exception ex)
@@ -54,8 +68,19 @@ namespace Hezhou
             return false;
         }
 
+        private static ulong LoadUiTextureId(string path)
+        {
+            if (string.IsNullOrEmpty(path)) return 0;
+            ulong id;
+            if (_uiTextureCache.TryGetValue(path, out id)) return id;
+            id = UI.LoadImageTexture(path);
+            if (id != 0) _uiTextureCache[path] = id;
+            return id;
+        }
+
         /// <summary>把 BMP 降到 8x8，输出 pixels:RRGGBB... 供 GridView 画像素缩略图。</summary>
         public static bool TestHasGradientTexture() { return HasTextureAsset("gradient"); }
+        public static bool TestHasPngTexture() { return HasTextureAsset("spectrum"); }
 
         private static string DecodeBmpThumbnail(string path)
         {

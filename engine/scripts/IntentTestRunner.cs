@@ -36,6 +36,7 @@ namespace Hezhou
             RunCase("intent.texture_dock", TextureDock);
             RunCase("intent.texture_bmp", TextureBmp);
             RunCase("intent.texture_drag_dock", TextureDragDock);
+            RunCase("intent.texture_png", TexturePng);
             RunCase("intent.console_open_close", ConsoleOpenClose);
             RunCase("intent.running_paused_editing", RunningPausedEditing);
         }
@@ -204,6 +205,13 @@ namespace Hezhou
                 throw new Exception("multi-select delete did not remove both entities");
             }
             return "2 entities selected, batch edit + multi-delete passed";
+        }
+
+        private static string TexturePng()
+        {
+            if (!EditorScript.TestHasPngTexture()) throw new Exception("spectrum.png texture not loaded");
+            EditorScript.TestSelectAssetTab(2);
+            return "png texture decoded and uploaded";
         }
 
         private static string TextureDragDock()

@@ -667,3 +667,11 @@ pub extern "C" fn ui_register_tab_drag_end_thunk_ptr(callback_ptr: *const std::f
     let callback: crate::thunk::TabDragEndCallback = unsafe { std::mem::transmute(callback_ptr) };
     crate::thunk::ui_register_tab_drag_end_callback(callback);
 }
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_load_image_texture(path: *const std::ffi::c_char) -> u64 {
+    if path.is_null() { return 0; }
+    let cstr = unsafe { std::ffi::CStr::from_ptr(path) };
+    let Ok(path) = cstr.to_str() else { return 0; };
+    crate::font_atlas::get_font_atlas().lock().load_png_image(path).unwrap_or(0)
+}

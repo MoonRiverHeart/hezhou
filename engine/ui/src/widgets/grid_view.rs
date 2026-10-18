@@ -369,6 +369,22 @@ impl Widget for GridView {
             canvas.draw_rect(Rect::new(x + 4.0 * self.content_scale, y + 4.0 * self.content_scale, 
                                         self.cell_size - 8.0 * self.content_scale, thumb_height - 8.0 * self.content_scale), &thumb_style);
 
+            let image_thumb = item.thumbnail.as_ref()
+                .and_then(|t| t.strip_prefix("img:"))
+                .and_then(|v| v.parse::<u64>().ok());
+            if let Some(image_id) = image_thumb {
+                let tx = x + 4.0 * self.content_scale;
+                let ty = y + 4.0 * self.content_scale;
+                let tw = self.cell_size - 8.0 * self.content_scale;
+                let th = thumb_height - 8.0 * self.content_scale;
+                if let Some(region) = crate::font_atlas::get_image_region(image_id) {
+                    canvas.draw_image(
+                        Rect::new(tx, ty, tw, th),
+                        image_id,
+                        Rect::new(region.uv_x, region.uv_y, region.uv_w, region.uv_h),
+                    );
+                }
+            } else {
             let pixel_thumb = item.thumbnail.as_ref().and_then(|t| t.strip_prefix("pixels:"));
             if let Some(hex) = pixel_thumb {
                 let tx = x + 4.0 * self.content_scale;
@@ -452,6 +468,7 @@ impl Widget for GridView {
                         }
                     }
                 }
+            }
             }
             }
             

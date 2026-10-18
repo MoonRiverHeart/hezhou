@@ -1,5 +1,16 @@
 # Bug Fixes Log
 
+## 2026-10-18: PNG 完整解码 + UI 纹理上传
+
+- 新增 `png` 依赖和 `FontAtlas::load_png_image`：完整解码 PNG（RGBA/RGB/
+  灰度/灰度透明），统一转 RGBA。
+- 解码像素写入字体图集空闲区，注册 `ImageRegion`，通过字体图集上传到 GPU；
+  `img:<id>` 缩略图直接采样该区域，支持 alpha。
+- `ui_load_image_texture(path)` FFI；GridView 新增 `img:<id>` 分支。
+- 新增 `assets/textures/spectrum.png`，纹理页显示真实 PNG 缩略图。
+- FFI 282 字段；intent `texture_png`（26/26）。
+
+
 ## 2026-10-18: 字体清晰度与控件视觉风格
 
 - 修复字体 3x 超采样后未降采样就写入图集的问题：UV 覆盖 3x 位图，

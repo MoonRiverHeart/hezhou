@@ -1703,13 +1703,20 @@ namespace Hezhou
                     string thumb = "tex:solid";
                     if (info.Name != null && info.Name.IndexOf("Checker", StringComparison.OrdinalIgnoreCase) >= 0) thumb = "tex:checker";
                     else if (info.Name != null && info.Name.IndexOf("UV", StringComparison.OrdinalIgnoreCase) >= 0) thumb = "tex:uv";
-                    if (info.Name != null && info.Name.IndexOf("gradient", StringComparison.OrdinalIgnoreCase) >= 0
-                        && info.Description != null)
+                    if (info.Description != null)
                     {
                         int fromIdx = info.Description.IndexOf("from ", StringComparison.Ordinal);
                         string path = fromIdx >= 0 ? info.Description.Substring(fromIdx + 5).Trim() : info.Description.Trim();
-                        string pixels = DecodeBmpThumbnail(path);
-                        if (pixels != null) thumb = pixels;
+                        if (path.EndsWith(".png", StringComparison.OrdinalIgnoreCase))
+                        {
+                            ulong imageId = LoadUiTextureId(path);
+                            if (imageId != 0) thumb = "img:" + imageId;
+                        }
+                        else if (path.EndsWith(".bmp", StringComparison.OrdinalIgnoreCase))
+                        {
+                            string pixels = DecodeBmpThumbnail(path);
+                            if (pixels != null) thumb = pixels;
+                        }
                     }
                     UI.GridViewSetItemThumbnail(_assetTextureGridViewId, index, thumb);
                     total++;

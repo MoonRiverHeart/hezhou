@@ -41,6 +41,13 @@ namespace Hezhou
             func(_widgetTree, tabWidgetId, enabled);
         }
 
+        public static ulong LoadImageTexture(string path)
+        {
+            if (_ffi.ui_load_image_texture == IntPtr.Zero) return 0;
+            var func = Marshal.GetDelegateForFunctionPointer<LoadImageTextureDelegate>(_ffi.ui_load_image_texture);
+            return func(path);
+        }
+
         public static void RegisterTabDragEndCallback(TabDragEndDelegate callback)
         {
             if (_ffi.ui_register_tab_drag_end_thunk_ptr == IntPtr.Zero) return;

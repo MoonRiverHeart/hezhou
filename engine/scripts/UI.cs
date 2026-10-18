@@ -115,6 +115,9 @@ namespace Hezhou
         public delegate void RegisterTabDragEndDelegate(IntPtr callbackPtr);
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate ulong LoadImageTextureDelegate(string path);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public delegate ulong GetRootIdDelegate(IntPtr handle);
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public delegate void ClearWidgetTreeDelegate(IntPtr handle);
@@ -1199,6 +1202,7 @@ namespace Hezhou
             public IntPtr ui_tab_widget_move_tab;
             public IntPtr ui_tab_widget_set_reorderable;
             public IntPtr ui_register_tab_drag_end_thunk_ptr;
+            public IntPtr ui_load_image_texture;
         }
 
         public static void InitFromContext(IntPtr contextPtr)
