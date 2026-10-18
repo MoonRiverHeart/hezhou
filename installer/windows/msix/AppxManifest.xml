@@ -18,7 +18,7 @@
     <Resource Language="en-US" />
   </Resources>
   <Applications>
-    <Application Id="HezhouEditor" Executable="mono_editor_demo.exe" EntryPoint="Windows.FullTrustApplication">
+    <Application Id="HezhouEditor" Executable="hezhou_launcher.exe" EntryPoint="Windows.FullTrustApplication">
       <uap:VisualElements
         DisplayName="Hezhou Editor"
         Description="Hezhou game editor"

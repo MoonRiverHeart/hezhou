@@ -426,10 +426,14 @@ glslc shaders/rotation.frag -o shaders/rotation.frag.spv
 - 全屏天空盒渐变 pipeline；视觉测试 33 / 意图 26 全通过。
 
 ### 48. 安装包：Windows MSI / Linux DEB (2026-10-18)
-- WiX v4 MSI + PowerShell 构建脚本；DEB 由 Python ar/tar 构建，无需 dpkg-deb。
+- WiX v4 MSIX + PowerShell 构建脚本；DEB 由 Python ar/tar 构建，无需 dpkg-deb。
 - 安装布局：Windows Program Files\Hezhou；Linux /opt/hezhou/editor + /usr/bin/hezhou-editor。
 - CI 手动任务 package-windows / package-linux。
 
 ### 49. 安装包内置运行时 (2026-10-18)
 - runtime/mono 自动打包（bin/etc/4.5/4.5-api）；Windows 含 Vulkan/VC runtime DLL。
 - 编辑器与启动器设置 Mono 环境；hot reload 优先内置 mcs。
+
+### 50. MSIX 与无终端启动 (2026-10-18)
+- MSI 改为 MSIX；launcher GUI 子进程启动编辑器（CREATE_NO_WINDOW）。
+- 只读安装目录自动复制运行时资源到 LOCALAPPDATA；字体进入安装包。

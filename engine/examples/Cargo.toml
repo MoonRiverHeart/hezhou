@@ -82,6 +82,10 @@ path = "src/mono_ui_thunk_demo.rs"
 required-features = ["mono"]
 
 [[bin]]
+name = "hezhou_launcher"
+path = "src/hezhou_launcher.rs"
+
+[[bin]]
 name = "mono_editor_demo"
 path = "src/mono_editor_demo.rs"
 required-features = ["mono"]

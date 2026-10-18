@@ -26,6 +26,7 @@ if (-not $SkipBuild) {
 if (Test-Path $Stage) { Remove-Item $Stage -Recurse -Force }
 New-Item -ItemType Directory -Force $App | Out-Null
 Copy-Item (Join-Path $Engine "target\release\mono_editor_demo.exe") $App
+Copy-Item (Join-Path $Engine "target\release\hezhou_launcher.exe") $App
 $scriptsStage = Join-Path $App "scripts"; New-Item -ItemType Directory -Force $scriptsStage | Out-Null
 Copy-Item (Join-Path $Engine "scripts\*.cs") $scriptsStage
 $dll = Join-Path $Engine "scripts\bin\Mono\EditorScript.dll"

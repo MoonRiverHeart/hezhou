@@ -10,15 +10,15 @@
 - 资产缩略图：SVG 图标、程序化纹理、BMP 像素缩略图、PNG 完整解码与图集上传
 - 引擎基础：ECS 系统调度、Lifetime、物理 AABB 碰撞/事件、几何射线
 - 重力、CharacterController、变换关键帧动画、渐变天空盒
-- 打包：Windows MSI（WiX v4）与 Linux DEB（Python ar/tar），内置最小 Mono 运行时
+- 打包：Windows MSIX（自签名证书）与 Linux DEB（Python ar/tar），内置最小 Mono 运行时
 
 ## Packaging
 
-- Windows: `dist/HezhouEditor-0.1.0.msi`
+- Windows: `dist/HezhouEditor-0.1.0.msix` + `dist/HezhouEditor.cer`
 - Linux: `dist/hezhou-editor_0.1.0_amd64.deb`
 
 CI 的 `package-windows` / `package-linux` 在 tag `v*` 或手动触发时构建，
-`publish-release` 自动创建 GitHub Release 并上传 MSI/DEB。
+`publish-release` 自动创建 GitHub Release 并上传 MSIX/DEB。
 
 ## Validation
 

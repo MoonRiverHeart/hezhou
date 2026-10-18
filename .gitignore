@@ -50,3 +50,4 @@ engine/test-results/
 dist-test/
 __pycache__/
 /download/
+/build-temp/

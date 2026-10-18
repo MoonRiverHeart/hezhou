@@ -1,5 +1,16 @@
 # Bug Fixes Log
 
+## 2026-10-18: MSIX 与启动器
+
+- Windows 安装包从 MSI 切换为 MSIX（MakeAppx + 自签名证书，发布 `.msix` 与 `.cer`）。
+- 新增 `hezhou_launcher.exe` GUI 启动器：创建无窗口子进程运行编辑器，
+  去掉了安装后点击出现的终端。
+- 编辑器启动时检测安装目录是否可写；MSIX/Program Files 只读时把
+  scripts/assets/fonts 复制到 `%LOCALAPPDATA%\Hezhou\Editor` 并从该目录运行。
+- 仓库加入 `engine/fonts/HarmonyOS_Sans_SC.ttf`，安装包包含字体。
+- 修复 Linux CI 的 Unix 信号处理、CMake 生成器、Mono 安装和 DEB C# 编译列表。
+
+
 ## 2026-10-18: 安装包内置运行时依赖
 
 - Windows/ Linux 打包脚本在构建机上存在 Mono 时，复制最小 Mono 运行时到
