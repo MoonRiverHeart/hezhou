@@ -705,3 +705,53 @@ pub extern "C" fn ui_set_widget_visible(
         }
     }
 }
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_create_icon_in_parent(
+    handle: WidgetTreeHandle,
+    parent_id: u64,
+    x: f32,
+    y: f32,
+    width: f32,
+    height: f32,
+    icon_id: u32,
+) -> u64 {
+    if handle.is_null() { return 0; }
+    unsafe {
+        let arc = &*(handle as *const Arc<Mutex<WidgetTree>>);
+        let mut tree = arc.lock();
+        let mut icon = crate::widgets::IconWidget::new(icon_id);
+        icon.set_layout(Layout::new(x, y, width, height));
+        let id = icon.id();
+        let parent = WidgetId::from_raw(parent_id);
+        tree.add_widget(Box::new(icon), parent);
+        id.id
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_icon_set_color(
+    handle: WidgetTreeHandle,
+    icon_id: u64,
+    r: f32,
+    g: f32,
+    b: f32,
+    a: f32,
+) {
+    if handle.is_null() { return; }
+    unsafe {
+        let arc = &*(handle as *const Arc<Mutex<WidgetTree>>);
+        let mut tree = arc.lock();
+        let id = WidgetId::from_raw(icon_id);
+        if let Some(widget) = tree.get_widget_mut(id) {
+            if let Some(icon) = widget.as_any_mut().downcast_mut::<crate::widgets::IconWidget>() {
+                icon.set_color(Color::new(r, g, b, a));
+            }
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_icon_count() -> u32 {
+    crate::icons::ICON_COUNT
+}

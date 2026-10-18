@@ -299,6 +299,9 @@ pub project_add_entity: ProjectAddEntityFn,
         pub ui_theme_role_count: ThemeRoleCountFn,
         pub ui_widget_set_text_color: SetWidgetTextColorFn,
         pub ui_clear_widget_tree_keep_callbacks: ClearWidgetTreeKeepCallbacksFn,
+        pub ui_create_icon_in_parent: CreateIconInParentFn,
+        pub ui_icon_set_color: IconSetColorFn,
+        pub ui_icon_count: IconCountFn,
     }
 
 static mut FFI_CONTEXT: Option<Box<FfiContext>> = None;

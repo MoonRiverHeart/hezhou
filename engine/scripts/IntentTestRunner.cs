@@ -19,6 +19,7 @@ namespace Hezhou
             RunCase("intent.undo_redo_property", UndoRedoProperty);
             RunCase("intent.multi_select_batch", MultiSelectBatch);
             RunCase("intent.bind_rotation_script", BindRotationScript);
+            RunCase("intent.icon_system", IconSystem);
             RunCase("intent.console_open_close", ConsoleOpenClose);
             RunCase("intent.running_paused_editing", RunningPausedEditing);
         }
@@ -187,6 +188,13 @@ namespace Hezhou
                 throw new Exception("multi-select delete did not remove both entities");
             }
             return "2 entities selected, batch edit + multi-delete passed";
+        }
+
+        private static string IconSystem()
+        {
+            uint count = UI.IconCount();
+            if (count < 20) throw new Exception("expected icon set, actual=" + count);
+            return "icon count=" + count;
         }
 
         private static string BindRotationScript()

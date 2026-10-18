@@ -1,5 +1,17 @@
 # Bug Fixes Log
 
+## 2026-10-18: SVG 图标系统（P0）
+
+- 新增 `engine/assets/icons/*.svg`（24 个线性图标，16×16 viewBox）。
+- `engine/scripts/gen_icons.py` 解析 line/polyline/polygon/rect/circle，生成：
+  - `ui/src/icons.rs`：归一化线段表
+  - `scripts/IconIds.cs`：稳定 IconId 枚举
+- 新增 Rust `IconWidget`：按布局缩放、主题着色、任意 DPI 矢量绘制。
+- FFI：`ui_create_icon_in_parent`、`ui_icon_set_color`、`ui_icon_count`。
+- 编辑器工具栏、预览标题、属性标题已接入图标。
+- FFI 契约 274 / 274 / 274 OK。
+
+
 ## 2026-10-18: P0 双主题 Design Tokens + 视觉基线
 
 ### Added
@@ -20,7 +32,7 @@
   和当前属性 Tab。
 
 ### Verification
-- FFI contract: 271 / 271 / 271 OK
+- FFI contract: 274 / 274 / 274 OK
 - Visual: 7 / 7 screenshots OK（含 Dark/Light）
 
 ## 2026-10-18: UI Visual Regression Fixes

@@ -62,6 +62,7 @@ if (-not $McsPath) {
 $AllSourceFiles = @(
     "$ScriptsDir/RotationScript.cs",
     "$ScriptsDir/UI.cs",
+    "$ScriptsDir/IconIds.cs",
     "$ScriptsDir/UI.Theme.cs",
     "$ScriptsDir/UI.Widgets.cs",
     "$ScriptsDir/UI.ComplexWidgets.cs",
@@ -88,6 +89,7 @@ $AllSourceFiles = @(
 # UI相关脚本子集（用于快速编译UI模块）
 $UiSourceFiles = @(
     "$ScriptsDir/UI.cs",
+    "$ScriptsDir/IconIds.cs",
     "$ScriptsDir/UI.Theme.cs",
     "$ScriptsDir/UI.Widgets.cs",
     "$ScriptsDir/UI.ComplexWidgets.cs",

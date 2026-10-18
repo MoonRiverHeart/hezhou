@@ -428,6 +428,9 @@ fn main() {
         ui_theme_role_count: stub_theme_role_count,
         ui_widget_set_text_color: stub_widget_set_text_color,
         ui_clear_widget_tree_keep_callbacks: stub_clear_widget_tree_keep_callbacks,
+        ui_create_icon_in_parent: stub_create_icon_in_parent,
+        ui_icon_set_color: stub_icon_set_color,
+        ui_icon_count: stub_icon_count,
     };
     hezhou_scripting::ffi_context::set_ffi_context(ffi_ctx);
     let ffi_ptr = hezhou_scripting::ffi_context::get_ffi_context_ptr();
@@ -577,6 +580,9 @@ extern "C" fn stub_theme_role_count() -> u32 {
 
 extern "C" fn stub_widget_set_text_color(_: *mut std::ffi::c_void, _: u64, _: f32, _: f32, _: f32, _: f32) {}
 extern "C" fn stub_clear_widget_tree_keep_callbacks(_: *mut std::ffi::c_void) {}
+extern "C" fn stub_create_icon_in_parent(_: *mut std::ffi::c_void, _: u64, _: f32, _: f32, _: f32, _: f32, _: u32) -> u64 { 0 }
+extern "C" fn stub_icon_set_color(_: *mut std::ffi::c_void, _: u64, _: f32, _: f32, _: f32, _: f32) {}
+extern "C" fn stub_icon_count() -> u32 { 24 }
 
 // 新增stub函数 — Feature 1脚本绑定
 pub extern "C" fn scene_get_existing_ptr_stub() -> *mut std::ffi::c_void { std::ptr::null_mut() }

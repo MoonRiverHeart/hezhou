@@ -117,6 +117,28 @@ namespace Hezhou
             return CreatePanel(parentId, x, y, width, height, c.R, c.G, c.B, c.A);
         }
 
+        public static ulong CreateIcon(ulong parentId, float x, float y, float width, float height, IconId icon)
+        {
+            if (_ffi.ui_create_icon_in_parent == IntPtr.Zero) return 0;
+            var func = Marshal.GetDelegateForFunctionPointer<CreateIconInParentDelegate>(_ffi.ui_create_icon_in_parent);
+            return func(_widgetTree, parentId, x, y, width, height, (uint)icon);
+        }
+
+        public static void ThemeSetIconColor(ulong iconId, ThemeRole role)
+        {
+            if (_ffi.ui_icon_set_color == IntPtr.Zero) return;
+            ThemeColor color = ThemeColorOf(role);
+            var func = Marshal.GetDelegateForFunctionPointer<IconSetColorDelegate>(_ffi.ui_icon_set_color);
+            func(_widgetTree, iconId, color.R, color.G, color.B, color.A);
+        }
+
+        public static uint IconCount()
+        {
+            if (_ffi.ui_icon_count == IntPtr.Zero) return 0;
+            var func = Marshal.GetDelegateForFunctionPointer<IconCountDelegate>(_ffi.ui_icon_count);
+            return func();
+        }
+
         public static ulong CreateTextEdit(ulong parentId, float width, float height)
         {
             if (_ffi.ui_create_text_edit_in_parent == IntPtr.Zero)

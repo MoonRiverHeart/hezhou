@@ -99,6 +99,8 @@ namespace Hezhou
             // 工具栏底部强调线，划分工具栏与主工作区。
             new Panel(rootId, 0, TOOLBAR_HEIGHT - 2f, _screenWidth, 2f, ThemeRole.Accent);
 
+            ulong appIcon = UI.CreateIcon(_toolbarButtons.Id, 0f, 0f, 20f, 20f, IconId.Cube);
+            UI.ThemeSetIconColor(appIcon, ThemeRole.Accent);
             CreateToolbarMenus();
             
             var fileMenuLabel = _toolbarButtons.AddLabel(80f, 30f, "文件");
@@ -205,7 +207,9 @@ namespace Hezhou
 
             // Second pane of Inner SplitView: Preview panel
             _previewPanel = new Panel(_innerHorizontalSplitViewId, 0, 0, 0, 0, ThemeRole.Canvas);
-            UI.CreateLabel(_previewPanel.Id, 10f, 10f, 200f, 25f, "游戏预览");
+            ulong previewIcon = UI.CreateIcon(_previewPanel.Id, 10f, 10f, 18f, 18f, IconId.Play);
+            UI.ThemeSetIconColor(previewIcon, ThemeRole.Success);
+            UI.CreateLabel(_previewPanel.Id, 34f, 10f, 200f, 25f, "游戏预览");
             
             float initialPreviewWidth = _screenWidth * 0.75f * 0.67f - 20f;
             float initialPreviewHeight = mainHeight * 0.7f - 50f;
@@ -250,7 +254,9 @@ namespace Hezhou
             _assetTabWidget.AddTab("场景", sceneTabContent, false);
 
             // === Properties Panel: 5-tab TabWidget ===
-            UI.CreateLabel(_rightPanel.Id, 10f, 10f, 200f, 25f, "属性编辑");
+            ulong inspectorIcon = UI.CreateIcon(_rightPanel.Id, 10f, 10f, 18f, 18f, IconId.Settings);
+            UI.ThemeSetIconColor(inspectorIcon, ThemeRole.TextSecondary);
+            UI.CreateLabel(_rightPanel.Id, 34f, 10f, 200f, 25f, "属性编辑");
             
             float tabWidgetY = 40f;
             float tabWidgetHeight = mainHeight - tabWidgetY - 10f;

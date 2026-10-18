@@ -80,6 +80,15 @@ namespace Hezhou
         public delegate ulong CreatePanelInParentDelegate(IntPtr handle, ulong parentId, float x, float y, float width, float height, float r, float g, float b, float a);
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate ulong CreateIconInParentDelegate(IntPtr handle, ulong parentId, float x, float y, float width, float height, uint iconId);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void IconSetColorDelegate(IntPtr handle, ulong iconId, float r, float g, float b, float a);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate uint IconCountDelegate();
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public delegate ulong GetRootIdDelegate(IntPtr handle);
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public delegate void ClearWidgetTreeDelegate(IntPtr handle);
@@ -1154,6 +1163,9 @@ namespace Hezhou
             public IntPtr ui_theme_role_count;
             public IntPtr ui_widget_set_text_color;
             public IntPtr ui_clear_widget_tree_keep_callbacks;
+            public IntPtr ui_create_icon_in_parent;
+            public IntPtr ui_icon_set_color;
+            public IntPtr ui_icon_count;
         }
 
         public static void InitFromContext(IntPtr contextPtr)

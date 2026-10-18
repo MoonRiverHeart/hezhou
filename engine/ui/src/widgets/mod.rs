@@ -21,6 +21,7 @@ pub mod slider;
 pub mod scroll_view;
 pub mod split_view;
 pub mod image;
+pub mod icon;
 
 pub use button::Button;
 pub use checkbox::Checkbox;
@@ -52,4 +53,5 @@ pub use scroll_view::ScrollView;
 pub use split_view::SplitView;
 pub use split_view::SplitOrientation;
 pub use image::Image;
+pub use icon::IconWidget;
 pub use image::ImageScaleMode;
