@@ -28,7 +28,8 @@ namespace Hezhou
             "打开项目            Ctrl+O",
             "收起/展开项目面板",
             "收起/展开资产面板",
-            "浮动资产面板"
+            "浮动资产面板",
+            "纹理页停靠右侧/回到底部"
         };
 
         public static bool IsCommandPaletteOpen { get { return _commandPanelId != 0; } }
@@ -72,6 +73,7 @@ namespace Hezhou
                 case 11: ToggleProjectPanel(); break;
                 case 12: ToggleAssetPanel(); break;
                 case 13: ToggleFloatingAssetPanel(); break;
+                case 14: ToggleTextureDock(); break;
             }
         }
 

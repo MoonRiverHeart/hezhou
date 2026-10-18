@@ -51,6 +51,9 @@ namespace Hezhou
                         case "assetCollapsed":
                             _assetCollapsed = value == "1";
                             break;
+                        case "textureDocked":
+                            _textureDockedRight = value == "1";
+                            break;
                     }
                 }
             }
@@ -124,7 +127,8 @@ namespace Hezhou
                     "assetTab=" + _dockAssetTab + "\n" +
                     "rightMax=" + (_rightPanelMaximized ? "1" : "0") + "\n" +
                     "projectCollapsed=" + (_projectCollapsed ? "1" : "0") + "\n" +
-                    "assetCollapsed=" + (_assetCollapsed ? "1" : "0") + "\n");
+                    "assetCollapsed=" + (_assetCollapsed ? "1" : "0") + "\n" +
+                    "textureDocked=" + (_textureDockedRight ? "1" : "0") + "\n");
             }
             catch (Exception) { }
         }
@@ -194,6 +198,21 @@ namespace Hezhou
             SaveDockLayout();
         }
 
+        public static void ToggleTextureDock()
+        {
+            _textureDockedRight = !_textureDockedRight;
+            SaveDockLayout();
+            RebuildUIForTheme();
+            if (_textureDockedRight && _propsTabWidget != null && _propsTabWidget.GetTabCount() > 5)
+            {
+                _propsTabWidget.SetActive(5);
+            }
+            if (_statusItem != null) _statusItem.Text = _textureDockedRight ? "纹理页已停靠右侧" : "纹理页已回到底部";
+        }
+
+        public static void TestToggleTextureDock() { ToggleTextureDock(); }
+        public static bool TestIsTextureDockedRight() { return _textureDockedRight; }
+
         public static void TestToggleAssetPanel() { ToggleAssetPanel(); }
         public static void TestToggleProjectPanel() { ToggleProjectPanel(); }
 
@@ -205,6 +224,7 @@ namespace Hezhou
             _rightPanelMaximized = false;
             _projectCollapsed = false;
             _assetCollapsed = false;
+            _textureDockedRight = false;
             _dockOuterRatio = 0.72f;
             _dockLeftCenterRatio = 0.70f;
             _dockInnerRatio = 0.38f;

@@ -271,13 +271,11 @@ namespace Hezhou
             }
             _materialTabItemCount = materialTotal;
             
-            ulong textureTabContent = UI.CreateScrollView(_assetTabWidget.Id, 0, 0, 0, 0);
-            ulong textureContentStack = UI.CreateVStack(textureTabContent, 6f);
-            UI.SetWidgetLayout(textureContentStack, 5f, 5f, 880f, 300f);
-            UI.CreateLabel(textureContentStack, 300f, 22f, "纹理库");
-            _assetTextureGridViewId = UI.CreateGridView(textureContentStack, 0f, 0f, 860f, 240f, 64);
-            RefreshTextureGridView();
-            UI.GridViewSetOnClick(_assetTextureGridViewId, _textureGridClickCallback);
+            ulong textureTabContent = 0;
+            if (!_textureDockedRight)
+            {
+                textureTabContent = BuildTextureTabContent(_assetTabWidget.Id);
+            }
 
             ulong scriptTabContent = UI.CreateVStack(_assetTabWidget.Id, 5f);
             UI.CreateLabel(scriptTabContent, 200f, 25f, "脚本列表 (待实现)");
@@ -287,7 +285,10 @@ namespace Hezhou
             
             _assetTabWidget.AddTab("模型", modelTabContent, false);
             _assetTabWidget.AddTab("材质", materialTabContent, false);
-            _assetTabWidget.AddTab("纹理", textureTabContent, false);
+            if (!_textureDockedRight)
+            {
+                _assetTabWidget.AddTab("纹理", textureTabContent, false);
+            }
             _assetTabWidget.AddTab("脚本", scriptTabContent, false);
             _assetTabWidget.AddTab("场景", sceneTabContent, false);
             _assetTabWidget.SetReorderable(true);
@@ -399,6 +400,11 @@ namespace Hezhou
             _propsTabWidget.AddTab("渲染", _renderTabContentId, false);
             _propsTabWidget.AddTab("运动", _motionTabContentId, false);
             _propsTabWidget.AddTab("物理", _physicsTabContentId, false);
+            if (_textureDockedRight)
+            {
+                ulong rightTextureContent = BuildTextureTabContent(_propsTabWidget.Id);
+                _propsTabWidget.AddTab("纹理", rightTextureContent, false);
+            }
             _propsTabWidget.SetOnSelect(_tabSelectCallback);
 
             // === Status Bar (fixed, bottom) ===
@@ -470,6 +476,19 @@ namespace Hezhou
             
             // Initially hidden — only shown when user clicks "编辑器" button
             UI.SetWidgetVisible(_scriptEditorPanel.Id, false);
+        }
+
+        private static ulong BuildTextureTabContent(ulong parentId)
+        {
+            ulong textureTabContent = UI.CreateScrollView(parentId, 0, 0, 0, 0);
+            ulong textureContentStack = UI.CreateVStack(textureTabContent, 6f);
+            UI.SetWidgetLayout(textureContentStack, 5f, 5f, 320f, 300f);
+            UI.CreateLabel(textureContentStack, 300f, 22f, "纹理库");
+            _assetTextureGridViewId = UI.CreateGridView(textureContentStack, 0f, 0f, 300f, 240f, 64);
+            RefreshTextureGridView();
+            UI.GridViewSetOnClick(_assetTextureGridViewId, _textureGridClickCallback);
+            _assetTextureTabContentId = textureTabContent;
+            return textureTabContent;
         }
 
         // === Build a single property widget into a target container ===

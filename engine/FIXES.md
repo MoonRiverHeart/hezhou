@@ -1,5 +1,13 @@
 # Bug Fixes Log
 
+## 2026-10-18: Dock v2 跨区域停靠（纹理页）
+
+- 纹理页可停靠到右侧属性 Tab（`纹理页停靠右侧/回到底部` 命令）。
+- 状态持久化 `.hezhou_layout` `textureDocked`；重建 UI 保持 Scene。
+- intent `texture_dock`（23/23）；visual `29_texture_docked_right`、`30_texture_dock_restored`。
+- 拖拽式跨区域停靠仍未实现，当前为命令式停靠。
+
+
 ## 2026-10-18: Asset Browser 纹理 Tab 与程序化缩略图
 
 - 新增“纹理”Tab，读取 AssetLibrary Textures 分类。

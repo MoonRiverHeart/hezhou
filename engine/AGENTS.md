@@ -385,3 +385,7 @@ glslc shaders/rotation.frag -o shaders/rotation.frag.spv
 
 ### 37. Asset Browser 纹理 Tab (2026-10-18)
 - Textures 分类 + 程序化 solid/checker/UV 缩略图；intent 22/22；visual 28 张。
+
+### 38. Dock v2 跨区域停靠（纹理页） (2026-10-18)
+- 纹理页命令式停靠到右侧属性 Tab，状态持久化；intent 23/23；visual 30 张。
+- 拖拽式跨区域停靠未实现。
