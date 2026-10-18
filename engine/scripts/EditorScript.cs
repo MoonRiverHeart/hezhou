@@ -88,6 +88,7 @@ _bindScriptClickCallback = OnBindScriptClick;
             _treeNodeRightClickCallback = OnTreeNodeRightClick;
             _gridViewClickCallback = OnGridViewClick;
             _materialClickCallback = OnMaterialButtonClick;
+            _tabDragEndCallback = OnTabDragEnd;
             _textureGridClickCallback = OnTextureGridClick;
             _fileBrowserSelectCallback = OnFileBrowserSelect;
             _workingDirectoryDialogResultCallback = OnWorkingDirectoryDialogResult;
@@ -158,6 +159,7 @@ _bindScriptClickCallback = OnBindScriptClick;
             
             UI.RegisterResizeCallback(_resizeCallback);
             UI.RegisterGlobalClickCallback(_globalClickCallback);
+            UI.RegisterTabDragEndCallback(_tabDragEndCallback);
             UI.RegisterKeyCallback(_keyCallback);
             UI.RegisterMouseMoveCallback(_mouseMoveCallback);
             UI.RegisterMouseWheelCallback(_mouseWheelCallback);

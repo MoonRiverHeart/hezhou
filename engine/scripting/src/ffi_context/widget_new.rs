@@ -98,3 +98,4 @@ pub type ImageSetUvFn = extern "C" fn(WidgetTreeHandle, u64, f32, f32, f32, f32)
 pub type TextEditSetCursorLineFn = extern "C" fn(WidgetTreeHandle, u64, u32);
 pub type TabWidgetMoveTabFn = extern "C" fn(WidgetTreeHandle, u64, usize, usize);
 pub type TabWidgetSetReorderableFn = extern "C" fn(WidgetTreeHandle, u64, bool);
+pub type RegisterTabDragEndThunkPtrFn = extern "C" fn(*const std::ffi::c_void);

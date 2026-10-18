@@ -49,6 +49,7 @@ pub struct UICallbacks {
     pub on_split_view_ratio_change: HashMap<u64, SplitViewRatioChangeCallback>,
     pub on_mouse_wheel: Option<MouseWheelCallback>,
     pub on_tree_node_right_click: Option<TreeNodeRightClickCallback>,
+    pub on_tab_drag_end: Option<TabDragEndCallback>,
 }
 
 impl UICallbacks {
@@ -81,6 +82,7 @@ pub fn new() -> Self {
                 on_split_view_ratio_change: HashMap::new(),
                 on_mouse_wheel: None,
                 on_tree_node_right_click: None,
+                on_tab_drag_end: None,
             }
         }
 
@@ -112,6 +114,7 @@ pub fn new() -> Self {
         self.on_split_view_ratio_change.clear();
         self.on_mouse_wheel = None;
         self.on_tree_node_right_click = None;
+        self.on_tab_drag_end = None;
     }
 }
 

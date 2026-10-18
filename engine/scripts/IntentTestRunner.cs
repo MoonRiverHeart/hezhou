@@ -35,6 +35,7 @@ namespace Hezhou
             RunCase("intent.texture_browser", TextureBrowser);
             RunCase("intent.texture_dock", TextureDock);
             RunCase("intent.texture_bmp", TextureBmp);
+            RunCase("intent.texture_drag_dock", TextureDragDock);
             RunCase("intent.console_open_close", ConsoleOpenClose);
             RunCase("intent.running_paused_editing", RunningPausedEditing);
         }
@@ -203,6 +204,15 @@ namespace Hezhou
                 throw new Exception("multi-select delete did not remove both entities");
             }
             return "2 entities selected, batch edit + multi-delete passed";
+        }
+
+        private static string TextureDragDock()
+        {
+            EditorScript.TestDragTextureTabToRight();
+            if (!EditorScript.TestIsTextureDockedRight()) throw new Exception("drag dock right failed");
+            EditorScript.TestDragTextureTabBack();
+            if (EditorScript.TestIsTextureDockedRight()) throw new Exception("drag dock back failed");
+            return "drag dock right/back";
         }
 
         private static string TextureBmp()

@@ -41,6 +41,14 @@ namespace Hezhou
             func(_widgetTree, tabWidgetId, enabled);
         }
 
+        public static void RegisterTabDragEndCallback(TabDragEndDelegate callback)
+        {
+            if (_ffi.ui_register_tab_drag_end_thunk_ptr == IntPtr.Zero) return;
+            _savedTabDragEndCallback = callback;
+            var func = Marshal.GetDelegateForFunctionPointer<RegisterTabDragEndDelegate>(_ffi.ui_register_tab_drag_end_thunk_ptr);
+            func(Marshal.GetFunctionPointerForDelegate(callback));
+        }
+
         public static void TabWidgetSetActive(ulong tabWidgetId, ulong index)
         {
             if (_ffi.ui_tab_widget_set_active == IntPtr.Zero)

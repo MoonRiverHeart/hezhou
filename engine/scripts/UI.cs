@@ -13,6 +13,7 @@ namespace Hezhou
         
         private static ResizeCallbackDelegate _savedResizeCallback;
         private static GlobalClickCallbackDelegate _savedGlobalClickCallback;
+        private static TabDragEndDelegate _savedTabDragEndCallback;
         private static KeyCallbackDelegate _savedKeyCallback;
         private static MouseMoveCallbackDelegate _savedMouseMoveCallback;
         private static MouseWheelCallbackDelegate _savedMouseWheelCallback;
@@ -106,6 +107,12 @@ namespace Hezhou
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public delegate void TabWidgetSetReorderableDelegate(IntPtr handle, ulong widgetId, bool enabled);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void TabDragEndDelegate(ulong widgetId, int index, float x, float y, string title);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void RegisterTabDragEndDelegate(IntPtr callbackPtr);
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public delegate ulong GetRootIdDelegate(IntPtr handle);
@@ -1191,6 +1198,7 @@ namespace Hezhou
             public IntPtr scene_get_entity_material;
             public IntPtr ui_tab_widget_move_tab;
             public IntPtr ui_tab_widget_set_reorderable;
+            public IntPtr ui_register_tab_drag_end_thunk_ptr;
         }
 
         public static void InitFromContext(IntPtr contextPtr)

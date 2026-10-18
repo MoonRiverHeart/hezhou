@@ -43,6 +43,8 @@ EXPECTED = [
     "29_texture_docked_right.png",
     "30_texture_dock_restored.png",
     "31_texture_bmp.png",
+    "32_drag_dock_right.png",
+    "33_drag_dock_back.png",
 ]
 
 

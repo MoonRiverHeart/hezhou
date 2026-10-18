@@ -437,6 +437,7 @@ fn main() {
         scene_get_entity_material: stub_scene_get_entity_material,
         ui_tab_widget_move_tab: stub_tab_move,
         ui_tab_widget_set_reorderable: stub_tab_reorder,
+        ui_register_tab_drag_end_thunk_ptr: stub_register_tab_drag_end,
     };
     hezhou_scripting::ffi_context::set_ffi_context(ffi_ctx);
     let ffi_ptr = hezhou_scripting::ffi_context::get_ffi_context_ptr();
@@ -595,6 +596,7 @@ extern "C" fn stub_scene_set_entity_material(_: *mut std::ffi::c_void, _: u64, _
 extern "C" fn stub_scene_get_entity_material(_: *mut std::ffi::c_void, _: u64, _: *mut std::ffi::c_char, _: usize) -> usize { 0 }
 extern "C" fn stub_tab_move(_: *mut std::ffi::c_void, _: u64, _: usize, _: usize) {}
 extern "C" fn stub_tab_reorder(_: *mut std::ffi::c_void, _: u64, _: bool) {}
+extern "C" fn stub_register_tab_drag_end(_: *const std::ffi::c_void) {}
 
 // 新增stub函数 — Feature 1脚本绑定
 pub extern "C" fn scene_get_existing_ptr_stub() -> *mut std::ffi::c_void { std::ptr::null_mut() }

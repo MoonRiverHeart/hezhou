@@ -198,8 +198,48 @@ namespace Hezhou
             SaveDockLayout();
         }
 
+        private static void OnTabDragEnd(ulong widgetId, int index, float localX, float localY, string title)
+        {
+            if (title != "纹理") return;
+            float[] layout = UI.WidgetGetAbsoluteLayout(widgetId);
+            float screenX = (layout != null && layout.Length >= 4) ? layout[0] + localX : localX;
+            float screenY = (layout != null && layout.Length >= 4) ? layout[1] + localY : localY;
+
+            if (!_textureDockedRight && widgetId == _assetTabWidget.Id
+                && screenX > _screenWidth * 0.70f)
+            {
+                ToggleTextureDock();
+            }
+            else if (_textureDockedRight && widgetId == _propsTabWidget.Id
+                && screenX < _screenWidth * 0.70f)
+            {
+                ToggleTextureDock();
+            }
+            else if (_statusItem != null)
+            {
+                _statusItem.Text = "拖拽 Tab: 未命中 Dock 区域";
+            }
+        }
+
+        public static void TestDragTextureTabToRight()
+        {
+            float[] layout = UI.WidgetGetAbsoluteLayout(_assetTabWidget.Id);
+            float x = _screenWidth * 0.85f - (layout != null && layout.Length >= 4 ? layout[0] : 0f);
+            OnTabDragEnd(_assetTabWidget.Id, 2, x, 0f, "纹理");
+        }
+
+        public static void TestDragTextureTabBack()
+        {
+            float[] layout = UI.WidgetGetAbsoluteLayout(_propsTabWidget.Id);
+            float x = _screenWidth * 0.2f - (layout != null && layout.Length >= 4 ? layout[0] : 0f);
+            OnTabDragEnd(_propsTabWidget.Id, 5, x, 0f, "纹理");
+        }
+
         public static void ToggleTextureDock()
         {
+            // 纹理停靠不应继承右侧最大化状态，否则重建后右栏会占满全屏。
+            _rightPanelMaximized = false;
+            if (_dockOuterRatio < 0.55f) _dockOuterRatio = 0.72f;
             _textureDockedRight = !_textureDockedRight;
             SaveDockLayout();
             RebuildUIForTheme();
@@ -207,6 +247,14 @@ namespace Hezhou
             {
                 _propsTabWidget.SetActive(5);
             }
+            if (_outerSplitViewId != 0)
+            {
+                _dockOuterRatio = 0.72f;
+                UI.SplitViewSetMinRatio(_outerSplitViewId, 0.4f);
+                UI.SplitViewSetMaxRatio(_outerSplitViewId, 0.9f);
+                UI.SplitViewSetSplitRatio(_outerSplitViewId, _dockOuterRatio);
+            }
+            SaveDockLayout();
             if (_statusItem != null) _statusItem.Text = _textureDockedRight ? "纹理页已停靠右侧" : "纹理页已回到底部";
         }
 

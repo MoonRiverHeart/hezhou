@@ -660,3 +660,10 @@ pub extern "C" fn ui_debug_dump_tree_to_buffer(
         write_len as u32
     }
 }
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_register_tab_drag_end_thunk_ptr(callback_ptr: *const std::ffi::c_void) {
+    if callback_ptr.is_null() { return; }
+    let callback: crate::thunk::TabDragEndCallback = unsafe { std::mem::transmute(callback_ptr) };
+    crate::thunk::ui_register_tab_drag_end_callback(callback);
+}

@@ -191,3 +191,9 @@ pub extern "C" fn ui_register_tree_node_right_click_callback(callback: TreeNodeR
     callbacks.on_tree_node_right_click = Some(callback);
     dfx_debug!("UI", "注册TreeNodeRightClick全局回调");
 }
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_register_tab_drag_end_callback(callback: crate::thunk::types::TabDragEndCallback) {
+    let mut callbacks = UI_CALLBACKS.lock();
+    callbacks.on_tab_drag_end = Some(callback);
+}

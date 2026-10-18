@@ -1,5 +1,13 @@
 # Bug Fixes Log
 
+## 2026-10-18: 拖拽式跨区域 Dock
+
+- TabWidget 拖拽结束时通过 `on_tab_drag_end` 回调把 Tab 标题/坐标交给 C#。
+- C# 判断拖到右侧属性区/左侧区域，调用纹理页停靠切换。
+- 修复停靠重建后外部分割比例异常（强制恢复 0.72）。
+- FFI 281 字段；intent `texture_drag_dock`（25/25）；visual `32_drag_dock_right`、`33_drag_dock_back`。
+
+
 ## 2026-10-18: 文件纹理缩略图（BMP → 8x8 像素）
 
 - 新增 `assets/textures/gradient.bmp`，启动时通过 AssetLibrary 加载。

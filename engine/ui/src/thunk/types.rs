@@ -25,3 +25,4 @@ pub type ScrollViewScrollCallback = extern "C" fn(u64, f32);
 pub type SplitViewRatioChangeCallback = extern "C" fn(u64, f32);
 pub type MouseWheelCallback = extern "C" fn(f32, f32);
 pub type TreeNodeRightClickCallback = extern "C" fn(u64, f32, f32);
+pub type TabDragEndCallback = extern "C" fn(u64, usize, f32, f32, *const std::ffi::c_char);

@@ -497,7 +497,15 @@ impl Widget for TabWidget {
                 if let EventData::Touch(touch) = &event.data {
                     let local_x = touch.x;
                     let local_y = touch.y;
-                    
+
+                    if let (Some(pressed), Some(start_x)) = (self.pressed_tab_index, self.drag_start_x) {
+                        let outside_bar = local_y < 0.0 || local_y > self.tab_bar_height * self.content_scale + 10.0;
+                        if (local_x - start_x).abs() > 30.0 * self.content_scale || outside_bar {
+                            let title = self.tabs.get(pressed).map(|t| t.title.clone()).unwrap_or_default();
+                            trigger_tab_drag_end(self.id.id, pressed, local_x, local_y, &title);
+                        }
+                    }
+
                     if let Some(pressed_index) = self.pressed_tab_index {
                         if let Some(index) = self.hit_test_tab(local_x, local_y) {
                             if index == pressed_index {

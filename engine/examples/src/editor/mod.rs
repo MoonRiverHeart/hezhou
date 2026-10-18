@@ -404,6 +404,9 @@ ui_widget_get_layout: unsafe { std::mem::transmute(ui_ffi::ui_widget_get_layout 
         ui_tab_widget_set_reorderable: unsafe {
             std::mem::transmute(hezhou_ui::ffi::ui_tab_widget_set_reorderable as *const std::ffi::c_void)
         },
+        ui_register_tab_drag_end_thunk_ptr: unsafe {
+            std::mem::transmute(hezhou_ui::ffi::ui_register_tab_drag_end_thunk_ptr as *const std::ffi::c_void)
+        },
         ui_set_widget_visible: unsafe { std::mem::transmute(ffi_impl::set_widget_visible as *const std::ffi::c_void) },
         get_pipeline_names: unsafe { std::mem::transmute(ffi_impl::get_pipeline_names as *const std::ffi::c_void) },
         switch_pipeline: unsafe { std::mem::transmute(ffi_impl::switch_pipeline as *const std::ffi::c_void) },

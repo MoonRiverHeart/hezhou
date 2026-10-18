@@ -308,6 +308,7 @@ pub project_add_entity: ProjectAddEntityFn,
         pub scene_get_entity_material: SceneGetEntityMaterialFn,
         pub ui_tab_widget_move_tab: TabWidgetMoveTabFn,
         pub ui_tab_widget_set_reorderable: TabWidgetSetReorderableFn,
+        pub ui_register_tab_drag_end_thunk_ptr: RegisterTabDragEndThunkPtrFn,
     }
 
 static mut FFI_CONTEXT: Option<Box<FfiContext>> = None;

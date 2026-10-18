@@ -285,3 +285,15 @@ pub fn trigger_tree_node_right_click_callback(widget_id: u64, x: f32, y: f32) {
         cb(widget_id, x, y);
     }
 }
+
+pub fn trigger_tab_drag_end(widget_id: u64, index: usize, x: f32, y: f32, title: &str) {
+    let callback = {
+        let callbacks = UI_CALLBACKS.lock();
+        callbacks.on_tab_drag_end
+    };
+    if let Some(cb) = callback {
+        if let Ok(cstr) = std::ffi::CString::new(title) {
+            cb(widget_id, index, x, y, cstr.as_ptr());
+        }
+    }
+}
