@@ -1,5 +1,14 @@
 # Bug Fixes Log
 
+## 2026-10-18: 引擎基础能力：ECS 系统、物理碰撞、几何射线
+
+- ECS：`World::update` 真正驱动 `SystemScheduler`，新增 `LifetimeComponent` /
+  `LifetimeSystem`，Scene 默认注册。
+- 物理：`PhysicsWorld` 新增 AABB 碰撞检测、碰撞事件、简单重叠分离；球/盒碰撞测试。
+- 几何：`BoundingBox::intersects_ray` slab 射线求交，含测试。
+- Rust 测试：core 全通过，physics 2 用例，geometry 2 用例。
+
+
 ## 2026-10-18: 拖拽式跨区域 Dock
 
 - TabWidget 拖拽结束时通过 `on_tab_drag_end` 回调把 Tab 标题/坐标交给 C#。

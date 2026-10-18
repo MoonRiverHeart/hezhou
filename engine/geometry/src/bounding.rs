@@ -69,6 +69,31 @@ impl BoundingBox {
             && self.max.z >= other.min.z
     }
 
+    /// Slab 法射线求交，返回最近正 t；未命中返回 None。
+    pub fn intersects_ray(&self, origin: &Vector3<f32>, direction: &Vector3<f32>) -> Option<f32> {
+        let mut tmin = f32::NEG_INFINITY;
+        let mut tmax = f32::INFINITY;
+        for axis in 0..3 {
+            let o = origin[axis];
+            let d = direction[axis];
+            let mn = self.min[axis];
+            let mx = self.max[axis];
+            if d.abs() < 1e-8 {
+                if o < mn || o > mx { return None; }
+                continue;
+            }
+            let inv = 1.0 / d;
+            let mut t1 = (mn - o) * inv;
+            let mut t2 = (mx - o) * inv;
+            if t1 > t2 { std::mem::swap(&mut t1, &mut t2); }
+            tmin = tmin.max(t1);
+            tmax = tmax.min(t2);
+            if tmin > tmax { return None; }
+        }
+        if tmax < 0.0 { return None; }
+        Some(if tmin >= 0.0 { tmin } else { 0.0 })
+    }
+
     pub fn merge(&self, other: &BoundingBox) -> BoundingBox {
         BoundingBox::new(self.min.inf(&other.min), self.max.sup(&other.max))
     }

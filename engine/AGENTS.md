@@ -402,3 +402,8 @@ glslc shaders/rotation.frag -o shaders/rotation.frag.spv
 ### 42. 拖拽式跨区域 Dock (2026-10-18)
 - TabWidget drag-end 回调 + C# 区域判定；纹理页可拖到右侧/拖回。
 - FFI 281 字段；intent 25/25；visual 33 张。
+
+### 43. 引擎基础：ECS 系统 / 物理碰撞 / 几何射线 (2026-10-18)
+- World::update 驱动 SystemScheduler；LifetimeComponent/LifetimeSystem。
+- PhysicsWorld AABB 碰撞检测 + CollisionEvent + 简单分离。
+- BoundingBox::intersects_ray 射线求交；Rust 测试通过。

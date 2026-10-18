@@ -130,9 +130,14 @@ impl World {
         self.scheduler.add_system(system);
     }
 
-    pub fn update(&mut self, _delta_time: f32) {
-        // Note: Systems cannot access World directly in this simple implementation
-        // A more sophisticated ECS would use a command buffer pattern
+    pub fn update(&mut self, delta_time: f32) {
+        let mut scheduler = std::mem::take(&mut self.scheduler);
+        scheduler.update(self, delta_time);
+        self.scheduler = scheduler;
+    }
+
+    pub fn scheduler_mut(&mut self) -> &mut SystemScheduler {
+        &mut self.scheduler
     }
 
     pub fn entity_count(&self) -> usize {

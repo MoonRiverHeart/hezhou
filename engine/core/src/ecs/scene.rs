@@ -49,8 +49,10 @@ pub struct Scene {
 
 impl Scene {
     pub fn new() -> Self {
+        let mut world = World::new();
+        world.add_system(Box::new(LifetimeSystem));
         Self {
-            world: World::new(),
+            world,
             state: GameState::Editing,
             selected_entities: Vec::new(),
             script_assets: HashMap::new(),
@@ -589,4 +591,26 @@ impl Default for Scene {
     fn default() -> Self {
         Self::new()
     }
+}
+
+/// 内置 LifetimeSystem：递减 LifetimeComponent，归零销毁实体。
+pub struct LifetimeSystem;
+
+impl crate::ecs::System for LifetimeSystem {
+    fn name(&self) -> &'static str { "LifetimeSystem" }
+    fn update(&mut self, world: &mut crate::ecs::World, delta_time: f32) {
+        let ids: Vec<crate::ecs::Entity> = world.all_entities().into_iter()
+            .filter(|e| world.get_component::<crate::ecs::components::LifetimeComponent>(*e).is_some())
+            .collect();
+        for entity in ids {
+            let expire = if let Some(mut life) = world.get_component::<crate::ecs::components::LifetimeComponent>(entity) {
+                life.remaining -= delta_time;
+                let expired = life.remaining <= 0.0 && life.destroy_on_expire;
+                world.add_component(entity, life);
+                expired
+            } else { false };
+            if expire { world.destroy_entity(entity); }
+        }
+    }
+    fn priority(&self) -> i32 { 1000 }
 }
