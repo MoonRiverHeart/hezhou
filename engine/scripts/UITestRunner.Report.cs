@@ -432,7 +432,7 @@ namespace Hezhou
         private static void VisualGalleryRestore()
         {
             EditorScript.TestHideWidgetGallery();
-            EditorScript.TestClickThemeButton();
+            EditorScript.TestSetTheme(ThemeMode.Dark);
         }
 
         private static void VisualRightPanelMax()

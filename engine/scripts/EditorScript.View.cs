@@ -388,6 +388,18 @@ namespace Hezhou
             UI.SetWidgetLayout(_projectItem.Id, 290f, 2f, 150f, itemHeight);
             UI.SetListItemFontSize(_projectItem.Id, fontSize);
 
+            _selectionItem = _statusItems.AddItem("选择: 0", true);
+            UI.SetWidgetLayout(_selectionItem.Id, 450f, 2f, 120f, itemHeight);
+            UI.SetListItemFontSize(_selectionItem.Id, fontSize);
+
+            _themeItem = _statusItems.AddItem(Theme.IsDark ? "主题: 深色" : "主题: 浅色", true);
+            UI.SetWidgetLayout(_themeItem.Id, 580f, 2f, 140f, itemHeight);
+            UI.SetListItemFontSize(_themeItem.Id, fontSize);
+
+            _errorItem = _statusItems.AddItem("错误: 0", true);
+            UI.SetWidgetLayout(_errorItem.Id, 730f, 2f, 120f, itemHeight);
+            UI.SetListItemFontSize(_errorItem.Id, fontSize);
+
             // === Script Editor Panel (pre-created, initially hidden) ===
             // Created under rootId at the same level as outerSplitView, toggled via SetWidgetVisible
             float editorY = TOOLBAR_HEIGHT;

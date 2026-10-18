@@ -94,6 +94,9 @@ namespace Hezhou
         private static ListItem _fpsItem;
         private static ListItem _statusItem;
         private static ListItem _projectItem;
+        private static ListItem _selectionItem;
+        private static ListItem _themeItem;
+        private static ListItem _errorItem;
 
         // === Toolbar State ===
         private static ulong _runButtonId;

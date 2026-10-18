@@ -597,6 +597,7 @@ namespace Hezhou
             
             _selectedEntityId = 0;
             _selectedEntityIds.Clear();
+            UpdateSelectionStatus();
             ClearScriptBindingUI();
             ClearEntityNodeSelectionHighlights();
             
@@ -1096,6 +1097,11 @@ namespace Hezhou
             }
         }
         
+        private static void UpdateSelectionStatus()
+        {
+            if (_selectionItem != null) _selectionItem.Text = "选择: " + _selectedEntityIds.Count;
+        }
+
         private static void SelectEntity(ulong entityId)
         {
             if (_gameScene == null) return;
@@ -1103,6 +1109,7 @@ namespace Hezhou
             _selectedEntityId = entityId;
             _selectedEntityIds.Clear();
             _selectedEntityIds.Add(entityId);
+            UpdateSelectionStatus();
             ClearEntityNodeSelectionHighlights();
             UpdatePropertiesPanel(entityId);
             if (_entityNodeMap.TryGetValue(entityId, out var nodeId))
@@ -1148,6 +1155,7 @@ namespace Hezhou
                 _selectedEntityId = entityId;
             }
 
+            UpdateSelectionStatus();
             for (int i = 0; i < _selectedEntityIds.Count; i++)
             {
                 if (_entityNodeMap.TryGetValue(_selectedEntityIds[i], out ulong nodeId))
@@ -1183,7 +1191,9 @@ namespace Hezhou
                 _selectedEntityIds.Add(id);
             }
             _selectedEntityId = primary;
+            UpdateSelectionStatus();
             ClearEntityNodeSelectionHighlights();
+            UpdateSelectionStatus();
             for (int i = 0; i < _selectedEntityIds.Count; i++)
             {
                 if (_entityNodeMap.TryGetValue(_selectedEntityIds[i], out ulong nodeId))

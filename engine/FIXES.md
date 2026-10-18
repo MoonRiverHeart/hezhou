@@ -1,5 +1,17 @@
 # Bug Fixes Log
 
+## 2026-10-18: 状态栏 v2 + CI 环境固化
+
+- 状态栏新增：选择数量、主题、错误数；选择/范围选择/主题切换时即时更新。
+- 修复自动测试模式下状态栏不刷新（原先只在正常 Update 更新）。
+- CI 固化：
+  - Rust 1.95.0、Mono 6.12.0.199、Python 3.11
+  - `CMAKE_GENERATOR=Visual Studio 17 2022`、`CMAKE_BUILD_PARALLEL_LEVEL=1`
+  - `Swatinem/rust-cache`
+  - 图标生成器一致性检查 `gen_icons.py` + `git diff --exit-code`
+  - `workflow_dispatch`、并发取消、超时限制
+
+
 ## 2026-10-18: Command Palette（Ctrl+Shift+P）
 
 - 新增 `EditorScript.CommandPalette.cs`：Cmd/Ctrl+Shift+P 打开，Esc 关闭。

@@ -377,6 +377,11 @@ _bindScriptClickCallback = OnBindScriptClick;
                         UI.SetCameraParams(fpsYaw, fpsPitch, camX, camY, camZ);
                     }
                     
+                    // === 状态栏实时信息 ===
+                    if (_selectionItem != null) _selectionItem.Text = "选择: " + _selectedEntityIds.Count;
+                    if (_themeItem != null) _themeItem.Text = Theme.IsDark ? "主题: 深色" : "主题: 浅色";
+                    if (_errorItem != null) _errorItem.Text = "错误: " + TestTelemetry.ErrorCount;
+
                     // === 脚本属性runtime值→UI同步 (每5帧) ===
                     SyncScriptPropertyValuesToUI();
                 }
@@ -493,6 +498,11 @@ _bindScriptClickCallback = OnBindScriptClick;
             {
                 _statusItem.Text = Theme.IsDark ? "主题: 深色" : "主题: 浅色";
             }
+            if (_themeItem != null)
+            {
+                _themeItem.Text = Theme.IsDark ? "主题: 深色" : "主题: 浅色";
+            }
+            UpdateSelectionStatus();
         }
 
         public static void TestSetTheme(ThemeMode mode)

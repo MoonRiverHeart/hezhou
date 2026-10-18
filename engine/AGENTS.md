@@ -320,3 +320,8 @@ glslc shaders/rotation.frag -o shaders/rotation.frag.spv
 - `EditorScript.CommandPalette.cs`：Ctrl+Shift+P 打开，输入过滤，Esc 关闭。
 - 11 个命令：新建/保存/撤销/重做/运行暂停/Console/主题/Gallery/Dock 最大化/重置/打开项目。
 - intent 11/11；visual 15 张（新增 14/15 命令面板与关闭恢复）。
+
+### 22. 状态栏 v2 + CI 固化 (2026-10-18)
+- 状态栏：选择数量、主题、错误数即时更新。
+- CI：Rust 1.95.0 / Mono 6.12.0.199 / Python 3.11；CMake generator 与并行度固定；
+  rust-cache；图标生成一致性检查；workflow_dispatch/并发/超时。

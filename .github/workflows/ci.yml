@@ -3,18 +3,42 @@ name: CI
 on:
   push:
   pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  CMAKE_BUILD_PARALLEL_LEVEL: "1"
+  CMAKE_GENERATOR: "Visual Studio 17 2022"
+  RUST_VERSION: "1.95.0"
+  MONO_VERSION: "6.12.0.199"
+  PYTHON_VERSION: "3.11"
 
 jobs:
   rust-tests:
     runs-on: windows-latest
-    env:
-      CMAKE_BUILD_PARALLEL_LEVEL: "1"
-      CARGO_TERM_COLOR: always
-
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
 
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ env.RUST_VERSION }}
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: engine
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
 
       - name: Rust unit/integration tests
         working-directory: engine
@@ -30,11 +54,23 @@ jobs:
 
   csharp-build:
     runs-on: windows-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Mono
-        run: choco install mono --no-progress -y
+      - name: Install pinned Mono
+        shell: pwsh
+        run: |
+          choco install mono --version=${{ env.MONO_VERSION }} --no-progress -y
+          & "C:\Program Files\Mono\bin\mono.exe" --version
 
       - name: Compile editor C# scripts
+        shell: pwsh
         run: powershell -ExecutionPolicy Bypass -File engine/scripts/build_mono.ps1
+
+      - name: Verify generated icon tables are current
+        working-directory: engine
+        shell: pwsh
+        run: |
+          python scripts/gen_icons.py
+          git diff --exit-code -- ui/src/icons.rs scripts/IconIds.cs
