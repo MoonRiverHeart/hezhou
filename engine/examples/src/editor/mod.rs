@@ -69,7 +69,77 @@ fn setup_bundled_runtime() {
     dfx_info!("Demo", "Bundled Mono runtime: {}", mono_root.display());
 }
 
+fn prepare_runtime_dir() {
+    // MSIX / Program Files installs are read-only for normal users. Keep assets
+    // next to the executable, but run from a writable per-user data directory.
+    let install_dir = match std::env::current_exe().ok().and_then(|p| p.parent().map(|p| p.to_path_buf())) {
+        Some(d) => d,
+        None => return,
+    };
+    let probe = install_dir.join(".hezhou_write_probe");
+    let writable = std::fs::write(&probe, b"probe").is_ok();
+    if writable {
+        let _ = std::fs::remove_file(probe);
+        return;
+    }
+
+    let data_dir = std::env::var_os("LOCALAPPDATA")
+        .map(|p| std::path::PathBuf::from(p).join("Hezhou").join("Editor"))
+        .or_else(|| {
+            std::env::var_os("XDG_DATA_HOME")
+                .map(|p| std::path::PathBuf::from(p).join("hezhou").join("editor"))
+        })
+        .or_else(|| {
+            std::env::var_os("HOME")
+                .map(|p| std::path::PathBuf::from(p).join(".local/share/hezhou/editor"))
+        });
+    let data_dir = match data_dir {
+        Some(p) => p,
+        None => return,
+    };
+    if std::fs::create_dir_all(&data_dir).is_err() {
+        return;
+    }
+
+    // Copy read-only payload once per installed version; runtime/mono stays in
+    // the install directory so Mono can derive its own prefix from the DLL path.
+    let version = env!("CARGO_PKG_VERSION");
+    let marker = data_dir.join(".hezhou_payload_version");
+    let needs_copy = std::fs::read_to_string(&marker).ok().as_deref() != Some(version);
+    if needs_copy {
+        for name in ["scripts", "assets", "fonts"] {
+            let src = install_dir.join(name);
+            let dst = data_dir.join(name);
+            if src.exists() {
+                if dst.exists() {
+                    let _ = std::fs::remove_dir_all(&dst);
+                }
+                let _ = copy_dir_recursive(&src, &dst);
+            }
+        }
+        let _ = std::fs::write(&marker, version);
+    }
+    let _ = std::env::set_current_dir(&data_dir);
+    std::env::set_var("HEZHOU_INSTALL_DIR", install_dir.display().to_string());
+}
+
+fn copy_dir_recursive(src: &std::path::Path, dst: &std::path::Path) -> std::io::Result<()> {
+    std::fs::create_dir_all(dst)?;
+    for entry in std::fs::read_dir(src)? {
+        let entry = entry?;
+        let ty = entry.file_type()?;
+        let target = dst.join(entry.file_name());
+        if ty.is_dir() {
+            copy_dir_recursive(&entry.path(), &target)?;
+        } else {
+            std::fs::copy(entry.path(), target)?;
+        }
+    }
+    Ok(())
+}
+
 pub fn run() {
+    prepare_runtime_dir();
     setup_bundled_runtime();
     let args: Vec<String> = std::env::args().collect();
 

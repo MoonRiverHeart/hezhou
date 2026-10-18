@@ -49,3 +49,4 @@ engine/test-results/
 /installer/build/
 dist-test/
 __pycache__/
+/download/

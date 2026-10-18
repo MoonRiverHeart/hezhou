@@ -100,9 +100,6 @@ jobs:
           Start-Process msiexec.exe -ArgumentList "/i `"$msi`" /qn /norestart" -Wait
           & "C:\Program Files\Mono\bin\mono.exe" --version
 
-      - name: Install WiX
-        shell: pwsh
-        run: dotnet tool install --global wix --version 5.0.2
 
       - name: Build editor
         working-directory: engine
@@ -112,16 +109,24 @@ jobs:
           cargo build -j 1 --release --features mono
           powershell -ExecutionPolicy Bypass -File scripts/build_mono.ps1
 
-      - name: Build MSI
+      - name: Build and sign MSIX
         shell: pwsh
         run: |
-          $env:PATH = "$env:USERPROFILE\.dotnet\tools;$env:PATH"
-          powershell -ExecutionPolicy Bypass -File installer/windows/build_msi.ps1 -SkipBuild
+          $cert = New-SelfSignedCertificate -Type CodeSigningCert -Subject "CN=Hezhou-Editor" `
+            -CertStoreLocation Cert:\CurrentUser\My -KeyExportPolicy Exportable -NotAfter (Get-Date).AddYears(5)
+          $pwd = ConvertTo-SecureString "hezhou-msix" -AsPlainText -Force
+          $pfx = Join-Path $env:RUNNER_TEMP "hezhou-msix.pfx"
+          Export-PfxCertificate -Cert $cert -FilePath $pfx -Password $pwd | Out-Null
+          Export-Certificate -Cert $cert -FilePath (Join-Path $PWD "dist\HezhouEditor.cer") | Out-Null
+          powershell -ExecutionPolicy Bypass -File installer/windows/build_msix.ps1 -SkipBuild `
+            -CertificatePath $pfx -CertificatePassword "hezhou-msix"
 
       - uses: actions/upload-artifact@v4
         with:
-          name: hezhou-editor-windows-msi
-          path: dist/*.msi
+          name: hezhou-editor-windows-msix
+          path: |
+            dist/*.msix
+            dist/*.cer
 
   package-linux:
     if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/v')
@@ -181,5 +186,6 @@ jobs:
         with:
           generate_release_notes: true
           files: |
-            artifacts/**/*.msi
+            artifacts/**/*.msix
+            artifacts/**/*.cer
             artifacts/**/*.deb

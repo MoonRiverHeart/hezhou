@@ -1,36 +1,27 @@
 = Hezhou Editor Packaging
 
-Windows MSI (WiX v4)
---------------------
-- Config: `installer/windows/HezhouEditor.wxs`
-- Builder: `installer/windows/build_msi.ps1`
-- Output: `dist/HezhouEditor-<version>.msi`
+Windows MSIX
+------------
+- Manifest: `installer/windows/msix/AppxManifest.xml`
+- Builder: `installer/windows/build_msix.ps1`
+- Output: `dist/HezhouEditor-<version>.msix`
+- CI produces a self-signed certificate (`dist/HezhouEditor.cer`) alongside it.
 
 Linux DEB
 ---------
-- Config/builder: `installer/linux/build_deb.sh`, `installer/linux/build_deb.py`
+- Builder: `installer/linux/build_deb.sh`, `installer/linux/build_deb.py`
 - Output: `dist/hezhou-editor_<version>_amd64.deb`
-- The Python builder writes a standard ar/deb archive directly, so `dpkg-deb`
-  is not required on the build host.
-- `data.tar.gz` contains `/opt/hezhou/editor`, `/usr/bin/hezhou-editor`,
-  desktop entry and icon.
+- Python writes a standard ar/deb archive directly; no dpkg-deb needed.
 
 Bundled runtime
---------------
+---------------
 Windows and Linux builders copy a minimal Mono runtime into `runtime/mono`
-when Mono is present at build time. The Windows MSI also bundles the Vulkan
+when Mono is present at build time. The Windows MSIX also bundles the Vulkan
 loader and MSVC runtime DLLs next to the executable. Linux keeps Vulkan/GLFW/X11
 as Debian dependencies because the GPU driver cannot be bundled.
 
 CI
 --
-`.github/workflows/ci.yml` has `package-windows` and `package-linux` jobs,
-triggered manually via `workflow_dispatch`, producing downloadable artifacts.
-
-Notes
------
-- The editor resolves `scripts/`, `assets/`, `fonts/` relative to its working
-  directory; the MSI shortcut and the Linux launcher set that directory.
-- Mono runtime + mcs are runtime/development dependencies for C# scripting.
-- Builds require the matching platform toolchain; MSI cannot be produced on
-  Linux and DEB cannot be produced with Windows binaries.
+Manually dispatch `.github/workflows/ci.yml`, or push a `v*` tag; the
+`package-windows`, `package-linux` and `publish-release` jobs build the MSIX/DEB
+and upload them to the GitHub Release.

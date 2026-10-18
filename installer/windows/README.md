@@ -1,31 +1,29 @@
-Hezhou Editor
-=============
+Hezhou Editor — Windows MSIX
+=============================
 
-Windows build prerequisites:
+Build prerequisites:
 - Rust toolchain
-- Mono (mcs) if C# scripts need recompilation
-- WiX Toolset v4+: `dotnet tool install --global wix --version 5.*`
+- Mono 6.12 (mcs/runtime)
+- Windows 10 SDK (`makeappx.exe`, `signtool.exe`), normally on windows-latest
 
-Build:
+Build unsigned:
 
 ```powershell
-# from repository root
-powershell -ExecutionPolicy Bypass -File installer/windows/build_msi.ps1
+powershell -ExecutionPolicy Bypass -File installer/windows/build_msix.ps1
 ```
 
-Options:
-- `-SkipBuild`: reuse `engine/target/release/mono_editor_demo.exe`
-- `-Version 0.1.0`: override package version
+Build and sign with a certificate:
 
-Output: `dist/HezhouEditor-<version>.msi`
+```powershell
+powershell -ExecutionPolicy Bypass -File installer/windows/build_msix.ps1 `
+  -CertificatePath C:\path\hezhou.pfx -CertificatePassword password
+```
 
-The MSI installs to `%ProgramFiles%\Hezhou`, with a Start Menu shortcut.
+Output: `dist/HezhouEditor-<version>.msix`
 
-Runtime dependencies bundled when available at build time:
-- `vulkan-1.dll` (Vulkan loader)
-- `vcruntime140.dll`, `vcruntime140_1.dll`, `msvcp140.dll` (MSVC runtime)
-- `runtime/mono/` (Mono runtime DLLs, `mcs`, 4.5 assemblies and config)
+Install:
+1. Install the matching `.cer` into `Trusted People`
+2. `Add-AppxPackage .\HezhouEditor-0.1.0.msix`
 
-The editor prepends `runtime/mono/bin` to PATH and sets `MONO_PATH`/
-`MONO_CFG_DIR` before initializing Mono, so a system Mono install is not required
-when the bundle is present. A Vulkan-capable GPU driver is still required.
+The package is a full-trust MSIX; the editor copies read-only assets to
+`%LOCALAPPDATA%\Hezhou\Editor` at first launch.
