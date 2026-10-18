@@ -21,9 +21,12 @@ namespace Hezhou
         private static void CreateGizmoOverlay()
         {
             ulong root = UI.GetRootId();
-            _gizmoXBarId = UI.CreatePanel(root, 0f, 0f, 70f, 6f, 0.95f, 0.30f, 0.30f, 1f);
-            _gizmoYBarId = UI.CreatePanel(root, 0f, 0f, 6f, 70f, 0.35f, 0.90f, 0.45f, 1f);
-            _gizmoZBarId = UI.CreatePanel(root, 0f, 0f, 60f, 6f, 0.35f, 0.60f, 1.0f, 1f);
+            _gizmoXBarId = UI.CreateButton(root, 70f, 24f, "X");
+            _gizmoYBarId = UI.CreateButton(root, 24f, 70f, "Y");
+            _gizmoZBarId = UI.CreateButton(root, 60f, 24f, "Z");
+            UI.SetWidgetBackgroundColor(_gizmoXBarId, 0.95f, 0.30f, 0.30f, 1f);
+            UI.SetWidgetBackgroundColor(_gizmoYBarId, 0.35f, 0.90f, 0.45f, 1f);
+            UI.SetWidgetBackgroundColor(_gizmoZBarId, 0.35f, 0.60f, 1.0f, 1f);
             _gizmoPanelId = _gizmoXBarId; // marker: overlay exists
             UI.SetWidgetLayer(_gizmoXBarId, 3);
             UI.SetWidgetLayer(_gizmoYBarId, 3);
@@ -42,11 +45,11 @@ namespace Hezhou
 
             float[] preview = UI.WidgetGetAbsoluteLayout(_previewWindowId);
             if (preview == null || preview.Length < 4 || preview[2] <= 0f) return;
-            float cx = preview[0] + preview[2] * 0.5f;
-            float cy = preview[1] + preview[3] * 0.5f;
-            UI.SetWidgetLayout(_gizmoXBarId, cx, cy - 3f, 70f, 6f);
-            UI.SetWidgetLayout(_gizmoYBarId, cx - 3f, cy - 70f, 6f, 70f);
-            UI.SetWidgetLayout(_gizmoZBarId, cx + 8f, cy + 8f, 60f, 6f);
+            float cx = _screenWidth * 0.5f;
+            float cy = _screenHeight * 0.42f;
+            UI.SetWidgetLayout(_gizmoXBarId, cx, cy - 12f, 70f, 24f);
+            UI.SetWidgetLayout(_gizmoYBarId, cx - 12f, cy - 70f, 24f, 70f);
+            UI.SetWidgetLayout(_gizmoZBarId, cx + 8f, cy + 8f, 60f, 24f);
         }
 
         private static int HitTestGizmo(float x, float y)

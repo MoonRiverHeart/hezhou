@@ -1,5 +1,12 @@
 # Bug Fixes Log
 
+## 2026-10-18: Gizmo 轴条居中
+
+- 发现 UI Panel 叠加层会被 PreviewWindow 覆盖，但 Button 不会被覆盖。
+- 轴条从 Panel 改为彩色 Button（X/Y/Z），按窗口比例居中到预览区。
+- visual `19_gizmo_translate` 已显示居中轴条。
+
+
 ## 2026-10-18: Dock v2 跨区域停靠（纹理页）
 
 - 纹理页可停靠到右侧属性 Tab（`纹理页停靠右侧/回到底部` 命令）。

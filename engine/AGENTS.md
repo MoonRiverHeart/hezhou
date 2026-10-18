@@ -389,3 +389,6 @@ glslc shaders/rotation.frag -o shaders/rotation.frag.spv
 ### 38. Dock v2 跨区域停靠（纹理页） (2026-10-18)
 - 纹理页命令式停靠到右侧属性 Tab，状态持久化；intent 23/23；visual 30 张。
 - 拖拽式跨区域停靠未实现。
+
+### 39. Gizmo 轴条居中 (2026-10-18)
+- Panel 被 PreviewWindow 覆盖；改用 Button 轴条并居中；visual 30 张。
