@@ -89,6 +89,9 @@ namespace Hezhou
         public delegate uint IconCountDelegate();
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void GridViewSetItemThumbnailDelegate(IntPtr handle, ulong gridId, int index, string thumbnail);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public delegate ulong GetRootIdDelegate(IntPtr handle);
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public delegate void ClearWidgetTreeDelegate(IntPtr handle);
@@ -1166,6 +1169,7 @@ namespace Hezhou
             public IntPtr ui_create_icon_in_parent;
             public IntPtr ui_icon_set_color;
             public IntPtr ui_icon_count;
+            public IntPtr ui_grid_view_set_item_thumbnail;
         }
 
         public static void InitFromContext(IntPtr contextPtr)

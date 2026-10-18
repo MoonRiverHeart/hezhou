@@ -1497,7 +1497,13 @@ namespace Hezhou
                 {
                     continue;
                 }
-                UI.GridViewAddItem(gridViewId, names[i], values[i]);
+                int itemIndex = (int)UI.GridViewAddItem(gridViewId, names[i], values[i]);
+                IconId thumb = IconId.Cube;
+                if (names[i] == "Sphere") thumb = IconId.Sun;
+                else if (names[i] == "Plane") thumb = IconId.Plane;
+                else if (names[i] == "Cylinder") thumb = IconId.Cylinder;
+                else if (names[i] == "CornellBox") thumb = IconId.Grid;
+                UI.GridViewSetItemThumbnail(gridViewId, itemIndex, "icon:" + (int)thumb);
             }
         }
 

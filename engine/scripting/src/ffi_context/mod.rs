@@ -302,6 +302,7 @@ pub project_add_entity: ProjectAddEntityFn,
         pub ui_create_icon_in_parent: CreateIconInParentFn,
         pub ui_icon_set_color: IconSetColorFn,
         pub ui_icon_count: IconCountFn,
+        pub ui_grid_view_set_item_thumbnail: GridViewSetItemThumbnailFn,
     }
 
 static mut FFI_CONTEXT: Option<Box<FfiContext>> = None;

@@ -19,7 +19,7 @@ engine/
 ├── ⚡ rhi-vulkan/     # Vulkan renderer impl (see rhi-vulkan/src/AGENTS.md)
 ├── 🎥 render/         # RenderEngine + Camera/Mesh/Texture (see render/src/AGENTS.md)
 ├── 📜 scripting/      # Mono JIT executor, FfiContext (see scripting/src/AGENTS.md)
-│   └── 🏗️ ffi_context/ # 274-field FfiContext struct (see scripting/src/ffi_context/AGENTS.md)
+│   └── 🏗️ ffi_context/ # 275-field FfiContext struct (see scripting/src/ffi_context/AGENTS.md)
 ├── 🤖 mcp/            # MCP server — LLM集成层 (see mcp/src/AGENTS.md)
 │   └── 🔮 bridge.rs   # EngineBridge trait + 8返回结构体 + [Both]/[RustOnly]/[FfiOnly]标注
 │   └── 🖥️ server.rs   # 18 #[tool]方法 + #[tool_router(server_handler)]自动生成ServerHandler
@@ -57,7 +57,7 @@ engine/
 ## Architecture Notes
 - **Inverted dependency**: core → scripting (core needs FfiContext types from scripting). Scripting is the leaf crate.
 - **4 mid-level crates produce cdylib**: scripting, ui, dfx, harmony — needed for standalone FFI export model
-- **FfiContext**: 274-field flat #[repr(C)] struct of function pointers, assembled in editor/mod.rs with transmute
+- **FfiContext**: 275-field flat #[repr(C)] struct of function pointers, assembled in editor/mod.rs with transmute
 - **C# has NO Main() methods**: All scripts are DLL assemblies, entry via static Initialize() called from Rust
 - **Shader compilation**: NO automated pipeline. `.spv` files manually compiled via glslc and committed to repo
 - **Mono build**: 3 inconsistent PowerShell scripts (build_mono.ps1, build_mono_ui.ps1, build_ui_mono.ps1)
@@ -248,7 +248,7 @@ glslc shaders/rotation.frag -o shaders/rotation.frag.spv
 ### 14. 分层测试 / DFX / 编辑器 P0 (2026-10-18)
 **新增测试**:
 - UT: `core/tests/{scene_properties,scene_hierarchy_cycles,project_fuzz_smoke}.rs`、`ui/tests/widget_tree_hit_test.rs`
-- 接口: `core/tests/{ffi_contract,project_ffi_contract}.rs` + `scripts/check_ffi_contract.py`（274 个 FfiContext 字段三方一致）
+- 接口: `core/tests/{ffi_contract,project_ffi_contract}.rs` + `scripts/check_ffi_contract.py`（275 个 FfiContext 字段三方一致）
 - FUZZ: `engine/fuzz/` cargo-fuzz target + 3000 组畸形 JSON 确定性 smoke
 - E2E: `scripts/run_autotest.ps1`、`UITestRunner.Report.cs`、`TestTelemetry.cs`
   - random/sequential/stress/intent 模式
@@ -292,13 +292,13 @@ glslc shaders/rotation.frag -o shaders/rotation.frag.spv
   `ui_clear_widget_tree_keep_callbacks` 重建 UI，保留 Scene/选中/Tab。
 - 基础控件与编辑器外壳颜色迁移；属性页从 ScrollView 改 VStack，规避隐藏 Tab
   首次显示的 0 尺寸问题。
-- `visual` 7 张截图（含双主题），FFI 274 字段。
+- `visual` 7 张截图（含双主题），FFI 275 字段。
 
 ### 17. SVG 图标系统 (2026-10-18)
 - `assets/icons/*.svg` → `scripts/gen_icons.py` → `ui/src/icons.rs` + `scripts/IconIds.cs`
 - 新增 `IconWidget`（矢量线段，按主题 tint，支持任意 DPI）
 - FFI: `ui_create_icon_in_parent` / `ui_icon_set_color` / `ui_icon_count`
-- 工具栏、游戏预览、属性面板标题已接入图标；FFI 274 字段
+- 工具栏、游戏预览、属性面板标题已接入图标；FFI 275 字段
 
 ### 18. P0 Widget Gallery (2026-10-18)
 - `EditorScript.WidgetGallery.cs` 整页展示 Buttons/Inputs/Icons/Tabs/Colors。
@@ -325,3 +325,7 @@ glslc shaders/rotation.frag -o shaders/rotation.frag.spv
 - 状态栏：选择数量、主题、错误数即时更新。
 - CI：Rust 1.95.0 / Mono 6.12.0.199 / Python 3.11；CMake generator 与并行度固定；
   rust-cache；图标生成一致性检查；workflow_dispatch/并发/超时。
+
+### 23. 资产缩略图 (2026-10-18)
+- GridView `icon:<id>` 缩略图 + 按资产名 fallback。
+- Cube/Sphere/Plane/Cylinder/CornellBox 显示矢量图标；FFI `ui_grid_view_set_item_thumbnail`，字段 275。

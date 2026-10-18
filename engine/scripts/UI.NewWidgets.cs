@@ -355,6 +355,13 @@ namespace Hezhou
             return func(_widgetTree, gridId, label, userData);
         }
         
+        public static void GridViewSetItemThumbnail(ulong gridId, int index, string thumbnail)
+        {
+            if (_ffi.ui_grid_view_set_item_thumbnail == IntPtr.Zero) return;
+            var func = Marshal.GetDelegateForFunctionPointer<GridViewSetItemThumbnailDelegate>(_ffi.ui_grid_view_set_item_thumbnail);
+            func(_widgetTree, gridId, index, thumbnail);
+        }
+
         public static void GridViewRemoveItem(ulong gridId, int index)
         {
             if (_ffi.ui_grid_view_remove_item == IntPtr.Zero)

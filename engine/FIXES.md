@@ -1,5 +1,13 @@
 # Bug Fixes Log
 
+## 2026-10-18: 资产缩略图（SVG 图标）
+
+- GridView 支持 `icon:<id>` 缩略图，并在 `thumbnail` 缺失时按资产名回退到图标。
+- 资产模型网格为 Cube/Sphere/Plane/Cylinder/CornellBox 绘制矢量缩略图。
+- 新增 FFI `ui_grid_view_set_item_thumbnail`；FFI 275 字段。
+- visual `03_asset_search` 已显示 Cube 缩略图。
+
+
 ## 2026-10-18: 状态栏 v2 + CI 环境固化
 
 - 状态栏新增：选择数量、主题、错误数；选择/范围选择/主题切换时即时更新。

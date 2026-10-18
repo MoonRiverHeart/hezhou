@@ -239,3 +239,33 @@ pub extern "C" fn ui_grid_view_set_on_click_thunk_ptr(
     crate::thunk::ui_register_grid_view_click_callback(grid_id, callback);
     dfx_debug!("FFI", "GridViewSetOnClickThunkPtr: grid_id={}", grid_id);
 }
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_grid_view_set_item_thumbnail(
+    handle: WidgetTreeHandle,
+    grid_id: u64,
+    index: usize,
+    thumbnail: *const c_char,
+) {
+    if handle.is_null() {
+        return;
+    }
+    unsafe {
+        let value = if thumbnail.is_null() {
+            None
+        } else {
+            Some(CStr::from_ptr(thumbnail).to_string_lossy().into_owned())
+        };
+        let arc = &*(handle as *const Arc<Mutex<WidgetTree>>);
+        let mut tree = arc.lock();
+        let id = WidgetId::from_raw(grid_id);
+        if let Some(widget) = tree.get_widget_mut(id) {
+            if widget.widget_type() == "GridView" {
+                use crate::widgets::GridView;
+                if let Some(grid) = widget.as_any_mut().downcast_mut::<GridView>() {
+                    grid.set_item_thumbnail(index, value);
+                }
+            }
+        }
+    }
+}

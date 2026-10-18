@@ -108,6 +108,14 @@ impl GridView {
         }
     }
     
+    /// 设置网格项缩略图。`icon:<id>` 使用 SVG 矢量图标作为缩略图。
+    pub fn set_item_thumbnail(&mut self, index: usize, thumbnail: Option<String>) {
+        if let Some(item) = self.items.get_mut(index) {
+            item.thumbnail = thumbnail;
+            self.flags.dirty_render = true;
+        }
+    }
+
     pub fn remove_item(&mut self, index: usize) {
         if index < self.items.len() {
             self.items.remove(index);
@@ -360,6 +368,38 @@ impl Widget for GridView {
             let thumb_style = Style::new().with_background(thumb_color);
             canvas.draw_rect(Rect::new(x + 4.0 * self.content_scale, y + 4.0 * self.content_scale, 
                                         self.cell_size - 8.0 * self.content_scale, thumb_height - 8.0 * self.content_scale), &thumb_style);
+
+            let fallback_icon = match item.label.as_str() {
+                "Cube" => Some(5u32),
+                "Sphere" => Some(21u32),
+                "Plane" => Some(14u32),
+                "Cylinder" => Some(6u32),
+                "CornellBox" => Some(9u32),
+                _ => None,
+            };
+            let icon_id = item.thumbnail
+                .as_ref()
+                .and_then(|t| t.strip_prefix("icon:"))
+                .and_then(|v| v.parse::<u32>().ok())
+                .or(fallback_icon);
+            if let Some(icon_id) = icon_id {
+                        if let Some(def) = crate::icons::icon(icon_id) {
+                            let pad = 10.0 * self.content_scale;
+                            let area_x = x + pad;
+                            let area_y = y + pad;
+                            let area_w = self.cell_size - pad * 2.0;
+                            let area_h = thumb_height - pad * 2.0;
+                            let color = crate::theme::colors().accent;
+                            for &(x1, y1, x2, y2) in def.segments {
+                                canvas.draw_line(
+                                    Point::new(area_x + x1 * area_w, area_y + y1 * area_h),
+                                    Point::new(area_x + x2 * area_w, area_y + y2 * area_h),
+                                    color,
+                                    2.0 * self.content_scale,
+                                );
+                        }
+                    }
+                }
             
             canvas.draw_text(
                 Rect::new(x, y, self.cell_size, self.cell_size),

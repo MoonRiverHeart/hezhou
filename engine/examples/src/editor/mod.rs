@@ -386,6 +386,9 @@ ui_widget_get_layout: unsafe { std::mem::transmute(ui_ffi::ui_widget_get_layout 
             std::mem::transmute(hezhou_ui::ffi::ui_icon_set_color as *const std::ffi::c_void)
         },
         ui_icon_count: hezhou_ui::ffi::ui_icon_count,
+        ui_grid_view_set_item_thumbnail: unsafe {
+            std::mem::transmute(hezhou_ui::ffi::ui_grid_view_set_item_thumbnail as *const std::ffi::c_void)
+        },
         ui_set_widget_visible: unsafe { std::mem::transmute(ffi_impl::set_widget_visible as *const std::ffi::c_void) },
         get_pipeline_names: unsafe { std::mem::transmute(ffi_impl::get_pipeline_names as *const std::ffi::c_void) },
         switch_pipeline: unsafe { std::mem::transmute(ffi_impl::switch_pipeline as *const std::ffi::c_void) },
