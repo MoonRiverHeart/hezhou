@@ -371,3 +371,7 @@ glslc shaders/rotation.frag -o shaders/rotation.frag.spv
 ### 33. Dock v2 浮动资产面板 (2026-10-18)
 - 浮动 Dialog 资产面板 + Command Palette 命令；intent 20/20；visual 26 张。
 - 可拖拽停靠的浮动 Dock 仍未实现。
+
+### 34. Dock v2 浮动面板拖动 (2026-10-18)
+- 浮动资产面板可拖动；intent 21/21；visual 27 张。
+- 跨区域停靠仍未实现。

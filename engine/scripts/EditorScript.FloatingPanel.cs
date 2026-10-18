@@ -5,6 +5,11 @@ namespace Hezhou
     public static partial class EditorScript
     {
         private static ulong _floatingPanelId;
+        private static bool _floatingDragging;
+        private static float _floatingDragStartX;
+        private static float _floatingDragStartY;
+        private static float _floatingPanelStartX;
+        private static float _floatingPanelStartY;
 
         public static bool IsFloatingPanelOpen { get { return _floatingPanelId != 0; } }
 
@@ -41,6 +46,44 @@ namespace Hezhou
             if (_floatingPanelId == 0) return;
             UI.RemoveWidget(_floatingPanelId);
             _floatingPanelId = 0;
+        }
+
+        private static bool PointInFloatingPanel(float x, float y)
+        {
+            if (_floatingPanelId == 0) return false;
+            float[] layout = UI.WidgetGetAbsoluteLayout(_floatingPanelId);
+            if (layout == null || layout.Length < 4) return false;
+            return x >= layout[0] && x <= layout[0] + layout[2]
+                && y >= layout[1] && y <= layout[1] + layout[3];
+        }
+
+        private static void BeginFloatingDrag(float x, float y)
+        {
+            float[] layout = UI.WidgetGetAbsoluteLayout(_floatingPanelId);
+            if (layout == null || layout.Length < 4) return;
+            _floatingDragging = true;
+            _floatingDragStartX = x;
+            _floatingDragStartY = y;
+            _floatingPanelStartX = layout[0];
+            _floatingPanelStartY = layout[1];
+        }
+
+        private static void UpdateFloatingDrag(float x, float y)
+        {
+            if (!_floatingDragging) return;
+            UI.SetWidgetLayout(_floatingPanelId,
+                _floatingPanelStartX + x - _floatingDragStartX,
+                _floatingPanelStartY + y - _floatingDragStartY, 0f, 0f);
+        }
+
+        private static void EndFloatingDrag() { _floatingDragging = false; }
+
+        public static void TestMoveFloatingPanel(float dx, float dy)
+        {
+            if (_floatingPanelId == 0) return;
+            float[] layout = UI.WidgetGetAbsoluteLayout(_floatingPanelId);
+            if (layout == null || layout.Length < 4) return;
+            UI.SetWidgetLayout(_floatingPanelId, layout[0] + dx, layout[1] + dy, 0f, 0f);
         }
 
         public static void TestShowFloatingPanel() { ShowFloatingAssetPanel(); }

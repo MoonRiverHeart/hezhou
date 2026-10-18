@@ -386,7 +386,8 @@ namespace Hezhou
             _visualSteps.Add(new VisualStep("23_asset_collapsed", VisualAssetCollapsed, 10));
             _visualSteps.Add(new VisualStep("24_dock_restored_2", VisualDockRestored2, 10));
             _visualSteps.Add(new VisualStep("25_floating_panel", VisualFloatingPanel, 10));
-            _visualSteps.Add(new VisualStep("26_floating_closed", VisualFloatingClosed, 10));
+            _visualSteps.Add(new VisualStep("26_floating_moved", VisualFloatingMoved, 10));
+            _visualSteps.Add(new VisualStep("27_floating_closed", VisualFloatingClosed, 10));
 
             RunNextVisualStep();
         }
@@ -481,6 +482,11 @@ namespace Hezhou
         private static void VisualFloatingPanel()
         {
             EditorScript.TestShowFloatingPanel();
+        }
+
+        private static void VisualFloatingMoved()
+        {
+            EditorScript.TestMoveFloatingPanel(80f, 40f);
         }
 
         private static void VisualFloatingClosed()

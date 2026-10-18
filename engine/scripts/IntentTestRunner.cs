@@ -31,6 +31,7 @@ namespace Hezhou
             RunCase("intent.tab_reorder", TabReorder);
             RunCase("intent.dock_collapse", DockCollapse);
             RunCase("intent.floating_panel", FloatingPanel);
+            RunCase("intent.floating_move", FloatingMove);
             RunCase("intent.console_open_close", ConsoleOpenClose);
             RunCase("intent.running_paused_editing", RunningPausedEditing);
         }
@@ -199,6 +200,14 @@ namespace Hezhou
                 throw new Exception("multi-select delete did not remove both entities");
             }
             return "2 entities selected, batch edit + multi-delete passed";
+        }
+
+        private static string FloatingMove()
+        {
+            EditorScript.TestShowFloatingPanel();
+            EditorScript.TestMoveFloatingPanel(80f, 40f);
+            EditorScript.TestHideFloatingPanel();
+            return "floating panel moved";
         }
 
         private static string FloatingPanel()

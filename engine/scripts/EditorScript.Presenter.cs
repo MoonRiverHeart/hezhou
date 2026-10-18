@@ -79,6 +79,18 @@ namespace Hezhou
         {
             if (_gameScene == null) return;
 
+            // === 浮动面板拖拽 ===
+            if (_floatingDragging)
+            {
+                if (dragging) { UpdateFloatingDrag(x, y); return; }
+                EndFloatingDrag();
+            }
+            else if (dragging && _floatingPanelId != 0 && PointInFloatingPanel(x, y) && y < 120f)
+            {
+                BeginFloatingDrag(x, y);
+                return;
+            }
+
             // === 材质拖拽 ===
             if (dragging && _materialDragName == null)
             {

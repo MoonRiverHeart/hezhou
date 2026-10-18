@@ -1,5 +1,13 @@
 # Bug Fixes Log
 
+## 2026-10-18: Dock v2 浮动面板拖动
+
+- 浮动资产面板支持按住标题区域拖动；位置实时更新。
+- 新增 `TestMoveFloatingPanel`。
+- intent `floating_move`（21/21）；visual `26_floating_moved`、`27_floating_closed`。
+- 跨区域停靠仍未实现。
+
+
 ## 2026-10-18: Dock v2 浮动资产面板
 
 - Command Palette 新增“浮动资产面板”。
