@@ -40,17 +40,10 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
-      - name: Rust unit/integration tests
+      - name: Local CI mirror (Rust/FFI/fuzz/icons)
         working-directory: engine
-        run: cargo test -j 1 -p hezhou-core -p hezhou-ui -p hezhou-dfx
-
-      - name: FFI contract
-        working-directory: engine
-        run: python scripts/check_ffi_contract.py
-
-      - name: Fuzz harness check
-        working-directory: engine
-        run: cargo check --manifest-path fuzz/Cargo.toml
+        shell: pwsh
+        run: ./scripts/ci_local.ps1 -SkipBuild
 
   csharp-build:
     runs-on: windows-latest
