@@ -1,5 +1,16 @@
 # Bug Fixes Log
 
+## 2026-10-18: Windows MSI / Linux DEB 打包
+
+- `installer/windows/HezhouEditor.wxs`：WiX v4 MSI，安装到 Program Files，
+  含开始菜单快捷方式和工作目录；`build_msi.ps1` 负责构建、暂存和调用 wix。
+- `installer/linux/build_deb.sh` + `build_deb.py`：在 Linux 构建 deb；
+  Python 直接写 ar + control.tar.gz + data.tar.gz，不依赖 dpkg-deb。
+- 安装目录 `/opt/hezhou/editor`，`/usr/bin/hezhou-editor` 启动器，
+  desktop entry 和 SVG 图标。
+- CI 增加手动触发的 `package-windows` / `package-linux` 任务。
+
+
 ## 2026-10-18: 重力 / 角色 / 动画 / 天空盒
 
 - `CharacterController`：水平移动、重力积分、跳跃、地面吸附；3 个物理用例。

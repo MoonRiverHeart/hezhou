@@ -43,3 +43,8 @@ release/hezhou-editor/traces/
 test-results/
 engine/test-results/
 .hezhou_layout
+# packaging artifacts
+/dist/
+/installer/stage/
+/installer/build/
+dist-test/
