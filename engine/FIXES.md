@@ -1,5 +1,13 @@
 # Bug Fixes Log
 
+## 2026-10-18: Gizmo 跟随实体投影位置
+
+- C# 内按 rotation.vert 的 view/projection 公式实现世界坐标到预览屏幕坐标投影。
+- Gizmo 轴条中心现在跟随选中实体的投影位置，不再按窗口比例居中。
+- 轴条改用 Button（Panel 会被 PreviewWindow 覆盖）。
+- visual `19_gizmo_translate` 已对齐 Cube。
+
+
 ## 2026-10-18: Gizmo 轴条居中
 
 - 发现 UI Panel 叠加层会被 PreviewWindow 覆盖，但 Button 不会被覆盖。

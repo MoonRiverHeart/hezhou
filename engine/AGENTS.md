@@ -392,3 +392,6 @@ glslc shaders/rotation.frag -o shaders/rotation.frag.spv
 
 ### 39. Gizmo 轴条居中 (2026-10-18)
 - Panel 被 PreviewWindow 覆盖；改用 Button 轴条并居中；visual 30 张。
+
+### 40. Gizmo 跟随实体投影 (2026-10-18)
+- C# 实现相机投影，Gizmo 轴条中心跟随选中实体；visual 30 张。

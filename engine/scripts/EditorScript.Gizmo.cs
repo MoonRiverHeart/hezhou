@@ -34,6 +34,46 @@ namespace Hezhou
             UpdateGizmoLayout();
         }
 
+        private static bool ProjectSelectedEntityToPreview(out float sx, out float sy)
+        {
+            sx = 0f;
+            sy = 0f;
+            if (_gameScene == null || _selectedEntityId == 0) return false;
+            UI.SceneGetEntityPosition(_gameScene.ScenePtr, _selectedEntityId,
+                out float ex, out float ey, out float ez);
+
+            float leftWidth = _screenWidth * _dockOuterRatio;
+            float previewW = leftWidth * (1f - _dockInnerRatio) - 8f;
+            float previewH = _screenHeight * _dockLeftCenterRatio - 15f;
+            float previewX = leftWidth * _dockInnerRatio + 4f;
+            float previewY = 80f;
+            if (previewW <= 10f || previewH <= 10f) return false;
+
+            float cyaw = (float)Math.Cos(_cameraYaw);
+            float syaw = (float)Math.Sin(_cameraYaw);
+            float cp = (float)Math.Cos(_cameraPitch);
+            float sp = (float)Math.Sin(_cameraPitch);
+            float fx = syaw * cp, fy = -sp, fz = -cyaw * cp;
+            float rx = cyaw, ry = 0f, rz = syaw;
+            float ux = syaw * sp, uy = cp, uz = -cyaw * sp;
+
+            float dx = ex - _cameraX;
+            float dy = ey - _cameraY;
+            float dz = ez - _cameraZ;
+            float viewX = rx * dx + ry * dy + rz * dz;
+            float viewY = ux * dx + uy * dy + uz * dz;
+            float viewZ = -(fx * dx + fy * dy + fz * dz);
+            if (viewZ <= 0.1f) return false;
+
+            float f = 1f / (float)Math.Tan(60.0 * Math.PI / 360.0);
+            float aspect = previewW / previewH;
+            float ndcX = (f / aspect) * viewX / viewZ;
+            float ndcY = (-f) * viewY / viewZ;
+            sx = previewX + (ndcX * 0.5f + 0.5f) * previewW;
+            sy = previewY + (ndcY * 0.5f + 0.5f) * previewH;
+            return true;
+        }
+
         private static void UpdateGizmoLayout()
         {
             if (_gizmoPanelId == 0) return;
@@ -47,7 +87,7 @@ namespace Hezhou
             if (preview == null || preview.Length < 4 || preview[2] <= 0f) return;
             float cx = _screenWidth * 0.5f;
             float cy = _screenHeight * 0.42f;
-            UI.SetWidgetLayout(_gizmoXBarId, cx, cy - 12f, 70f, 24f);
+            UI.SetWidgetLayout(_gizmoXBarId, cx - 35f, cy - 12f, 70f, 24f);
             UI.SetWidgetLayout(_gizmoYBarId, cx - 12f, cy - 70f, 24f, 70f);
             UI.SetWidgetLayout(_gizmoZBarId, cx + 8f, cy + 8f, 60f, 24f);
         }
