@@ -1589,7 +1589,72 @@ namespace Hezhou
             RefreshAssetGridView();
         }
         
-private static void OnGridViewClick(ulong widgetId, int index, ulong userData)
+        private static void RefreshMaterialGridView()
+        {
+            if (_assetMaterialGridViewId == 0) return;
+            UI.GridViewClear(_assetMaterialGridViewId);
+            int categoryCount = AssetLibrary.GetCategoryCount();
+            for (int c = 0; c < categoryCount; c++)
+            {
+                string category = AssetLibrary.GetCategoryName(c);
+                if (category == null) continue;
+                if (category.IndexOf("Material", StringComparison.OrdinalIgnoreCase) < 0
+                    && category.IndexOf("材质", StringComparison.Ordinal) < 0) continue;
+                int count = AssetLibrary.GetAssetCount(c);
+                for (int i = 0; i < count; i++)
+                {
+                    AssetInfo info = AssetLibrary.GetAssetInfo(c, i);
+                    int itemIndex = (int)UI.GridViewAddItem(_assetMaterialGridViewId, info.Name, info.Id);
+                    UI.GridViewSetItemThumbnail(_assetMaterialGridViewId, itemIndex, "icon:9");
+                }
+            }
+        }
+
+        private static void OnMaterialGridClick(ulong widgetId, int index, ulong userData)
+        {
+            _selectedMaterialId = userData;
+            int categoryCount = AssetLibrary.GetCategoryCount();
+            for (int c = 0; c < categoryCount; c++)
+            {
+                int count = AssetLibrary.GetAssetCount(c);
+                for (int i = 0; i < count; i++)
+                {
+                    AssetInfo info = AssetLibrary.GetAssetInfo(c, i);
+                    if (info.Id == userData)
+                    {
+                        if (_statusItem != null) _statusItem.Text = "材质: " + info.Name;
+                        return;
+                    }
+                }
+            }
+        }
+
+        public static int TestMaterialCount()
+        {
+            int total = 0;
+            int categoryCount = AssetLibrary.GetCategoryCount();
+            for (int c = 0; c < categoryCount; c++)
+            {
+                string category = AssetLibrary.GetCategoryName(c);
+                if (category == null) continue;
+                if (category.IndexOf("Material", StringComparison.OrdinalIgnoreCase) >= 0
+                    || category.IndexOf("材质", StringComparison.Ordinal) >= 0)
+                    total += AssetLibrary.GetAssetCount(c);
+            }
+            return total;
+        }
+
+        public static ulong TestGetAssetTab()
+        {
+            return _assetTabWidget != null ? _assetTabWidget.GetActive() : 99;
+        }
+
+        public static void TestSelectAssetTab(ulong index)
+        {
+            if (_assetTabWidget != null) _assetTabWidget.SetActive(index);
+        }
+
+        private static void OnGridViewClick(ulong widgetId, int index, ulong userData)
         {
             if (_gameScene != null && userData != 0)
             {

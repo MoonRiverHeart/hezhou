@@ -342,3 +342,8 @@ glslc shaders/rotation.frag -o shaders/rotation.frag.spv
 ### 26. Hierarchy 拖拽 reparent (2026-10-18)
 - 全局鼠标拖拽把已选实体拖到目标节点，释放后 SetParent；循环层级被拒绝。
 - intent 13/13；visual 17 张（新增 `17_hierarchy_drag.png`）。
+
+### 27. Asset Browser 材质列表 (2026-10-18)
+- 材质 Tab 从 AssetLibrary Materials 分类读取并列出。
+- intent 14/14；visual 18 张（新增 `18_material_tab.png`）。
+- 材质拖放/赋给实体仍未实现。

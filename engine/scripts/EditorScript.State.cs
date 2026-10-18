@@ -45,7 +45,11 @@ namespace Hezhou
 
         // === Asset Panel TabWidget ===
         private static TabWidget _assetTabWidget;
-        private static ulong _assetModelGridViewId;      // GridView inside 模型 tab
+        private static ulong _assetModelGridViewId;
+        private static ulong _assetMaterialGridViewId;
+        private static UI.GridViewClickCallbackDelegate _materialGridClickCallback;
+        private static ulong _selectedMaterialId;
+        private static int _materialTabItemCount;      // GridView inside 模型 tab
         private static ulong _assetGridViewId;           // Legacy alias for backward compat
         private static ulong _assetSearchInputId;
         private static string _assetSearchQuery = "";

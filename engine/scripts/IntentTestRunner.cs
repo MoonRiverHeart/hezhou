@@ -24,6 +24,7 @@ namespace Hezhou
             RunCase("intent.command_palette", CommandPalette);
             RunCase("intent.console_source_location", ConsoleSourceLocation);
             RunCase("intent.hierarchy_drag", HierarchyDrag);
+            RunCase("intent.material_browser", MaterialBrowser);
             RunCase("intent.console_open_close", ConsoleOpenClose);
             RunCase("intent.running_paused_editing", RunningPausedEditing);
         }
@@ -192,6 +193,15 @@ namespace Hezhou
                 throw new Exception("multi-select delete did not remove both entities");
             }
             return "2 entities selected, batch edit + multi-delete passed";
+        }
+
+        private static string MaterialBrowser()
+        {
+            int count = EditorScript.TestMaterialCount();
+            if (count <= 0) throw new Exception("material library is empty");
+            EditorScript.TestSelectAssetTab(1);
+            if (EditorScript.TestGetAssetTab() != 1) throw new Exception("material tab did not activate");
+            return "materials=" + count + ", tab=1";
         }
 
         private static string HierarchyDrag()

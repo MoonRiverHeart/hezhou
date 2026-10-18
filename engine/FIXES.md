@@ -1,5 +1,13 @@
 # Bug Fixes Log
 
+## 2026-10-18: Asset Browser 材质列表
+
+- 材质 Tab 不再是“待实现”，改为读取 AssetLibrary Materials 分类并列出材质。
+- 材质项显示名称；空名称回退 `(unnamed)`。
+- 新增 `intent.material_browser`；visual `18_material_tab`。
+- 材质拖放/赋给实体仍未实现。
+
+
 ## 2026-10-18: Hierarchy 拖拽 reparent
 
 - 全局鼠标拖拽：在已选实体节点上按下并拖到另一个节点，释放后 SetParent。

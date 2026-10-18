@@ -29,6 +29,7 @@ EXPECTED = [
     "15_palette_closed.png",
     "16_inspector_rows.png",
     "17_hierarchy_drag.png",
+    "18_material_tab.png",
 ]
 
 

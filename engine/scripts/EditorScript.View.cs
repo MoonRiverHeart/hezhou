@@ -245,8 +245,28 @@ namespace Hezhou
             RefreshAssetGridView();
             UI.GridViewSetOnClick(_assetModelGridViewId, _gridViewClickCallback);
             
-            ulong materialTabContent = UI.CreateVStack(_assetTabWidget.Id, 5f);
-            UI.CreateLabel(materialTabContent, 200f, 25f, "材质列表 (待实现)");
+            ulong materialTabContent = UI.CreateScrollView(_assetTabWidget.Id, 0, 0, 0, 0);
+            ulong materialContentStack = UI.CreateVStack(materialTabContent, 4f);
+            UI.SetWidgetLayout(materialContentStack, 5f, 5f, 880f, 300f);
+            UI.CreateLabel(materialContentStack, 300f, 22f, "材质库");
+            int materialTotal = 0;
+            int materialCategoryCount = AssetLibrary.GetCategoryCount();
+            for (int mc = 0; mc < materialCategoryCount; mc++)
+            {
+                string materialCategory = AssetLibrary.GetCategoryName(mc);
+                if (materialCategory == null) continue;
+                if (materialCategory.IndexOf("Material", StringComparison.OrdinalIgnoreCase) < 0
+                    && materialCategory.IndexOf("材质", StringComparison.Ordinal) < 0) continue;
+                int materialCount = AssetLibrary.GetAssetCount(mc);
+                for (int mi = 0; mi < materialCount; mi++)
+                {
+                    AssetInfo materialInfo = AssetLibrary.GetAssetInfo(mc, mi);
+                    string materialName = string.IsNullOrEmpty(materialInfo.Name) ? "(unnamed)" : materialInfo.Name;
+                    UI.CreateLabel(materialContentStack, 300f, 20f, "🎨 " + materialName);
+                    materialTotal++;
+                }
+            }
+            _materialTabItemCount = materialTotal;
             
             ulong scriptTabContent = UI.CreateVStack(_assetTabWidget.Id, 5f);
             UI.CreateLabel(scriptTabContent, 200f, 25f, "脚本列表 (待实现)");
