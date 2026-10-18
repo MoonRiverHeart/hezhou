@@ -1379,12 +1379,24 @@ namespace Hezhou
             if (gridViewId == 0) return;
             
             UI.GridViewClear(gridViewId);
-            
-            UI.GridViewAddItem(gridViewId, "Cube", 1);
-            UI.GridViewAddItem(gridViewId, "Sphere", 2);
-            UI.GridViewAddItem(gridViewId, "Plane", 3);
-            UI.GridViewAddItem(gridViewId, "Cylinder", 4);
-            UI.GridViewAddItem(gridViewId, "CornellBox", 8);
+
+            string[] names = new string[] { "Cube", "Sphere", "Plane", "Cylinder", "CornellBox" };
+            ulong[] values = new ulong[] { 1, 2, 3, 4, 8 };
+            for (int i = 0; i < names.Length; i++)
+            {
+                if (!string.IsNullOrEmpty(_assetSearchQuery)
+                    && names[i].IndexOf(_assetSearchQuery, StringComparison.OrdinalIgnoreCase) < 0)
+                {
+                    continue;
+                }
+                UI.GridViewAddItem(gridViewId, names[i], values[i]);
+            }
+        }
+
+        private static void OnAssetSearchChange(ulong widgetId, string text)
+        {
+            _assetSearchQuery = text ?? "";
+            RefreshAssetGridView();
         }
         
 private static void OnGridViewClick(ulong widgetId, int index, ulong userData)

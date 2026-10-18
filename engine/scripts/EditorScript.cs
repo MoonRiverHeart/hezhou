@@ -51,6 +51,7 @@ namespace Hezhou
             _undoClickCallback = OnUndoClick;
             _redoClickCallback = OnRedoClick;
             _projectSearchChangeCallback = OnProjectSearchChange;
+            _assetSearchChangeCallback = OnAssetSearchChange;
             _hotReloadClickCallback = OnHotReloadClick;
             _newScriptClickCallback = OnNewScriptClick;
             _openInExplorerCallback = OpenInExplorer;

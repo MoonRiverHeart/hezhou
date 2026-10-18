@@ -7,6 +7,7 @@
 - Multi-select delete removes all selected entities (single undo snapshot); confirmation dialog shows count.
 - Undo/redo toolbar buttons with operation counts; `Ctrl+Z/Y` still works.
 - Project tree search InputField; typing filters entities live (flat result list while searching).
+- Asset panel model-tab search InputField; filters Cube/Sphere/Plane/Cylinder/CornellBox.
 - Console panel:
   - live refresh every 30 frames while open
   - level filter `All/Info/Warn+/Error+`

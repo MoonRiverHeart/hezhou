@@ -196,7 +196,11 @@ namespace Hezhou
             _assetTabWidget = new TabWidget(_assetPanel.Id, 5f, 5f, 0, 0);
             
             ulong modelTabContent = UI.CreateScrollView(_assetTabWidget.Id, 0, 0, 0, 0);
-            _assetModelGridViewId = UI.CreateGridView(modelTabContent, 5f, 5f, 0, 0, 64);
+            _assetSearchInputId = UI.CreateInputField(modelTabContent, 190f, 24f);
+            UI.SetWidgetLayout(_assetSearchInputId, 5f, 5f, 190f, 24f);
+            UI.InputFieldSetPlaceholder(_assetSearchInputId, "搜索资产...");
+            UI.InputFieldSetOnChange(_assetSearchInputId, _assetSearchChangeCallback);
+            _assetModelGridViewId = UI.CreateGridView(modelTabContent, 5f, 35f, 0, 0, 64);
             _assetGridViewId = _assetModelGridViewId; // Legacy alias
             RefreshAssetGridView();
             UI.GridViewSetOnClick(_assetModelGridViewId, _gridViewClickCallback);
