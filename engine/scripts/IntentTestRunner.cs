@@ -29,6 +29,7 @@ namespace Hezhou
             RunCase("intent.material_assign", MaterialAssign);
             RunCase("intent.gizmo_scale", GizmoScale);
             RunCase("intent.tab_reorder", TabReorder);
+            RunCase("intent.dock_collapse", DockCollapse);
             RunCase("intent.console_open_close", ConsoleOpenClose);
             RunCase("intent.running_paused_editing", RunningPausedEditing);
         }
@@ -197,6 +198,15 @@ namespace Hezhou
                 throw new Exception("multi-select delete did not remove both entities");
             }
             return "2 entities selected, batch edit + multi-delete passed";
+        }
+
+        private static string DockCollapse()
+        {
+            EditorScript.TestToggleAssetPanel();
+            if (!EditorScript.TestIsAssetCollapsed()) throw new Exception("asset panel did not collapse");
+            EditorScript.TestToggleAssetPanel();
+            if (EditorScript.TestIsAssetCollapsed()) throw new Exception("asset panel did not restore");
+            return "dock collapse/restore";
         }
 
         private static string TabReorder()

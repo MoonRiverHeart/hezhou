@@ -6,6 +6,10 @@ namespace Hezhou
     public static partial class EditorScript
     {
         private const string DockLayoutPath = ".hezhou_layout";
+        private static bool _projectCollapsed;
+        private static bool _assetCollapsed;
+        private static float _dockInnerRestore = 0.38f;
+        private static float _dockLeftCenterRestore = 0.70f;
 
         public static void LoadDockLayout()
         {
@@ -41,6 +45,12 @@ namespace Hezhou
                         case "rightMax":
                             _rightPanelMaximized = value == "1";
                             break;
+                        case "projectCollapsed":
+                            _projectCollapsed = value == "1";
+                            break;
+                        case "assetCollapsed":
+                            _assetCollapsed = value == "1";
+                            break;
                     }
                 }
             }
@@ -66,11 +76,11 @@ namespace Hezhou
             }
             if (_leftCenterSplitViewId != 0)
             {
-                UI.SplitViewSetSplitRatio(_leftCenterSplitViewId, _dockLeftCenterRatio);
+                UI.SplitViewSetSplitRatio(_leftCenterSplitViewId, _assetCollapsed ? 1.0f : _dockLeftCenterRatio);
             }
             if (_innerHorizontalSplitViewId != 0)
             {
-                UI.SplitViewSetSplitRatio(_innerHorizontalSplitViewId, _dockInnerRatio);
+                UI.SplitViewSetSplitRatio(_innerHorizontalSplitViewId, _projectCollapsed ? 1.0f : _dockInnerRatio);
             }
             if (_propsTabWidget != null && _dockPropTab < _propsTabWidget.GetTabCount())
             {
@@ -112,7 +122,9 @@ namespace Hezhou
                     "inner=" + _dockInnerRatio.ToString("R", CultureInfo.InvariantCulture) + "\n" +
                     "propTab=" + _dockPropTab + "\n" +
                     "assetTab=" + _dockAssetTab + "\n" +
-                    "rightMax=" + (_rightPanelMaximized ? "1" : "0") + "\n");
+                    "rightMax=" + (_rightPanelMaximized ? "1" : "0") + "\n" +
+                    "projectCollapsed=" + (_projectCollapsed ? "1" : "0") + "\n" +
+                    "assetCollapsed=" + (_assetCollapsed ? "1" : "0") + "\n");
             }
             catch (Exception) { }
         }
@@ -146,9 +158,53 @@ namespace Hezhou
             SaveDockLayout();
         }
 
+        public static void ToggleProjectPanel()
+        {
+            if (_projectCollapsed)
+            {
+                _projectCollapsed = false;
+                _dockInnerRatio = Math.Max(0.15f, Math.Min(0.85f, _dockInnerRestore));
+                UI.SplitViewSetSplitRatio(_innerHorizontalSplitViewId, _dockInnerRatio);
+            }
+            else
+            {
+                _dockInnerRestore = UI.SplitViewGetSplitRatio(_innerHorizontalSplitViewId);
+                _projectCollapsed = true;
+                UI.SplitViewSetSplitRatio(_innerHorizontalSplitViewId, 1.0f);
+            }
+            if (_statusItem != null) _statusItem.Text = _projectCollapsed ? "项目面板已收起" : "项目面板已展开";
+            SaveDockLayout();
+        }
+
+        public static void ToggleAssetPanel()
+        {
+            if (_assetCollapsed)
+            {
+                _assetCollapsed = false;
+                _dockLeftCenterRatio = Math.Max(0.15f, Math.Min(0.85f, _dockLeftCenterRestore));
+                UI.SplitViewSetSplitRatio(_leftCenterSplitViewId, _dockLeftCenterRatio);
+            }
+            else
+            {
+                _dockLeftCenterRestore = UI.SplitViewGetSplitRatio(_leftCenterSplitViewId);
+                _assetCollapsed = true;
+                UI.SplitViewSetSplitRatio(_leftCenterSplitViewId, 1.0f);
+            }
+            if (_statusItem != null) _statusItem.Text = _assetCollapsed ? "资产面板已收起" : "资产面板已展开";
+            SaveDockLayout();
+        }
+
+        public static void TestToggleAssetPanel() { ToggleAssetPanel(); }
+        public static void TestToggleProjectPanel() { ToggleProjectPanel(); }
+
+        public static bool TestIsProjectCollapsed() { return _projectCollapsed; }
+        public static bool TestIsAssetCollapsed() { return _assetCollapsed; }
+
         public static void ResetDockLayout()
         {
             _rightPanelMaximized = false;
+            _projectCollapsed = false;
+            _assetCollapsed = false;
             _dockOuterRatio = 0.72f;
             _dockLeftCenterRatio = 0.70f;
             _dockInnerRatio = 0.38f;

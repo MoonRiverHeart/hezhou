@@ -25,7 +25,9 @@ namespace Hezhou
             "控件画廊",
             "最大化属性面板",
             "重置 Dock 布局",
-            "打开项目            Ctrl+O"
+            "打开项目            Ctrl+O",
+            "收起/展开项目面板",
+            "收起/展开资产面板"
         };
 
         public static bool IsCommandPaletteOpen { get { return _commandPanelId != 0; } }
@@ -66,6 +68,8 @@ namespace Hezhou
                 case 8: OnRightMaxClick(0); break;
                 case 9: ResetDockLayout(); break;
                 case 10: ShowOpenProjectDialog(); break;
+                case 11: ToggleProjectPanel(); break;
+                case 12: ToggleAssetPanel(); break;
             }
         }
 

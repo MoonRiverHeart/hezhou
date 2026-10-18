@@ -1,5 +1,13 @@
 # Bug Fixes Log
 
+## 2026-10-18: Dock v2 面板收起/展开
+
+- 项目面板、资产面板支持收起/展开（SplitView ratio 1.0）。
+- 收起状态写入 `.hezhou_layout`；Command Palette 新增两条命令。
+- intent `dock_collapse`（19/19）；visual `23_asset_collapsed`、`24_dock_restored_2`。
+- 跨区域停靠/浮动面板仍未实现。
+
+
 ## 2026-10-18: Dock v2 Tab 拖拽重排
 
 - TabWidget 支持 reorderable 拖拽重排；同步 Rust children 顺序，避免内容错位。
