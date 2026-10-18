@@ -1,5 +1,14 @@
 # Bug Fixes Log
 
+## 2026-10-18: Gizmo v1 平移
+
+- 预览区叠加 X/Y/Z 三轴彩色条（layer 3）。
+- 拖拽轴条更新选中实体位置；状态栏显示实时 X/Y。
+- 新增 `TestGizmoNudge` / `TestGizmoVisible`。
+- intent `gizmo_translate`（15/15）；visual `19_gizmo_translate`。
+- 当前轴条位置基于 PreviewWindow 布局，尚未做到投影中心跟随。
+
+
 ## 2026-10-18: Asset Browser 材质列表
 
 - 材质 Tab 不再是“待实现”，改为读取 AssetLibrary Materials 分类并列出材质。

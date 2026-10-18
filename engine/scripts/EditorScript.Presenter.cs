@@ -79,6 +79,18 @@ namespace Hezhou
         {
             if (_gameScene == null) return;
 
+            // === Gizmo 拖拽 ===
+            if (_gizmoAxis != 0)
+            {
+                if (dragging) { UpdateGizmoDrag(x, y); return; }
+                EndGizmoDrag();
+            }
+            else if (dragging && _selectedEntityId != 0)
+            {
+                int axis = HitTestGizmo(x, y);
+                if (axis != 0) { BeginGizmoDrag(axis, x, y); return; }
+            }
+
             // === Hierarchy 拖拽 ===
             if (dragging && _hierarchyDragSource == 0 && _selectedEntityId != 0
                 && IsPointInsideEntityNode(_selectedEntityId, x, y))

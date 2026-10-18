@@ -25,6 +25,7 @@ namespace Hezhou
             RunCase("intent.console_source_location", ConsoleSourceLocation);
             RunCase("intent.hierarchy_drag", HierarchyDrag);
             RunCase("intent.material_browser", MaterialBrowser);
+            RunCase("intent.gizmo_translate", GizmoTranslate);
             RunCase("intent.console_open_close", ConsoleOpenClose);
             RunCase("intent.running_paused_editing", RunningPausedEditing);
         }
@@ -193,6 +194,21 @@ namespace Hezhou
                 throw new Exception("multi-select delete did not remove both entities");
             }
             return "2 entities selected, batch edit + multi-delete passed";
+        }
+
+        private static string GizmoTranslate()
+        {
+            EditorScript.TestNewScene();
+            ulong cube = EditorScript.TestCreateMeshEntity(0);
+            EditorScript.TestSelectEntity(cube);
+            float[] p0 = EditorScript.TestGetPosition(cube);
+            EditorScript.TestGizmoNudge(1.5f, 0.8f);
+            float[] p1 = EditorScript.TestGetPosition(cube);
+            if (Math.Abs(p1[0] - p0[0]) < 1.0f || Math.Abs(p1[1] - p0[1]) < 0.5f)
+                throw new Exception("gizmo did not translate entity");
+            if (!EditorScript.TestGizmoVisible())
+                throw new Exception("gizmo overlay not visible");
+            return "gizmo translated";
         }
 
         private static string MaterialBrowser()

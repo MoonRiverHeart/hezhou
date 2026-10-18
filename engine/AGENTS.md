@@ -347,3 +347,7 @@ glslc shaders/rotation.frag -o shaders/rotation.frag.spv
 - 材质 Tab 从 AssetLibrary Materials 分类读取并列出。
 - intent 14/14；visual 18 张（新增 `18_material_tab.png`）。
 - 材质拖放/赋给实体仍未实现。
+
+### 28. Gizmo v1 平移 (2026-10-18)
+- 预览区 X/Y/Z 轴条，拖拽更新实体位置；intent 15/15；visual 19 张。
+- 轴条位置基于 PreviewWindow 布局，投影中心跟随未完成。

@@ -378,6 +378,8 @@ _bindScriptClickCallback = OnBindScriptClick;
                         UI.SetCameraParams(fpsYaw, fpsPitch, camX, camY, camZ);
                     }
                     
+                    UpdateGizmoLayout();
+
                     // === 状态栏实时信息 ===
                     if (_selectionItem != null) _selectionItem.Text = "选择: " + _selectedEntityIds.Count;
                     if (_themeItem != null) _themeItem.Text = Theme.IsDark ? "主题: 深色" : "主题: 浅色";

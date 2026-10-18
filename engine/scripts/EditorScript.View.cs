@@ -225,6 +225,7 @@ namespace Hezhou
             _previewWindowId = UI.CreatePreviewWindow(_previewPanel.Id, 10f, 40f, initialPreviewWidth, initialPreviewHeight, 1);
             UI.SetWidgetLayer(_previewWindowId, 0);
             UI.SetGamePreviewExtent((uint)(initialPreviewWidth * UI.GetContentScale()), (uint)(initialPreviewHeight * UI.GetContentScale()));
+            CreateGizmoOverlay();
 
             // === Asset Panel: TabWidget spanning left+center bottom ===
             _assetTabWidget = new TabWidget(_assetPanel.Id, 5f, 5f, 0, 0);
