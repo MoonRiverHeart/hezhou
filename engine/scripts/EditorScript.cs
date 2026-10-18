@@ -48,6 +48,7 @@ namespace Hezhou
             _toggleEditorClickCallback = OnToggleEditorClick;
             _consoleClickCallback = OnConsoleClick;
             _themeClickCallback = OnThemeClick;
+            _rightMaxClickCallback = OnRightMaxClick;
             _consoleDialogResultCallback = OnConsoleDialogResult;
             _consoleRefreshCallback = OnConsoleRefresh;
             _consoleLevelSelectCallback = OnConsoleLevelSelect;
@@ -133,10 +134,13 @@ _bindScriptClickCallback = OnBindScriptClick;
                 _workingDirectorySet = true;
             }
             
+            LoadDockLayout();
+
             if (_workingDirectorySet)
             {
                 ScanScripts();
                 CreateEditorLayout();
+                ApplyDockLayout();
             }
             else
             {
@@ -469,6 +473,7 @@ _bindScriptClickCallback = OnBindScriptClick;
             _lastScriptBindingCount = -1;
 
             CreateEditorLayout();
+            ApplyDockLayout();
             OnResize(_screenWidth, _screenHeight);
             if (_propsTabWidget != null) _propsTabWidget.SetActive(savedPropertyTab);
 

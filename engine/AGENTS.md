@@ -304,3 +304,9 @@ glslc shaders/rotation.frag -o shaders/rotation.frag.spv
 - `EditorScript.WidgetGallery.cs` 整页展示 Buttons/Inputs/Icons/Tabs/Colors。
 - 打开时隐藏主 SplitView/状态栏，关闭恢复；不破坏 Scene/选中。
 - visual 扩展为 10 张截图，含 Dark/Light Gallery 与恢复验证。
+
+### 19. Dock v1 布局持久化 (2026-10-18)
+- `EditorScript.Dock.cs` 保存/恢复 SplitView 比例、Tab、右侧最大化到 `.hezhou_layout`。
+- 右侧面板标题栏最大化按钮；主题切换/resize 后重新应用。
+- visual 12 张，含最大化与恢复。
+- v2：Tab 拖拽、跨区域停靠、浮动面板。

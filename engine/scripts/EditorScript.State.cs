@@ -163,6 +163,17 @@ namespace Hezhou
         private static UI.WidgetCallbackDelegate _consoleClickCallback;
         private static UI.WidgetCallbackDelegate _themeClickCallback;
         private static ulong _themeButtonId;
+
+        // === Dock / Layout State ===
+        private static ulong _rightMaxButtonId;
+        private static UI.WidgetCallbackDelegate _rightMaxClickCallback;
+        private static bool _rightPanelMaximized;
+        private static float _rightPanelRestoreRatio = 0.72f;
+        private static float _dockOuterRatio = 0.72f;
+        private static float _dockLeftCenterRatio = 0.70f;
+        private static float _dockInnerRatio = 0.38f;
+        private static ulong _dockPropTab = 0;
+        private static ulong _dockAssetTab = 0;
         private static UI.WidgetCallbackDelegate _consoleRefreshCallback;
         private static UI.DropdownSelectCallbackDelegate _consoleLevelSelectCallback;
         private static UI.InputFieldChangeCallbackDelegate _consoleSearchChangeCallback;

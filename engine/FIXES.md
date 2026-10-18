@@ -1,5 +1,15 @@
 # Bug Fixes Log
 
+## 2026-10-18: Dock v1 — 布局持久化与面板最大化
+
+- 新增 `EditorScript.Dock.cs`：保存/恢复 outer/leftCenter/inner SplitView 比例、
+  属性 Tab、资产 Tab、右侧面板最大化状态（`.hezhou_layout`）。
+- 右侧面板标题栏增加最大化/还原按钮；最大化时右栏铺满工作区。
+- 主题切换、窗口 resize 后重新应用 Dock 布局。
+- visual 新增 `11_right_panel_max.png`、`12_dock_restored.png`，总计 12 张。
+- 当前 Dock v1 范围：比例持久化 + 最大化/恢复；Tab 拖拽与跨区域停靠留到 v2。
+
+
 ## 2026-10-18: P0 Widget Gallery（双主题控件基线）
 
 - 新增 `EditorScript.WidgetGallery.cs`：整页显示 Buttons/Inputs/Icons/Tabs/Theme Colors。

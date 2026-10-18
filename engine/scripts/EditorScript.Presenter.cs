@@ -2272,6 +2272,7 @@ UI.SetText(_runButtonId, "运行");
             string[] tabNames = new string[] { "几何", "位置", "渲染", "运动", "物理" };
             string tabName = ((int)index < tabNames.Length) ? tabNames[(int)index] : "未知";
             _statusItem.Text = "属性页: " + tabName;
+            SaveDockLayout();
         }
         
         // === Pipeline Selection Handler ===

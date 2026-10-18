@@ -180,6 +180,12 @@ namespace Hezhou
             // Second pane of outer SplitView: Properties panel
             _rightPanel = new Panel(_outerSplitViewId, 0, 0, 0, 0, ThemeRole.Panel);
 
+            _rightMaxButtonId = UI.CreateButton(_rightPanel.Id, 26f, 22f, "□");
+            UI.SetWidgetLayout(_rightMaxButtonId, _screenWidth * 0.28f - 34f, 8f, 26f, 22f);
+            UI.SetOnClick(_rightMaxButtonId, _rightMaxClickCallback);
+            UI.ThemeSetBackground(_rightMaxButtonId, ThemeRole.ButtonSecondaryBg);
+            UI.ThemeSetText(_rightMaxButtonId, ThemeRole.TextPrimary);
+
             // LeftCenter Vertical SplitView: Top (70%) | Asset (30%)
             _leftCenterSplitViewId = UI.CreateSplitView(_leftCenterPanel.Id, 0, 0, 0, 0, 1);
             UI.SplitViewSetSplitRatio(_leftCenterSplitViewId, 0.7f);
@@ -818,20 +824,23 @@ namespace Hezhou
 
         private static void OnOuterSplitViewRatioChange(ulong widgetId, float ratio)
         {
-            // Outer split changed: update preview extent
+            // Outer split changed: update preview extent + dock layout
             UpdatePreviewExtent();
+            SaveDockLayout();
         }
 
         private static void OnLeftCenterSplitViewRatioChange(ulong widgetId, float ratio)
         {
-            // LeftCenter vertical split changed: update preview extent
+            // LeftCenter vertical split changed: update preview extent + dock layout
             UpdatePreviewExtent();
+            SaveDockLayout();
         }
 
         private static void OnInnerHorizontalSplitViewRatioChange(ulong widgetId, float ratio)
         {
-            // Inner horizontal split changed: update preview extent
+            // Inner horizontal split changed: update preview extent + dock layout
             UpdatePreviewExtent();
+            SaveDockLayout();
         }
 
         private static void OnScriptEditorSplitViewRatioChange(ulong widgetId, float ratio)

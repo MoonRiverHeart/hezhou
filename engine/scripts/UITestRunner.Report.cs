@@ -371,6 +371,8 @@ namespace Hezhou
             _visualSteps.Add(new VisualStep("08_widget_gallery_dark", VisualGalleryDark, 10));
             _visualSteps.Add(new VisualStep("09_widget_gallery_light", VisualGalleryLight, 10));
             _visualSteps.Add(new VisualStep("10_editor_restored", VisualGalleryRestore, 10));
+            _visualSteps.Add(new VisualStep("11_right_panel_max", VisualRightPanelMax, 10));
+            _visualSteps.Add(new VisualStep("12_dock_restored", VisualDockRestore, 10));
 
             RunNextVisualStep();
         }
@@ -428,6 +430,16 @@ namespace Hezhou
         {
             EditorScript.TestHideWidgetGallery();
             EditorScript.TestClickThemeButton();
+        }
+
+        private static void VisualRightPanelMax()
+        {
+            EditorScript.TestToggleRightPanelMax();
+        }
+
+        private static void VisualDockRestore()
+        {
+            EditorScript.TestToggleRightPanelMax();
         }
 
         private static void VisualMultiSelect()

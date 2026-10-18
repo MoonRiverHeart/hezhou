@@ -76,6 +76,7 @@ $AllSourceFiles = @(
     "$ScriptsDir/EditorScript.View.cs",
     "$ScriptsDir/EditorScript.Presenter.cs",
     "$ScriptsDir/EditorScript.WidgetGallery.cs",
+    "$ScriptsDir/EditorScript.Dock.cs",
     "$ScriptsDir/AssetProjectTest.cs",
     "$ScriptsDir/UITestRunner.cs",
     "$ScriptsDir/UITestRunner.Report.cs",
