@@ -112,13 +112,14 @@ jobs:
       - name: Build and sign MSIX
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Force dist | Out-Null
+          $dist = Join-Path $PWD "dist"
+          New-Item -ItemType Directory -Force $dist | Out-Null
           $cert = New-SelfSignedCertificate -Type CodeSigningCert -Subject "CN=Hezhou-Editor" `
             -CertStoreLocation Cert:\CurrentUser\My -KeyExportPolicy Exportable -NotAfter (Get-Date).AddYears(5)
           $pwd = ConvertTo-SecureString "hezhou-msix" -AsPlainText -Force
           $pfx = Join-Path $env:RUNNER_TEMP "hezhou-msix.pfx"
           Export-PfxCertificate -Cert $cert -FilePath $pfx -Password $pwd | Out-Null
-          Export-Certificate -Cert $cert -FilePath (Join-Path $PWD "dist\HezhouEditor.cer") | Out-Null
+          Export-Certificate -Cert $cert -FilePath (Join-Path $dist "HezhouEditor.cer") | Out-Null
           powershell -ExecutionPolicy Bypass -File installer/windows/build_msix.ps1 -SkipBuild `
             -CertificatePath $pfx -CertificatePassword "hezhou-msix"
 
