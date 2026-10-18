@@ -338,3 +338,7 @@ glslc shaders/rotation.frag -o shaders/rotation.frag.spv
 ### 25. Inspector 属性行重做 (2026-10-18)
 - 单行 Label + 输入控件；Float3 三轴同排；长属性名截断。
 - visual 16 张（新增 `16_inspector_rows.png`）。
+
+### 26. Hierarchy 拖拽 reparent (2026-10-18)
+- 全局鼠标拖拽把已选实体拖到目标节点，释放后 SetParent；循环层级被拒绝。
+- intent 13/13；visual 17 张（新增 `17_hierarchy_drag.png`）。

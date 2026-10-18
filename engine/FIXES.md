@@ -1,5 +1,13 @@
 # Bug Fixes Log
 
+## 2026-10-18: Hierarchy 拖拽 reparent
+
+- 全局鼠标拖拽：在已选实体节点上按下并拖到另一个节点，释放后 SetParent。
+- 拖拽中状态栏显示目标实体；循环层级由 Scene 校验拒绝。
+- 新增 `TestHierarchyDrop`、`TestExpandHierarchy`。
+- intent `hierarchy_drag`（13/13）；visual `17_hierarchy_drag`。
+
+
 ## 2026-10-18: Inspector 属性行重做
 
 - 属性面板从“标签一行 + 输入一行”改为单行 Label + 输入控件。

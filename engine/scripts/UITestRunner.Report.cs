@@ -377,6 +377,7 @@ namespace Hezhou
             _visualSteps.Add(new VisualStep("14_command_palette", VisualCommandPalette, 10));
             _visualSteps.Add(new VisualStep("15_palette_closed", VisualCommandPaletteClose, 10));
             _visualSteps.Add(new VisualStep("16_inspector_rows", VisualInspectorRows, 10));
+            _visualSteps.Add(new VisualStep("17_hierarchy_drag", VisualHierarchyDrag, 10));
 
             RunNextVisualStep();
         }
@@ -457,6 +458,15 @@ namespace Hezhou
             EditorScript.TestSetPosition(c, 2f, 0.5f, 0f);
             EditorScript.TestSelectEntity(a);
             EditorScript.TestShiftRangeSelect(a, c);
+        }
+
+        private static void VisualHierarchyDrag()
+        {
+            EditorScript.TestNewScene();
+            ulong parent = EditorScript.TestCreateMeshEntity(0);
+            ulong child = EditorScript.TestCreateMeshEntity(0);
+            EditorScript.TestHierarchyDrop(child, parent);
+            EditorScript.TestExpandHierarchy();
         }
 
         private static void VisualInspectorRows()

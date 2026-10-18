@@ -23,6 +23,7 @@ namespace Hezhou
             RunCase("intent.shift_range_select", ShiftRangeSelect);
             RunCase("intent.command_palette", CommandPalette);
             RunCase("intent.console_source_location", ConsoleSourceLocation);
+            RunCase("intent.hierarchy_drag", HierarchyDrag);
             RunCase("intent.console_open_close", ConsoleOpenClose);
             RunCase("intent.running_paused_editing", RunningPausedEditing);
         }
@@ -191,6 +192,20 @@ namespace Hezhou
                 throw new Exception("multi-select delete did not remove both entities");
             }
             return "2 entities selected, batch edit + multi-delete passed";
+        }
+
+        private static string HierarchyDrag()
+        {
+            EditorScript.TestNewScene();
+            ulong parent = EditorScript.TestCreateMeshEntity(0);
+            ulong child = EditorScript.TestCreateMeshEntity(0);
+            EditorScript.TestHierarchyDrop(child, parent);
+            if (EditorScript.TestGetParent(child) != parent)
+                throw new Exception("hierarchy drag did not reparent child");
+            EditorScript.TestHierarchyDrop(parent, child);
+            if (EditorScript.TestGetParent(parent) == child)
+                throw new Exception("hierarchy drag created a cycle");
+            return "drag reparent + cycle rejected";
         }
 
         private static string ConsoleSourceLocation()

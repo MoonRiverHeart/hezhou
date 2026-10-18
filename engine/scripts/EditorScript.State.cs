@@ -57,6 +57,9 @@ namespace Hezhou
         private static bool _ctrlPressed = false;
         private static bool _shiftPressed = false;
         private static ulong _selectionAnchorEntityId = 0;
+        private static ulong _hierarchyDragSource = 0;
+        private static ulong _hierarchyDragTarget = 0;
+        private static bool _hierarchyDragActive = false;
         private static System.Collections.Generic.List<ulong> _entityDisplayOrder = new System.Collections.Generic.List<ulong>();
         private static bool _propertiesDirty = false;
         private static ulong _lastPropertiesEntityId = 0;

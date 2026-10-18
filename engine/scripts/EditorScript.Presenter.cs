@@ -78,6 +78,33 @@ namespace Hezhou
         private static void OnMouseMove(float x, float y, bool dragging)
         {
             if (_gameScene == null) return;
+
+            // === Hierarchy 拖拽 ===
+            if (dragging && _hierarchyDragSource == 0 && _selectedEntityId != 0
+                && IsPointInsideEntityNode(_selectedEntityId, x, y))
+            {
+                _hierarchyDragSource = _selectedEntityId;
+                _hierarchyDragActive = true;
+            }
+            if (_hierarchyDragActive)
+            {
+                if (dragging)
+                {
+                    ulong hover = FindEntityAtPoint(x, y);
+                    if (hover != 0 && hover != _hierarchyDragSource)
+                    {
+                        _hierarchyDragTarget = hover;
+                        if (_statusItem != null) _statusItem.Text = "拖拽到: " + UI.SceneGetEntityName(_gameScene.ScenePtr, hover);
+                    }
+                    return;
+                }
+                else
+                {
+                    PerformHierarchyDrop(_hierarchyDragSource, _hierarchyDragTarget);
+                    ResetHierarchyDrag();
+                    return;
+                }
+            }
             
             GameState state = _gameScene.GetGameState();
             
@@ -1097,6 +1124,55 @@ namespace Hezhou
             }
         }
         
+        private static bool IsPointInsideEntityNode(ulong entityId, float x, float y)
+        {
+            if (_entityNodeMap.TryGetValue(entityId, out ulong nodeId))
+            {
+                float[] layout = UI.WidgetGetAbsoluteLayout(nodeId);
+                if (layout != null && layout.Length >= 4)
+                {
+                    return x >= layout[0] && x <= layout[0] + layout[2]
+                        && y >= layout[1] && y <= layout[1] + layout[3];
+                }
+            }
+            return false;
+        }
+
+        private static ulong FindEntityAtPoint(float x, float y)
+        {
+            foreach (var entry in _entityNodeMap)
+            {
+                float[] layout = UI.WidgetGetAbsoluteLayout(entry.Value);
+                if (layout == null || layout.Length < 4) continue;
+                if (x >= layout[0] && x <= layout[0] + layout[2]
+                    && y >= layout[1] && y <= layout[1] + layout[3])
+                {
+                    return entry.Key;
+                }
+            }
+            return 0;
+        }
+
+        private static void ResetHierarchyDrag()
+        {
+            _hierarchyDragSource = 0;
+            _hierarchyDragTarget = 0;
+            _hierarchyDragActive = false;
+        }
+
+        private static void PerformHierarchyDrop(ulong source, ulong target)
+        {
+            if (_gameScene == null || source == 0 || target == 0 || source == target) return;
+            _gameScene.SetParent(source, target);
+            bool ok = _gameScene.GetParent(source) == target;
+            RefreshEntityTree();
+            SelectEntity(source);
+            if (_statusItem != null)
+            {
+                _statusItem.Text = ok ? "已拖拽设置父子层级" : "拖拽失败：不能形成循环层级";
+            }
+        }
+
         private static void UpdateSelectionStatus()
         {
             if (_selectionItem != null) _selectionItem.Text = "选择: " + _selectedEntityIds.Count;
@@ -3130,6 +3206,23 @@ UI.SetText(_runButtonId, "运行");
             _gameScene.SetGameState((GameState)state);
             UI.SetRendererGameState(state);
             return (int)_gameScene.GetGameState() == state;
+        }
+
+        public static void TestExpandHierarchy()
+        {
+            if (_projectTreeViewId == 0) return;
+            if (_scriptsNodeId != 0) UI.TreeViewCollapseNode(_projectTreeViewId, _scriptsNodeId);
+            if (_scenesNodeId != 0) UI.TreeViewExpandNode(_projectTreeViewId, _scenesNodeId);
+            if (_entitiesNodeId != 0) UI.TreeViewExpandNode(_projectTreeViewId, _entitiesNodeId);
+            foreach (var entry in _entityNodeMap)
+            {
+                UI.TreeViewExpandNode(_projectTreeViewId, entry.Value);
+            }
+        }
+
+        public static void TestHierarchyDrop(ulong source, ulong target)
+        {
+            PerformHierarchyDrop(source, target);
         }
 
         public static bool TestSetParent(ulong entityId, ulong parentId)
