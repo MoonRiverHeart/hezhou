@@ -1,5 +1,16 @@
 # Bug Fixes Log
 
+## 2026-10-18: 重力 / 角色 / 动画 / 天空盒
+
+- `CharacterController`：水平移动、重力积分、跳跃、地面吸附；3 个物理用例。
+- 动画：`AnimationClip`/`AnimationKeyframe`/`AnimationPlayer` + `AnimationSystem`，
+  支持位置/旋转/缩放关键帧、循环、slerp 插值；加入 Scene 默认系统。
+- 天空盒：`sky.vert/sky.frag` 全屏渐变 pipeline，RasterPipeline 在实体前绘制；
+  BGR 写出 + Vulkan UV 翻转修正，渐变顶部深蓝、底部浅蓝。
+- 新增 `core/tests/animation_system.rs`、`physics/tests/character.rs`。
+- visual 33 / intent 26 全通过；平均帧 6.94ms。
+
+
 ## 2026-10-18: 3D renderer Gizmo 轴线段
 
 - `RasterPipeline` 在实体绘制后增加 Gizmo 轴线段绘制：以实体世界坐标为原点，

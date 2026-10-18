@@ -420,3 +420,7 @@ glslc shaders/rotation.frag -o shaders/rotation.frag.spv
 ### 46. 3D renderer Gizmo 轴线段 (2026-10-18)
 - RasterPipeline 实体后绘制三轴薄四边形；outline pipeline + outline_color 分轴着色。
 - FFI 283 字段；UI Button 仅作透明命中区域；visual 33 / intent 26 全通过。
+
+### 47. 重力 / 角色 / 动画 / 天空盒 (2026-10-18)
+- CharacterController 重力/跳跃/地面吸附；AnimationClip + AnimationSystem。
+- 全屏天空盒渐变 pipeline；视觉测试 33 / 意图 26 全通过。

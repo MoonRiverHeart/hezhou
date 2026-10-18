@@ -51,6 +51,7 @@ impl Scene {
     pub fn new() -> Self {
         let mut world = World::new();
         world.add_system(Box::new(LifetimeSystem));
+        world.add_system(Box::new(crate::ecs::components::AnimationSystem));
         Self {
             world,
             state: GameState::Editing,

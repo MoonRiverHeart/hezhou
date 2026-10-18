@@ -139,6 +139,8 @@ pub struct UIVulkanRenderer {
     
     // Game preview rendering (offscreen + FXAA)
     game_render_pass: vk::RenderPass,
+    sky_pipeline: vk::Pipeline,
+    sky_pipeline_layout: vk::PipelineLayout,
     game_pipeline: vk::Pipeline,
     game_pipeline_layout: vk::PipelineLayout,
     texture_descriptor_set_layout: vk::DescriptorSetLayout,
@@ -222,6 +224,9 @@ pub struct UIVulkanRenderer {
     gizmo_vertex_memory: Option<vk::DeviceMemory>,
     gizmo_visible: bool,
     gizmo_position: [f32; 3],
+    sky_enabled: bool,
+    sky_top: [f32; 3],
+    sky_bottom: [f32; 3],
     
     // 截图源图像 — 记录当前帧实际渲染结果的image和extent
     // rasterization模式: offscreen_image(经FXAA后)
@@ -763,6 +768,9 @@ p_multisample_state: &vk::PipelineMultisampleStateCreateInfo {
                 p_dependencies: game_subpass_dependencies.as_ptr(),
                 ..Default::default()
             }, None).map_err(|e| format!("Failed to create game render pass: {}", e))?;
+
+            let (sky_pipeline, sky_pipeline_layout) =
+                Self::create_sky_pipeline(&device, game_render_pass)?;
             
             // Create depth image
             let (depth_image, depth_image_memory) = Self::create_depth_image(
@@ -1697,6 +1705,8 @@ p_multisample_state: &vk::PipelineMultisampleStateCreateInfo {
                 content_scale,
                 
                 game_render_pass,
+                sky_pipeline,
+                sky_pipeline_layout,
                 game_pipeline,
                 game_pipeline_layout,
                 texture_descriptor_set_layout,
@@ -1768,6 +1778,9 @@ p_multisample_state: &vk::PipelineMultisampleStateCreateInfo {
                 gizmo_vertex_memory: None,
                 gizmo_visible: false,
                 gizmo_position: [0.0, 0.0, 0.0],
+                sky_enabled: true,
+                sky_top: [0.16, 0.32, 0.62],
+                sky_bottom: [0.72, 0.82, 0.92],
                 // 截图源初始为offscreen_image（初始化时尚未渲染，后续draw_frame会更新）
                 screenshot_source_image: offscreen_image,
                 screenshot_source_extent: offscreen_extent,
@@ -1786,6 +1799,12 @@ p_multisample_state: &vk::PipelineMultisampleStateCreateInfo {
     /// 启用后，draw_frame()的游戏渲染部分将委托给PipelineRegistry。
     /// 不启用时，走现有legacy渲染路径（向后兼容）。
     /// C# 每帧同步选中实体的世界坐标与可见性，供 RasterPipeline 画 3D 轴线。
+    pub fn set_skybox(&mut self, top: [f32; 3], bottom: [f32; 3]) {
+        self.sky_top = top;
+        self.sky_bottom = bottom;
+        self.sky_enabled = true;
+    }
+
     pub fn set_gizmo_3d(&mut self, visible: bool, x: f32, y: f32, z: f32) {
         self.gizmo_visible = visible;
         self.gizmo_position = [x, y, z];
@@ -1889,6 +1908,8 @@ p_multisample_state: &vk::PipelineMultisampleStateCreateInfo {
             self.fxaa_descriptor_set,
             self.fxaa_sampler,
             self.game_render_pass,
+            self.sky_pipeline,
+            self.sky_pipeline_layout,
             self.light_ubo,
             self.light_ubo_memory,
             self.light_descriptor_set,
@@ -2037,6 +2058,9 @@ p_multisample_state: &vk::PipelineMultisampleStateCreateInfo {
             frame_index: self.frame_count as u32,
             gizmo_visible: self.gizmo_visible,
             gizmo_position: self.gizmo_position,
+            sky_enabled: self.sky_enabled,
+            sky_top: self.sky_top,
+            sky_bottom: self.sky_bottom,
         };
         
 // 5. 在switch_pipeline前，从active_resources取出renderer自有资源
@@ -2201,6 +2225,74 @@ p_multisample_state: &vk::PipelineMultisampleStateCreateInfo {
         }
     }
     
+    fn create_sky_pipeline(device: &ash::Device, render_pass: vk::RenderPass) -> Result<(vk::Pipeline, vk::PipelineLayout), String> {
+        let vert = Self::create_shader_module(device, include_bytes!("../../shaders/sky.vert.spv"))?;
+        let frag = Self::create_shader_module(device, include_bytes!("../../shaders/sky.frag.spv"))?;
+        unsafe {
+            let layout = device.create_pipeline_layout(&vk::PipelineLayoutCreateInfo {
+                push_constant_range_count: 1,
+                p_push_constant_ranges: &vk::PushConstantRange {
+                    stage_flags: vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT,
+                    offset: 0,
+                    size: 32,
+                },
+                ..Default::default()
+            }, None).map_err(|e| format!("sky layout: {}", e))?;
+            let dynamic_states = [vk::DynamicState::VIEWPORT, vk::DynamicState::SCISSOR];
+            let pipeline = device.create_graphics_pipelines(vk::PipelineCache::null(), &[
+                vk::GraphicsPipelineCreateInfo {
+                    stage_count: 2,
+                    p_stages: &[
+                        vk::PipelineShaderStageCreateInfo { stage: vk::ShaderStageFlags::VERTEX, module: vert, p_name: b"main\0".as_ptr() as *const i8, ..Default::default() },
+                        vk::PipelineShaderStageCreateInfo { stage: vk::ShaderStageFlags::FRAGMENT, module: frag, p_name: b"main\0".as_ptr() as *const i8, ..Default::default() },
+                    ] as *const _,
+                    p_vertex_input_state: &vk::PipelineVertexInputStateCreateInfo::default(),
+                    p_input_assembly_state: &vk::PipelineInputAssemblyStateCreateInfo {
+                        topology: vk::PrimitiveTopology::TRIANGLE_LIST,
+                        ..Default::default()
+                    },
+                    p_viewport_state: &vk::PipelineViewportStateCreateInfo {
+                        viewport_count: 1,
+                        scissor_count: 1,
+                        ..Default::default()
+                    },
+                    p_rasterization_state: &vk::PipelineRasterizationStateCreateInfo {
+                        polygon_mode: vk::PolygonMode::FILL,
+                        cull_mode: vk::CullModeFlags::NONE,
+                        front_face: vk::FrontFace::COUNTER_CLOCKWISE,
+                        line_width: 1.0,
+                        ..Default::default()
+                    },
+                    p_multisample_state: &vk::PipelineMultisampleStateCreateInfo {
+                        rasterization_samples: vk::SampleCountFlags::TYPE_1,
+                        ..Default::default()
+                    },
+                    p_color_blend_state: &vk::PipelineColorBlendStateCreateInfo {
+                        attachment_count: 1,
+                        p_attachments: &vk::PipelineColorBlendAttachmentState {
+                            blend_enable: vk::FALSE,
+                            color_write_mask: vk::ColorComponentFlags::RGBA,
+                            ..Default::default()
+                        },
+                        ..Default::default()
+                    },
+                    p_dynamic_state: &vk::PipelineDynamicStateCreateInfo {
+                        dynamic_state_count: dynamic_states.len() as u32,
+                        p_dynamic_states: dynamic_states.as_ptr(),
+                        ..Default::default()
+                    },
+                    layout,
+                    render_pass,
+                    subpass: 0,
+                    ..Default::default()
+                },
+            ], None).map_err(|e| format!("sky pipeline: {:?}", e.1))?[0];
+            device.destroy_shader_module(vert, None);
+            device.destroy_shader_module(frag, None);
+            Ok((pipeline, layout))
+        }
+    }
+
     fn create_shader_module(device: &ash::Device, spirv: &[u8]) -> Result<vk::ShaderModule, String> {
         let code: Vec<u32> = spirv.chunks_exact(4)
             .map(|chunk| u32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]))
@@ -3125,7 +3217,10 @@ self.device.wait_for_fences(&[self.in_flight_fences[self.current_frame]], true, 
                     },
                     frame_index: self.frame_count as u32,
                     gizmo_visible: self.gizmo_visible,
-                    gizmo_position: self.gizmo_position,  // 用frame_count而非current_frame（不循环）
+                    gizmo_position: self.gizmo_position,
+                    sky_enabled: self.sky_enabled,
+                    sky_top: self.sky_top,
+                    sky_bottom: self.sky_bottom,  // 用frame_count而非current_frame（不循环）
                 };
                 
                 // 委托给PipelineRegistry执行完整渲染帧

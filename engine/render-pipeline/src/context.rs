@@ -100,6 +100,10 @@ pub struct RenderContext {
     pub gizmo_visible: bool,
     /// Gizmo 世界坐标
     pub gizmo_position: [f32; 3],
+    /// 天空盒渐变
+    pub sky_enabled: bool,
+    pub sky_top: [f32; 3],
+    pub sky_bottom: [f32; 3],
 }
 
 impl Default for RenderContext {
@@ -113,6 +117,9 @@ impl Default for RenderContext {
             frame_index: 0,
             gizmo_visible: false,
             gizmo_position: [0.0, 0.0, 0.0],
+            sky_enabled: true,
+            sky_top: [0.16, 0.32, 0.62],
+            sky_bottom: [0.55, 0.68, 0.82],
         }
     }
 }

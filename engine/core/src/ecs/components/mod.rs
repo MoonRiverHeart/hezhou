@@ -7,3 +7,5 @@ pub use script::*;
 pub use selection::*;
 pub mod lifetime;
 pub use lifetime::*;
+pub mod animation;
+pub use animation::*;

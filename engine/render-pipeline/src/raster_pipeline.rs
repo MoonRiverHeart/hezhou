@@ -127,6 +127,13 @@ pub struct TextureCacheEntry {
 /// - _end_pad(vec2): offset 136, size 8 ✓
 /// - 总计: 144 bytes, struct alignment 16, 144 % 16 == 0 ✓
 #[repr(C)]
+#[derive(Clone, Copy, Pod, Zeroable)]
+struct SkyPush {
+    top: [f32; 4],
+    bottom: [f32; 4],
+}
+
+#[repr(C)]
 #[derive(Clone, Copy, Debug, Default, Pod, Zeroable)]
 pub struct PushConstantData {
     /// 模型矩阵 — column-major 4x4（Vulkan约定）
@@ -314,6 +321,10 @@ pub struct RasterPipeline {
 
     /// 游戏render pass（game + FXAA共用）
     game_render_pass: vk::RenderPass,
+    /// 天空盒渐变 pipeline
+    sky_pipeline: vk::Pipeline,
+    /// 天空盒 pipeline layout
+    sky_pipeline_layout: vk::PipelineLayout,
 
     /// Light UBO buffer
     light_ubo: vk::Buffer,
@@ -390,6 +401,8 @@ impl RasterPipeline {
         fxaa_descriptor_set: vk::DescriptorSet,
         fxaa_sampler: vk::Sampler,
         game_render_pass: vk::RenderPass,
+        sky_pipeline: vk::Pipeline,
+        sky_pipeline_layout: vk::PipelineLayout,
         light_ubo: vk::Buffer,
         light_ubo_memory: vk::DeviceMemory,
         light_descriptor_set: vk::DescriptorSet,
@@ -422,6 +435,8 @@ impl RasterPipeline {
             fxaa_descriptor_set,
             fxaa_sampler,
             game_render_pass,
+            sky_pipeline,
+            sky_pipeline_layout,
             light_ubo,
             light_ubo_memory,
             light_descriptor_set,
@@ -677,6 +692,23 @@ impl RenderPipeline for RasterPipeline {
             };
             self.device.cmd_set_viewport(cmd_buffer, 0, &[viewport]);
             self.device.cmd_set_scissor(cmd_buffer, 0, &[scissor]);
+
+            // 3.5 天空盒渐变（全屏三角形，先于实体绘制）
+            if ctx.sky_enabled {
+                self.device.cmd_bind_pipeline(cmd_buffer, vk::PipelineBindPoint::GRAPHICS, self.sky_pipeline);
+                let sky = SkyPush {
+                    top: [ctx.sky_top[0], ctx.sky_top[1], ctx.sky_top[2], 1.0],
+                    bottom: [ctx.sky_bottom[0], ctx.sky_bottom[1], ctx.sky_bottom[2], 1.0],
+                };
+                self.device.cmd_push_constants(
+                    cmd_buffer,
+                    self.sky_pipeline_layout,
+                    vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT,
+                    0,
+                    bytemuck::cast_slice(&[sky]),
+                );
+                self.device.cmd_draw(cmd_buffer, 3, 1, 0, 0);
+            }
 
             // 4. 绑定light descriptor set (set 0) + default texture descriptor set (set 1)
             self.device.cmd_bind_descriptor_sets(
