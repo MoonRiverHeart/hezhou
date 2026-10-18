@@ -376,6 +376,7 @@ namespace Hezhou
             _visualSteps.Add(new VisualStep("13_shift_range_select", VisualShiftRangeSelect, 10));
             _visualSteps.Add(new VisualStep("14_command_palette", VisualCommandPalette, 10));
             _visualSteps.Add(new VisualStep("15_palette_closed", VisualCommandPaletteClose, 10));
+            _visualSteps.Add(new VisualStep("16_inspector_rows", VisualInspectorRows, 10));
 
             RunNextVisualStep();
         }
@@ -456,6 +457,14 @@ namespace Hezhou
             EditorScript.TestSetPosition(c, 2f, 0.5f, 0f);
             EditorScript.TestSelectEntity(a);
             EditorScript.TestShiftRangeSelect(a, c);
+        }
+
+        private static void VisualInspectorRows()
+        {
+            EditorScript.TestNewScene();
+            ulong cube = EditorScript.TestCreateMeshEntity(0);
+            EditorScript.TestSelectEntity(cube);
+            EditorScript.TestSetPropertyTab(1);
         }
 
         private static void VisualCommandPalette()

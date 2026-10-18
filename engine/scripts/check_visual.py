@@ -27,6 +27,7 @@ EXPECTED = [
     "13_shift_range_select.png",
     "14_command_palette.png",
     "15_palette_closed.png",
+    "16_inspector_rows.png",
 ]
 
 

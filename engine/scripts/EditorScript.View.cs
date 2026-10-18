@@ -440,6 +440,15 @@ namespace Hezhou
         }
 
         // === Build a single property widget into a target container ===
+        // 现代 Inspector 行：一行内 Label + 输入控件，避免标签/输入各占一行。
+        private static ulong CreatePropertyRow(ulong parentContainerId, string displayName, out ulong labelId)
+        {
+            ulong rowId = UI.CreateHStack(parentContainerId, 6f);
+            string labelText = displayName.Length > 12 ? displayName.Substring(0, 11) + "." : displayName;
+            labelId = UI.CreateLabel(rowId, 96f, 24f, labelText + ":");
+            return rowId;
+        }
+
         private static void BuildSingleProperty(ulong parentContainerId, string name, uint type, string category, bool readOnly)
         {
             PropertyDescriptor desc = new PropertyDescriptor();
@@ -447,176 +456,154 @@ namespace Hezhou
             desc.Type = type;
             desc.Category = category;
             desc.ReadOnly = readOnly;
-            
+
             string displayName = name.Length > 0 ? name.Substring(0, 1).ToUpper() + name.Substring(1) : name;
-            
+            ulong rowId = CreatePropertyRow(parentContainerId, displayName, out desc.LabelId);
+
             if (type == 1) // Float3
             {
-                // Label独占一行(wrap模式)，然后HStack放3个InputField
-                desc.LabelId = UI.CreateLabel(parentContainerId, 0, 20f, displayName + ":");
-                UI.SetLabelWrapMode(desc.LabelId, 1); // 启用Wrap模式
-                
-                ulong hStackId = UI.CreateHStack(parentContainerId, 5f);
                 desc.WidgetIds = new ulong[3];
-                
                 string[] axisLabels = new string[] { "X", "Y", "Z" };
                 for (int j = 0; j < 3; j++)
                 {
-                    ulong inputId = UI.CreateInputField(hStackId, 70f, 25f);
+                    ulong inputId = UI.CreateInputField(rowId, 58f, 24f);
                     UI.InputFieldSetPlaceholder(inputId, axisLabels[j]);
-                    
+
                     string propName = name;
                     int compIdx = j;
-                    
+
                     PropertyChangeCallback pcb = delegate(ulong wid, string txt) {
                         HandleFloat3ComponentChange(propName, compIdx, wid, txt);
                     };
                     _propertyCallbacks[inputId] = pcb;
-                    
+
                     UI.InputFieldChangeCallbackDelegate ifcb = delegate(ulong wid, string txt) {
                         HandleFloat3ComponentChange(propName, compIdx, wid, txt);
                     };
                     _propertyInputFieldCallbacks[inputId] = ifcb;
                     UI.InputFieldSetOnChange(inputId, ifcb);
-                    
+
                     desc.WidgetIds[j] = inputId;
                 }
             }
             else if (type == 2) // String
             {
-                // Label独占一行(wrap模式)，InputField/ValueLabel独占另一行
-                desc.LabelId = UI.CreateLabel(parentContainerId, 0, 20f, displayName + ":");
-                UI.SetLabelWrapMode(desc.LabelId, 1); // 启用Wrap模式
-                
                 if (readOnly)
                 {
-                    ulong valueLabelId = UI.CreateLabel(parentContainerId, RIGHT_PANEL_WIDTH - 40f, 20f, "");
+                    ulong valueLabelId = UI.CreateLabel(rowId, 170f, 22f, "");
                     desc.WidgetIds = new ulong[] { valueLabelId };
                 }
                 else
                 {
-                    ulong inputId = UI.CreateInputField(parentContainerId, RIGHT_PANEL_WIDTH - 40f, 25f);
+                    ulong inputId = UI.CreateInputField(rowId, 170f, 24f);
                     UI.InputFieldSetPlaceholder(inputId, displayName);
-                    
+
                     string propName = name;
-                    
+
                     PropertyChangeCallback pcb = delegate(ulong wid, string txt) {
                         HandleStringPropertyChange(propName, wid, txt);
                     };
                     _propertyCallbacks[inputId] = pcb;
-                    
+
                     UI.InputFieldChangeCallbackDelegate ifcb = delegate(ulong wid, string txt) {
                         pcb(wid, txt);
                     };
                     _propertyInputFieldCallbacks[inputId] = ifcb;
                     UI.InputFieldSetOnChange(inputId, ifcb);
-                    
+
                     desc.WidgetIds = new ulong[] { inputId };
                 }
             }
             else if (type == 4) // Int
             {
-                // Label独占一行(wrap模式)，InputField/ValueLabel独占另一行
-                desc.LabelId = UI.CreateLabel(parentContainerId, 0, 20f, displayName + ":");
-                UI.SetLabelWrapMode(desc.LabelId, 1); // 启用Wrap模式
-                
                 if (readOnly)
                 {
-                    ulong valueLabelId = UI.CreateLabel(parentContainerId, RIGHT_PANEL_WIDTH - 40f, 20f, "");
+                    ulong valueLabelId = UI.CreateLabel(rowId, 170f, 22f, "");
                     desc.WidgetIds = new ulong[] { valueLabelId };
                 }
                 else
                 {
-                    ulong inputId = UI.CreateInputField(parentContainerId, RIGHT_PANEL_WIDTH - 40f, 25f);
-                    UI.InputFieldSetPlaceholder(inputId, displayName);
-                    
+                    ulong inputId = UI.CreateInputField(rowId, 170f, 24f);
+                    UI.InputFieldSetPlaceholder(inputId, "0");
+
                     string propName = name;
-                    
+
                     PropertyChangeCallback pcb = delegate(ulong wid, string txt) {
                         HandleIntPropertyChange(propName, wid, txt);
                     };
                     _propertyCallbacks[inputId] = pcb;
-                    
+
                     UI.InputFieldChangeCallbackDelegate ifcb = delegate(ulong wid, string txt) {
                         pcb(wid, txt);
                     };
                     _propertyInputFieldCallbacks[inputId] = ifcb;
                     UI.InputFieldSetOnChange(inputId, ifcb);
-                    
+
                     desc.WidgetIds = new ulong[] { inputId };
                 }
             }
             else if (type == 0) // Float
             {
-                // Label独占一行(wrap模式)，InputField/ValueLabel独占另一行
-                desc.LabelId = UI.CreateLabel(parentContainerId, 0, 20f, displayName + ":");
-                UI.SetLabelWrapMode(desc.LabelId, 1); // 启用Wrap模式
-                
                 if (readOnly)
                 {
-                    ulong valueLabelId = UI.CreateLabel(parentContainerId, RIGHT_PANEL_WIDTH - 40f, 20f, "");
+                    ulong valueLabelId = UI.CreateLabel(rowId, 170f, 22f, "");
                     desc.WidgetIds = new ulong[] { valueLabelId };
                 }
                 else
                 {
-                    ulong inputId = UI.CreateInputField(parentContainerId, RIGHT_PANEL_WIDTH - 40f, 25f);
-                    UI.InputFieldSetPlaceholder(inputId, displayName);
-                    
+                    ulong inputId = UI.CreateInputField(rowId, 170f, 24f);
+                    UI.InputFieldSetPlaceholder(inputId, "0");
+
                     string propName = name;
-                    
+
                     PropertyChangeCallback pcb = delegate(ulong wid, string txt) {
                         HandleFloatPropertyChange(propName, wid, txt);
                     };
                     _propertyCallbacks[inputId] = pcb;
-                    
+
                     UI.InputFieldChangeCallbackDelegate ifcb = delegate(ulong wid, string txt) {
                         pcb(wid, txt);
                     };
                     _propertyInputFieldCallbacks[inputId] = ifcb;
                     UI.InputFieldSetOnChange(inputId, ifcb);
-                    
+
                     desc.WidgetIds = new ulong[] { inputId };
                 }
             }
             else if (type == 3) // Bool
             {
-                // Label独占一行(wrap模式)，InputField/ValueLabel独占另一行
-                desc.LabelId = UI.CreateLabel(parentContainerId, 0, 20f, displayName + ":");
-                UI.SetLabelWrapMode(desc.LabelId, 1); // 启用Wrap模式
-                
                 if (readOnly)
                 {
-                    ulong valueLabelId = UI.CreateLabel(parentContainerId, RIGHT_PANEL_WIDTH - 40f, 20f, "");
+                    ulong valueLabelId = UI.CreateLabel(rowId, 170f, 22f, "");
                     desc.WidgetIds = new ulong[] { valueLabelId };
                 }
                 else
                 {
-                    ulong inputId = UI.CreateInputField(parentContainerId, RIGHT_PANEL_WIDTH - 40f, 25f);
+                    ulong inputId = UI.CreateInputField(rowId, 170f, 24f);
                     UI.InputFieldSetPlaceholder(inputId, "true/false");
-                    
+
                     string propName = name;
-                    
+
                     PropertyChangeCallback pcb = delegate(ulong wid, string txt) {
                         HandleBoolPropertyChange(propName, wid, txt);
                     };
                     _propertyCallbacks[inputId] = pcb;
-                    
+
                     UI.InputFieldChangeCallbackDelegate ifcb = delegate(ulong wid, string txt) {
                         pcb(wid, txt);
                     };
                     _propertyInputFieldCallbacks[inputId] = ifcb;
                     UI.InputFieldSetOnChange(inputId, ifcb);
-                    
+
                     desc.WidgetIds = new ulong[] { inputId };
                 }
             }
             else
             {
-                // Unsupported property type (Enum=5 etc) - skip
                 desc.LabelId = 0;
                 desc.WidgetIds = new ulong[0];
             }
-            
+
             _propertyDescriptors.Add(desc);
         }
 

@@ -334,3 +334,7 @@ glslc shaders/rotation.frag -o shaders/rotation.frag.spv
 - Log Warn/Error/Fatal 带 CallerFilePath/LineNumber；TestTelemetry 保存来源。
 - Console 显示 `[文件:行]`，新增“跳转源码”按钮。
 - TextEdit `set_cursor_to_line` + FFI `ui_text_edit_set_cursor_line`；FFI 276 字段。
+
+### 25. Inspector 属性行重做 (2026-10-18)
+- 单行 Label + 输入控件；Float3 三轴同排；长属性名截断。
+- visual 16 张（新增 `16_inspector_rows.png`）。

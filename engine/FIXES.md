@@ -1,5 +1,13 @@
 # Bug Fixes Log
 
+## 2026-10-18: Inspector 属性行重做
+
+- 属性面板从“标签一行 + 输入一行”改为单行 Label + 输入控件。
+- Float3 使用一行 Label + X/Y/Z 三个输入；String/Int/Float/Bool 单行。
+- 长属性名截断到 11 字符，避免挤压输入框。
+- visual 新增 `16_inspector_rows.png`。
+
+
 ## 2026-10-18: Console 源码定位与跳转
 
 - `Log.Warn/Error/Fatal` 增加 `[CallerFilePath]` / `[CallerLineNumber]`。
