@@ -58,7 +58,7 @@ impl Label {
             flags: crate::widget::WidgetFlags::default(),
             text: text.to_string(),
             text_style: TextStyle::new()
-                .with_size(14.0)
+                .with_size(15.0)
                 .with_color(crate::theme::colors().text_primary),
             wrap_mode: WrapMode::None,
         }

@@ -65,7 +65,7 @@ pub struct TextStyle {
 impl TextStyle {
     pub fn new() -> Self {
         Self {
-            font_size: 14.0,
+            font_size: 15.0,
             font_color: theme::colors().text_primary,
             font_weight: FontWeight::Normal,
             alignment: TextAlignment::default(),

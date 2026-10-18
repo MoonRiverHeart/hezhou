@@ -28,12 +28,12 @@ impl Button {
             layout: Layout::new(0.0, 0.0, 100.0, 40.0),
             style: Style::new()
                 .with_background(crate::theme::colors().button_primary_bg)
-                .with_border(Color::transparent(), 0.0, 4.0),
+                .with_border(crate::theme::colors().border, 1.0, 6.0),
             state: WidgetState::Normal,
             flags: crate::widget::WidgetFlags::default(),
             text: text.to_string(),
             text_style: TextStyle::new()
-                .with_size(14.0)
+                .with_size(15.0)
                 .with_color(crate::theme::colors().text_on_accent)
                 .with_alignment(TextAlignment {
                     horizontal: crate::types::HorizontalAlignment::Center,
@@ -171,16 +171,17 @@ impl Widget for Button {
         let height = self.layout.height;
         let padding = 15.0;
 
+        let base = self.style.background_color;
         let current_style = match self.state {
             WidgetState::Hovered => Style::new()
-                .with_background(Color::new(0.25, 0.65, 1.0, 1.0))
-                .with_border(Color::transparent(), 0.0, 4.0),
+                .with_background(lighten(base, 0.06))
+                .with_border(crate::theme::colors().border_strong, 1.0, 6.0),
             WidgetState::Pressed => Style::new()
-                .with_background(Color::new(0.15, 0.55, 0.95, 1.0))
-                .with_border(Color::transparent(), 0.0, 4.0),
+                .with_background(darken(base, 0.08))
+                .with_border(crate::theme::colors().accent, 1.0, 6.0),
             WidgetState::Disabled => Style::new()
                 .with_background(Color::new(0.5, 0.5, 0.5, 0.3))
-                .with_border(Color::transparent(), 0.0, 4.0),
+                .with_border(crate::theme::colors().border, 1.0, 6.0),
             _ => self.style,
         };
 
@@ -227,4 +228,12 @@ impl Widget for Button {
 
         EventResult::Ignored
     }
+}
+
+fn lighten(c: Color, amount: f32) -> Color {
+    Color::new((c.r + amount).min(1.0), (c.g + amount).min(1.0), (c.b + amount).min(1.0), c.a)
+}
+
+fn darken(c: Color, amount: f32) -> Color {
+    Color::new((c.r - amount).max(0.0), (c.g - amount).max(0.0), (c.b - amount).max(0.0), c.a)
 }

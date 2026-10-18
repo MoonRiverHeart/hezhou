@@ -333,7 +333,7 @@ impl Widget for GridView {
         canvas.set_clip_rect(Rect::new(0.0, 0.0, width, height));
         canvas.draw_rect(Rect::new(0.0, 0.0, width, height), &self.style);
         
-        let font_size = 12.0 * self.content_scale;
+        let font_size = 13.0 * self.content_scale;
         let text_style = TextStyle::new()
             .with_size(font_size)
             .with_color(crate::theme::colors().text_primary)

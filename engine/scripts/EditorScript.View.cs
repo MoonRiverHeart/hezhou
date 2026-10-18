@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 using System.Collections.Generic;
 
@@ -412,7 +412,7 @@ namespace Hezhou
             _statusItems = new List(_statusBar.Id, 0f, true);
             UI.SetWidgetLayout(_statusItems.Id, 10f, 0f, _screenWidth - 20f, STATUS_BAR_HEIGHT);
             
-            float fontSize = 14f;
+            float fontSize = 15f;
             float itemHeight = STATUS_BAR_HEIGHT - 4f;
             
             _fpsItem = _statusItems.AddItem("FPS: 0", false);
@@ -496,8 +496,8 @@ namespace Hezhou
         private static ulong CreatePropertyRow(ulong parentContainerId, string displayName, out ulong labelId)
         {
             ulong rowId = UI.CreateHStack(parentContainerId, 6f);
-            string labelText = displayName.Length > 12 ? displayName.Substring(0, 11) + "." : displayName;
-            labelId = UI.CreateLabel(rowId, 96f, 24f, labelText + ":");
+            string labelText = displayName.Length > 10 ? displayName.Substring(0, 9) + "." : displayName;
+            labelId = UI.CreateLabel(rowId, 150f, 24f, labelText + ":");
             return rowId;
         }
 
@@ -518,7 +518,7 @@ namespace Hezhou
                 string[] axisLabels = new string[] { "X", "Y", "Z" };
                 for (int j = 0; j < 3; j++)
                 {
-                    ulong inputId = UI.CreateInputField(rowId, 58f, 24f);
+                    ulong inputId = UI.CreateInputField(rowId, 52f, 24f);
                     UI.InputFieldSetPlaceholder(inputId, axisLabels[j]);
 
                     string propName = name;
@@ -542,12 +542,12 @@ namespace Hezhou
             {
                 if (readOnly)
                 {
-                    ulong valueLabelId = UI.CreateLabel(rowId, 170f, 22f, "");
+                    ulong valueLabelId = UI.CreateLabel(rowId, 155f, 22f, "");
                     desc.WidgetIds = new ulong[] { valueLabelId };
                 }
                 else
                 {
-                    ulong inputId = UI.CreateInputField(rowId, 170f, 24f);
+                    ulong inputId = UI.CreateInputField(rowId, 155f, 24f);
                     UI.InputFieldSetPlaceholder(inputId, displayName);
 
                     string propName = name;
@@ -570,12 +570,12 @@ namespace Hezhou
             {
                 if (readOnly)
                 {
-                    ulong valueLabelId = UI.CreateLabel(rowId, 170f, 22f, "");
+                    ulong valueLabelId = UI.CreateLabel(rowId, 155f, 22f, "");
                     desc.WidgetIds = new ulong[] { valueLabelId };
                 }
                 else
                 {
-                    ulong inputId = UI.CreateInputField(rowId, 170f, 24f);
+                    ulong inputId = UI.CreateInputField(rowId, 155f, 24f);
                     UI.InputFieldSetPlaceholder(inputId, "0");
 
                     string propName = name;
@@ -598,12 +598,12 @@ namespace Hezhou
             {
                 if (readOnly)
                 {
-                    ulong valueLabelId = UI.CreateLabel(rowId, 170f, 22f, "");
+                    ulong valueLabelId = UI.CreateLabel(rowId, 155f, 22f, "");
                     desc.WidgetIds = new ulong[] { valueLabelId };
                 }
                 else
                 {
-                    ulong inputId = UI.CreateInputField(rowId, 170f, 24f);
+                    ulong inputId = UI.CreateInputField(rowId, 155f, 24f);
                     UI.InputFieldSetPlaceholder(inputId, "0");
 
                     string propName = name;
@@ -626,12 +626,12 @@ namespace Hezhou
             {
                 if (readOnly)
                 {
-                    ulong valueLabelId = UI.CreateLabel(rowId, 170f, 22f, "");
+                    ulong valueLabelId = UI.CreateLabel(rowId, 155f, 22f, "");
                     desc.WidgetIds = new ulong[] { valueLabelId };
                 }
                 else
                 {
-                    ulong inputId = UI.CreateInputField(rowId, 170f, 24f);
+                    ulong inputId = UI.CreateInputField(rowId, 155f, 24f);
                     UI.InputFieldSetPlaceholder(inputId, "true/false");
 
                     string propName = name;

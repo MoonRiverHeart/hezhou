@@ -349,7 +349,7 @@ impl Widget for TabWidget {
         let width = self.layout.width;
         let height = self.layout.height;
         let scaled_tab_bar_height = self.tab_bar_height * self.content_scale;
-        let font_size = 14.0 * self.content_scale;
+        let font_size = 15.0 * self.content_scale;
         let tab_padding_x = 10.0 * self.content_scale;
         let tab_count = self.tabs.len().max(1);
         let max_scaled_width = self.tab_width * self.content_scale;
@@ -381,8 +381,16 @@ impl Widget for TabWidget {
 
             let tab_style = Style::new()
                 .with_background(tab_bg_color)
-                .with_border(t.border, 1.0, 0.0);
+                .with_border(t.border, 1.0, 6.0);
             canvas.draw_rect(tab_rect, &tab_style);
+            if i == self.active_index {
+                let indicator = Style::new().with_background(t.accent);
+                canvas.draw_rect(
+                    Rect::new(tab_rect.x + 8.0 * self.content_scale, tab_rect.y + tab_rect.height - 2.0 * self.content_scale,
+                              (tab_rect.width - 16.0 * self.content_scale).max(0.0), 2.0 * self.content_scale),
+                    &indicator,
+                );
+            }
 
             // Dog-ear fold on top-right corner of tab
             let fold_size = 6.0 * self.content_scale;

@@ -54,12 +54,12 @@ impl TextEdit {
             layout: Layout::new(0.0, 0.0, 400.0, 300.0),
             style: Style::new()
                 .with_background(crate::theme::colors().input_bg)
-                .with_border(crate::theme::colors().input_border, 1.0, 0.0),
+                .with_border(crate::theme::colors().input_border, 1.0, 7.0),
             state: WidgetState::Normal,
             flags: crate::widget::WidgetFlags::default(),
             text: String::new(),
             text_style: TextStyle::new()
-                .with_size(14.0)
+                .with_size(15.0)
                 .with_color(crate::theme::colors().text_primary),
             cursor_grapheme_index: 0,
             cursor_byte_index: 0,

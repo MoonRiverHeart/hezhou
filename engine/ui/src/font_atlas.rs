@@ -248,15 +248,20 @@ atlas_width: 8192,
         }
         
         // Check atlas space
-        if self.current_x + char_width > self.atlas_width {
+        // 3x 超采样后先降采样到 1x 再写入图集；否则 UV 覆盖整张 3x 位图，
+        // 绘制时被双线性缩小 3 倍，笔画会明显发虚。
+        let dst_width = char_width;
+        let dst_height = char_height;
+
+        if self.current_x + dst_width > self.atlas_width {
             self.current_x = 0;
             self.current_y += self.row_height;
             self.row_height = 0;
         }
         
-        if self.current_y + char_height > self.atlas_height {
+        if self.current_y + dst_height > self.atlas_height {
             dfx_warn!("FontAtlas", "Atlas FULL! color char='{}' font_idx={} size={}: y={} + h={} > max={}", 
-                character, font_index, font_size, self.current_y, char_height, self.atlas_height);
+                character, font_index, font_size, self.current_y, dst_height, self.atlas_height);
             return;
         }
         
@@ -339,10 +344,10 @@ atlas_width: 8192,
         let info = CharacterInfo {
             uv_x: self.current_x as f32 / self.atlas_width as f32,
             uv_y: self.current_y as f32 / self.atlas_height as f32,
-            uv_w: char_width as f32 / self.atlas_width as f32,
-            uv_h: char_height as f32 / self.atlas_height as f32,
-            width: char_width as f32,
-            height: char_height as f32,
+            uv_w: dst_width as f32 / self.atlas_width as f32,
+            uv_h: dst_height as f32 / self.atlas_height as f32,
+            width: dst_width as f32,
+            height: dst_height as f32,
             advance_x,
             bearing_x,
             bearing_y,
@@ -351,8 +356,8 @@ atlas_width: 8192,
         
         self.character_cache.insert(key, info);
         
-        self.current_x += char_width + 1;
-        self.row_height = self.row_height.max(char_height);
+        self.current_x += dst_width + 1;
+        self.row_height = self.row_height.max(dst_height);
     }
 
     /// Try to rasterize a character with fallback to emoji font.
@@ -549,10 +554,10 @@ atlas_width: 8192,
         let raster_size = font_size * supersample_scale;
         let (metrics, bitmap) = self.fonts[font_index].rasterize(character, raster_size);
         
-        let char_width = metrics.width as u32;
-        let char_height = metrics.height as u32;
-        
-        if char_width == 0 || char_height == 0 || bitmap.is_empty() {
+        let src_width = metrics.width as u32;
+        let src_height = metrics.height as u32;
+
+        if src_width == 0 || src_height == 0 || bitmap.is_empty() {
             let info = CharacterInfo {
                 uv_x: 0.97,
                 uv_y: 0.0,
@@ -569,27 +574,49 @@ atlas_width: 8192,
             return;
         }
         
-        if self.current_x + char_width > self.atlas_width {
+        // 3x 超采样后先降采样到 1x 再写入图集；否则 UV 覆盖整张 3x 位图，
+        // 绘制时被双线性缩小 3 倍，笔画会明显发虚。
+        let dst_width = ((src_width as f32) / supersample_scale).round().max(1.0) as u32;
+        let dst_height = ((src_height as f32) / supersample_scale).round().max(1.0) as u32;
+
+        if self.current_x + dst_width > self.atlas_width {
             self.current_x = 0;
             self.current_y += self.row_height;
             self.row_height = 0;
         }
         
-        if self.current_y + char_height > self.atlas_height {
+        if self.current_y + dst_height > self.atlas_height {
             dfx_warn!("FontAtlas", "Atlas FULL! char='{}' font_idx={} size={}: y={} + h={} > max={}, cache={}", 
-                character, font_index, font_size, self.current_y, char_height, self.atlas_height, self.character_cache.len());
+                character, font_index, font_size, self.current_y, dst_height, self.atlas_height, self.character_cache.len());
             return;
         }
         
-        for y in 0..char_height {
-            for x in 0..char_width {
-                let atlas_x = self.current_x + x;
-                let atlas_y = self.current_y + y;
-                let src_idx = y as usize * char_width as usize + x as usize;
+        for dy in 0..dst_height {
+            for dx in 0..dst_width {
+                let sx0 = ((dx as f32 * supersample_scale) as u32).min(src_width.saturating_sub(1));
+                let sy0 = ((dy as f32 * supersample_scale) as u32).min(src_height.saturating_sub(1));
+                let sx1 = (((dx + 1) as f32 * supersample_scale) as u32).min(src_width);
+                let sy1 = (((dy + 1) as f32 * supersample_scale) as u32).min(src_height);
+                let mut sum = 0u32;
+                let mut count = 0u32;
+                for sy in sy0..sy1.max(sy0 + 1) {
+                    for sx in sx0..sx1.max(sx0 + 1) {
+                        let idx = sy as usize * src_width as usize + sx as usize;
+                        if idx < bitmap.len() {
+                            sum += bitmap[idx] as u32;
+                            count += 1;
+                        }
+                    }
+                }
+                let val = if count > 0 {
+                    let avg = sum as f32 / count as f32;
+                    // 轻微提高中间调覆盖率，避免 3x 降采样后笔画偏淡
+                    ((avg / 255.0).powf(0.55) * 255.0).round().clamp(0.0, 255.0) as u8
+                } else { 0 };
+                let atlas_x = self.current_x + dx;
+                let atlas_y = self.current_y + dy;
                 let dst_idx = atlas_y as usize * self.atlas_width as usize * 4 + atlas_x as usize * 4;
-                
-                if src_idx < bitmap.len() && dst_idx + 3 < self.atlas_texture.len() {
-                    let val = bitmap[src_idx];
+                if dst_idx + 3 < self.atlas_texture.len() {
                     self.atlas_texture[dst_idx] = 255;
                     self.atlas_texture[dst_idx + 1] = 255;
                     self.atlas_texture[dst_idx + 2] = 255;
@@ -604,10 +631,10 @@ atlas_width: 8192,
         let info = CharacterInfo {
             uv_x: self.current_x as f32 / self.atlas_width as f32,
             uv_y: self.current_y as f32 / self.atlas_height as f32,
-            uv_w: char_width as f32 / self.atlas_width as f32,
-            uv_h: char_height as f32 / self.atlas_height as f32,
-            width: char_width as f32 / supersample_scale,
-            height: char_height as f32 / supersample_scale,
+            uv_w: dst_width as f32 / self.atlas_width as f32,
+            uv_h: dst_height as f32 / self.atlas_height as f32,
+            width: dst_width as f32,
+            height: dst_height as f32,
             advance_x: metrics.advance_width / supersample_scale,
             bearing_x,
             bearing_y,
@@ -616,8 +643,8 @@ atlas_width: 8192,
         
         self.character_cache.insert(key, info);
         
-        self.current_x += char_width + 1;
-        self.row_height = self.row_height.max(char_height);
+        self.current_x += dst_width + 1;
+        self.row_height = self.row_height.max(dst_height);
     }
     
     fn rasterize_char(&mut self, font_index: usize, character: char, font_size: f32) {
@@ -667,10 +694,10 @@ atlas_width: 8192,
         let raster_size = font_size * supersample_scale;
         let (metrics, bitmap) = self.fonts[font_index].rasterize(character, raster_size);
         
-        let char_width = metrics.width as u32;
-        let char_height = metrics.height as u32;
-        
-        if char_width == 0 || char_height == 0 || bitmap.is_empty() {
+        let src_width = metrics.width as u32;
+        let src_height = metrics.height as u32;
+
+        if src_width == 0 || src_height == 0 || bitmap.is_empty() {
             let info = CharacterInfo {
                 uv_x: 0.97,
                 uv_y: 0.0,
@@ -687,27 +714,49 @@ atlas_width: 8192,
             return;
         }
         
-        if self.current_x + char_width > self.atlas_width {
+        // 3x 超采样后先降采样到 1x 再写入图集；否则 UV 覆盖整张 3x 位图，
+        // 绘制时被双线性缩小 3 倍，笔画会明显发虚。
+        let dst_width = ((src_width as f32) / supersample_scale).round().max(1.0) as u32;
+        let dst_height = ((src_height as f32) / supersample_scale).round().max(1.0) as u32;
+
+        if self.current_x + dst_width > self.atlas_width {
             self.current_x = 0;
             self.current_y += self.row_height;
             self.row_height = 0;
         }
         
-        if self.current_y + char_height > self.atlas_height {
+        if self.current_y + dst_height > self.atlas_height {
             dfx_warn!("FontAtlas", "Atlas FULL! char='{}' font_idx={} size={}: y={} + h={} > max={}, cache={}", 
-                character, font_index, font_size, self.current_y, char_height, self.atlas_height, self.character_cache.len());
+                character, font_index, font_size, self.current_y, dst_height, self.atlas_height, self.character_cache.len());
             return;
         }
         
-        for y in 0..char_height {
-            for x in 0..char_width {
-                let atlas_x = self.current_x + x;
-                let atlas_y = self.current_y + y;
-                let src_idx = y as usize * char_width as usize + x as usize;
+        for dy in 0..dst_height {
+            for dx in 0..dst_width {
+                let sx0 = ((dx as f32 * supersample_scale) as u32).min(src_width.saturating_sub(1));
+                let sy0 = ((dy as f32 * supersample_scale) as u32).min(src_height.saturating_sub(1));
+                let sx1 = (((dx + 1) as f32 * supersample_scale) as u32).min(src_width);
+                let sy1 = (((dy + 1) as f32 * supersample_scale) as u32).min(src_height);
+                let mut sum = 0u32;
+                let mut count = 0u32;
+                for sy in sy0..sy1.max(sy0 + 1) {
+                    for sx in sx0..sx1.max(sx0 + 1) {
+                        let idx = sy as usize * src_width as usize + sx as usize;
+                        if idx < bitmap.len() {
+                            sum += bitmap[idx] as u32;
+                            count += 1;
+                        }
+                    }
+                }
+                let val = if count > 0 {
+                    let avg = sum as f32 / count as f32;
+                    // 轻微提高中间调覆盖率，避免 3x 降采样后笔画偏淡
+                    ((avg / 255.0).powf(0.55) * 255.0).round().clamp(0.0, 255.0) as u8
+                } else { 0 };
+                let atlas_x = self.current_x + dx;
+                let atlas_y = self.current_y + dy;
                 let dst_idx = atlas_y as usize * self.atlas_width as usize * 4 + atlas_x as usize * 4;
-                
-                if src_idx < bitmap.len() && dst_idx + 3 < self.atlas_texture.len() {
-                    let val = bitmap[src_idx];
+                if dst_idx + 3 < self.atlas_texture.len() {
                     self.atlas_texture[dst_idx] = 255;
                     self.atlas_texture[dst_idx + 1] = 255;
                     self.atlas_texture[dst_idx + 2] = 255;
@@ -722,10 +771,10 @@ atlas_width: 8192,
         let info = CharacterInfo {
             uv_x: self.current_x as f32 / self.atlas_width as f32,
             uv_y: self.current_y as f32 / self.atlas_height as f32,
-            uv_w: char_width as f32 / self.atlas_width as f32,
-            uv_h: char_height as f32 / self.atlas_height as f32,
-            width: char_width as f32 / supersample_scale,
-            height: char_height as f32 / supersample_scale,
+            uv_w: dst_width as f32 / self.atlas_width as f32,
+            uv_h: dst_height as f32 / self.atlas_height as f32,
+            width: dst_width as f32,
+            height: dst_height as f32,
             advance_x: metrics.advance_width / supersample_scale,
             bearing_x,
             bearing_y,
@@ -734,8 +783,8 @@ atlas_width: 8192,
         
         self.character_cache.insert(key, info);
         
-        self.current_x += char_width + 1;
-        self.row_height = self.row_height.max(char_height);
+        self.current_x += dst_width + 1;
+        self.row_height = self.row_height.max(dst_height);
     }
     
     pub fn get_char_info(&self, font_index: usize, character: char, font_size: f32) -> Option<&CharacterInfo> {

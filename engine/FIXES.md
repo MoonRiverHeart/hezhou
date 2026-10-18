@@ -1,5 +1,18 @@
 # Bug Fixes Log
 
+## 2026-10-18: 字体清晰度与控件视觉风格
+
+- 修复字体 3x 超采样后未降采样就写入图集的问题：UV 覆盖 3x 位图，
+  绘制时被双线性缩小 3 倍，笔画明显发虚。现按 3x3 box filter 降采样到 1x。
+- 降采样 alpha 增加 gamma 0.55，避免小字号笔画过淡。
+- 字形落点四舍五入到像素网格，减少 LINEAR 采样模糊。
+- 默认字号 14→15（按钮/Label/TextEdit/ListItem/Tab），状态栏 15，GridView 13。
+- 新增圆角矩形绘制路径（三角形扇），按钮/输入框/Tab 使用 6–7px 圆角。
+- Button 默认边框改为主题 border，hover/pressed 由基础色明暗派生，不再硬编码蓝色。
+- Inspector 标签宽度 96→150，Float3/字符串输入宽度相应调整，修复字号增大后的截断。
+- Tab 激活项增加 2px accent 指示条。
+
+
 ## 2026-10-18: 引擎基础能力：ECS 系统、物理碰撞、几何射线
 
 - ECS：`World::update` 真正驱动 `SystemScheduler`，新增 `LifetimeComponent` /

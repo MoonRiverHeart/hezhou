@@ -15,6 +15,15 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use hezhou_core::asset_library::MeshType;
 use crate::primitive_meshes::{self, MeshRange};
 
+
+fn push_ui_triangle(v: &mut Vec<f32>, x1: f32, y1: f32, x2: f32, y2: f32, x3: f32, y3: f32, r: f32, g: f32, b: f32, a: f32) {
+    v.extend_from_slice(&[
+        x1, y1, r, g, b, a, 0.0, 0.0,
+        x2, y2, r, g, b, a, 0.0, 0.0,
+        x3, y3, r, g, b, a, 0.0, 0.0,
+    ]);
+}
+
 pub struct CachedGlyph {
     x: f32,
     y: f32,
@@ -3873,7 +3882,7 @@ self.camera_pitch,
                         flush_batch(&mut batches, &mut current_vertices, current_clip, current_layer);
                         current_clip = None;
                     }
-                    DrawCommand::Rect { bounds, width, height, fill_color, stroke_color, stroke_width, .. } => {
+                    DrawCommand::Rect { bounds, width, height, fill_color, stroke_color, stroke_width, border_radius } => {
                         let x = bounds.x;
                         let y = bounds.y;
                         let w = *width;
@@ -3885,14 +3894,40 @@ self.camera_pitch,
                         
                         // 如果fill_color是透明且是preview window context，跳过填充
                         if !is_preview_window_context || a > 0.0 {
-                            current_vertices.extend_from_slice(&[
-                                x.round(), y.round(), r, g, b, a, 0.0, 0.0,
-                                (x + w).round(), y.round(), r, g, b, a, 0.0, 0.0,
-                                x.round(), (y + h).round(), r, g, b, a, 0.0, 0.0,
-                                (x + w).round(), y.round(), r, g, b, a, 0.0, 0.0,
-                                (x + w).round(), (y + h).round(), r, g, b, a, 0.0, 0.0,
-                                x.round(), (y + h).round(), r, g, b, a, 0.0, 0.0,
-                            ]);
+                            let radius = (*border_radius).min(w * 0.5).min(h * 0.5);
+                            if radius > 0.5 {
+                                // 圆角矩形：中心三角扇 + 每角 6 段圆弧
+                                let cx = x + w * 0.5;
+                                let cy = y + h * 0.5;
+                                let mut perimeter: Vec<(f32, f32)> = Vec::new();
+                                let corners = [
+                                    (x + w - radius, y + radius, -std::f32::consts::FRAC_PI_2),
+                                    (x + w - radius, y + h - radius, 0.0),
+                                    (x + radius, y + h - radius, std::f32::consts::FRAC_PI_2),
+                                    (x + radius, y + radius, std::f32::consts::PI),
+                                ];
+                                const SEGMENTS: usize = 6;
+                                for (ccx, ccy, start) in corners {
+                                    for i in 0..=SEGMENTS {
+                                        let ang = start + (i as f32 / SEGMENTS as f32) * std::f32::consts::FRAC_PI_2;
+                                        perimeter.push((ccx + radius * ang.cos(), ccy + radius * ang.sin()));
+                                    }
+                                }
+                                for i in 0..perimeter.len() {
+                                    let p0 = perimeter[i];
+                                    let p1 = perimeter[(i + 1) % perimeter.len()];
+                                    push_ui_triangle(&mut current_vertices, cx, cy, p0.0, p0.1, p1.0, p1.1, r, g, b, a);
+                                }
+                            } else {
+                                current_vertices.extend_from_slice(&[
+                                    x.round(), y.round(), r, g, b, a, 0.0, 0.0,
+                                    (x + w).round(), y.round(), r, g, b, a, 0.0, 0.0,
+                                    x.round(), (y + h).round(), r, g, b, a, 0.0, 0.0,
+                                    (x + w).round(), y.round(), r, g, b, a, 0.0, 0.0,
+                                    (x + w).round(), (y + h).round(), r, g, b, a, 0.0, 0.0,
+                                    x.round(), (y + h).round(), r, g, b, a, 0.0, 0.0,
+                                ]);
+                            }
                         }
                         
                         if let Some(stroke) = stroke_color {
@@ -4005,8 +4040,9 @@ self.camera_pitch,
                                 continue;
                             }
                             
-                            let x = gx;
-                            let y = gy;
+                            // 字形落点对齐像素网格，避免 LINEAR 采样造成发虚
+                            let x = gx.round();
+                            let y = gy.round();
                             let u0 = uv_x;
                             let v0 = uv_y;
                             let u1 = uv_x + uv_w;

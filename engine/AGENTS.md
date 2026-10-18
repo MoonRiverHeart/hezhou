@@ -407,3 +407,8 @@ glslc shaders/rotation.frag -o shaders/rotation.frag.spv
 - World::update 驱动 SystemScheduler；LifetimeComponent/LifetimeSystem。
 - PhysicsWorld AABB 碰撞检测 + CollisionEvent + 简单分离。
 - BoundingBox::intersects_ray 射线求交；Rust 测试通过。
+
+### 44. 字体清晰度与控件风格 (2026-10-18)
+- 修复 3x 字形未降采样导致的发虚；alpha gamma、像素对齐、默认字号提升。
+- 圆角矩形绘制、Button 语义色 hover/pressed、Tab accent 指示条。
+- Inspector 标签/输入宽度调整；visual 33 / intent 25 全通过。
