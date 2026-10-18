@@ -1,5 +1,13 @@
 # Bug Fixes Log
 
+## 2026-10-18: Asset Browser 纹理 Tab 与程序化缩略图
+
+- 新增“纹理”Tab，读取 AssetLibrary Textures 分类。
+- GridView 支持 `tex:solid` / `tex:checker` / `tex:uv` 程序化纹理缩略图。
+- intent `texture_browser`（22/22）；visual `28_texture_tab`。
+- PNG 文件纹理缩略图仍未实现。
+
+
 ## 2026-10-18: 材质赋值持久化
 
 - `ProjectEntity` 新增 `material` 字段（serde default 兼容旧工程）。

@@ -50,6 +50,9 @@ namespace Hezhou
         private static UI.GridViewClickCallbackDelegate _materialGridClickCallback;
         private static ulong _selectedMaterialId;
         private static int _materialTabItemCount;
+        private static ulong _assetTextureGridViewId;
+        private static UI.GridViewClickCallbackDelegate _textureGridClickCallback;
+        private static int _textureTabItemCount;
         private static UI.WidgetCallbackDelegate _materialClickCallback;
         private static System.Collections.Generic.Dictionary<ulong, string> _materialButtons = new System.Collections.Generic.Dictionary<ulong, string>();
         private static string _materialDragName;      // GridView inside 模型 tab

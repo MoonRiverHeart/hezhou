@@ -1683,6 +1683,53 @@ namespace Hezhou
             return UI.SceneGetEntityMaterial(_gameScene.ScenePtr, entityId);
         }
 
+        private static void RefreshTextureGridView()
+        {
+            if (_assetTextureGridViewId == 0) return;
+            UI.GridViewClear(_assetTextureGridViewId);
+            int categoryCount = AssetLibrary.GetCategoryCount();
+            int total = 0;
+            for (int c = 0; c < categoryCount; c++)
+            {
+                string category = AssetLibrary.GetCategoryName(c);
+                if (category == null) continue;
+                if (category.IndexOf("Texture", StringComparison.OrdinalIgnoreCase) < 0
+                    && category.IndexOf("纹理", StringComparison.Ordinal) < 0) continue;
+                int count = AssetLibrary.GetAssetCount(c);
+                for (int i = 0; i < count; i++)
+                {
+                    AssetInfo info = AssetLibrary.GetAssetInfo(c, i);
+                    int index = (int)UI.GridViewAddItem(_assetTextureGridViewId, info.Name, info.Id);
+                    string thumb = "tex:solid";
+                    if (info.Name != null && info.Name.IndexOf("Checker", StringComparison.OrdinalIgnoreCase) >= 0) thumb = "tex:checker";
+                    else if (info.Name != null && info.Name.IndexOf("UV", StringComparison.OrdinalIgnoreCase) >= 0) thumb = "tex:uv";
+                    UI.GridViewSetItemThumbnail(_assetTextureGridViewId, index, thumb);
+                    total++;
+                }
+            }
+            _textureTabItemCount = total;
+        }
+
+        private static void OnTextureGridClick(ulong widgetId, int index, ulong userData)
+        {
+            int categoryCount = AssetLibrary.GetCategoryCount();
+            for (int c = 0; c < categoryCount; c++)
+            {
+                int count = AssetLibrary.GetAssetCount(c);
+                for (int i = 0; i < count; i++)
+                {
+                    AssetInfo info = AssetLibrary.GetAssetInfo(c, i);
+                    if (info.Id == userData)
+                    {
+                        if (_statusItem != null) _statusItem.Text = "纹理: " + info.Name;
+                        return;
+                    }
+                }
+            }
+        }
+
+        public static int TestTextureCount() { return _textureTabItemCount; }
+
         private static void RefreshMaterialGridView()
         {
             if (_assetMaterialGridViewId == 0) return;

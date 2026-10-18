@@ -39,6 +39,7 @@ EXPECTED = [
     "25_floating_panel.png",
     "26_floating_moved.png",
     "27_floating_closed.png",
+    "28_texture_tab.png",
 ]
 
 

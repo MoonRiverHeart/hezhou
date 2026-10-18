@@ -382,3 +382,6 @@ glslc shaders/rotation.frag -o shaders/rotation.frag.spv
 
 ### 36. 材质赋值持久化 (2026-10-18)
 - ProjectEntity.material 保存/加载；project_roundtrip 覆盖材质。
+
+### 37. Asset Browser 纹理 Tab (2026-10-18)
+- Textures 分类 + 程序化 solid/checker/UV 缩略图；intent 22/22；visual 28 张。

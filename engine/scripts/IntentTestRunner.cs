@@ -32,6 +32,7 @@ namespace Hezhou
             RunCase("intent.dock_collapse", DockCollapse);
             RunCase("intent.floating_panel", FloatingPanel);
             RunCase("intent.floating_move", FloatingMove);
+            RunCase("intent.texture_browser", TextureBrowser);
             RunCase("intent.console_open_close", ConsoleOpenClose);
             RunCase("intent.running_paused_editing", RunningPausedEditing);
         }
@@ -200,6 +201,15 @@ namespace Hezhou
                 throw new Exception("multi-select delete did not remove both entities");
             }
             return "2 entities selected, batch edit + multi-delete passed";
+        }
+
+        private static string TextureBrowser()
+        {
+            int count = EditorScript.TestTextureCount();
+            if (count <= 0) throw new Exception("texture library is empty");
+            EditorScript.TestSelectAssetTab(2);
+            if (EditorScript.TestGetAssetTab() != 2) throw new Exception("texture tab did not activate");
+            return "textures=" + count;
         }
 
         private static string FloatingMove()

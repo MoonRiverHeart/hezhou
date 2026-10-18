@@ -369,6 +369,37 @@ impl Widget for GridView {
             canvas.draw_rect(Rect::new(x + 4.0 * self.content_scale, y + 4.0 * self.content_scale, 
                                         self.cell_size - 8.0 * self.content_scale, thumb_height - 8.0 * self.content_scale), &thumb_style);
 
+            let texture_kind = item.thumbnail.as_ref().and_then(|t| t.strip_prefix("tex:"));
+            if let Some(kind) = texture_kind {
+                let tx = x + 4.0 * self.content_scale;
+                let ty = y + 4.0 * self.content_scale;
+                let tw = self.cell_size - 8.0 * self.content_scale;
+                let th = thumb_height - 8.0 * self.content_scale;
+                if kind == "checker" {
+                    let cells = 5usize;
+                    let cw = tw / cells as f32;
+                    let ch = th / cells as f32;
+                    for cy in 0..cells {
+                        for cx in 0..cells {
+                            let light = (cx + cy) % 2 == 0;
+                            let c = if light { Color::new(0.85, 0.85, 0.85, 1.0) } else { Color::new(0.25, 0.25, 0.25, 1.0) };
+                            let st = Style::new().with_background(c);
+                            canvas.draw_rect(Rect::new(tx + cx as f32 * cw, ty + cy as f32 * ch, cw, ch), &st);
+                        }
+                    }
+                } else if kind == "uv" {
+                    let h = th / 3.0;
+                    let st_r = Style::new().with_background(Color::new(0.9, 0.2, 0.2, 1.0));
+                    let st_g = Style::new().with_background(Color::new(0.2, 0.9, 0.3, 1.0));
+                    let st_b = Style::new().with_background(Color::new(0.2, 0.4, 0.95, 1.0));
+                    canvas.draw_rect(Rect::new(tx, ty, tw, h), &st_r);
+                    canvas.draw_rect(Rect::new(tx, ty + h, tw, h), &st_g);
+                    canvas.draw_rect(Rect::new(tx, ty + h * 2.0, tw, h), &st_b);
+                } else {
+                    let st = Style::new().with_background(Color::new(0.95, 0.95, 0.95, 1.0));
+                    canvas.draw_rect(Rect::new(tx, ty, tw, th), &st);
+                }
+            } else {
             let fallback_icon = match item.label.as_str() {
                 "Cube" => Some(5u32),
                 "Sphere" => Some(21u32),
@@ -400,6 +431,7 @@ impl Widget for GridView {
                         }
                     }
                 }
+            }
             
             canvas.draw_text(
                 Rect::new(x, y, self.cell_size, self.cell_size),

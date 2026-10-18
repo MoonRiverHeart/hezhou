@@ -271,6 +271,14 @@ namespace Hezhou
             }
             _materialTabItemCount = materialTotal;
             
+            ulong textureTabContent = UI.CreateScrollView(_assetTabWidget.Id, 0, 0, 0, 0);
+            ulong textureContentStack = UI.CreateVStack(textureTabContent, 6f);
+            UI.SetWidgetLayout(textureContentStack, 5f, 5f, 880f, 300f);
+            UI.CreateLabel(textureContentStack, 300f, 22f, "纹理库");
+            _assetTextureGridViewId = UI.CreateGridView(textureContentStack, 0f, 0f, 860f, 240f, 64);
+            RefreshTextureGridView();
+            UI.GridViewSetOnClick(_assetTextureGridViewId, _textureGridClickCallback);
+
             ulong scriptTabContent = UI.CreateVStack(_assetTabWidget.Id, 5f);
             UI.CreateLabel(scriptTabContent, 200f, 25f, "脚本列表 (待实现)");
             
@@ -279,6 +287,7 @@ namespace Hezhou
             
             _assetTabWidget.AddTab("模型", modelTabContent, false);
             _assetTabWidget.AddTab("材质", materialTabContent, false);
+            _assetTabWidget.AddTab("纹理", textureTabContent, false);
             _assetTabWidget.AddTab("脚本", scriptTabContent, false);
             _assetTabWidget.AddTab("场景", sceneTabContent, false);
             _assetTabWidget.SetReorderable(true);

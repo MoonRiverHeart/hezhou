@@ -388,6 +388,7 @@ namespace Hezhou
             _visualSteps.Add(new VisualStep("25_floating_panel", VisualFloatingPanel, 10));
             _visualSteps.Add(new VisualStep("26_floating_moved", VisualFloatingMoved, 10));
             _visualSteps.Add(new VisualStep("27_floating_closed", VisualFloatingClosed, 10));
+            _visualSteps.Add(new VisualStep("28_texture_tab", VisualTextureTab, 10));
 
             RunNextVisualStep();
         }
@@ -477,6 +478,11 @@ namespace Hezhou
             ulong child = EditorScript.TestCreateMeshEntity(0);
             EditorScript.TestHierarchyDrop(child, parent);
             EditorScript.TestExpandHierarchy();
+        }
+
+        private static void VisualTextureTab()
+        {
+            EditorScript.TestSelectAssetTab(2);
         }
 
         private static void VisualFloatingPanel()
