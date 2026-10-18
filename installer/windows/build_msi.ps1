@@ -1,4 +1,4 @@
-#requires -Version 5
+﻿#requires -Version 5
 param(
     [string]$Version = "",
     [switch]$SkipBuild,
@@ -47,7 +47,12 @@ if (Test-Path $editorDll) {
     Copy-Item $editorDll (Join-Path $scriptsStage "bin\Mono\EditorScript.dll") -Force
 }
 Copy-Item (Join-Path $Engine "assets") (Join-Path $Stage "assets") -Recurse
-Copy-Item (Join-Path $Engine "fonts") (Join-Path $Stage "fonts") -Recurse
+$fontDir = Join-Path $Engine "fonts"
+if (Test-Path $fontDir) {
+    Copy-Item $fontDir (Join-Path $Stage "fonts") -Recurse
+} else {
+    Write-Warning "engine/fonts not present; editor will use a system font"
+}
 Copy-Item (Join-Path $Engine "FIXES.md") (Join-Path $Stage "CHANGELOG.md") -ErrorAction SilentlyContinue
 
 if (-not $NoRuntime) {
