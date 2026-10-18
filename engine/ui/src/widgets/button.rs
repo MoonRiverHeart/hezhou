@@ -27,14 +27,14 @@ impl Button {
             children: Vec::new(),
             layout: Layout::new(0.0, 0.0, 100.0, 40.0),
             style: Style::new()
-                .with_background(Color::new(0.2, 0.6, 1.0, 1.0))
+                .with_background(crate::theme::colors().button_primary_bg)
                 .with_border(Color::transparent(), 0.0, 4.0),
             state: WidgetState::Normal,
             flags: crate::widget::WidgetFlags::default(),
             text: text.to_string(),
             text_style: TextStyle::new()
-                .with_size(16.0)
-                .with_color(Color::white())
+                .with_size(14.0)
+                .with_color(crate::theme::colors().text_on_accent)
                 .with_alignment(TextAlignment {
                     horizontal: crate::types::HorizontalAlignment::Center,
                     vertical: crate::types::VerticalAlignment::Center,
@@ -159,6 +159,11 @@ impl Widget for Button {
 
     fn get_text(&self) -> Option<&str> {
         Some(&self.text)
+    }
+
+    fn set_text_color(&mut self, color: Color) {
+        self.text_style.font_color = color;
+        self.flags.dirty_render = true;
     }
 
     fn draw(&mut self, canvas: &mut Canvas) {

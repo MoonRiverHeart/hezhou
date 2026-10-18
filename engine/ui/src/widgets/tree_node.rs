@@ -49,10 +49,10 @@ impl TreeNode {
             indent_width: 20.0,
             user_data: 0,
             content_scale: 1.0,
-            hover_color: Color::new(0.22, 0.26, 0.30, 1.0),
-            selected_color: Color::new(0.18, 0.22, 0.28, 1.0),
-            text_color: Color::white(),
-            icon_color: Color::white(),
+            hover_color: crate::theme::colors().hover,
+            selected_color: crate::theme::colors().selection_bg,
+            text_color: crate::theme::colors().text_primary,
+            icon_color: crate::theme::colors().text_secondary,
             font_size: 14.0,
         }
     }

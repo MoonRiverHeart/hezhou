@@ -80,8 +80,8 @@ impl PopupMenu {
             children: Vec::new(),
             layout: Layout::zero(),
             style: Style::new()
-                .with_background(Color::new(0.2, 0.2, 0.2, 1.0))
-                .with_border(Color::new(0.4, 0.4, 0.4, 1.0), 1.0, 0.0),
+                .with_background(crate::theme::colors().menu_bg)
+                .with_border(crate::theme::colors().border, 1.0, 0.0),
             state: WidgetState::Normal,
             flags: WidgetFlags::default(),
             items: Vec::new(),
@@ -326,7 +326,7 @@ impl Widget for PopupMenu {
                 canvas.draw_line(
                     Point::new(self.padding, sep_y),
                     Point::new(width - self.padding, sep_y),
-                    Color::new(0.4, 0.4, 0.4, 1.0),
+                    crate::theme::colors().border,
                     1.0
                 );
                 current_y += 9.0 * self.content_scale;
@@ -334,14 +334,14 @@ impl Widget for PopupMenu {
                 let is_hovered = self.hovered_index == Some(i);
                 if is_hovered && item.is_enabled {
                     let hover_style = Style::new()
-                        .with_background(Color::new(0.3, 0.3, 0.3, 1.0));
+                        .with_background(crate::theme::colors().menu_hover);
                     canvas.draw_rect(Rect::new(self.padding, current_y, width - self.padding * 2.0, self.item_height), &hover_style);
                 }
                 
                 let text_color = if item.is_enabled {
-                    Color::white()
+                    crate::theme::colors().text_primary
                 } else {
-                    Color::new(0.5, 0.5, 0.5, 1.0)
+                    crate::theme::colors().text_disabled
                 };
                 
                 let text_style = TextStyle::new()
@@ -361,7 +361,7 @@ impl Widget for PopupMenu {
                 if let Some(shortcut) = &item.shortcut {
                     let shortcut_style = TextStyle::new()
                         .with_size(shortcut_font_size)
-                        .with_color(Color::new(0.6, 0.6, 0.6, 1.0))
+                        .with_color(crate::theme::colors().text_muted)
                         .with_alignment(TextAlignment {
                             horizontal: HorizontalAlignment::Right,
                             vertical: VerticalAlignment::Center,

@@ -92,60 +92,71 @@ namespace Hezhou
             ulong rootId = UI.GetRootId();
 
             // === Toolbar (fixed, top) ===
-            _toolbar = new Panel(rootId, 0, toolbarY, _screenWidth, TOOLBAR_HEIGHT, 0.07f, 0.09f, 0.12f, 1.0f);
+            _toolbar = new Panel(rootId, 0, toolbarY, _screenWidth, TOOLBAR_HEIGHT, ThemeRole.ToolbarBg);
             _toolbarButtons = new HStack(_toolbar.Id, 10f);
             _toolbarButtons.SetPosition(10f, 5f);
 
             // 工具栏底部强调线，划分工具栏与主工作区。
-            new Panel(rootId, 0, TOOLBAR_HEIGHT - 2f, _screenWidth, 2f,
-                0.95f, 0.55f, 0.16f, 1.0f);
+            new Panel(rootId, 0, TOOLBAR_HEIGHT - 2f, _screenWidth, 2f, ThemeRole.Accent);
 
             CreateToolbarMenus();
             
             var fileMenuLabel = _toolbarButtons.AddLabel(80f, 30f, "文件");
             UI.SetOnClick(fileMenuLabel, _newClickCallback);
-            UI.SetWidgetBackgroundColor(fileMenuLabel, 0.07f, 0.09f, 0.12f, 1.0f);
+            UI.ThemeSetBackground(fileMenuLabel, ThemeRole.ToolbarBg);
+            UI.ThemeSetText(fileMenuLabel, ThemeRole.TextPrimary);
             _menuBarLabelIds[0] = fileMenuLabel;
             
             var openMenuLabel = _toolbarButtons.AddLabel(80f, 30f, "打开");
             UI.SetOnClick(openMenuLabel, _openClickCallback);
-            UI.SetWidgetBackgroundColor(openMenuLabel, 0.07f, 0.09f, 0.12f, 1.0f);
+            UI.ThemeSetBackground(openMenuLabel, ThemeRole.ToolbarBg);
+            UI.ThemeSetText(openMenuLabel, ThemeRole.TextPrimary);
             _menuBarLabelIds[1] = openMenuLabel;
             
             var saveMenuLabel = _toolbarButtons.AddLabel(80f, 30f, "保存");
             UI.SetOnClick(saveMenuLabel, _saveClickCallback);
-            UI.SetWidgetBackgroundColor(saveMenuLabel, 0.07f, 0.09f, 0.12f, 1.0f);
+            UI.ThemeSetBackground(saveMenuLabel, ThemeRole.ToolbarBg);
+            UI.ThemeSetText(saveMenuLabel, ThemeRole.TextPrimary);
             _menuBarLabelIds[2] = saveMenuLabel;
             
             var runBtn = _toolbarButtons.AddButton(100f, 30f, "运行");
             _runButtonId = runBtn.Id;
             runBtn.SetOnClick(_runClickCallback);
-            UI.SetWidgetBackgroundColor(_runButtonId, 0.16f, 0.52f, 0.40f, 1.0f);
+            UI.ThemeSetBackground(_runButtonId, ThemeRole.Success);
             
             _pauseButtonId = UI.CreateButton(_toolbar.Id, 80f, 30f, "暂停");
             UI.SetOnClick(_pauseButtonId, _pauseClickCallback);
             UI.SetWidgetLayout(_pauseButtonId, -100f, -100f, 80f, 30f);
-            UI.SetWidgetBackgroundColor(_pauseButtonId, 0.72f, 0.45f, 0.14f, 1.0f);
+            UI.ThemeSetBackground(_pauseButtonId, ThemeRole.Warning);
             
             _toggleEditorBtn = new Button(_toolbar.Id, 100f, 30f, "编辑器");
             UI.SetWidgetLayout(_toggleEditorBtn.Id, _screenWidth - 120f, 5f, 100f, 30f);
             _toggleEditorBtn.SetOnClick(_toggleEditorClickCallback);
-            UI.SetWidgetBackgroundColor(_toggleEditorBtn.Id, 0.22f, 0.40f, 0.64f, 1.0f);
+            UI.ThemeSetBackground(_toggleEditorBtn.Id, ThemeRole.Accent);
 
             _undoButtonId = UI.CreateButton(_toolbar.Id, 80f, 30f, "撤销");
             UI.SetWidgetLayout(_undoButtonId, _screenWidth - 400f, 5f, 80f, 30f);
             UI.SetOnClick(_undoButtonId, _undoClickCallback);
-            UI.SetWidgetBackgroundColor(_undoButtonId, 0.15f, 0.21f, 0.30f, 1.0f);
+            UI.ThemeSetBackground(_undoButtonId, ThemeRole.ButtonSecondaryBg);
+            UI.ThemeSetText(_undoButtonId, ThemeRole.TextPrimary);
 
             _redoButtonId = UI.CreateButton(_toolbar.Id, 80f, 30f, "重做");
             UI.SetWidgetLayout(_redoButtonId, _screenWidth - 310f, 5f, 80f, 30f);
             UI.SetOnClick(_redoButtonId, _redoClickCallback);
-            UI.SetWidgetBackgroundColor(_redoButtonId, 0.15f, 0.21f, 0.30f, 1.0f);
+            UI.ThemeSetBackground(_redoButtonId, ThemeRole.ButtonSecondaryBg);
+            UI.ThemeSetText(_redoButtonId, ThemeRole.TextPrimary);
 
             ulong consoleBtnId = UI.CreateButton(_toolbar.Id, 80f, 30f, "Console");
             UI.SetWidgetLayout(consoleBtnId, _screenWidth - 220f, 5f, 80f, 30f);
             UI.SetOnClick(consoleBtnId, _consoleClickCallback);
-            UI.SetWidgetBackgroundColor(consoleBtnId, 0.15f, 0.21f, 0.30f, 1.0f);
+            UI.ThemeSetBackground(consoleBtnId, ThemeRole.ButtonSecondaryBg);
+            UI.ThemeSetText(consoleBtnId, ThemeRole.TextPrimary);
+
+            _themeButtonId = UI.CreateButton(_toolbar.Id, 90f, 30f, Theme.IsDark ? "浅色" : "深色");
+            UI.SetWidgetLayout(_themeButtonId, _screenWidth - 500f, 5f, 90f, 30f);
+            UI.SetOnClick(_themeButtonId, _themeClickCallback);
+            UI.ThemeSetBackground(_themeButtonId, ThemeRole.ButtonSecondaryBg);
+            UI.ThemeSetText(_themeButtonId, ThemeRole.TextPrimary);
 
             // === SplitView-based Main Layout ===
             // Structure:
@@ -162,10 +173,10 @@ namespace Hezhou
             UI.SplitViewSetOnRatioChange(_outerSplitViewId, _outerSplitViewRatioCallback);
 
             // First pane of outer SplitView: LeftCenter zone
-            _leftCenterPanel = new Panel(_outerSplitViewId, 0, 0, 0, 0, 0.09f, 0.11f, 0.15f, 1.0f);
+            _leftCenterPanel = new Panel(_outerSplitViewId, 0, 0, 0, 0, ThemeRole.Panel);
             
             // Second pane of outer SplitView: Properties panel
-            _rightPanel = new Panel(_outerSplitViewId, 0, 0, 0, 0, 0.10f, 0.12f, 0.17f, 1.0f);
+            _rightPanel = new Panel(_outerSplitViewId, 0, 0, 0, 0, ThemeRole.Panel);
 
             // LeftCenter Vertical SplitView: Top (70%) | Asset (30%)
             _leftCenterSplitViewId = UI.CreateSplitView(_leftCenterPanel.Id, 0, 0, 0, 0, 1);
@@ -175,10 +186,10 @@ namespace Hezhou
             UI.SplitViewSetOnRatioChange(_leftCenterSplitViewId, _leftCenterSplitViewRatioCallback);
 
             // First pane of LeftCenter SplitView: Top zone
-            _topPanel = new Panel(_leftCenterSplitViewId, 0, 0, 0, 0, 0.09f, 0.11f, 0.15f, 1.0f);
+            _topPanel = new Panel(_leftCenterSplitViewId, 0, 0, 0, 0, ThemeRole.Panel);
 
             // Second pane of LeftCenter SplitView: Asset panel
-            _assetPanel = new Panel(_leftCenterSplitViewId, 0, 0, 0, 0, 0.10f, 0.12f, 0.17f, 1.0f);
+            _assetPanel = new Panel(_leftCenterSplitViewId, 0, 0, 0, 0, ThemeRole.Panel);
 
             // Inner Horizontal SplitView: Project (33%) | Preview (67%)
             _innerHorizontalSplitViewId = UI.CreateSplitView(_topPanel.Id, 0, 0, 0, 0, 0);
@@ -188,12 +199,12 @@ namespace Hezhou
             UI.SplitViewSetOnRatioChange(_innerHorizontalSplitViewId, _innerHorizontalSplitViewRatioCallback);
 
             // First pane of Inner SplitView: Project panel
-            _projectPanel = new Panel(_innerHorizontalSplitViewId, 0, 0, 0, 0, 0.105f, 0.13f, 0.18f, 1.0f);
+            _projectPanel = new Panel(_innerHorizontalSplitViewId, 0, 0, 0, 0, ThemeRole.Panel);
             UI.CreateLabel(_projectPanel.Id, 10f, 10f, 200f, 25f, "项目结构");
             CreateProjectStructureTree();
 
             // Second pane of Inner SplitView: Preview panel
-            _previewPanel = new Panel(_innerHorizontalSplitViewId, 0, 0, 0, 0, 0.035f, 0.045f, 0.065f, 1.0f);
+            _previewPanel = new Panel(_innerHorizontalSplitViewId, 0, 0, 0, 0, ThemeRole.Canvas);
             UI.CreateLabel(_previewPanel.Id, 10f, 10f, 200f, 25f, "游戏预览");
             
             float initialPreviewWidth = _screenWidth * 0.75f * 0.67f - 20f;
@@ -246,15 +257,17 @@ namespace Hezhou
             
             _propsTabWidget = new TabWidget(_rightPanel.Id, 5f, tabWidgetY, 0, tabWidgetHeight);
             
-            // Create 5 tab content containers (ScrollView for scrollable property lists)
-            _geometryTabContentId = UI.CreateScrollView(_propsTabWidget.Id, 0, 0, 0, 0);
-            ulong geometryVStack = UI.CreateVStack(_geometryTabContentId, 5f);
+            // 属性页内容用 VStack 直接作为 Tab 内容。
+            // ScrollView 在“隐藏 Tab 首次显示”时会保留 0 尺寸（已知布局缺陷），
+            // 会导致切换主题/切 Tab 后属性行不可见；属性列表本身很短，先不套 ScrollView。
+            _geometryTabContentId = UI.CreateVStack(_propsTabWidget.Id, 5f);
+            ulong geometryVStack = _geometryTabContentId;
             
-            _positionTabContentId = UI.CreateScrollView(_propsTabWidget.Id, 0, 0, 0, 0);
-            ulong positionVStack = UI.CreateVStack(_positionTabContentId, 5f);
+            _positionTabContentId = UI.CreateVStack(_propsTabWidget.Id, 5f);
+            ulong positionVStack = _positionTabContentId;
             
-            _renderTabContentId = UI.CreateScrollView(_propsTabWidget.Id, 0, 0, 0, 0);
-            ulong renderVStack = UI.CreateVStack(_renderTabContentId, 5f);
+            _renderTabContentId = UI.CreateVStack(_propsTabWidget.Id, 5f);
+            ulong renderVStack = _renderTabContentId;
             
             // === 管线选择区域 (渲染tab顶部) ===
             UI.CreateLabel(renderVStack, RIGHT_PANEL_WIDTH - 40f, 20f, "管线选择:");
@@ -297,8 +310,8 @@ namespace Hezhou
             
             _motionTabContentId = UI.CreateVStack(_propsTabWidget.Id, 5f);
             
-            _physicsTabContentId = UI.CreateScrollView(_propsTabWidget.Id, 0, 0, 0, 0);
-            ulong physicsVStack = UI.CreateVStack(_physicsTabContentId, 5f);
+            _physicsTabContentId = UI.CreateVStack(_propsTabWidget.Id, 5f);
+            ulong physicsVStack = _physicsTabContentId;
 
             // Build property panels for each category tab
             _propertyDescriptors.Clear();
@@ -334,11 +347,7 @@ namespace Hezhou
             // Build Motion tab: script dropdown + 绑定 button + binding list
             BuildMotionTab(_motionTabContentId);
             
-            // Set ScrollView content sizes based on property count per tab
-            UpdatePropertyScrollViewContentSize(_geometryTabContentId, geometryVStack);
-            UpdatePropertyScrollViewContentSize(_positionTabContentId, positionVStack);
-            UpdatePropertyScrollViewContentSize(_renderTabContentId, renderVStack);
-            UpdatePropertyScrollViewContentSize(_physicsTabContentId, physicsVStack);
+            // 属性页直接使用 VStack，无需 ScrollView content size。
             
             _propsTabWidget.AddTab("几何", _geometryTabContentId, false);
             _propsTabWidget.AddTab("位置", _positionTabContentId, false);
@@ -348,7 +357,7 @@ namespace Hezhou
             _propsTabWidget.SetOnSelect(_tabSelectCallback);
 
             // === Status Bar (fixed, bottom) ===
-            _statusBar = new Panel(rootId, 0, statusY, _screenWidth, STATUS_BAR_HEIGHT, 0.065f, 0.08f, 0.11f, 1.0f);
+            _statusBar = new Panel(rootId, 0, statusY, _screenWidth, STATUS_BAR_HEIGHT, ThemeRole.ToolbarBg);
             _statusItems = new List(_statusBar.Id, 0f, true);
             UI.SetWidgetLayout(_statusItems.Id, 10f, 0f, _screenWidth - 20f, STATUS_BAR_HEIGHT);
             
@@ -373,7 +382,7 @@ namespace Hezhou
             float editorHeight = mainHeight;
             float editorWidth = _screenWidth;
             
-            _scriptEditorPanel = new Panel(rootId, 0, editorY, editorWidth, editorHeight, 0.12f, 0.12f, 0.14f, 1.0f);
+            _scriptEditorPanel = new Panel(rootId, 0, editorY, editorWidth, editorHeight, ThemeRole.Panel);
             
             // Toolbar: Hot Reload button + label
             _scriptEditorHotReloadBtnId = UI.CreateButton(_scriptEditorPanel.Id, 100f, 30f, "Hot Reload");
@@ -392,10 +401,10 @@ namespace Hezhou
             UI.SplitViewSetOnRatioChange(_scriptEditorSplitViewId, _scriptEditorSplitViewRatioCallback);
             
             // Left pane: directory tree
-            _scriptEditorTreePanel = new Panel(_scriptEditorSplitViewId, 0, 0, 0, 0, 0.18f, 0.18f, 0.22f, 1.0f);
+            _scriptEditorTreePanel = new Panel(_scriptEditorSplitViewId, 0, 0, 0, 0, ThemeRole.Panel);
             
             // Right pane: TextEdit
-            _scriptEditorEditPanel = new Panel(_scriptEditorSplitViewId, 0, 0, 0, 0, 0.15f, 0.15f, 0.15f, 1.0f);
+            _scriptEditorEditPanel = new Panel(_scriptEditorSplitViewId, 0, 0, 0, 0, ThemeRole.Canvas);
             
             _scriptTextEditId = UI.CreateTextEdit(_scriptEditorEditPanel.Id, editorWidth * 0.8f - 20f, editorHeight - 90f);
             UI.SetTextEditShowLineNumbers(_scriptTextEditId, true);

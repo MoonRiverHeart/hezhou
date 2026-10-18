@@ -29,6 +29,9 @@ namespace Hezhou
             
             UI.GetScreenSize(out _screenWidth, out _screenHeight);
             _contentScale = UI.GetContentScale();
+
+            // 主题必须在 CreateEditorLayout 之前恢复，控件构造时按当前主题取色。
+            UI.ThemeSetMode(LoadThemePreference());
             
             Log.Info("Editor", $"编辑器初始化: {_screenWidth}x{_screenHeight}, DPI={_contentScale}");
             
@@ -44,6 +47,7 @@ namespace Hezhou
             _runClickCallback = OnRunClick;
             _toggleEditorClickCallback = OnToggleEditorClick;
             _consoleClickCallback = OnConsoleClick;
+            _themeClickCallback = OnThemeClick;
             _consoleDialogResultCallback = OnConsoleDialogResult;
             _consoleRefreshCallback = OnConsoleRefresh;
             _consoleLevelSelectCallback = OnConsoleLevelSelect;
@@ -391,6 +395,113 @@ _bindScriptClickCallback = OnBindScriptClick;
             {
                 _statusItem.Text = "状态: 就绪";
             }
+        }
+
+        // === Theme ===
+
+        private static ThemeMode LoadThemePreference()
+        {
+            try
+            {
+                if (System.IO.File.Exists(".hezhou_theme"))
+                {
+                    string value = System.IO.File.ReadAllText(".hezhou_theme").Trim();
+                    if (string.Equals(value, "light", StringComparison.OrdinalIgnoreCase))
+                    {
+                        return ThemeMode.Light;
+                    }
+                }
+            }
+            catch (Exception) { }
+            return ThemeMode.Dark;
+        }
+
+        private static void SaveThemePreference()
+        {
+            try
+            {
+                System.IO.File.WriteAllText(".hezhou_theme", Theme.IsDark ? "dark" : "light");
+            }
+            catch (Exception) { }
+        }
+
+        private static void OnThemeClick(ulong widgetId)
+        {
+            ApplyTheme(Theme.IsDark ? ThemeMode.Light : ThemeMode.Dark, true);
+        }
+
+        public static void ApplyTheme(ThemeMode mode, bool rebuild)
+        {
+            UI.ThemeSetMode(mode);
+            SaveThemePreference();
+            if (rebuild)
+            {
+                RebuildUIForTheme();
+            }
+        }
+
+        /// <summary>
+        /// 主题切换必须重建控件树：当前控件颜色在构造时取自主题。
+        /// Scene、选中实体、相机状态保留。
+        /// </summary>
+        private static void RebuildUIForTheme()
+        {
+            if (_gameScene == null) return;
+
+            ulong selected = _selectedEntityId;
+            ulong savedPropertyTab = _propsTabWidget != null ? _propsTabWidget.GetActive() : 0;
+            try { ClearPropertiesPanel(); }
+            catch (Exception ex) { Log.Error("Editor", "主题切换清理属性面板失败: " + ex.Message); }
+
+            UI.ClearWidgetTreeKeepCallbacks();
+
+            _selectedEntityId = selected;
+            _selectedEntityIds.Clear();
+            _propertyDescriptors.Clear();
+            _scriptRowIds.Clear();
+            _scriptPropertyWidgetIds.Clear();
+            _scriptPropertyInfoMap.Clear();
+            _scriptPropertySliderCallbacks.Clear();
+            _scriptPropertyInputCallbacks.Clear();
+            _scriptMinMaxInitialToMainWidgetMap.Clear();
+            _lastPropertiesEntityId = 0;
+            _lastScriptBindingCount = -1;
+
+            CreateEditorLayout();
+            OnResize(_screenWidth, _screenHeight);
+            if (_propsTabWidget != null) _propsTabWidget.SetActive(savedPropertyTab);
+
+            if (selected != 0)
+            {
+                _gameScene.SelectEntity(selected);
+                _selectedEntityId = selected;
+                _selectedEntityIds.Add(selected);
+                RefreshEntityTree();
+                _propertiesDirty = true;
+                _lastPropertiesEntityId = 0;
+                _lastScriptBindingCount = -1;
+                UpdatePropertiesPanel(selected);
+            }
+
+            if (_statusItem != null)
+            {
+                _statusItem.Text = Theme.IsDark ? "主题: 深色" : "主题: 浅色";
+            }
+        }
+
+        public static void TestSetTheme(ThemeMode mode)
+        {
+            ApplyTheme(mode, true);
+        }
+
+        public static void TestClickThemeButton()
+        {
+            OnThemeClick(0);
+        }
+
+        public static string TestGetThemeName()
+        {
+            return Theme.IsDark ? "dark" : "light";
         }
     }
 }

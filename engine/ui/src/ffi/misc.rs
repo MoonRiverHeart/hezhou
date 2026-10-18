@@ -31,6 +31,28 @@ pub extern "C" fn ui_widget_set_layout(
 }
 
 #[unsafe(no_mangle)]
+pub extern "C" fn ui_widget_set_text_color(
+    handle: WidgetTreeHandle,
+    widget_id: u64,
+    r: f32,
+    g: f32,
+    b: f32,
+    a: f32,
+) {
+    if handle.is_null() {
+        return;
+    }
+    unsafe {
+        let arc = &*(handle as *const Arc<Mutex<WidgetTree>>);
+        let mut tree = arc.lock();
+        let id = WidgetId::from_raw(widget_id);
+        if let Some(widget) = tree.get_widget_mut(id) {
+            widget.set_text_color(Color::new(r, g, b, a));
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
 pub extern "C" fn ui_widget_set_background_color(
     handle: WidgetTreeHandle,
     widget_id: u64,
@@ -225,6 +247,18 @@ pub extern "C" fn ui_get_root_id(handle: WidgetTreeHandle) -> u64 {
         let arc = &*(handle as *const Arc<Mutex<WidgetTree>>);
         let tree = arc.lock();
         tree.root.map(|r| r.id).unwrap_or(0)
+    }
+}
+
+/// 只清空控件树，保留已注册的回调（用于主题切换重建 UI）。
+pub extern "C" fn ui_clear_widget_tree_keep_callbacks(handle: WidgetTreeHandle) {
+    if handle.is_null() {
+        return;
+    }
+    unsafe {
+        let arc = &*(handle as *const Arc<Mutex<WidgetTree>>);
+        let mut tree = arc.lock();
+        tree.clear();
     }
 }
 

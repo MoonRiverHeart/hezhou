@@ -290,7 +290,7 @@ namespace Hezhou
                     // Hide pause button — move off-screen since it's a direct toolbar child
                     UI.SetWidgetLayout(_pauseButtonId, -100f, -100f, 80f, 30f);
                     // Reset preview border
-                    UI.SetWidgetBackgroundColor(_previewWindowId, 0.08f, 0.08f, 0.08f, 0.3f);
+                    UI.ThemeSetBackground(_previewWindowId, ThemeRole.Canvas);
                     _cameraX = _savedCameraX;
                     _cameraY = _savedCameraY;
                     _cameraZ = _savedCameraZ;
@@ -826,11 +826,11 @@ namespace Hezhou
             
             if (info.Enabled)
             {
-                UI.SetWidgetBackgroundColor(toggleBtnId, 0.2f, 0.8f, 0.2f, 1.0f);
+                UI.ThemeSetBackground(toggleBtnId, ThemeRole.Success);
             }
             else
             {
-                UI.SetWidgetBackgroundColor(toggleBtnId, 0.8f, 0.2f, 0.2f, 1.0f);
+                UI.ThemeSetBackground(toggleBtnId, ThemeRole.Danger);
             }
             
             ulong removeBtnId = UI.CreateButton(scriptRow, 40f, 20f, "X");
@@ -1496,7 +1496,7 @@ SelectEntity(entityId);
                 UI.SetWidgetLayout(_pauseButtonId, 375f, 5f, 80f, 30f);
                 UI.SetText(_pauseButtonId, "暂停");
                 // Set preview border blue for Running
-                UI.SetWidgetBackgroundColor(_previewWindowId, 0.2f, 0.4f, 0.8f, 0.3f);
+                UI.ThemeSetBackground(_previewWindowId, ThemeRole.SelectionBg);
                 _statusItem.Text = "状态: 运行中";
             }
             else if (currentState == GameState.Running || currentState == GameState.Paused)
@@ -1508,7 +1508,7 @@ UI.SetText(_runButtonId, "运行");
                 // Hide pause button — move off-screen
                 UI.SetWidgetLayout(_pauseButtonId, -100f, -100f, 80f, 30f);
                 // Reset preview border to default
-                UI.SetWidgetBackgroundColor(_previewWindowId, 0.08f, 0.08f, 0.08f, 0.3f);
+                UI.ThemeSetBackground(_previewWindowId, ThemeRole.Canvas);
                 _cameraX = _savedCameraX;
                 _cameraY = _savedCameraY;
                 _cameraZ = _savedCameraZ;
@@ -2404,7 +2404,7 @@ UI.SetText(_runButtonId, "运行");
                 _gameScene.SetGameState(GameState.Paused);
                 UI.SetRendererGameState(2);
                 UI.SetText(_pauseButtonId, "继续");
-                UI.SetWidgetBackgroundColor(_previewWindowId, 0.2f, 0.8f, 0.2f, 0.3f);
+                UI.ThemeSetBackground(_previewWindowId, ThemeRole.Success);
                 _statusItem.Text = "状态: 已暂停";
                 Log.Info("Editor", "Pause: Running → Paused");
             }
@@ -2414,7 +2414,7 @@ UI.SetText(_runButtonId, "运行");
                 _gameScene.SetGameState(GameState.Running);
                 UI.SetRendererGameState(1);
                 UI.SetText(_pauseButtonId, "暂停");
-                UI.SetWidgetBackgroundColor(_previewWindowId, 0.2f, 0.4f, 0.8f, 0.3f);
+                UI.ThemeSetBackground(_previewWindowId, ThemeRole.SelectionBg);
                 _statusItem.Text = "状态: 运行中";
                 Log.Info("Editor", "Pause: Paused → Running");
             }
@@ -3235,12 +3235,12 @@ UI.SetText(_runButtonId, "运行");
                 if (newEnabled)
                 {
                     UI.SetText(widgetId, "[ON]");
-                    UI.SetWidgetBackgroundColor(widgetId, 0.2f, 0.8f, 0.2f, 1.0f);
+                    UI.ThemeSetBackground(widgetId, ThemeRole.Success);
                 }
                 else
                 {
                     UI.SetText(widgetId, "[OFF]");
-                    UI.SetWidgetBackgroundColor(widgetId, 0.8f, 0.2f, 0.2f, 1.0f);
+                    UI.ThemeSetBackground(widgetId, ThemeRole.Danger);
                 }
                 
                 _statusItem.Text = newEnabled ? "脚本已启用: " + info.ClassName : "脚本已禁用: " + info.ClassName;

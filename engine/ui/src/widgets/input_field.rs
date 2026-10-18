@@ -37,8 +37,8 @@ impl InputField {
             children: Vec::new(),
             layout: Layout::new(0.0, 0.0, 200.0, 30.0),
             style: Style::new()
-                .with_background(Color::new(0.15, 0.15, 0.15, 1.0))
-                .with_border(Color::new(0.4, 0.4, 0.4, 1.0), 1.0, 4.0),
+                .with_background(crate::theme::colors().input_bg)
+                .with_border(crate::theme::colors().input_border, 1.0, 4.0),
             state: WidgetState::Normal,
             text: String::new(),
             placeholder: String::new(),
@@ -295,15 +295,16 @@ impl Widget for InputField {
         let global_focused = crate::thunk::ui_get_focused_input_field();
         self.is_focused = global_focused == self.id.id;
         
+        let t = crate::theme::colors();
         let current_style = if self.is_focused {
             Style::new()
-                .with_background(Color::new(0.18, 0.18, 0.18, 1.0))
-                .with_border(Color::new(0.5, 0.7, 1.0, 1.0), 2.0, 4.0)
+                .with_background(t.input_bg)
+                .with_border(t.input_focus, 2.0, 4.0)
         } else {
             match self.state {
                 WidgetState::Hovered => Style::new()
-                    .with_background(Color::new(0.2, 0.2, 0.2, 1.0))
-                    .with_border(Color::new(0.5, 0.5, 0.5, 1.0), 1.0, 4.0),
+                    .with_background(t.input_bg)
+                    .with_border(t.border_strong, 1.0, 4.0),
                 _ => self.style,
             }
         };
@@ -331,7 +332,7 @@ impl Widget for InputField {
                     self.layout.height - 12.0
                 );
                 let selection_style = Style::new()
-                    .with_background(Color::new(0.2, 0.4, 0.8, 0.5));
+                    .with_background(crate::theme::colors().selection_bg);
                 canvas.draw_rect(selection_rect, &selection_style);
             }
         }
@@ -343,9 +344,9 @@ impl Widget for InputField {
         };
         
         let text_color = if self.text.is_empty() && !self.is_focused {
-            Color::new(0.5, 0.5, 0.5, 1.0)
+            crate::theme::colors().text_muted
         } else {
-            Color::white()
+            crate::theme::colors().text_primary
         };
         
         let text_style = TextStyle::new()

@@ -57,7 +57,9 @@ impl Label {
             state: WidgetState::Normal,
             flags: crate::widget::WidgetFlags::default(),
             text: text.to_string(),
-            text_style: TextStyle::new().with_size(16.0).with_color(Color::white()),
+            text_style: TextStyle::new()
+                .with_size(14.0)
+                .with_color(crate::theme::colors().text_primary),
             wrap_mode: WrapMode::None,
         }
     }
@@ -172,6 +174,11 @@ impl Widget for Label {
 
     fn get_text(&self) -> Option<&str> {
         Some(&self.text)
+    }
+
+    fn set_text_color(&mut self, color: Color) {
+        self.text_style.font_color = color;
+        self.flags.dirty_render = true;
     }
 
 fn draw(&mut self, canvas: &mut Canvas) {

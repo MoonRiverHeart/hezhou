@@ -292,6 +292,13 @@ pub project_add_entity: ProjectAddEntityFn,
         pub scene_snapshot_json: SceneSnapshotJsonFn,
         pub scene_free_json: SceneFreeJsonFn,
         pub scene_restore_json: SceneRestoreJsonFn,
+        // Theme FFI (tail; must match C# FfiContext)
+        pub ui_theme_get_mode: ThemeGetModeFn,
+        pub ui_theme_set_mode: ThemeSetModeFn,
+        pub ui_theme_color: ThemeColorFn,
+        pub ui_theme_role_count: ThemeRoleCountFn,
+        pub ui_widget_set_text_color: SetWidgetTextColorFn,
+        pub ui_clear_widget_tree_keep_callbacks: ClearWidgetTreeKeepCallbacksFn,
     }
 
 static mut FFI_CONTEXT: Option<Box<FfiContext>> = None;

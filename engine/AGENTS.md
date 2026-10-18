@@ -19,7 +19,7 @@ engine/
 ├── ⚡ rhi-vulkan/     # Vulkan renderer impl (see rhi-vulkan/src/AGENTS.md)
 ├── 🎥 render/         # RenderEngine + Camera/Mesh/Texture (see render/src/AGENTS.md)
 ├── 📜 scripting/      # Mono JIT executor, FfiContext (see scripting/src/AGENTS.md)
-│   └── 🏗️ ffi_context/ # 270-field FfiContext struct (see scripting/src/ffi_context/AGENTS.md)
+│   └── 🏗️ ffi_context/ # 271-field FfiContext struct (see scripting/src/ffi_context/AGENTS.md)
 ├── 🤖 mcp/            # MCP server — LLM集成层 (see mcp/src/AGENTS.md)
 │   └── 🔮 bridge.rs   # EngineBridge trait + 8返回结构体 + [Both]/[RustOnly]/[FfiOnly]标注
 │   └── 🖥️ server.rs   # 18 #[tool]方法 + #[tool_router(server_handler)]自动生成ServerHandler
@@ -57,7 +57,7 @@ engine/
 ## Architecture Notes
 - **Inverted dependency**: core → scripting (core needs FfiContext types from scripting). Scripting is the leaf crate.
 - **4 mid-level crates produce cdylib**: scripting, ui, dfx, harmony — needed for standalone FFI export model
-- **FfiContext**: 270-field flat #[repr(C)] struct of function pointers, assembled in editor/mod.rs with transmute
+- **FfiContext**: 271-field flat #[repr(C)] struct of function pointers, assembled in editor/mod.rs with transmute
 - **C# has NO Main() methods**: All scripts are DLL assemblies, entry via static Initialize() called from Rust
 - **Shader compilation**: NO automated pipeline. `.spv` files manually compiled via glslc and committed to repo
 - **Mono build**: 3 inconsistent PowerShell scripts (build_mono.ps1, build_mono_ui.ps1, build_ui_mono.ps1)
@@ -248,7 +248,7 @@ glslc shaders/rotation.frag -o shaders/rotation.frag.spv
 ### 14. 分层测试 / DFX / 编辑器 P0 (2026-10-18)
 **新增测试**:
 - UT: `core/tests/{scene_properties,scene_hierarchy_cycles,project_fuzz_smoke}.rs`、`ui/tests/widget_tree_hit_test.rs`
-- 接口: `core/tests/{ffi_contract,project_ffi_contract}.rs` + `scripts/check_ffi_contract.py`（265 个 FfiContext 字段三方一致）
+- 接口: `core/tests/{ffi_contract,project_ffi_contract}.rs` + `scripts/check_ffi_contract.py`（271 个 FfiContext 字段三方一致）
 - FUZZ: `engine/fuzz/` cargo-fuzz target + 3000 组畸形 JSON 确定性 smoke
 - E2E: `scripts/run_autotest.ps1`、`UITestRunner.Report.cs`、`TestTelemetry.cs`
   - random/sequential/stress/intent 模式
@@ -285,3 +285,11 @@ glslc shaders/rotation.frag -o shaders/rotation.frag.spv
 - Console Dialog 680x360；`ClearScriptBindingUI` 按容器子节点清理
 - 工具栏深蓝灰主题 + 运行绿/编辑器蓝/橙色强调线
 **视觉验证**: `run_autotest.ps1 -Mode visual` 输出 5 张截图，`check_visual.py` 校验尺寸/非空；人工检查确认绑定行、Console、搜索框、属性面板、多选
+
+### 16. P0 双主题 Design Tokens (2026-10-18)
+- Rust `ui/src/theme.rs`：Dark/Light 语义色板；C# `UI.Theme.cs` 只用 ThemeRole。
+- 工具栏“浅色/深色”切换，`.hezhou_theme` 持久化；切换时
+  `ui_clear_widget_tree_keep_callbacks` 重建 UI，保留 Scene/选中/Tab。
+- 基础控件与编辑器外壳颜色迁移；属性页从 ScrollView 改 VStack，规避隐藏 Tab
+  首次显示的 0 尺寸问题。
+- `visual` 7 张截图（含双主题），FFI 271 字段。

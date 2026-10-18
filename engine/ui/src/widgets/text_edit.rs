@@ -53,12 +53,14 @@ impl TextEdit {
             children: Vec::new(),
             layout: Layout::new(0.0, 0.0, 400.0, 300.0),
             style: Style::new()
-                .with_background(Color::new(0.15, 0.15, 0.15, 1.0))
-                .with_border(Color::new(0.3, 0.3, 0.3, 1.0), 1.0, 0.0),
+                .with_background(crate::theme::colors().input_bg)
+                .with_border(crate::theme::colors().input_border, 1.0, 0.0),
             state: WidgetState::Normal,
             flags: crate::widget::WidgetFlags::default(),
             text: String::new(),
-            text_style: TextStyle::new().with_size(16.0).with_color(Color::new(0.9, 0.9, 0.9, 1.0)),
+            text_style: TextStyle::new()
+                .with_size(14.0)
+                .with_color(crate::theme::colors().text_primary),
             cursor_grapheme_index: 0,
             cursor_byte_index: 0,
             cursor_visible: true,
@@ -347,7 +349,7 @@ impl Widget for TextEdit {
         
         if self.show_line_numbers {
             let line_number_style = Style::new()
-                .with_background(Color::new(0.12, 0.12, 0.12, 1.0));
+                .with_background(crate::theme::colors().input_bg);
             canvas.draw_rect(Rect::new(0.0, 0.0, line_number_width, text_area_height), &line_number_style);
         }
         
@@ -376,7 +378,7 @@ impl Widget for TextEdit {
         if self.show_line_numbers {
             let line_number_text_style = TextStyle::new()
                 .with_size(font_size)
-                .with_color(Color::new(0.5, 0.5, 0.5, 1.0));
+                .with_color(crate::theme::colors().text_muted);
             
             for (line_idx, line) in self.presenter.get_model().get_lines().iter().enumerate() {
                 let line_y = line.baseline_y - max_bearing_y - self.scroll_offset_y;
@@ -421,7 +423,7 @@ impl Widget for TextEdit {
                         if start_x < text_start_x + text_area_width && end_x > text_start_x {
                             canvas.draw_rect(
                                 Rect::new(start_x.max(text_start_x), line_y, (end_x - start_x).min(text_area_width), line_height),
-                                &Style::new().with_background(Color::new(0.3, 0.5, 0.8, 0.3)),
+                                &Style::new().with_background(crate::theme::colors().selection_bg),
                             );
                         }
                     }
@@ -445,7 +447,7 @@ impl Widget for TextEdit {
         if self.total_content_height > text_area_height {
             let v_scrollbar_x = width - scrollbar_width;
             let scrollbar_bg_style = Style::new()
-                .with_background(Color::new(0.08, 0.08, 0.08, 1.0));
+                .with_background(crate::theme::colors().canvas);
             canvas.draw_rect(Rect::new(v_scrollbar_x, 0.0, scrollbar_width, text_area_height), &scrollbar_bg_style);
             
             let scrollbar_ratio = text_area_height / self.total_content_height;
@@ -453,8 +455,8 @@ impl Widget for TextEdit {
             let v_scrollbar_y = (self.scroll_offset_y / max_scroll_y) * (text_area_height - v_scrollbar_h);
             
             let scrollbar_style = Style::new()
-                .with_background(Color::new(0.3, 0.3, 0.3, 1.0))
-                .with_border(Color::new(0.4, 0.4, 0.4, 1.0), 1.0, 3.0);
+                .with_background(crate::theme::colors().scrollbar_thumb)
+                .with_border(crate::theme::colors().border, 1.0, 3.0);
             canvas.draw_rect(
                 Rect::new(v_scrollbar_x + 1.0, v_scrollbar_y, scrollbar_width - 2.0, v_scrollbar_h),
                 &scrollbar_style,
@@ -465,7 +467,7 @@ impl Widget for TextEdit {
         if self.total_content_width > text_area_width {
             let h_scrollbar_y = text_area_height;
             let scrollbar_bg_style = Style::new()
-                .with_background(Color::new(0.08, 0.08, 0.08, 1.0));
+                .with_background(crate::theme::colors().canvas);
             canvas.draw_rect(Rect::new(line_number_width, h_scrollbar_y, width - line_number_width - scrollbar_width, scrollbar_height), &scrollbar_bg_style);
             
             let scrollbar_ratio = text_area_width / self.total_content_width;
@@ -473,8 +475,8 @@ impl Widget for TextEdit {
             let h_scrollbar_x = line_number_width + (self.scroll_offset_x / max_scroll_x) * (text_area_width - h_scrollbar_w);
             
             let scrollbar_style = Style::new()
-                .with_background(Color::new(0.3, 0.3, 0.3, 1.0))
-                .with_border(Color::new(0.4, 0.4, 0.4, 1.0), 1.0, 3.0);
+                .with_background(crate::theme::colors().scrollbar_thumb)
+                .with_border(crate::theme::colors().border, 1.0, 3.0);
             canvas.draw_rect(
                 Rect::new(h_scrollbar_x, h_scrollbar_y + 1.0, h_scrollbar_w, scrollbar_height - 2.0),
                 &scrollbar_style,
@@ -489,7 +491,7 @@ impl Widget for TextEdit {
             if draw_y >= 0.0 && draw_y < text_area_height && cursor_x >= text_start_x && cursor_x < text_start_x + text_area_width {
                 canvas.draw_rect(
                     Rect::new(cursor_x, draw_y, 2.0, max_bearing_y + 4.0),
-                    &Style::new().with_background(Color::white()),
+                    &Style::new().with_background(crate::theme::colors().panel),
                 );
             }
         }

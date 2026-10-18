@@ -25,6 +25,7 @@ pub mod dialog;
 pub mod file_browser;
 pub mod misc;
 pub mod image;
+pub mod theme;
 
 pub use system::*;
 pub use event::*;
@@ -45,3 +46,4 @@ pub use dialog::*;
 pub use file_browser::*;
 pub use misc::*;
 pub use image::*;
+pub use theme::*;

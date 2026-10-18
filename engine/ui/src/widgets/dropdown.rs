@@ -32,8 +32,8 @@ impl Dropdown {
             children: Vec::new(),
             layout: Layout::new(0.0, 0.0, 200.0, 30.0),
             style: Style::new()
-                .with_background(Color::new(0.25, 0.25, 0.28, 1.0))
-                .with_border(Color::new(0.4, 0.4, 0.45, 1.0), 1.0, 4.0),
+                .with_background(crate::theme::colors().input_bg)
+                .with_border(crate::theme::colors().input_border, 1.0, 4.0),
             state: WidgetState::Normal,
             options: Vec::new(),
             selected_index: 0,
@@ -223,13 +223,14 @@ impl Widget for Dropdown {
             self.options.get(self.selected_index).unwrap_or(&String::new()).to_string()
         };
         
+        let t = crate::theme::colors();
         let current_style = match self.state {
             WidgetState::Hovered => Style::new()
-                .with_background(Color::new(0.25, 0.25, 0.25, 1.0))
-                .with_border(Color::new(0.5, 0.5, 0.5, 1.0), 1.0, 4.0),
+                .with_background(t.input_bg)
+                .with_border(t.border_strong, 1.0, 4.0),
             WidgetState::Pressed => Style::new()
-                .with_background(Color::new(0.15, 0.15, 0.15, 1.0))
-                .with_border(Color::new(0.3, 0.3, 0.3, 1.0), 1.0, 4.0),
+                .with_background(t.input_bg)
+                .with_border(t.input_focus, 1.0, 4.0),
             _ => self.style,
         };
         
@@ -238,7 +239,7 @@ impl Widget for Dropdown {
         
         let text_style = TextStyle::new()
             .with_size(14.0 * self.content_scale)
-            .with_color(Color::white())
+            .with_color(t.text_primary)
             .with_alignment(TextAlignment {
                 horizontal: HorizontalAlignment::Left,
                 vertical: VerticalAlignment::Center,
@@ -254,23 +255,23 @@ impl Widget for Dropdown {
         let arrow_half = arrow_size / 2.0;
         
         // ▼ triangle using 3 lines
-        let arrow_style = Style::new().with_background(Color::new(0.7, 0.7, 0.7, 1.0));
+        let arrow_style = Style::new().with_background(t.text_muted);
         canvas.draw_line(
             Point::new(arrow_x, arrow_y_center - arrow_half * 0.4),
             Point::new(arrow_x + arrow_size, arrow_y_center - arrow_half * 0.4),
-            Color::new(0.7, 0.7, 0.7, 1.0),
+            t.text_muted,
             1.5 * self.content_scale,
         );
         canvas.draw_line(
             Point::new(arrow_x + arrow_size, arrow_y_center - arrow_half * 0.4),
             Point::new(arrow_x + arrow_half, arrow_y_center + arrow_half * 0.6),
-            Color::new(0.7, 0.7, 0.7, 1.0),
+            t.text_muted,
             1.5 * self.content_scale,
         );
         canvas.draw_line(
             Point::new(arrow_x + arrow_half, arrow_y_center + arrow_half * 0.6),
             Point::new(arrow_x, arrow_y_center - arrow_half * 0.4),
-            Color::new(0.7, 0.7, 0.7, 1.0),
+            t.text_muted,
             1.5 * self.content_scale,
         );
         
@@ -299,7 +300,7 @@ impl Widget for Dropdown {
                 // 选项文本
                 let text_style = TextStyle::new()
                     .with_size(font_size)
-                    .with_color(Color::white())
+                    .with_color(t.text_primary)
                     .with_alignment(TextAlignment {
                         horizontal: HorizontalAlignment::Left,
                         vertical: VerticalAlignment::Center,
@@ -316,7 +317,7 @@ impl Widget for Dropdown {
             let popup_total_height = self.options.len() as f32 * option_height;
             canvas.draw_rect_outline(
                 Rect::new(0.0, popup_y_start, popup_width, popup_total_height),
-                Color::new(0.4, 0.4, 0.45, 1.0),
+                t.border,
                 1.0 * self.content_scale,
             );
         }

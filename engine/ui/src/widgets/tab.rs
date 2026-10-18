@@ -43,7 +43,7 @@ impl TabWidget {
             children: Vec::new(),
             layout: Layout::new(0.0, 0.0, 300.0, 400.0),
             style: Style::new()
-                .with_background(Color::new(0.15, 0.15, 0.15, 1.0)),
+                .with_background(crate::theme::colors().tab_bg),
             state: WidgetState::Normal,
             flags: crate::widget::WidgetFlags::default(),
             tabs: Vec::new(),
@@ -339,24 +339,24 @@ impl Widget for TabWidget {
         // 缓存tab宽度供get_tab_rect和hit_test_tab使用
         self.cached_tab_width = scaled_tab_width;
 
-        let tab_bar_style = Style::new()
-            .with_background(Color::new(0.15, 0.15, 0.15, 1.0));
+        let t = crate::theme::colors();
+        let tab_bar_style = Style::new().with_background(t.tab_bg);
         canvas.draw_rect(Rect::new(0.0, 0.0, width, scaled_tab_bar_height), &tab_bar_style);
 
         for (i, tab) in self.tabs.iter().enumerate() {
             let tab_rect = self.get_tab_rect(i);
             
             let tab_bg_color = if i == self.active_index {
-                Color::new(0.25, 0.25, 0.25, 1.0)
+                t.tab_active_bg
             } else if self.hovered_tab_index == Some(i) {
-                Color::new(0.22, 0.22, 0.22, 1.0)
+                t.hover
             } else {
-                Color::new(0.2, 0.2, 0.2, 1.0)
+                t.tab_bg
             };
 
             let tab_style = Style::new()
                 .with_background(tab_bg_color)
-                .with_border(Color::new(0.3, 0.3, 0.3, 1.0), 1.0, 0.0);
+                .with_border(t.border, 1.0, 0.0);
             canvas.draw_rect(tab_rect, &tab_style);
 
             // Dog-ear fold on top-right corner of tab
@@ -364,14 +364,14 @@ impl Widget for TabWidget {
             let fold_x = tab_rect.x + tab_rect.width;
             let fold_y = tab_rect.y;
             let fold_shadow_color = if i == self.active_index {
-                Color::new(0.18, 0.18, 0.18, 1.0)
+                t.border
             } else {
-                Color::new(0.15, 0.15, 0.15, 1.0)
+                t.tab_bg
             };
             let fold_color = if i == self.active_index {
-                Color::new(0.35, 0.35, 0.35, 1.0)
+                t.border_strong
             } else {
-                Color::new(0.28, 0.28, 0.28, 1.0)
+                t.border
             };
             canvas.draw_triangle(
                 Point::new(fold_x + 1.0 * self.content_scale, fold_y + 1.0 * self.content_scale),
@@ -405,7 +405,7 @@ impl Widget for TabWidget {
 
             let text_style = TextStyle::new()
                 .with_size(font_size)
-                .with_color(Color::white())
+                .with_color(if i == self.active_index { t.tab_active_fg } else { t.text_secondary })
                 .with_alignment(TextAlignment {
                     horizontal: HorizontalAlignment::Center,
                     vertical: VerticalAlignment::Center,
@@ -421,14 +421,13 @@ impl Widget for TabWidget {
 
             if tab.closable {
                 let close_rect = self.get_close_button_rect(&tab_rect);
-                let close_style = Style::new()
-                    .with_background(Color::new(0.4, 0.4, 0.4, 1.0));
+                let close_style = Style::new().with_background(t.menu_hover);
                 canvas.draw_rect(close_rect, &close_style);
 
                 let x_size = 8.0 * self.content_scale;
                 let center_x = close_rect.x + close_rect.width / 2.0;
                 let center_y = close_rect.y + close_rect.height / 2.0;
-                let x_color = Color::new(0.8, 0.8, 0.8, 1.0);
+                let x_color = t.text_secondary;
                 canvas.draw_line(
                     Point::new(center_x - x_size / 2.0, center_y - x_size / 2.0),
                     Point::new(center_x + x_size / 2.0, center_y + x_size / 2.0),
@@ -442,8 +441,7 @@ impl Widget for TabWidget {
             }
         }
 
-        let content_style = Style::new()
-            .with_background(Color::new(0.12, 0.12, 0.12, 1.0));
+        let content_style = Style::new().with_background(t.canvas);
         let content_rect = Rect::new(0.0, scaled_tab_bar_height, width, height - scaled_tab_bar_height);
         canvas.draw_rect(content_rect, &content_style);
     }

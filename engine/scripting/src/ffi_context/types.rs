@@ -29,6 +29,8 @@ pub type DebugPrintWidgetTreeFn = extern "C" fn(WidgetTreeHandle);
 pub type SetFlexExpandFn = extern "C" fn(WidgetTreeHandle, u64, u32);
 pub type SetCrossAxisFillFn = extern "C" fn(WidgetTreeHandle, u64, u32);
 pub type SetWidgetBackgroundColorFn = extern "C" fn(WidgetTreeHandle, u64, f32, f32, f32, f32);
+pub type SetWidgetTextColorFn = extern "C" fn(WidgetTreeHandle, u64, f32, f32, f32, f32);
+pub type ClearWidgetTreeKeepCallbacksFn = extern "C" fn(WidgetTreeHandle);
 pub type SetLabelWrapModeFn = extern "C" fn(WidgetTreeHandle, u64, u32);
 
 pub type EventDispatcherHandle = *mut c_void;

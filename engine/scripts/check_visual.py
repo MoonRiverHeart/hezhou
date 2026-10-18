@@ -17,6 +17,8 @@ EXPECTED = [
     "03_asset_search.png",
     "04_project_search.png",
     "05_multi_select.png",
+    "06_theme_light.png",
+    "07_theme_dark.png",
 ]
 
 

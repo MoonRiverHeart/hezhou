@@ -369,6 +369,16 @@ ui_widget_get_layout: unsafe { std::mem::transmute(ui_ffi::ui_widget_get_layout 
         scene_restore_json: unsafe {
             std::mem::transmute(hezhou_core::scene_restore_json as *const std::ffi::c_void)
         },
+        ui_theme_get_mode: hezhou_ui::ffi::ui_theme_get_mode,
+        ui_theme_set_mode: hezhou_ui::ffi::ui_theme_set_mode,
+        ui_theme_color: hezhou_ui::ffi::ui_theme_color,
+        ui_theme_role_count: hezhou_ui::ffi::ui_theme_role_count,
+        ui_widget_set_text_color: unsafe {
+            std::mem::transmute(hezhou_ui::ffi::ui_widget_set_text_color as *const std::ffi::c_void)
+        },
+        ui_clear_widget_tree_keep_callbacks: unsafe {
+            std::mem::transmute(hezhou_ui::ffi::ui_clear_widget_tree_keep_callbacks as *const std::ffi::c_void)
+        },
         ui_set_widget_visible: unsafe { std::mem::transmute(ffi_impl::set_widget_visible as *const std::ffi::c_void) },
         get_pipeline_names: unsafe { std::mem::transmute(ffi_impl::get_pipeline_names as *const std::ffi::c_void) },
         switch_pipeline: unsafe { std::mem::transmute(ffi_impl::switch_pipeline as *const std::ffi::c_void) },

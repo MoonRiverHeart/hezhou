@@ -111,6 +111,12 @@ namespace Hezhou
             return func(_widgetTree, parentId, x, y, width, height, r, g, b, a);
         }
 
+        public static ulong CreatePanel(ulong parentId, float x, float y, float width, float height, ThemeRole role)
+        {
+            ThemeColor c = Theme.Color(role);
+            return CreatePanel(parentId, x, y, width, height, c.R, c.G, c.B, c.A);
+        }
+
         public static ulong CreateTextEdit(ulong parentId, float width, float height)
         {
             if (_ffi.ui_create_text_edit_in_parent == IntPtr.Zero)
@@ -243,6 +249,17 @@ public static ulong GetRootId()
             return func(_widgetTree);
         }
         
+        public static void ClearWidgetTreeKeepCallbacks()
+        {
+            if (_ffi.ui_clear_widget_tree_keep_callbacks == IntPtr.Zero)
+            {
+                Log.Error("C#", "ClearWidgetTreeKeepCallbacks函数指针为空");
+                return;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<ClearWidgetTreeKeepCallbacksDelegate>(_ffi.ui_clear_widget_tree_keep_callbacks);
+            func(_widgetTree);
+        }
+
         public static void ClearWidgetTree()
         {
             if (_ffi.ui_clear_widget_tree == IntPtr.Zero)
@@ -718,6 +735,11 @@ public static ulong GetRootId()
         {
             Id = UI.CreatePanel(parentId, x, y, width, height, r, g, b, a);
         }
+
+        public Panel(ulong parentId, float x, float y, float width, float height, ThemeRole role)
+        {
+            Id = UI.CreatePanel(parentId, x, y, width, height, role);
+        }
         
         public ulong AddButton(float width, float height, string text)
         {
@@ -732,6 +754,11 @@ public static ulong GetRootId()
         public ulong AddPanel(float x, float y, float width, float height, float r = 0.2f, float g = 0.2f, float b = 0.2f, float a = 1.0f)
         {
             return UI.CreatePanel(Id, x, y, width, height, r, g, b, a);
+        }
+
+        public ulong AddPanel(float x, float y, float width, float height, ThemeRole role)
+        {
+            return UI.CreatePanel(Id, x, y, width, height, role);
         }
         
 public void SetPosition(float x, float y)

@@ -85,6 +85,9 @@ namespace Hezhou
         public delegate void ClearWidgetTreeDelegate(IntPtr handle);
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void ClearWidgetTreeKeepCallbacksDelegate(IntPtr handle);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public delegate void SetWidgetLayoutDelegate(IntPtr handle, ulong widgetId, float x, float y, float width, float height);
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
@@ -152,6 +155,9 @@ namespace Hezhou
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public delegate void SetWidgetBackgroundColorDelegate(IntPtr handle, ulong widgetId, float r, float g, float b, float a);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void SetWidgetTextColorDelegate(IntPtr handle, ulong widgetId, float r, float g, float b, float a);
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public delegate void SetLabelWrapModeDelegate(IntPtr handle, ulong widgetId, int mode);
@@ -598,6 +604,15 @@ namespace Hezhou
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public delegate ulong SceneGetFirstSelectedEntityIdDelegate(IntPtr scene);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate uint ThemeGetModeDelegate();
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate uint ThemeSetModeDelegate(uint mode);
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate uint ThemeColorDelegate(uint role);
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate uint ThemeRoleCountDelegate();
         
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public delegate void SceneUpdateDelegate(IntPtr scene, float deltaTime);
@@ -1132,6 +1147,13 @@ namespace Hezhou
             public IntPtr scene_snapshot_json;
             public IntPtr scene_free_json;
             public IntPtr scene_restore_json;
+            // Theme FFI (tail; must match Rust FfiContext)
+            public IntPtr ui_theme_get_mode;
+            public IntPtr ui_theme_set_mode;
+            public IntPtr ui_theme_color;
+            public IntPtr ui_theme_role_count;
+            public IntPtr ui_widget_set_text_color;
+            public IntPtr ui_clear_widget_tree_keep_callbacks;
         }
 
         public static void InitFromContext(IntPtr contextPtr)

@@ -422,6 +422,12 @@ fn main() {
         scene_snapshot_json: unsafe { std::mem::transmute(stub_scene_snapshot_json as *const std::ffi::c_void) },
         scene_free_json: stub_scene_free_json,
         scene_restore_json: unsafe { std::mem::transmute(stub_scene_restore_json as *const std::ffi::c_void) },
+        ui_theme_get_mode: stub_theme_get_mode,
+        ui_theme_set_mode: stub_theme_set_mode,
+        ui_theme_color: stub_theme_color,
+        ui_theme_role_count: stub_theme_role_count,
+        ui_widget_set_text_color: stub_widget_set_text_color,
+        ui_clear_widget_tree_keep_callbacks: stub_clear_widget_tree_keep_callbacks,
     };
     hezhou_scripting::ffi_context::set_ffi_context(ffi_ctx);
     let ffi_ptr = hezhou_scripting::ffi_context::get_ffi_context_ptr();
@@ -552,6 +558,25 @@ extern "C" fn stub_scene_free_json(_: *mut std::ffi::c_char) {}
 extern "C" fn stub_scene_restore_json(_: *mut std::ffi::c_void, _: *const std::ffi::c_char) -> bool {
     false
 }
+
+extern "C" fn stub_theme_get_mode() -> u32 {
+    0
+}
+
+extern "C" fn stub_theme_set_mode(_: u32) -> u32 {
+    0
+}
+
+extern "C" fn stub_theme_color(_: u32) -> u32 {
+    0xFFFFFFFF
+}
+
+extern "C" fn stub_theme_role_count() -> u32 {
+    44
+}
+
+extern "C" fn stub_widget_set_text_color(_: *mut std::ffi::c_void, _: u64, _: f32, _: f32, _: f32, _: f32) {}
+extern "C" fn stub_clear_widget_tree_keep_callbacks(_: *mut std::ffi::c_void) {}
 
 // 新增stub函数 — Feature 1脚本绑定
 pub extern "C" fn scene_get_existing_ptr_stub() -> *mut std::ffi::c_void { std::ptr::null_mut() }

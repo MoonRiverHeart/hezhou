@@ -63,7 +63,7 @@ impl GridView {
             children: Vec::new(),
             layout: Layout::zero(),
             style: Style::new()
-                .with_background(Color::new(0.15, 0.15, 0.15, 1.0)),
+                .with_background(crate::theme::colors().panel),
             state: WidgetState::Normal,
             flags: WidgetFlags::default(),
             items: Vec::new(),
@@ -328,7 +328,7 @@ impl Widget for GridView {
         let font_size = 12.0 * self.content_scale;
         let text_style = TextStyle::new()
             .with_size(font_size)
-            .with_color(Color::white())
+            .with_color(crate::theme::colors().text_primary)
             .with_alignment(TextAlignment {
                 horizontal: HorizontalAlignment::Center,
                 vertical: VerticalAlignment::Bottom,
@@ -345,18 +345,18 @@ impl Widget for GridView {
             let is_selected = item.is_selected;
             
             let bg_color = if is_selected {
-                Color::new(0.2, 0.4, 0.6, 0.8)
+                crate::theme::colors().selection_bg
             } else if is_hovered {
-                Color::new(0.25, 0.25, 0.25, 0.8)
+                crate::theme::colors().hover
             } else {
-                Color::new(0.2, 0.2, 0.2, 0.5)
+                crate::theme::colors().canvas
             };
             
             let cell_style = Style::new().with_background(bg_color);
             canvas.draw_rect(Rect::new(x, y, self.cell_size, self.cell_size), &cell_style);
             
             let thumb_height = self.cell_size - 20.0 * self.content_scale;
-            let thumb_color = Color::new(0.3, 0.3, 0.3, 0.6);
+            let thumb_color = crate::theme::colors().scrollbar_thumb;
             let thumb_style = Style::new().with_background(thumb_color);
             canvas.draw_rect(Rect::new(x + 4.0 * self.content_scale, y + 4.0 * self.content_scale, 
                                         self.cell_size - 8.0 * self.content_scale, thumb_height - 8.0 * self.content_scale), &thumb_style);
@@ -368,7 +368,7 @@ impl Widget for GridView {
             );
             
             if is_selected {
-                let border_color = Color::new(0.3, 0.6, 1.0, 1.0);
+                let border_color = crate::theme::colors().accent;
                 canvas.draw_rect_outline(
                     Rect::new(x, y, self.cell_size, self.cell_size),
                     border_color,
@@ -383,7 +383,7 @@ impl Widget for GridView {
             let scrollbar_width = 6.0 * self.content_scale;
             let scrollbar_y = scroll_ratio * (height - scrollbar_height);
             
-            let scrollbar_style = Style::new().with_background(Color::new(0.5, 0.5, 0.5, 0.5));
+            let scrollbar_style = Style::new().with_background(crate::theme::colors().scrollbar_thumb);
             canvas.draw_rect(Rect::new(width - scrollbar_width, scrollbar_y, scrollbar_width, scrollbar_height), &scrollbar_style);
         }
         

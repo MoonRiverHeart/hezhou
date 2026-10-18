@@ -30,8 +30,10 @@ impl ListItem {
             state: WidgetState::Normal,
             flags: WidgetFlags::default(),
             text: text.to_string(),
-            text_style: TextStyle::new().with_size(14.0).with_color(Color::white()),
-            border_color: Color::new(0.3, 0.3, 0.3, 0.3),
+            text_style: TextStyle::new()
+                .with_size(14.0)
+                .with_color(crate::theme::colors().text_primary),
+            border_color: crate::theme::colors().border,
             show_border: false,
         }
     }

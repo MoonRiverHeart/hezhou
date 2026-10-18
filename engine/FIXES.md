@@ -1,5 +1,28 @@
 # Bug Fixes Log
 
+## 2026-10-18: P0 双主题 Design Tokens + 视觉基线
+
+### Added
+- Rust `ui/src/theme.rs`：Dark/Light 两套语义色板、`ThemeRole`、全局主题模式。
+- FFI：`ui_theme_get_mode/set_mode/color/role_count`、`ui_widget_set_text_color`、
+  `ui_clear_widget_tree_keep_callbacks`。
+- C# `UI.Theme.cs`：`ThemeRole`/`ThemeColor`/`Theme`，C# 只使用语义角色。
+- 工具栏“浅色/深色”切换按钮；主题写入 `.hezhou_theme`，重启恢复。
+- `visual` 模式新增 `06_theme_light.png`、`07_theme_dark.png`，走真实按钮路径。
+
+### Changed
+- 基础控件默认色迁移到 Theme：Button/Label/InputField/Dropdown/TabWidget/
+  TreeView/TreeNode/ScrollView/TextEdit/PopupMenu/GridView/Dialog/Panel/ListItem。
+- 编辑器外壳 Panel/工具栏按钮/菜单/状态栏改用 `ThemeRole`。
+- 属性页内容从 ScrollView 改为 VStack，规避“隐藏 Tab 首次显示时 ScrollView
+  内容保持 0 尺寸”的布局缺陷。
+- 主题切换使用 `ClearWidgetTreeKeepCallbacks` 重建 UI，保留回调、Scene、选中实体
+  和当前属性 Tab。
+
+### Verification
+- FFI contract: 271 / 271 / 271 OK
+- Visual: 7 / 7 screenshots OK（含 Dark/Light）
+
 ## 2026-10-18: UI Visual Regression Fixes
 
 ### Problems

@@ -24,8 +24,8 @@ impl Panel {
             children: Vec::new(),
             layout: Layout::new(0.0, 0.0, 300.0, 200.0),
             style: Style::new()
-                .with_background(Color::new(1.0, 1.0, 1.0, 1.0))
-                .with_border(Color::new(0.8, 0.8, 0.8, 1.0), 1.0, 8.0),
+                .with_background(crate::theme::colors().panel)
+                .with_border(crate::theme::colors().border, 1.0, 6.0),
             state: WidgetState::Normal,
             flags: crate::widget::WidgetFlags::default(),
             layout_type: crate::layout::LayoutType::Absolute,

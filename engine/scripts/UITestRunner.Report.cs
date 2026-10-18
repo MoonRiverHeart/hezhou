@@ -366,6 +366,8 @@ namespace Hezhou
             _visualSteps.Add(new VisualStep("03_asset_search", VisualAssetSearch));
             _visualSteps.Add(new VisualStep("04_project_search", VisualProjectSearch));
             _visualSteps.Add(new VisualStep("05_multi_select", VisualMultiSelect));
+            _visualSteps.Add(new VisualStep("06_theme_light", VisualLightTheme, 20));
+            _visualSteps.Add(new VisualStep("07_theme_dark", VisualDarkTheme, 20));
 
             RunNextVisualStep();
         }
@@ -395,6 +397,17 @@ namespace Hezhou
         {
             EditorScript.TestSetAssetSearch("");
             EditorScript.TestSetProjectSearch("Cube");
+        }
+
+        private static void VisualLightTheme()
+        {
+            // 走真实工具栏按钮路径，而不是直接调 SetTheme。
+            EditorScript.TestClickThemeButton();
+        }
+
+        private static void VisualDarkTheme()
+        {
+            EditorScript.TestClickThemeButton();
         }
 
         private static void VisualMultiSelect()

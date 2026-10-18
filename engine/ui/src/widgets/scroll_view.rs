@@ -34,8 +34,7 @@ impl ScrollView {
             parent_id: WidgetId::invalid(),
             children: Vec::new(),
             layout: Layout::new(0.0, 0.0, width, height),
-            style: Style::new()
-                .with_background(Color::new(0.16, 0.16, 0.20, 1.0)),
+            style: Style::new().with_background(crate::theme::colors().canvas),
             state: WidgetState::Normal,
             flags: crate::widget::WidgetFlags::default(),
             scroll_offset_y: 0.0,
@@ -195,10 +194,11 @@ impl Widget for ScrollView {
         let height = self.layout.height;
         let scale = self.content_scale;
 
+        let t = crate::theme::colors();
         // Viewport background
         canvas.draw_rect(
             Rect::new(0.0, 0.0, width, height),
-            &Style::new().with_background(Color::new(0.16, 0.16, 0.20, 1.0)),
+            &Style::new().with_background(t.canvas),
         );
 
         // Vertical scrollbar
@@ -212,20 +212,20 @@ impl Widget for ScrollView {
             // Track background
             canvas.draw_rect(
                 Rect::new(bar_x, 2.0 * scale, bar_width, track_h),
-                &Style::new().with_background(Color::new(0.2, 0.2, 0.25, 1.0)),
+                &Style::new().with_background(t.scrollbar_track),
             );
 
             // Thumb
             let thumb_color = if self.v_scrollbar_dragging {
-                Color::new(0.55, 0.55, 0.6, 1.0)
+                t.scrollbar_thumb_hover
             } else {
-                Color::new(0.4, 0.4, 0.45, 1.0)
+                t.scrollbar_thumb
             };
             canvas.draw_rect(
                 Rect::new(bar_x, thumb_y, bar_width, thumb_h),
                 &Style::new()
                     .with_background(thumb_color)
-                    .with_border(Color::new(0.5, 0.5, 0.55, 1.0), 1.0, 1.0),
+                    .with_border(t.border, 1.0, 1.0),
             );
         }
     }

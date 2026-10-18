@@ -33,7 +33,7 @@ impl TreeView {
             parent_id: WidgetId::invalid(),
             children: Vec::new(),
             layout: Layout::new(0.0, 0.0, 200.0, 300.0),
-            style: Style::new().with_background(Color::new(0.15, 0.15, 0.15, 1.0)),
+            style: Style::new().with_background(crate::theme::colors().panel),
             state: WidgetState::Normal,
             flags: WidgetFlags::default(),
             root_nodes: Vec::new(),
@@ -352,7 +352,7 @@ impl Widget for TreeView {
             
             canvas.draw_rect(
                 Rect::new(scrollbar_x, scrollbar_y, scrollbar_width, scrollbar_height),
-                &Style::new().with_background(Color::new(0.4, 0.4, 0.4, 0.6))
+                &Style::new().with_background(crate::theme::colors().scrollbar_thumb)
             );
         }
         

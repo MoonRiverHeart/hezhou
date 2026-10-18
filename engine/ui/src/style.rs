@@ -1,3 +1,4 @@
+use crate::theme;
 use crate::types::*;
 
 #[repr(C)]
@@ -64,8 +65,8 @@ pub struct TextStyle {
 impl TextStyle {
     pub fn new() -> Self {
         Self {
-            font_size: 16.0,
-            font_color: Color::black(),
+            font_size: 14.0,
+            font_color: theme::colors().text_primary,
             font_weight: FontWeight::Normal,
             alignment: TextAlignment::default(),
         }
@@ -125,27 +126,39 @@ pub struct ButtonStyle {
 
 impl ButtonStyle {
     pub fn new() -> Self {
+        let t = theme::colors();
         Self {
-            normal: Style::new().with_background(Color::new(0.9, 0.9, 0.9, 1.0)),
-            hovered: Style::new().with_background(Color::new(0.85, 0.85, 0.85, 1.0)),
-            pressed: Style::new().with_background(Color::new(0.8, 0.8, 0.8, 1.0)),
-            disabled: Style::new().with_background(Color::new(0.7, 0.7, 0.7, 0.5)),
+            normal: Style::new().with_background(t.button_primary_bg),
+            hovered: Style::new().with_background(t.button_primary_hover),
+            pressed: Style::new().with_background(t.button_primary_pressed),
+            disabled: Style::new().with_background(t.button_secondary_bg).with_opacity(0.6),
+        }
+    }
+
+    pub fn secondary() -> Self {
+        let t = theme::colors();
+        Self {
+            normal: Style::new().with_background(t.button_secondary_bg),
+            hovered: Style::new().with_background(t.button_secondary_hover),
+            pressed: Style::new().with_background(t.button_secondary_pressed),
+            disabled: Style::new().with_background(t.button_secondary_bg).with_opacity(0.5),
         }
     }
 
     pub fn material() -> Self {
+        let t = theme::colors();
         Self {
             normal: Style::new()
-                .with_background(Color::new(0.2, 0.6, 1.0, 1.0))
+                .with_background(t.button_primary_bg)
                 .with_border(Color::transparent(), 0.0, 4.0),
             hovered: Style::new()
-                .with_background(Color::new(0.25, 0.65, 1.0, 1.0))
+                .with_background(t.button_primary_hover)
                 .with_border(Color::transparent(), 0.0, 4.0),
             pressed: Style::new()
-                .with_background(Color::new(0.15, 0.55, 0.95, 1.0))
+                .with_background(t.button_primary_pressed)
                 .with_border(Color::transparent(), 0.0, 4.0),
             disabled: Style::new()
-                .with_background(Color::new(0.5, 0.5, 0.5, 0.3))
+                .with_background(t.button_secondary_bg)
                 .with_border(Color::transparent(), 0.0, 4.0),
         }
     }

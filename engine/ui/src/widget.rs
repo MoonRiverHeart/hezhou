@@ -51,6 +51,9 @@ pub trait Widget: Send + Sync {
     
     /// Return the widget's display text, if any. Used for on-demand font rasterization.
     fn get_text(&self) -> Option<&str> { None }
+
+    /// Apply a semantic text color without replacing the full style.
+    fn set_text_color(&mut self, _color: Color) {}
 }
 
 #[repr(C)]

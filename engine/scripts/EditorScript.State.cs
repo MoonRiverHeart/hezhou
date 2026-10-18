@@ -161,6 +161,8 @@ namespace Hezhou
         private static int _consoleRefreshFrame = 0;
         private static UI.DialogResultCallbackDelegate _consoleDialogResultCallback;
         private static UI.WidgetCallbackDelegate _consoleClickCallback;
+        private static UI.WidgetCallbackDelegate _themeClickCallback;
+        private static ulong _themeButtonId;
         private static UI.WidgetCallbackDelegate _consoleRefreshCallback;
         private static UI.DropdownSelectCallbackDelegate _consoleLevelSelectCallback;
         private static UI.InputFieldChangeCallbackDelegate _consoleSearchChangeCallback;

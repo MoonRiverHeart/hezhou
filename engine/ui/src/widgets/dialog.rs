@@ -79,8 +79,8 @@ impl Dialog {
             children: Vec::new(),
             layout: Layout::new(0.0, 0.0, 400.0, 300.0),
             style: Style::new()
-                .with_background(Color::new(0.18, 0.18, 0.18, 1.0))
-                .with_border(Color::new(0.3, 0.3, 0.3, 1.0), 1.0, 8.0),
+                .with_background(crate::theme::colors().elevated)
+                .with_border(crate::theme::colors().border, 1.0, 8.0),
             state: WidgetState::Normal,
             flags: crate::widget::WidgetFlags::default(),
             title: "Dialog".to_string(),
@@ -357,13 +357,13 @@ impl Widget for Dialog {
         
         canvas.draw_rect(Rect::new(0.0, 0.0, width, height), &self.style);
         
-        let title_bar_style = Style::new()
-            .with_background(Color::new(0.22, 0.22, 0.22, 1.0));
+        let t = crate::theme::colors();
+        let title_bar_style = Style::new().with_background(t.elevated);
         canvas.draw_rect(Rect::new(0.0, 0.0, width, scaled_title_height), &title_bar_style);
         
         let title_style = TextStyle::new()
             .with_size(16.0 * self.content_scale)
-            .with_color(Color::white())
+            .with_color(t.text_primary)
             .with_alignment(TextAlignment {
                 horizontal: HorizontalAlignment::Center,
                 vertical: VerticalAlignment::Center,
@@ -374,13 +374,11 @@ impl Widget for Dialog {
             &title_style,
         );
         
-        let content_style = Style::new()
-            .with_background(Color::new(0.15, 0.15, 0.15, 1.0));
+        let content_style = Style::new().with_background(t.panel);
         let content_rect = self.get_content_rect();
         canvas.draw_rect(content_rect, &content_style);
         
-        let button_area_style = Style::new()
-            .with_background(Color::new(0.18, 0.18, 0.18, 1.0));
+        let button_area_style = Style::new().with_background(t.elevated);
         canvas.draw_rect(
             Rect::new(0.0, height - scaled_button_height - 10.0 * self.content_scale, width, scaled_button_height + 10.0 * self.content_scale),
             &button_area_style,
@@ -390,22 +388,22 @@ impl Widget for Dialog {
             let rect = self.get_button_rect(i);
             
             let bg_color = if self.pressed_button_index == Some(i) {
-                Color::new(0.35, 0.35, 0.35, 1.0)
+                t.button_secondary_pressed
             } else if self.hovered_button_index == Some(i) {
-                Color::new(0.28, 0.28, 0.28, 1.0)
+                t.button_secondary_hover
             } else {
-                Color::new(0.25, 0.25, 0.25, 1.0)
+                t.button_secondary_bg
             };
             
             let button_style = Style::new()
                 .with_background(bg_color)
-                .with_border(Color::new(0.35, 0.35, 0.35, 1.0), 1.0, 0.0);
+                .with_border(t.border, 1.0, 0.0);
             
             canvas.draw_rect(rect, &button_style);
             
             let text_style = TextStyle::new()
                 .with_size(14.0 * self.content_scale)
-                .with_color(Color::white())
+                .with_color(t.text_primary)
                 .with_alignment(TextAlignment {
                     horizontal: HorizontalAlignment::Center,
                     vertical: VerticalAlignment::Center,
