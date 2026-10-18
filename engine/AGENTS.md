@@ -395,3 +395,6 @@ glslc shaders/rotation.frag -o shaders/rotation.frag.spv
 
 ### 40. Gizmo 跟随实体投影 (2026-10-18)
 - C# 实现相机投影，Gizmo 轴条中心跟随选中实体；visual 30 张。
+
+### 41. 文件纹理缩略图 (2026-10-18)
+- BMP 解码降采样 8x8，GridView `pixels:` 绘制；intent 24/24；visual 31 张。

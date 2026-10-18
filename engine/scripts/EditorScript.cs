@@ -17,6 +17,7 @@ namespace Hezhou
         public static void Initialize(IntPtr contextPtr)
         {
             UI.InitFromContext(contextPtr);
+            LoadSampleTextureOnce();
             
             // 热重载时先清空旧的widget树和回调(在所有回调注册之前)
             // 首次初始化时SceneGetExistingPtr返回0，不需要清空

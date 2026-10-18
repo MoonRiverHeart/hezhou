@@ -274,7 +274,7 @@ namespace Hezhou
             ulong textureTabContent = 0;
             if (!_textureDockedRight)
             {
-                textureTabContent = BuildTextureTabContent(_assetTabWidget.Id);
+                textureTabContent = BuildTextureTabContent(_assetTabWidget.Id, false);
             }
 
             ulong scriptTabContent = UI.CreateVStack(_assetTabWidget.Id, 5f);
@@ -402,7 +402,7 @@ namespace Hezhou
             _propsTabWidget.AddTab("物理", _physicsTabContentId, false);
             if (_textureDockedRight)
             {
-                ulong rightTextureContent = BuildTextureTabContent(_propsTabWidget.Id);
+                ulong rightTextureContent = BuildTextureTabContent(_propsTabWidget.Id, true);
                 _propsTabWidget.AddTab("纹理", rightTextureContent, false);
             }
             _propsTabWidget.SetOnSelect(_tabSelectCallback);
@@ -478,13 +478,13 @@ namespace Hezhou
             UI.SetWidgetVisible(_scriptEditorPanel.Id, false);
         }
 
-        private static ulong BuildTextureTabContent(ulong parentId)
+        private static ulong BuildTextureTabContent(ulong parentId, bool compact)
         {
             ulong textureTabContent = UI.CreateScrollView(parentId, 0, 0, 0, 0);
             ulong textureContentStack = UI.CreateVStack(textureTabContent, 6f);
-            UI.SetWidgetLayout(textureContentStack, 5f, 5f, 320f, 300f);
+            UI.SetWidgetLayout(textureContentStack, 5f, 5f, compact ? 320f : 880f, 300f);
             UI.CreateLabel(textureContentStack, 300f, 22f, "纹理库");
-            _assetTextureGridViewId = UI.CreateGridView(textureContentStack, 0f, 0f, 300f, 240f, 64);
+            _assetTextureGridViewId = UI.CreateGridView(textureContentStack, 0f, 0f, compact ? 300f : 860f, 240f, compact ? 48 : 64);
             RefreshTextureGridView();
             UI.GridViewSetOnClick(_assetTextureGridViewId, _textureGridClickCallback);
             _assetTextureTabContentId = textureTabContent;

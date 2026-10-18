@@ -1,5 +1,13 @@
 # Bug Fixes Log
 
+## 2026-10-18: 文件纹理缩略图（BMP → 8x8 像素）
+
+- 新增 `assets/textures/gradient.bmp`，启动时通过 AssetLibrary 加载。
+- C# 解析 24/32-bit BMP 并降采样为 8x8 `pixels:RRGGBB...`。
+- GridView 新增 `pixels:` 缩略图分支，按像素块绘制真实文件纹理预览。
+- intent `texture_bmp`（24/24）；visual `31_texture_bmp`。
+
+
 ## 2026-10-18: Gizmo 跟随实体投影位置
 
 - C# 内按 rotation.vert 的 view/projection 公式实现世界坐标到预览屏幕坐标投影。

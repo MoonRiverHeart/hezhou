@@ -369,6 +369,27 @@ impl Widget for GridView {
             canvas.draw_rect(Rect::new(x + 4.0 * self.content_scale, y + 4.0 * self.content_scale, 
                                         self.cell_size - 8.0 * self.content_scale, thumb_height - 8.0 * self.content_scale), &thumb_style);
 
+            let pixel_thumb = item.thumbnail.as_ref().and_then(|t| t.strip_prefix("pixels:"));
+            if let Some(hex) = pixel_thumb {
+                let tx = x + 4.0 * self.content_scale;
+                let ty = y + 4.0 * self.content_scale;
+                let tw = self.cell_size - 8.0 * self.content_scale;
+                let th = thumb_height - 8.0 * self.content_scale;
+                let cw = tw / 8.0;
+                let ch = th / 8.0;
+                if hex.len() >= 8 * 8 * 6 {
+                    for py in 0..8usize {
+                        for px in 0..8usize {
+                            let off = (py * 8 + px) * 6;
+                            let r = u8::from_str_radix(&hex[off..off + 2], 16).unwrap_or(0) as f32 / 255.0;
+                            let g = u8::from_str_radix(&hex[off + 2..off + 4], 16).unwrap_or(0) as f32 / 255.0;
+                            let b = u8::from_str_radix(&hex[off + 4..off + 6], 16).unwrap_or(0) as f32 / 255.0;
+                            let st = Style::new().with_background(Color::new(r, g, b, 1.0));
+                            canvas.draw_rect(Rect::new(tx + px as f32 * cw, ty + py as f32 * ch, cw + 0.5, ch + 0.5), &st);
+                        }
+                    }
+                }
+            } else {
             let texture_kind = item.thumbnail.as_ref().and_then(|t| t.strip_prefix("tex:"));
             if let Some(kind) = texture_kind {
                 let tx = x + 4.0 * self.content_scale;
@@ -431,6 +452,7 @@ impl Widget for GridView {
                         }
                     }
                 }
+            }
             }
             
             canvas.draw_text(
