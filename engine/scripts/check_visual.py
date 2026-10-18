@@ -24,6 +24,7 @@ EXPECTED = [
     "10_editor_restored.png",
     "11_right_panel_max.png",
     "12_dock_restored.png",
+    "13_shift_range_select.png",
 ]
 
 

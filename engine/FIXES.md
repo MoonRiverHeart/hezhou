@@ -1,5 +1,15 @@
 # Bug Fixes Log
 
+## 2026-10-18: Shift 范围多选（Selection v1）
+
+- Hierarchy 维护当前可见实体顺序 `_entityDisplayOrder`。
+- 记录 Shift/Ctrl 修饰键与选择锚点 `_selectionAnchorEntityId`。
+- Shift+点击树节点：按可见顺序选中 anchor..target，同步 Rust selection、C# 多选列表、
+  TreeView 高亮与属性面板。
+- 新增 `intent.shift_range_select`（10/10）与 visual `13_shift_range_select.png`。
+- 多选 outline 渲染仍待后续验证加粗/描边颜色。
+
+
 ## 2026-10-18: Dock v1 — 布局持久化与面板最大化
 
 - 新增 `EditorScript.Dock.cs`：保存/恢复 outer/leftCenter/inner SplitView 比例、

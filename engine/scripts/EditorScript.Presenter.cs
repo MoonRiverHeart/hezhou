@@ -207,6 +207,7 @@ namespace Hezhou
             bool ctrl = (modifiers & 2) != 0;
             bool shift = (modifiers & 1) != 0;
             _ctrlPressed = ctrl;
+            _shiftPressed = shift;
 
             // 文件快捷键：Ctrl+S 保存、Ctrl+Shift+S 另存为、Ctrl+O 打开项目、Ctrl+N 新建场景
             if (pressed && ctrl)
@@ -1146,6 +1147,45 @@ namespace Hezhou
             _statusItem.Text = "已选中 " + _selectedEntityIds.Count + " 个实体";
         }
 
+        /// <summary>Shift 范围选择：按当前树可见顺序选中 anchor..target。</summary>
+        private static void SelectEntityRange(ulong anchor, ulong target)
+        {
+            int a = _entityDisplayOrder.IndexOf(anchor);
+            int b = _entityDisplayOrder.IndexOf(target);
+            if (a < 0 || b < 0)
+            {
+                SelectEntity(target);
+                _selectionAnchorEntityId = target;
+                return;
+            }
+            int start = Math.Min(a, b);
+            int end = Math.Max(a, b);
+            ulong primary = target;
+            _selectedEntityIds.Clear();
+            _gameScene.SelectEntity(_entityDisplayOrder[start]);
+            _selectedEntityIds.Add(_entityDisplayOrder[start]);
+            for (int i = start + 1; i <= end; i++)
+            {
+                ulong id = _entityDisplayOrder[i];
+                _gameScene.AddToSelection(id);
+                _selectedEntityIds.Add(id);
+            }
+            _selectedEntityId = primary;
+            ClearEntityNodeSelectionHighlights();
+            for (int i = 0; i < _selectedEntityIds.Count; i++)
+            {
+                if (_entityNodeMap.TryGetValue(_selectedEntityIds[i], out ulong nodeId))
+                {
+                    UI.TreeNodeSetSelected(nodeId, true);
+                }
+            }
+            _propertiesDirty = true;
+            _lastPropertiesEntityId = 0;
+            _lastScriptBindingCount = -1;
+            UpdatePropertiesPanel(primary);
+            if (_statusItem != null) _statusItem.Text = "范围选择: " + (end - start + 1) + " 个实体";
+        }
+
         private static void ClearEntityNodeSelectionHighlights()
         {
             foreach (var entry in _entityNodeMap)
@@ -1156,6 +1196,7 @@ namespace Hezhou
 
         private static void AddEntityToTree(ulong entityId, string name)
         {
+            if (!_entityDisplayOrder.Contains(entityId)) _entityDisplayOrder.Add(entityId);
             if (_projectTreeViewId == 0 || _entitiesNodeId == 0) return;
 
             ulong parentNodeId = _entitiesNodeId;
@@ -1186,6 +1227,7 @@ namespace Hezhou
             }
             _entityNodeMap.Clear();
             _nodeIdToName.Clear();
+            _entityDisplayOrder.Clear();
 
             if (!string.IsNullOrEmpty(_projectSearchQuery))
             {
@@ -1283,13 +1325,19 @@ namespace Hezhou
             // Project tree entity selection
             if (userData != 0)
             {
-                if (_ctrlPressed)
+                if (_shiftPressed && _selectionAnchorEntityId != 0 && _selectionAnchorEntityId != userData)
+                {
+                    SelectEntityRange(_selectionAnchorEntityId, userData);
+                }
+                else if (_ctrlPressed)
                 {
                     ToggleEntitySelection(userData);
+                    if (!_shiftPressed) _selectionAnchorEntityId = userData;
                 }
                 else
                 {
                     SelectEntity(userData);
+                    _selectionAnchorEntityId = userData;
                 }
             }
         }
@@ -2965,6 +3013,16 @@ UI.SetText(_runButtonId, "运行");
         public static ulong TestGetSelectedEntityId()
         {
             return _selectedEntityId;
+        }
+
+        public static int TestGetSelectedCount()
+        {
+            return _selectedEntityIds.Count;
+        }
+
+        public static void TestShiftRangeSelect(ulong anchor, ulong target)
+        {
+            SelectEntityRange(anchor, target);
         }
 
         public static ulong TestCreateMeshEntity(int meshType)

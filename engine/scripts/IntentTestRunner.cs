@@ -20,6 +20,7 @@ namespace Hezhou
             RunCase("intent.multi_select_batch", MultiSelectBatch);
             RunCase("intent.bind_rotation_script", BindRotationScript);
             RunCase("intent.icon_system", IconSystem);
+            RunCase("intent.shift_range_select", ShiftRangeSelect);
             RunCase("intent.console_open_close", ConsoleOpenClose);
             RunCase("intent.running_paused_editing", RunningPausedEditing);
         }
@@ -188,6 +189,19 @@ namespace Hezhou
                 throw new Exception("multi-select delete did not remove both entities");
             }
             return "2 entities selected, batch edit + multi-delete passed";
+        }
+
+        private static string ShiftRangeSelect()
+        {
+            EditorScript.TestNewScene();
+            ulong a = EditorScript.TestCreateMeshEntity(0);
+            ulong b = EditorScript.TestCreateMeshEntity(0);
+            ulong c = EditorScript.TestCreateMeshEntity(0);
+            EditorScript.TestSelectEntity(a);
+            EditorScript.TestShiftRangeSelect(a, c);
+            int count = EditorScript.TestGetSelectedCount();
+            if (count != 3) throw new Exception("expected 3 range-selected entities, actual=" + count);
+            return "range selected " + count + " entities";
         }
 
         private static string IconSystem()

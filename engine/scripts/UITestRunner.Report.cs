@@ -373,6 +373,7 @@ namespace Hezhou
             _visualSteps.Add(new VisualStep("10_editor_restored", VisualGalleryRestore, 10));
             _visualSteps.Add(new VisualStep("11_right_panel_max", VisualRightPanelMax, 10));
             _visualSteps.Add(new VisualStep("12_dock_restored", VisualDockRestore, 10));
+            _visualSteps.Add(new VisualStep("13_shift_range_select", VisualShiftRangeSelect, 10));
 
             RunNextVisualStep();
         }
@@ -440,6 +441,19 @@ namespace Hezhou
         private static void VisualDockRestore()
         {
             EditorScript.TestToggleRightPanelMax();
+        }
+
+        private static void VisualShiftRangeSelect()
+        {
+            EditorScript.TestNewScene();
+            ulong a = EditorScript.TestCreateMeshEntity(0);
+            ulong b = EditorScript.TestCreateMeshEntity(0);
+            ulong c = EditorScript.TestCreateMeshEntity(0);
+            EditorScript.TestSetPosition(a, -2f, 0.5f, 0f);
+            EditorScript.TestSetPosition(b, 0f, 0.5f, 0f);
+            EditorScript.TestSetPosition(c, 2f, 0.5f, 0f);
+            EditorScript.TestSelectEntity(a);
+            EditorScript.TestShiftRangeSelect(a, c);
         }
 
         private static void VisualMultiSelect()

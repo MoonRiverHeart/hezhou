@@ -310,3 +310,8 @@ glslc shaders/rotation.frag -o shaders/rotation.frag.spv
 - 右侧面板标题栏最大化按钮；主题切换/resize 后重新应用。
 - visual 12 张，含最大化与恢复。
 - v2：Tab 拖拽、跨区域停靠、浮动面板。
+
+### 20. Shift 范围多选 (2026-10-18)
+- `_entityDisplayOrder` + `_selectionAnchorEntityId`；Shift 点击按树可见顺序范围选择。
+- 同步 Rust selection / C# 多选列表 / TreeView 高亮 / 属性面板。
+- intent 10/10；visual 13 张（新增 `13_shift_range_select.png`）。
