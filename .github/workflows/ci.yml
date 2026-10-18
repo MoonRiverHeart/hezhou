@@ -39,9 +39,13 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
-      - name: Install Mono
+      - name: Install Mono 6.12
         shell: pwsh
-        run: choco install mono --no-progress -y
+        run: |
+          $msi = Join-Path $env:TEMP "mono-6.12.0.199-x64.msi"
+          Invoke-WebRequest "https://download.mono-project.com/archive/6.12.0/windows-installer/mono-6.12.0.199-x64-0.msi" -OutFile $msi
+          Start-Process msiexec.exe -ArgumentList "/i `"$msi`" /qn /norestart" -Wait
+          & "C:\Program Files\Mono\bin\mono.exe" --version
 
       - name: Local CI mirror (Rust/FFI/fuzz/icons)
         working-directory: engine
@@ -54,10 +58,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install pinned Mono
+      - name: Install Mono 6.12
         shell: pwsh
         run: |
-          choco install mono --no-progress -y
+          $msi = Join-Path $env:TEMP "mono-6.12.0.199-x64.msi"
+          Invoke-WebRequest "https://download.mono-project.com/archive/6.12.0/windows-installer/mono-6.12.0.199-x64-0.msi" -OutFile $msi
+          Start-Process msiexec.exe -ArgumentList "/i `"$msi`" /qn /norestart" -Wait
           & "C:\Program Files\Mono\bin\mono.exe" --version
 
       - name: Compile editor C# scripts
@@ -86,10 +92,13 @@ jobs:
         with:
           workspaces: engine
 
-      - name: Install Mono
+      - name: Install Mono 6.12
         shell: pwsh
         run: |
-          choco install mono --no-progress -y
+          $msi = Join-Path $env:TEMP "mono-6.12.0.199-x64.msi"
+          Invoke-WebRequest "https://download.mono-project.com/archive/6.12.0/windows-installer/mono-6.12.0.199-x64-0.msi" -OutFile $msi
+          Start-Process msiexec.exe -ArgumentList "/i `"$msi`" /qn /norestart" -Wait
+          & "C:\Program Files\Mono\bin\mono.exe" --version
 
       - name: Install WiX
         shell: pwsh
