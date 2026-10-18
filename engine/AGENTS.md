@@ -355,3 +355,6 @@ glslc shaders/rotation.frag -o shaders/rotation.frag.spv
 ### 29. 材质赋给实体 (2026-10-18)
 - Scene renderable material 读写 + FFI；材质 Tab 按钮点击/拖拽赋材质。
 - FFI 278 字段；intent 16/16；visual 20 张（新增 `20_material_assign.png`）。
+
+### 30. Gizmo 缩放/旋转模式 (2026-10-18)
+- Ctrl+G 循环平移/缩放/旋转；缩放/旋转测试通过；intent 17/17；visual 21 张。

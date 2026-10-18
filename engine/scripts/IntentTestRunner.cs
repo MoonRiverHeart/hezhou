@@ -27,6 +27,7 @@ namespace Hezhou
             RunCase("intent.material_browser", MaterialBrowser);
             RunCase("intent.gizmo_translate", GizmoTranslate);
             RunCase("intent.material_assign", MaterialAssign);
+            RunCase("intent.gizmo_scale", GizmoScale);
             RunCase("intent.console_open_close", ConsoleOpenClose);
             RunCase("intent.running_paused_editing", RunningPausedEditing);
         }
@@ -195,6 +196,18 @@ namespace Hezhou
                 throw new Exception("multi-select delete did not remove both entities");
             }
             return "2 entities selected, batch edit + multi-delete passed";
+        }
+
+        private static string GizmoScale()
+        {
+            EditorScript.TestNewScene();
+            ulong cube = EditorScript.TestCreateMeshEntity(0);
+            EditorScript.TestSelectEntity(cube);
+            float[] s0 = EditorScript.TestGetScale(cube);
+            EditorScript.TestGizmoScale(1.5f);
+            float[] s1 = EditorScript.TestGetScale(cube);
+            if (Math.Abs(s1[0] - s0[0] * 1.5f) > 0.05f) throw new Exception("gizmo scale did not apply");
+            return "gizmo scaled";
         }
 
         private static string MaterialAssign()

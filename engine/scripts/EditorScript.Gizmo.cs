@@ -9,6 +9,9 @@ namespace Hezhou
         private static ulong _gizmoYBarId;
         private static ulong _gizmoZBarId;
         private static int _gizmoAxis; // 0=none, 1=X, 2=Y, 3=Z
+        private static int _gizmoMode; // 0=translate, 1=scale, 2=rotate
+        private static float _gizmoStartScaleX, _gizmoStartScaleY, _gizmoStartScaleZ;
+        private static float _gizmoLastX;
         private static float _gizmoDragStartX;
         private static float _gizmoDragStartY;
         private static float _gizmoStartPosX;
@@ -71,6 +74,9 @@ namespace Hezhou
             _gizmoDragStartY = y;
             UI.SceneGetEntityPosition(_gameScene.ScenePtr, _selectedEntityId,
                 out _gizmoStartPosX, out _gizmoStartPosY, out _gizmoStartPosZ);
+            UI.SceneGetEntityScale(_gameScene.ScenePtr, _selectedEntityId,
+                out _gizmoStartScaleX, out _gizmoStartScaleY, out _gizmoStartScaleZ);
+            _gizmoLastX = x;
             CaptureUndoSnapshot();
         }
 
@@ -85,9 +91,28 @@ namespace Hezhou
             else if (_gizmoAxis == 2) py -= dy;
             // Z uses horizontal delta as a simple depth proxy.
             else if (_gizmoAxis == 3) px += dx;
-            UI.SceneSetEntityPosition(_gameScene.ScenePtr, _selectedEntityId, px, py, _gizmoStartPosZ);
+            if (_gizmoMode == 1)
+            {
+                float factor = Math.Max(0.05f, 1f + dx);
+                float sx = _gizmoAxis == 1 ? _gizmoStartScaleX * factor : _gizmoStartScaleX;
+                float sy = _gizmoAxis == 2 ? _gizmoStartScaleY * factor : _gizmoStartScaleY;
+                float sz = _gizmoAxis == 3 ? _gizmoStartScaleZ * factor : _gizmoStartScaleZ;
+                UI.SceneSetEntityScale(_gameScene.ScenePtr, _selectedEntityId, sx, sy, sz);
+                if (_statusItem != null) _statusItem.Text = "Gizmo 缩放: " + factor.ToString("F2");
+            }
+            else if (_gizmoMode == 2)
+            {
+                float deltaX = x - _gizmoLastX;
+                _gizmoLastX = x;
+                UI.SceneRotateEntity(_gameScene.ScenePtr, _selectedEntityId, deltaX * 0.5f);
+                if (_statusItem != null) _statusItem.Text = "Gizmo 旋转";
+            }
+            else
+            {
+                UI.SceneSetEntityPosition(_gameScene.ScenePtr, _selectedEntityId, px, py, _gizmoStartPosZ);
+                if (_statusItem != null) _statusItem.Text = "Gizmo: X=" + px.ToString("F2") + " Y=" + py.ToString("F2");
+            }
             _propertiesDirty = true;
-            if (_statusItem != null) _statusItem.Text = "Gizmo: X=" + px.ToString("F2") + " Y=" + py.ToString("F2");
         }
 
         private static void EndGizmoDrag()
@@ -95,12 +120,41 @@ namespace Hezhou
             _gizmoAxis = 0;
         }
 
+        public static void TestGizmoCycleMode()
+        {
+            _gizmoMode = (_gizmoMode + 1) % 3;
+            if (_statusItem != null)
+            {
+                string[] names = new string[] { "平移", "缩放", "旋转" };
+                _statusItem.Text = "Gizmo 模式: " + names[_gizmoMode];
+            }
+        }
+
+        public static int TestGetGizmoMode() { return _gizmoMode; }
+
         public static void TestGizmoNudge(float dx, float dy)
         {
             if (_gameScene == null || _selectedEntityId == 0) return;
             UI.SceneGetEntityPosition(_gameScene.ScenePtr, _selectedEntityId,
                 out float x, out float y, out float z);
             UI.SceneSetEntityPosition(_gameScene.ScenePtr, _selectedEntityId, x + dx, y + dy, z);
+            _propertiesDirty = true;
+        }
+
+        public static float[] TestGetScale(ulong entityId)
+        {
+            float x = 1, y = 1, z = 1;
+            if (_gameScene != null && entityId != 0)
+                UI.SceneGetEntityScale(_gameScene.ScenePtr, entityId, out x, out y, out z);
+            return new float[] { x, y, z };
+        }
+
+        public static void TestGizmoScale(float factor)
+        {
+            if (_gameScene == null || _selectedEntityId == 0) return;
+            UI.SceneGetEntityScale(_gameScene.ScenePtr, _selectedEntityId,
+                out float sx, out float sy, out float sz);
+            UI.SceneSetEntityScale(_gameScene.ScenePtr, _selectedEntityId, sx * factor, sy * factor, sz * factor);
             _propertiesDirty = true;
         }
 

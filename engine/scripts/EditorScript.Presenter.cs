@@ -256,6 +256,7 @@ namespace Hezhou
             const uint KEY_N = 14;
             const uint KEY_O = 15;
             const uint KEY_P = 16;
+            const uint KEY_G = 6;
             const uint KEY_S = 19;
             const uint KEY_Y = 25;
             const uint KEY_Z = 26;
@@ -269,6 +270,11 @@ namespace Hezhou
             _ctrlPressed = ctrl;
             _shiftPressed = shift;
 
+            if (pressed && ctrl && !shift && keycode == KEY_G)
+            {
+                TestGizmoCycleMode();
+                return;
+            }
             if (pressed && ctrl && shift && keycode == KEY_P)
             {
                 ToggleCommandPalette();

@@ -1,5 +1,12 @@
 # Bug Fixes Log
 
+## 2026-10-18: Gizmo 缩放/旋转模式
+
+- Gizmo 支持平移/缩放/旋转三种模式（Ctrl+G 循环）。
+- 缩放按轴改变实体 scale；旋转轴拖拽调用 SceneRotateEntity。
+- intent `gizmo_scale`（17/17）；visual `21_gizmo_scale`。
+
+
 ## 2026-10-18: 材质拖放/赋给实体
 
 - Scene 新增 renderable material 读写；FFI `scene_set_entity_material` / `scene_get_entity_material`，契约 278 字段。
