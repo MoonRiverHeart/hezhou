@@ -198,10 +198,11 @@ namespace Hezhou
                 throw new Exception("failed to prepare entity for script binding");
             }
 
-            if (!EditorScript.TestBindScript("RotationScript.cs"))
-            {
-                throw new Exception("RotationScript.cs binding failed");
-            }
+            // 走真实 UI 按钮路径：选择下拉项 → 点击“绑定”
+            EditorScript.TestSetPropertyTab(3);
+            EditorScript.TestSelectScript("RotationScript.cs");
+            EditorScript.TestClickBindButton();
+
             string className = EditorScript.TestGetLastBindingClass();
             if (className != "RotationScript")
             {

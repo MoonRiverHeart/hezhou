@@ -178,3 +178,27 @@ fn transform_helpers_reject_missing_entities_without_panicking() {
         .get_component::<LocalTransform>(missing)
         .is_none());
 }
+
+#[test]
+fn reset_script_instance_ids_keeps_bindings_but_clears_ids() {
+    let mut scene = Scene::new();
+    let cube = scene.create_cube();
+    scene.attach_script_binding(
+        cube,
+        "scripts/RotationScript.cs".to_string(),
+        "RotationScript".to_string(),
+    );
+    scene.set_script_binding_instance_id(cube, 0, 12345);
+    assert_eq!(
+        scene.get_script_binding(cube, 0).map(|b| b.instance_id),
+        Some(12345)
+    );
+
+    scene.reset_script_instance_ids();
+
+    assert_eq!(scene.get_script_binding_count(cube), 1);
+    assert_eq!(
+        scene.get_script_binding(cube, 0).map(|b| b.instance_id),
+        Some(0)
+    );
+}

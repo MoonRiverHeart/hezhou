@@ -17,6 +17,7 @@ pub type SceneSelectEntityFn = extern "C" fn(*mut c_void, u64);
 pub type SceneAddToSelectionFn = extern "C" fn(*mut c_void, u64);
 pub type SceneRemoveFromSelectionFn = extern "C" fn(*mut c_void, u64);
 pub type SceneToggleSelectionFn = extern "C" fn(*mut c_void, u64);
+pub type SceneGetFirstSelectedEntityIdFn = extern "C" fn(*const c_void) -> u64;
 pub type SceneUpdateFn = extern "C" fn(*mut c_void, f32);
 
 pub type SceneGetEntityPositionFn = extern "C" fn(*mut c_void, u64, *mut f32, *mut f32, *mut f32);

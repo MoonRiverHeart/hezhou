@@ -194,6 +194,7 @@ namespace Hezhou
 
             // 恢复原始内容（保留用户可能已修改的值，如Max=300而非硬编码400）
             File.WriteAllText(filePath, originalContent);
+            EditorScript.TestClearSourceModifiedFlag();
             Log.Info("TestRunner", "ModifyScriptSourceFile: 已恢复原始文件内容（保留用户修改）");
         }
 

@@ -194,6 +194,7 @@ pub struct FfiContext {
     pub scene_add_to_selection: SceneAddToSelectionFn,
     pub scene_remove_from_selection: SceneRemoveFromSelectionFn,
     pub scene_toggle_selection: SceneToggleSelectionFn,
+    pub scene_get_first_selected_entity_id: SceneGetFirstSelectedEntityIdFn,
     pub scene_update: SceneUpdateFn,
     pub set_renderer_game_state: SetRendererGameStateFn,
     pub get_renderer_game_state: GetRendererGameStateFn,

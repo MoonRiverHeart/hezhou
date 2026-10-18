@@ -332,11 +332,18 @@ namespace Hezhou
         {
             public string Name;
             public Action Setup;
+            public int WaitFrames;
 
             public VisualStep(string name, Action setup)
+                : this(name, setup, 3)
+            {
+            }
+
+            public VisualStep(string name, Action setup, int waitFrames)
             {
                 Name = name;
                 Setup = setup;
+                WaitFrames = waitFrames;
             }
         }
 
@@ -353,7 +360,8 @@ namespace Hezhou
             _visualWaitFrames = 0;
 
             _visualSteps = new List<VisualStep>();
-            _visualSteps.Add(new VisualStep("01_rotation_script_binding", VisualRotationBinding));
+            // 第一步等待 hot reload 完成（mcs + reload 约 1s，留足 3s）。
+            _visualSteps.Add(new VisualStep("01_rotation_script_binding", VisualRotationBindingViaUI, 180));
             _visualSteps.Add(new VisualStep("02_console", VisualConsole));
             _visualSteps.Add(new VisualStep("03_asset_search", VisualAssetSearch));
             _visualSteps.Add(new VisualStep("04_project_search", VisualProjectSearch));
@@ -362,13 +370,14 @@ namespace Hezhou
             RunNextVisualStep();
         }
 
-        private static void VisualRotationBinding()
+        private static void VisualRotationBindingViaUI()
         {
             EditorScript.TestNewScene();
             ulong entity = EditorScript.TestCreateMeshEntity(0);
             EditorScript.TestSelectEntity(entity);
-            EditorScript.TestBindScript("RotationScript.cs");
             EditorScript.TestSetPropertyTab(3);
+            EditorScript.TestSelectScript("RotationScript.cs");
+            EditorScript.TestClickBindButton();
         }
 
         private static void VisualConsole()
@@ -409,7 +418,7 @@ namespace Hezhou
             }
 
             _visualSteps[_visualIndex].Setup();
-            _visualWaitFrames = 3;
+            _visualWaitFrames = _visualSteps[_visualIndex].WaitFrames;
         }
 
         private static void UpdateVisualCheck()

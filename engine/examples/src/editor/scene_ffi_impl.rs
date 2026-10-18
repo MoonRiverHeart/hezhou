@@ -236,6 +236,17 @@ pub extern "C" fn scene_toggle_selection_editor(scene: *mut std::ffi::c_void, en
 }
 
 #[unsafe(no_mangle)]
+pub extern "C" fn scene_get_first_selected_entity_id_editor(scene: *const std::ffi::c_void) -> u64 {
+    if scene.is_null() {
+        return 0;
+    }
+    unsafe {
+        let scene_ptr = scene as *const hezhou_core::Scene;
+        (*scene_ptr).selected_entities.first().map(|e| e.id).unwrap_or(0)
+    }
+}
+
+#[unsafe(no_mangle)]
 pub extern "C" fn scene_update_editor(scene: *mut std::ffi::c_void, dt: f32) {
     if scene.is_null() {
         return;

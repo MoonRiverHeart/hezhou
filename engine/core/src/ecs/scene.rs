@@ -278,6 +278,16 @@ impl Scene {
         self.selected_entities.iter().map(|e| e.id).collect()
     }
 
+    /// 热重载后旧 C# 实例已失效，把所有 binding 的 instance_id 清 0，
+    /// 让 C# 侧 RecreateAllScriptInstances 重新创建。
+    pub fn reset_script_instance_ids(&mut self) {
+        for bindings in self.entity_bindings.values_mut() {
+            for binding in bindings.iter_mut() {
+                binding.instance_id = 0;
+            }
+        }
+    }
+
     pub fn select_submesh(&mut self, entity: Entity, index: u32) {
         if !self.world.entity_exists(entity) {
             return;

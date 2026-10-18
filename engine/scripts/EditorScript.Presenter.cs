@@ -1760,47 +1760,68 @@ UI.SetText(_runButtonId, "运行");
                 return;
             }
 
-            CaptureUndoSnapshot();
-            
-            // ★ 绑定脚本始终触发热重载：确保DLL descriptor与.cs文件一致
-            // 原因：.cs的config值(Min/Max/Step/Initial)修改后如果不重新编译DLL，
-            //       descriptor仍显示旧值(如Max=400而非用户修改的Max=40)
-            //       始终热重载保证descriptor反映当前.cs内容
-            //       绑定是低频操作，2-3秒编译延迟可接受
-            _pendingBindEntityId = _selectedEntityId;
-            _pendingBindScriptIndex = _selectedScriptIndex;
-            
-            // 保存脚本编辑器内容到.cs文件（如果有内容）
-            if (_scriptTextEditId != 0)
+            string scriptName = _availableScripts[_selectedScriptIndex];
+            string scriptPath = "scripts/" + scriptName;
+            string className = Path.GetFileNameWithoutExtension(scriptName);
+
+            // 重复绑定检查
+            int existingCount = _gameScene.GetScriptBindingCount(_selectedEntityId);
+            for (int i = 0; i < existingCount; i++)
             {
-                try
+                if (_gameScene.GetScriptBindingInfo(_selectedEntityId, i).ClassName == className)
                 {
-                    string scriptContent = UI.TextEditGetText(_scriptTextEditId);
-                    string saveScriptPath = "scripts/bin/Mono/EditorScript.cs";
-                    System.IO.Directory.CreateDirectory("scripts/bin/Mono");
-                    System.IO.File.WriteAllText(saveScriptPath, scriptContent);
-                }
-                catch (Exception ex)
-                {
-                    Log.Error("Editor", "保存脚本编辑器内容失败: " + ex.Message);
+                    _statusItem.Text = className + " 已绑定到此实体";
+                    return;
                 }
             }
-            
+
+            CaptureUndoSnapshot("绑定脚本 " + className);
+
+            // 关键：binding 必须在 hot reload 之前写入 Rust Scene。
+            // 旧实现只保存 pending 字段再 reload，而 reload 会重建 C# assembly，
+            // pending 静态字段被重置为 0，导致“点击绑定没反应”。
+            _gameScene.AttachScriptBinding(_selectedEntityId, scriptPath, className);
+
+            // 立即创建 C# 实例并刷新 UI，不再依赖 hot reload 的 pending 状态。
+            // pending 字段会在 Initialize 重建 assembly 时丢失，导致“点击没反应”。
+            int bindingIndex = _gameScene.GetScriptBindingCount(_selectedEntityId) - 1;
+            Type scriptType;
+            if (_scriptTypeRegistry.TryGetValue(className, out scriptType) && scriptType != null)
+            {
+                MethodInfo setScenePtr = scriptType.GetMethod("SetScenePtr",
+                    BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
+                if (setScenePtr != null) setScenePtr.Invoke(null, new object[] { _gameScene.ScenePtr });
+
+                MethodInfo createInstance = scriptType.GetMethod("CreateInstance",
+                    BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
+                if (createInstance != null)
+                {
+                    IntPtr instancePtr = (IntPtr)createInstance.Invoke(null, null);
+                    UI.SceneSetScriptBindingInstanceId(
+                        _gameScene.ScenePtr,
+                        _selectedEntityId,
+                        (ulong)bindingIndex,
+                        (ulong)instancePtr.ToInt64());
+                }
+            }
+
+            _propertiesDirty = true;
+            _lastScriptBindingCount = -1;
+            UpdatePropertiesPanel(_selectedEntityId);
+
             if (_statusItem != null)
             {
-                _statusItem.Text = "正在热更新脚本，稍后自动绑定...";
+                _statusItem.Text = "已绑定 " + className;
             }
-            
-            SaveAllScriptPropertyValues();
-            UI.TriggerHotReload();
-            return; // 不立即创建实例 — 等待OnHotReloadComplete回调
-            
-            // 增量刷新属性面板 — 不重置_lastScriptBindingCount，让UpdateScriptBindingsList做增量添加
-            // 这样只在现有绑定基础上追加新行+属性控件，避免UI跳转
-            // Bug1 fix: UpdatePropertiesPanel现在会保存/恢复active tab，无需手动SetActive(3)
-            _propertiesDirty = true;
-            // _lastScriptBindingCount保持原值（不设-1），增量逻辑会检测+1变化
-            UpdatePropertiesPanel(_selectedEntityId);
+            Log.Info("Editor", "脚本绑定成功: entity=" + _selectedEntityId + ", className=" + className);
+
+            // 只有 .cs 被修改过才需要重新编译；普通绑定即时生效。
+            if (_sourceFilesModified)
+            {
+                SaveAllScriptPropertyValues();
+                UI.TriggerHotReload();
+            }
+            return;
         }
         
         private static void OnRemoveScriptClick(ulong widgetId)
@@ -2226,9 +2247,19 @@ UI.SetText(_runButtonId, "运行");
                 return;
             }
             
-            // 非pending场景也要刷新属性面板
+            // 热重载会重建 C# assembly，_selectedEntityId 静态字段被清零；
+            // 从 Rust Scene 恢复当前选中项，否则新绑定行不会重建。
             _propertiesDirty = true;
             _lastScriptBindingCount = -1;
+
+            ulong selectedAfterReload = UI.SceneGetFirstSelectedEntityId(_gameScene.ScenePtr);
+            if (selectedAfterReload != 0)
+            {
+                _selectedEntityId = selectedAfterReload;
+                _selectedEntityIds.Clear();
+                _selectedEntityIds.Add(selectedAfterReload);
+                UpdatePropertiesPanel(selectedAfterReload);
+            }
             
             if (_statusItem != null)
             {
@@ -3136,6 +3167,32 @@ UI.SetText(_runButtonId, "运行");
             _projectSearchQuery = text ?? "";
             if (_projectSearchInputId != 0) UI.InputFieldSetText(_projectSearchInputId, _projectSearchQuery);
             RefreshEntityTree();
+        }
+
+        public static void TestClearSourceModifiedFlag()
+        {
+            _sourceFilesModified = false;
+        }
+
+        public static void TestSelectScript(string fileName)
+        {
+            for (int i = 0; i < _availableScripts.Count; i++)
+            {
+                if (_availableScripts[i] == fileName)
+                {
+                    _selectedScriptIndex = i;
+                    if (_scriptDropdownId != 0)
+                    {
+                        UI.DropdownSetSelected(_scriptDropdownId, (ulong)i);
+                    }
+                    return;
+                }
+            }
+        }
+
+        public static void TestClickBindButton()
+        {
+            OnBindScriptClick(0);
         }
 
         public static void TestSetPropertyTab(ulong index)

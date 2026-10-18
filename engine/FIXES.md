@@ -3,6 +3,12 @@
 ## 2026-10-18: UI Visual Regression Fixes
 
 ### Problems
+0. 实际点击“绑定”没反应，而不是属性行渲染问题：
+   - `TestRunner` 启动自检修改 `RotatingEntity.cs` 后把 `_sourceFilesModified` 留为 `true`
+   - 因此每次绑定都触发 hot reload
+   - hot reload 会重建 C# assembly，`_pendingBindEntityId` / `_selectedScriptIndex`
+     静态字段被清零，`OnHotReloadComplete` 拿不到待绑定信息
+   - 同时 reload 后 `_selectedEntityId` 也丢失，属性面板不会重建
 1. `RotationScript.cs` 绑定后无脚本行/无属性：文件中的类是 `RotationController`，
    而绑定逻辑按文件名推导 className=`RotationScript`，类型注册表中不存在。
 2. 资产面板搜索框被放进 ScrollView 直接子级，ScrollView 会把子节点拉伸到
@@ -13,6 +19,11 @@
 5. 新建场景/加载工程后，旧脚本绑定 UI 变成“幽灵行”残留。
 
 ### Fixes
+- 绑定改为**即时生效**：先 `AttachScriptBinding` + `CreateInstance` + 刷新属性面板，
+  不再依赖 hot reload 的 pending 状态；只有 `.cs` 被编辑过才触发 reload
+- `TestRunner` 源文件自检结束后清除 `_sourceFilesModified`，避免普通绑定被误判为需要重编译
+- hot reload 不再重复 attach binding，改为 `reset_script_instance_ids()`；
+  reload 后从 Rust Scene 恢复 `selected_entity_id` 并重建属性面板
 - `RotationScript.cs` 新增逐实体 `RotationScript` 类（`[Expose]` 属性、
   CreateInstance/DestroyInstance/UpdateInstance/Get/SetPropertyValue），
   并注册到 `_scriptTypeRegistry`。
@@ -64,7 +75,7 @@ test-results/visual/visual/
 ### Verified
 ```text
 cargo test -j 1 -p hezhou-core -p hezhou-ui --offline   PASS (14 tests)
-python scripts/check_ffi_contract.py                    264/264/264 PASS
+python scripts/check_ffi_contract.py                    265/265/265 PASS
 run_autotest.ps1 -Mode intent                            7/7 PASS
 run_autotest.ps1 -Mode random 30 steps                   30/30 PASS, avg 7.12ms
 ```

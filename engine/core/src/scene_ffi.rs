@@ -234,6 +234,14 @@ pub extern "C" fn scene_toggle_selection(scene: *mut Scene, entity_id: u64) {
 }
 
 #[no_mangle]
+pub extern "C" fn scene_get_first_selected_entity_id(scene: *const Scene) -> u64 {
+    if scene.is_null() {
+        return 0;
+    }
+    unsafe { (*scene).selected_entities.first().map(|e| e.id).unwrap_or(0) }
+}
+
+#[no_mangle]
 pub extern "C" fn scene_clear_selection(scene: *mut Scene) {
     if scene.is_null() {
         return;

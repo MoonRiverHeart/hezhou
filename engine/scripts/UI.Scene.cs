@@ -506,6 +506,13 @@ UI.SceneSelectEntity(_scenePtr, entityId);
             func(scene, entityId);
         }
 
+        public static ulong SceneGetFirstSelectedEntityId(IntPtr scene)
+        {
+            if (_ffi.scene_get_first_selected_entity_id == IntPtr.Zero) return 0;
+            var func = Marshal.GetDelegateForFunctionPointer<SceneGetFirstSelectedEntityIdDelegate>(_ffi.scene_get_first_selected_entity_id);
+            return func(scene);
+        }
+
         public static void SceneUpdate(IntPtr scene, float deltaTime)
         {
             if (_ffi.scene_update == IntPtr.Zero)

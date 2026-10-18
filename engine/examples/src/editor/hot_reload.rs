@@ -219,8 +219,14 @@ pub fn handle_hot_reload(widget_tree_handle: WidgetTreeHandle) -> bool {
                         executor.call_static_with_ptr_namespace("Hezhou", "EditorScript", "Initialize", ffi_ptr_val as usize)
                             .expect("Initialize failed");
                         
-                        dfx_info!("HotReload", "[6] 恢复Entity-Script绑定数据...");
-                        restore_scene_bindings(&super::SAVED_BINDINGS);
+                        dfx_info!("HotReload", "[6] 重置脚本实例ID（绑定本身保留在Scene中）...");
+                        // 旧 assembly 的 C# 实例已随 reload 失效；Scene 中的 binding
+                        // 不需要重复 attach，只需把所有 instance_id 清 0。
+                        if let Some(scene_ptr) = super::SCENE {
+                            unsafe {
+                                (*scene_ptr).reset_script_instance_ids();
+                            }
+                        }
                         
                         dfx_info!("HotReload", "[7] 调用OnHotReloadComplete回调...");
                         if let Some(callback) = super::HOT_RELOAD_COMPLETE_CALLBACK {

@@ -271,6 +271,7 @@ ui_tree_view_set_on_select_thunk_ptr: unsafe { std::mem::transmute(ui_ffi::ui_tr
         scene_add_to_selection: scene_ffi_impl::scene_add_to_selection_editor,
         scene_remove_from_selection: scene_ffi_impl::scene_remove_from_selection_editor,
         scene_toggle_selection: scene_ffi_impl::scene_toggle_selection_editor,
+        scene_get_first_selected_entity_id: scene_ffi_impl::scene_get_first_selected_entity_id_editor,
         scene_update: scene_ffi_impl::scene_update_editor,
         set_renderer_game_state: ffi_impl::set_renderer_game_state,
         get_renderer_game_state: ffi_impl::get_renderer_game_state,

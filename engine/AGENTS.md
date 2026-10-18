@@ -248,7 +248,7 @@ glslc shaders/rotation.frag -o shaders/rotation.frag.spv
 ### 14. 分层测试 / DFX / 编辑器 P0 (2026-10-18)
 **新增测试**:
 - UT: `core/tests/{scene_properties,scene_hierarchy_cycles,project_fuzz_smoke}.rs`、`ui/tests/widget_tree_hit_test.rs`
-- 接口: `core/tests/{ffi_contract,project_ffi_contract}.rs` + `scripts/check_ffi_contract.py`（264 个 FfiContext 字段三方一致）
+- 接口: `core/tests/{ffi_contract,project_ffi_contract}.rs` + `scripts/check_ffi_contract.py`（265 个 FfiContext 字段三方一致）
 - FUZZ: `engine/fuzz/` cargo-fuzz target + 3000 组畸形 JSON 确定性 smoke
 - E2E: `scripts/run_autotest.ps1`、`UITestRunner.Report.cs`、`TestTelemetry.cs`
   - random/sequential/stress/intent 模式
@@ -270,8 +270,15 @@ glslc shaders/rotation.frag -o shaders/rotation.frag.spv
 **文件**: `scripts/{run_tests,run_autotest,check_ffi_contract,check_autotest_report}.*`, `docs/ai_intent_testing.md`, `core/src/{asset_ffi,project,scene_ffi}.rs`, `core/src/ecs/*`, `ui/src/ffi/misc.rs`, `scripts/*.cs`
 
 ### 15. UI 视觉回归修复 (2026-10-18)
-**问题**: RotationScript 绑定无显示；资产搜索框填满面板；属性 Tab/配置行溢出；Console 对话框越界；新建场景残留旧脚本绑定行。
+**问题**: 点击绑定没反应；RotationScript 无显示；资产搜索框填满面板；属性 Tab/配置行溢出；Console 对话框越界；新建场景残留旧脚本绑定行。
+**根因**:
+- `TestRunner` 自检后遗留 `_sourceFilesModified=true`，每次绑定触发 hot reload
+- reload 重建 C# assembly，pending 静态字段与 `_selectedEntityId` 清零，绑定请求/面板刷新丢失
 **修复**:
+- 绑定即时生效：先 attach + CreateInstance + 刷新面板；仅 `.cs` 修改后才 reload
+- `TestRunner` 自检结束清除 `_sourceFilesModified`
+- hot reload 用 `reset_script_instance_ids()`，reload 后从 Rust Scene 恢复选中项
+**其他修复**:
 - `RotationScript.cs` 增加逐实体 `RotationScript` 类并注册，保留旧 `RotationController`
 - 资产模型 Tab: `ScrollView → VStack → InputField + GridView`
 - `TabWidget::truncate_text` 先判断完整宽度；属性面板加宽，Min/Max/Step/Init 两行布局
