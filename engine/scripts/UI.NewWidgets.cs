@@ -27,6 +27,20 @@ namespace Hezhou
             return func(_widgetTree, tabWidgetId, title, contentId, closable);
         }
         
+        public static void TabWidgetMoveTab(ulong tabWidgetId, int from, int to)
+        {
+            if (_ffi.ui_tab_widget_move_tab == IntPtr.Zero) return;
+            var func = Marshal.GetDelegateForFunctionPointer<TabWidgetMoveTabDelegate>(_ffi.ui_tab_widget_move_tab);
+            func(_widgetTree, tabWidgetId, from, to);
+        }
+
+        public static void TabWidgetSetReorderable(ulong tabWidgetId, bool enabled)
+        {
+            if (_ffi.ui_tab_widget_set_reorderable == IntPtr.Zero) return;
+            var func = Marshal.GetDelegateForFunctionPointer<TabWidgetSetReorderableDelegate>(_ffi.ui_tab_widget_set_reorderable);
+            func(_widgetTree, tabWidgetId, enabled);
+        }
+
         public static void TabWidgetSetActive(ulong tabWidgetId, ulong index)
         {
             if (_ffi.ui_tab_widget_set_active == IntPtr.Zero)
@@ -1030,6 +1044,16 @@ namespace Hezhou
             return UI.TabWidgetGetTabCount(Id);
         }
         
+        public void SetReorderable(bool enabled)
+        {
+            UI.TabWidgetSetReorderable(Id, enabled);
+        }
+
+        public void MoveTab(int from, int to)
+        {
+            UI.TabWidgetMoveTab(Id, from, to);
+        }
+
         public void SetOnSelect(UI.TabSelectCallbackDelegate callback)
         {
             _selectCallback = callback;

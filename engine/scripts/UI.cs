@@ -7,6 +7,7 @@ namespace Hezhou
     public static partial class UI
     {
         private static IntPtr _widgetTree;
+        public static IntPtr WidgetTreeHandle { get { return _widgetTree; } }
         private static IntPtr _eventDispatcher;
         public static FfiContext _ffi;
         
@@ -99,6 +100,12 @@ namespace Hezhou
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public delegate int SceneGetEntityMaterialDelegate(IntPtr scene, ulong entityId, IntPtr buffer, int bufferSize);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void TabWidgetMoveTabDelegate(IntPtr handle, ulong widgetId, int from, int to);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void TabWidgetSetReorderableDelegate(IntPtr handle, ulong widgetId, bool enabled);
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public delegate ulong GetRootIdDelegate(IntPtr handle);
@@ -1182,6 +1189,8 @@ namespace Hezhou
             public IntPtr ui_text_edit_set_cursor_line;
             public IntPtr scene_set_entity_material;
             public IntPtr scene_get_entity_material;
+            public IntPtr ui_tab_widget_move_tab;
+            public IntPtr ui_tab_widget_set_reorderable;
         }
 
         public static void InitFromContext(IntPtr contextPtr)

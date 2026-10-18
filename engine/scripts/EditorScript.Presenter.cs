@@ -1731,6 +1731,11 @@ namespace Hezhou
             return _assetTabWidget != null ? _assetTabWidget.GetActive() : 99;
         }
 
+        public static void TestMoveAssetTab(int from, int to)
+        {
+            if (_assetTabWidget != null) _assetTabWidget.MoveTab(from, to);
+        }
+
         public static void TestSelectAssetTab(ulong index)
         {
             if (_assetTabWidget != null) _assetTabWidget.SetActive(index);

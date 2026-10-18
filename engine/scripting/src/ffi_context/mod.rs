@@ -306,6 +306,8 @@ pub project_add_entity: ProjectAddEntityFn,
         pub ui_text_edit_set_cursor_line: TextEditSetCursorLineFn,
         pub scene_set_entity_material: SceneSetEntityMaterialFn,
         pub scene_get_entity_material: SceneGetEntityMaterialFn,
+        pub ui_tab_widget_move_tab: TabWidgetMoveTabFn,
+        pub ui_tab_widget_set_reorderable: TabWidgetSetReorderableFn,
     }
 
 static mut FFI_CONTEXT: Option<Box<FfiContext>> = None;

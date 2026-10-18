@@ -33,6 +33,7 @@ EXPECTED = [
     "19_gizmo_translate.png",
     "20_material_assign.png",
     "21_gizmo_scale.png",
+    "22_tab_reorder.png",
 ]
 
 

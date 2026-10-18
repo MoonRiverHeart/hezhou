@@ -178,6 +178,12 @@ impl WidgetTree {
         self.nodes.get(&id).map(|node| node.layer).unwrap_or_default()
     }
 
+    pub fn reorder_children(&mut self, id: WidgetId, order: &[WidgetId]) {
+        if let Some(children) = self.children_map.get_mut(&id) {
+            *children = order.to_vec();
+        }
+    }
+
     pub fn get_children(&self, id: WidgetId) -> &[WidgetId] {
         self.children_map
             .get(&id)

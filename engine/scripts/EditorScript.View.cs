@@ -281,6 +281,7 @@ namespace Hezhou
             _assetTabWidget.AddTab("材质", materialTabContent, false);
             _assetTabWidget.AddTab("脚本", scriptTabContent, false);
             _assetTabWidget.AddTab("场景", sceneTabContent, false);
+            _assetTabWidget.SetReorderable(true);
 
             // === Properties Panel: 5-tab TabWidget ===
             ulong inspectorIcon = UI.CreateIcon(_rightPanel.Id, 10f, 10f, 18f, 18f, IconId.Settings);

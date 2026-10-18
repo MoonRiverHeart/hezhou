@@ -27,6 +27,8 @@ pub struct TabWidget {
     tab_width: f32,
     hovered_tab_index: Option<usize>,
     pressed_tab_index: Option<usize>,
+    drag_start_x: Option<f32>,
+    reorderable: bool,
     content_scale: f32,
     /// 缓存计算好的tab宽度（draw阶段计算，get_tab_rect和hit_test_tab使用）
     cached_tab_width: f32,
@@ -52,6 +54,8 @@ impl TabWidget {
             tab_width: 100.0,
             hovered_tab_index: None,
             pressed_tab_index: None,
+            drag_start_x: None,
+            reorderable: false,
             content_scale: 1.0,
             cached_tab_width: 0.0,
             measured_tab_text_widths: Vec::new(),
@@ -90,6 +94,27 @@ impl TabWidget {
             self.rebuild_all_text();
             dfx_debug!("TabWidget", "RemoveTab: index={}, removed title={}", index, tab.title);
         }
+    }
+
+
+    /// Dock v2：Tab 拖拽重排（仅 reorderable 的 TabWidget）。
+    pub fn set_reorderable(&mut self, enabled: bool) { self.reorderable = enabled; }
+
+    pub fn content_ids(&self) -> Vec<WidgetId> {
+        self.tabs.iter().map(|t| t.content_id).collect()
+    }
+
+    pub fn move_tab(&mut self, from: usize, to: usize) {
+        if from >= self.tabs.len() || to >= self.tabs.len() || from == to { return; }
+        let tab = self.tabs.remove(from);
+        self.tabs.insert(to, tab);
+        self.children = self.tabs.iter().map(|t| t.content_id).collect();
+        if self.active_index == from { self.active_index = to; }
+        else if from < self.active_index && to >= self.active_index { self.active_index -= 1; }
+        else if from > self.active_index && to <= self.active_index { self.active_index += 1; }
+        self.rebuild_all_text();
+        self.flags.dirty_layout = true;
+        self.flags.dirty_render = true;
     }
 
     fn rebuild_all_text(&mut self) {
@@ -459,6 +484,7 @@ impl Widget for TabWidget {
                             dfx_debug!("TabWidget", "TouchBegin on close button: index={}", index);
                         } else {
                             self.pressed_tab_index = Some(index);
+                            self.drag_start_x = Some(local_x);
                             self.set_state(WidgetState::Pressed);
                             dfx_debug!("TabWidget", "TouchBegin on tab: index={}", index);
                         }
@@ -486,6 +512,7 @@ impl Widget for TabWidget {
                             }
                         }
                         self.pressed_tab_index = None;
+                        self.drag_start_x = None;
                         self.set_state(WidgetState::Normal);
                         return EventResult::Stopped;
                     }
@@ -516,6 +543,20 @@ impl Widget for TabWidget {
                     let local_x = touch.x;
                     let local_y = touch.y;
                     
+                    if self.reorderable {
+                        if let (Some(pressed), Some(start_x)) = (self.pressed_tab_index, self.drag_start_x) {
+                            if (local_x - start_x).abs() > 20.0 * self.content_scale {
+                                if let Some(target) = self.hit_test_tab(local_x, local_y) {
+                                    if target != pressed {
+                                        self.move_tab(pressed, target);
+                                        self.pressed_tab_index = Some(target);
+                                        self.drag_start_x = Some(local_x);
+                                        self.trigger_select_callback(target);
+                                    }
+                                }
+                            }
+                        }
+                    }
                     if local_y < self.tab_bar_height * self.content_scale {
                         if let Some(index) = self.hit_test_tab(local_x, local_y) {
                             self.hovered_tab_index = Some(index);

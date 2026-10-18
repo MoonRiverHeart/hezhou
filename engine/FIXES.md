@@ -1,5 +1,13 @@
 # Bug Fixes Log
 
+## 2026-10-18: Dock v2 Tab 拖拽重排
+
+- TabWidget 支持 reorderable 拖拽重排；同步 Rust children 顺序，避免内容错位。
+- 资产页 Tab 开启拖拽；FFI `ui_tab_widget_move_tab` / `ui_tab_widget_set_reorderable`，契约 280 字段。
+- intent `tab_reorder`（18/18）；visual `22_tab_reorder`。
+- 跨区域停靠/浮动面板仍未实现。
+
+
 ## 2026-10-18: Gizmo 缩放/旋转模式
 
 - Gizmo 支持平移/缩放/旋转三种模式（Ctrl+G 循环）。

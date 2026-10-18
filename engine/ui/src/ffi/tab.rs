@@ -204,3 +204,47 @@ pub extern "C" fn ui_tab_widget_get_tab_count(
         0
     }
 }
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_tab_widget_move_tab(
+    handle: WidgetTreeHandle,
+    widget_id: u64,
+    from: usize,
+    to: usize,
+) {
+    if handle.is_null() { return; }
+    unsafe {
+        let arc = &*(handle as *const Arc<Mutex<WidgetTree>>);
+        let mut tree = arc.lock();
+        let id = crate::types::WidgetId::from_raw(widget_id);
+        let mut order = None;
+        if let Some(widget) = tree.get_widget_mut(id) {
+            if let Some(tabs) = widget.as_any_mut().downcast_mut::<crate::widgets::TabWidget>() {
+                tabs.move_tab(from, to);
+                order = Some(tabs.content_ids());
+            }
+        }
+        if let Some(order) = order {
+            tree.reorder_children(id, &order);
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_tab_widget_set_reorderable(
+    handle: WidgetTreeHandle,
+    widget_id: u64,
+    enabled: bool,
+) {
+    if handle.is_null() { return; }
+    unsafe {
+        let arc = &*(handle as *const Arc<Mutex<WidgetTree>>);
+        let mut tree = arc.lock();
+        let id = crate::types::WidgetId::from_raw(widget_id);
+        if let Some(widget) = tree.get_widget_mut(id) {
+            if let Some(tabs) = widget.as_any_mut().downcast_mut::<crate::widgets::TabWidget>() {
+                tabs.set_reorderable(enabled);
+            }
+        }
+    }
+}

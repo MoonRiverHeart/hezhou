@@ -28,6 +28,7 @@ namespace Hezhou
             RunCase("intent.gizmo_translate", GizmoTranslate);
             RunCase("intent.material_assign", MaterialAssign);
             RunCase("intent.gizmo_scale", GizmoScale);
+            RunCase("intent.tab_reorder", TabReorder);
             RunCase("intent.console_open_close", ConsoleOpenClose);
             RunCase("intent.running_paused_editing", RunningPausedEditing);
         }
@@ -196,6 +197,14 @@ namespace Hezhou
                 throw new Exception("multi-select delete did not remove both entities");
             }
             return "2 entities selected, batch edit + multi-delete passed";
+        }
+
+        private static string TabReorder()
+        {
+            EditorScript.TestSelectAssetTab(0);
+            EditorScript.TestMoveAssetTab(0, 1);
+            if (EditorScript.TestGetAssetTab() != 1) throw new Exception("tab reorder did not update active tab");
+            return "tab reordered";
         }
 
         private static string GizmoScale()

@@ -398,6 +398,12 @@ ui_widget_get_layout: unsafe { std::mem::transmute(ui_ffi::ui_widget_get_layout 
         scene_get_entity_material: unsafe {
             std::mem::transmute(hezhou_core::scene_ffi::scene_get_entity_material as *const std::ffi::c_void)
         },
+        ui_tab_widget_move_tab: unsafe {
+            std::mem::transmute(hezhou_ui::ffi::ui_tab_widget_move_tab as *const std::ffi::c_void)
+        },
+        ui_tab_widget_set_reorderable: unsafe {
+            std::mem::transmute(hezhou_ui::ffi::ui_tab_widget_set_reorderable as *const std::ffi::c_void)
+        },
         ui_set_widget_visible: unsafe { std::mem::transmute(ffi_impl::set_widget_visible as *const std::ffi::c_void) },
         get_pipeline_names: unsafe { std::mem::transmute(ffi_impl::get_pipeline_names as *const std::ffi::c_void) },
         switch_pipeline: unsafe { std::mem::transmute(ffi_impl::switch_pipeline as *const std::ffi::c_void) },
