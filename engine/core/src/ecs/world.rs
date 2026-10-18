@@ -32,6 +32,21 @@ impl World {
         entity
     }
 
+    /// 以指定 ID 创建实体（工程加载/撤销快照恢复需要保持 ID 稳定）。
+    /// 返回 None 表示 ID 非法或已存在。
+    pub fn create_entity_with_id(&mut self, id: EntityId) -> Option<Entity> {
+        if id == 0 || self.entities.contains_key(&id) {
+            return None;
+        }
+        if id >= self.next_entity_id {
+            self.next_entity_id = id + 1;
+        }
+        let entity = Entity::new(id);
+        self.entities.insert(id, entity);
+        self.parent_map.insert(id, None);
+        Some(entity)
+    }
+
     pub fn destroy_entity(&mut self, entity: Entity) {
         self.entities.remove(&entity.id);
         self.parent_map.remove(&entity.id);
@@ -122,6 +137,11 @@ impl World {
 
     pub fn entity_count(&self) -> usize {
         self.entities.len()
+    }
+
+    /// 遍历所有实体（包括子实体），用于工程保存/快照。
+    pub fn all_entities(&self) -> Vec<Entity> {
+        self.entities.values().copied().collect()
     }
 
     /// 清空所有实体及其组件、父子关系。

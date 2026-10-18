@@ -20,11 +20,23 @@ fn unique_temp_dir(tag: &str) -> PathBuf {
 
 fn find_entity(scene: &Scene, name: &str) -> u64 {
     for entity in scene.get_root_entities() {
-        if scene.get_entity_name(*entity).map(|n| n.as_str()) == Some(name) {
-            return entity.id;
+        if let Some(id) = find_entity_recursive(scene, *entity, name) {
+            return id;
         }
     }
     panic!("entity not found: {}", name);
+}
+
+fn find_entity_recursive(scene: &Scene, entity: hezhou_core::Entity, name: &str) -> Option<u64> {
+    if scene.get_entity_name(entity).map(|n| n.as_str()) == Some(name) {
+        return Some(entity.id);
+    }
+    for child in scene.get_children(entity) {
+        if let Some(id) = find_entity_recursive(scene, child, name) {
+            return Some(id);
+        }
+    }
+    None
 }
 
 #[test]
@@ -49,6 +61,7 @@ fn project_roundtrip_preserves_entity_kinds_and_properties() {
     let empty = scene.create_entity();
     scene.set_entity_name(empty, "Empty_A".to_string());
     scene.set_entity_position(empty, Vec3::new(-1.0, 0.5, 0.0));
+    scene.set_parent(empty, Some(cube));
 
     let light = scene.create_directional_light();
     scene.set_entity_name(light, "Sun".to_string());
@@ -72,7 +85,7 @@ fn project_roundtrip_preserves_entity_kinds_and_properties() {
     loaded.sync_to_scene(&mut target);
 
     assert_eq!(target.entity_count(), 3);
-    assert_eq!(target.get_root_entities().len(), 3);
+    assert_eq!(target.get_root_entities().len(), 2);
     assert_eq!(target.state, GameState::Editing);
 
     let cube_id = find_entity(&target, "Cube_A");
@@ -101,12 +114,7 @@ fn project_roundtrip_preserves_entity_kinds_and_properties() {
     assert!(!target.get_script_binding(cube_entity, 0).unwrap().enabled);
 
     let empty_id = find_entity(&target, "Empty_A");
-    let empty_entity = target
-        .get_root_entities()
-        .iter()
-        .copied()
-        .find(|e| e.id == empty_id)
-        .unwrap();
+    let empty_entity = hezhou_core::Entity::new(empty_id);
     assert!(target
         .world
         .get_component::<RenderableComponent>(empty_entity)
@@ -115,6 +123,7 @@ fn project_roundtrip_preserves_entity_kinds_and_properties() {
         .world
         .get_component::<DirectionalLightComponent>(empty_entity)
         .is_none());
+    assert_eq!(target.get_parent(empty_entity), Some(cube_entity));
 
     let light_id = find_entity(&target, "Sun");
     let light_entity = target
@@ -153,4 +162,28 @@ fn project_load_accepts_direct_json_file_and_create_new_file_path() {
     assert_eq!(loaded.get_name(), "Standalone");
 
     let _ = std::fs::remove_dir_all(&temp_root);
+}
+
+#[test]
+fn scene_snapshot_restore_preserves_entity_ids_and_hierarchy() {
+    let mut scene = Scene::new();
+    let parent = scene.create_cube();
+    let child = scene.create_entity();
+    scene.set_entity_name(parent, "Parent".to_string());
+    scene.set_entity_name(child, "Child".to_string());
+    scene.set_entity_position(parent, Vec3::new(3.0, 4.0, 5.0));
+    scene.set_parent(child, Some(parent));
+
+    let json = hezhou_core::Project::snapshot_to_json(&scene).expect("snapshot");
+    let mut restored = Scene::new();
+    hezhou_core::Project::restore_from_json(&json, &mut restored).expect("restore");
+
+    let restored_parent = find_entity(&restored, "Parent");
+    let restored_child = find_entity(&restored, "Child");
+    assert_eq!(restored_parent, parent.id);
+    assert_eq!(restored_child, child.id);
+    assert_eq!(
+        restored.get_parent(hezhou_core::Entity::new(restored_child)),
+        Some(hezhou_core::Entity::new(parent.id))
+    );
 }

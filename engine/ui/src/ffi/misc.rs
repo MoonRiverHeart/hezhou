@@ -603,7 +603,7 @@ pub extern "C" fn ui_debug_dump_tree_to_buffer(
     buf: *mut u8,
     buf_len: u32,
 ) -> u32 {
-    if handle.is_null() || buf.is_null() || buf_len == 0 {
+    if handle.is_null() {
         return 0;
     }
     unsafe {
@@ -614,6 +614,12 @@ pub extern "C" fn ui_debug_dump_tree_to_buffer(
             tree.dump_node_to_string(root, 0, &mut output);
         }
         let bytes = output.as_bytes();
+
+        // buf == null / buf_len == 0: 查询所需缓冲区大小（含结尾 NUL）。
+        if buf.is_null() || buf_len == 0 {
+            return (bytes.len() + 1) as u32;
+        }
+
         let write_len = std::cmp::min(bytes.len(), buf_len as usize - 1);
         std::ptr::copy_nonoverlapping(bytes.as_ptr(), buf, write_len);
         *buf.add(write_len) = 0;

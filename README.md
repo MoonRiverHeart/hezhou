@@ -222,6 +222,69 @@ cargo run --bin screenshot_demo --release
 ### Vulkan
 需要Vulkan驱动支持，大多数现代GPU都支持。
 
+## 测试与自动化
+
+### 分层测试
+
+```powershell
+cd engine
+powershell -ExecutionPolicy Bypass -File scripts/run_tests.ps1 -Offline
+```
+
+包含：
+- Rust UT / 集成测试
+- 确定性 fuzz smoke（畸形工程 JSON）
+- FFI 契约检查（Rust FfiContext / C# FfiContext / 编辑器装配 261 字段）
+- C# 编译
+- 端到端自动点击（random / intent / stress）
+
+### 自动点击 / 意图测试
+
+```powershell
+# 随机点击
+powershell -ExecutionPolicy Bypass -File scripts/run_autotest.ps1 `
+  -Mode random -Steps 30 -Duration 10 -Seed 42 -ReportDir test-results/random
+
+# 意图测试（新场景/实体/层级/撤销/多选/Console/运行暂停）
+powershell -ExecutionPolicy Bypass -File scripts/run_autotest.ps1 `
+  -Mode intent -ReportDir test-results/intent
+
+# 压力模式
+powershell -ExecutionPolicy Bypass -File scripts/run_autotest.ps1 `
+  -Mode stress -Duration 8 -Interval 0.1 -ReportDir test-results/stress
+```
+
+报告产物：
+
+```text
+test-results/<mode>/
+├── report.json     # 步骤/性能/错误结构化报告
+├── summary.txt     # 摘要
+├── ui_tree.txt     # 完整 UI 树
+├── final.png       # 最终截图
+└── DONE            # Rust 主循环退出信号
+```
+
+同时保存 `traces/trace_*.json` 和定期 `screenshots/step_*.png`。
+
+### Fuzz
+
+```powershell
+cd engine/fuzz
+cargo +nightly fuzz run project_json -- -max_total_time=60
+```
+
+不依赖 nightly 的快速回归：
+
+```powershell
+cd engine
+cargo test -p hezhou-core --offline project_fuzz_smoke
+```
+
+### 手册
+
+- [AI 意图测试与自动化点击](engine/docs/ai_intent_testing.md)
+
 ## DFX日志系统
 
 所有demo使用统一的DFX日志系统：

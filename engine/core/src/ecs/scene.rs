@@ -70,6 +70,16 @@ impl Scene {
         self.entity_names.insert(entity.id, default_name);
         entity
     }
+
+    /// 以指定 ID 创建实体；ID 已存在时返回 None。
+    pub fn create_entity_with_id(&mut self, id: EntityId) -> Option<Entity> {
+        let entity = self.world.create_entity_with_id(id)?;
+        self.world.add_component(entity, LocalTransform::new());
+        self.world.add_component(entity, SelectionComponent::default());
+        self.root_entities.push(entity);
+        self.entity_names.insert(entity.id, format!("Entity_{}", entity.id));
+        Some(entity)
+    }
     
     pub fn create_render_entity(&mut self, mesh_path: String) -> Entity {
         let entity = self.create_entity();
@@ -351,6 +361,15 @@ impl Scene {
             return;
         }
         
+        // 删除父实体时把子实体提升为根，避免子实体因 parent_map 指向已删除实体
+        // 而无法出现在 root_entities / UI 层级树中。
+        for child in self.get_children(entity) {
+            self.world.set_parent(child, None);
+            if !self.root_entities.contains(&child) {
+                self.root_entities.push(child);
+            }
+        }
+
         self.root_entities.retain(|e| *e != entity);
         self.selected_entities.retain(|e| *e != entity);
         self.entity_scripts.remove(&entity.id);
@@ -367,6 +386,16 @@ impl Scene {
             if !self.world.entity_exists(p) {
                 return;
             }
+
+            // 拒绝自环和祖先环：A→B→…→A 会让层级树无法遍历。
+            let mut cursor = Some(p);
+            while let Some(current) = cursor {
+                if current == entity {
+                    return;
+                }
+                cursor = self.get_parent(current);
+            }
+
             // Remove from root_entities if becoming a child
             self.root_entities.retain(|e| *e != entity);
         } else {
@@ -388,6 +417,11 @@ impl Scene {
     
     pub fn get_root_entities(&self) -> &Vec<Entity> {
         &self.root_entities
+    }
+
+    /// 所有实体（含子实体），用于工程保存/快照/UI 层级遍历。
+    pub fn get_all_entities(&self) -> Vec<Entity> {
+        self.world.all_entities()
     }
     
     pub fn get_entity_position(&self, entity: Entity) -> Option<Vec3> {

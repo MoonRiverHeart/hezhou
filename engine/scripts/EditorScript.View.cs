@@ -122,6 +122,10 @@ namespace Hezhou
             UI.SetWidgetLayout(_toggleEditorBtn.Id, _screenWidth - 120f, 5f, 100f, 30f);
             _toggleEditorBtn.SetOnClick(_toggleEditorClickCallback);
 
+            ulong consoleBtnId = UI.CreateButton(_toolbar.Id, 80f, 30f, "Console");
+            UI.SetWidgetLayout(consoleBtnId, _screenWidth - 210f, 5f, 80f, 30f);
+            UI.SetOnClick(consoleBtnId, _consoleClickCallback);
+
             // === SplitView-based Main Layout ===
             // Structure:
             //   OuterSplitView (Horizontal): LeftCenterZone | PropertiesPanel

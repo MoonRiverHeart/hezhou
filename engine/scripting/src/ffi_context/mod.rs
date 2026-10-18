@@ -285,6 +285,9 @@ pub project_add_entity: ProjectAddEntityFn,
         pub get_pipeline_names: GetPipelineNamesFn,
         pub switch_pipeline: SwitchPipelineFn,
         pub get_active_pipeline_name: GetActivePipelineNameFn,
+        pub scene_snapshot_json: SceneSnapshotJsonFn,
+        pub scene_free_json: SceneFreeJsonFn,
+        pub scene_restore_json: SceneRestoreJsonFn,
     }
 
 static mut FFI_CONTEXT: Option<Box<FfiContext>> = None;

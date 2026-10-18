@@ -49,7 +49,9 @@ fn main() {
         .lock()
         .dispatch_event(&mut touch_event);
 
-    let render_data = tree.lock().generate_render_data();
+    let font_atlas = hezhou_ui::font_atlas::get_font_atlas();
+    let font_atlas = font_atlas.lock();
+    let render_data = tree.lock().generate_render_data(&font_atlas);
     println!(
         "\nRender data generated: {} draw commands",
         render_data.len()

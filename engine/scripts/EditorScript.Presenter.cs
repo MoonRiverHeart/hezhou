@@ -197,6 +197,8 @@ namespace Hezhou
             const uint KEY_N = 14;
             const uint KEY_O = 15;
             const uint KEY_S = 19;
+            const uint KEY_Y = 25;
+            const uint KEY_Z = 26;
             const uint KEY_DELETE = 49;
             const uint KEY_F5 = 57;
             const uint KEY_F6 = 58;
@@ -204,10 +206,21 @@ namespace Hezhou
 
             bool ctrl = (modifiers & 2) != 0;
             bool shift = (modifiers & 1) != 0;
+            _ctrlPressed = ctrl;
 
             // 文件快捷键：Ctrl+S 保存、Ctrl+Shift+S 另存为、Ctrl+O 打开项目、Ctrl+N 新建场景
             if (pressed && ctrl)
             {
+                if (keycode == KEY_Z)
+                {
+                    Undo();
+                    return;
+                }
+                if (keycode == KEY_Y)
+                {
+                    Redo();
+                    return;
+                }
                 if (keycode == KEY_S)
                 {
                     if (shift) ShowSaveAsDialog();
@@ -532,6 +545,8 @@ namespace Hezhou
             if (_propsTabWidget == null) return;
             
             _selectedEntityId = 0;
+            _selectedEntityIds.Clear();
+            ClearEntityNodeSelectionHighlights();
             
             for (int i = 0; i < _propertyDescriptors.Count; i++)
             {
@@ -598,29 +613,56 @@ namespace Hezhou
             if (_selectedEntityId == 0 || _gameScene == null) return;
             if (float.TryParse(text, out float value))
             {
-                float x, y, z;
-                UI.EntityGetPropertyValueFloat3(_gameScene.ScenePtr, _selectedEntityId, propertyName, out x, out y, out z);
-                switch (componentIndex)
+                CaptureUndoSnapshot();
+                List<ulong> targets = GetSelectedEntityIdsForEdit();
+                for (int i = 0; i < targets.Count; i++)
                 {
-                    case 0: x = value; break;
-                    case 1: y = value; break;
-                    case 2: z = value; break;
+                    ulong entityId = targets[i];
+                    float x, y, z;
+                    if (!UI.EntityGetPropertyValueFloat3(_gameScene.ScenePtr, entityId, propertyName, out x, out y, out z))
+                    {
+                        continue;
+                    }
+                    switch (componentIndex)
+                    {
+                        case 0: x = value; break;
+                        case 1: y = value; break;
+                        case 2: z = value; break;
+                    }
+                    UI.EntitySetPropertyValueFloat3(_gameScene.ScenePtr, entityId, propertyName, x, y, z);
                 }
-                UI.EntitySetPropertyValueFloat3(_gameScene.ScenePtr, _selectedEntityId, propertyName, x, y, z);
                 _propertiesDirty = true;
             }
+        }
+
+        /// <summary>
+        /// 批量编辑目标：多选时对全部选中实体生效；否则回退到主选中实体。
+        /// </summary>
+        private static List<ulong> GetSelectedEntityIdsForEdit()
+        {
+            if (_selectedEntityIds.Count > 0)
+            {
+                return new List<ulong>(_selectedEntityIds);
+            }
+            List<ulong> single = new List<ulong>();
+            if (_selectedEntityId != 0) single.Add(_selectedEntityId);
+            return single;
         }
         
         private static void HandleStringPropertyChange(string propertyName, ulong widgetId, string text)
         {
             if (_selectedEntityId == 0 || _gameScene == null) return;
-            UI.EntitySetPropertyValueString(_gameScene.ScenePtr, _selectedEntityId, propertyName, text);
-            
-            if (propertyName == "name")
+            CaptureUndoSnapshot();
+            List<ulong> targets = GetSelectedEntityIdsForEdit();
+            for (int i = 0; i < targets.Count; i++)
             {
-                UpdateEntityNameInTree(_selectedEntityId, text);
+                ulong entityId = targets[i];
+                UI.EntitySetPropertyValueString(_gameScene.ScenePtr, entityId, propertyName, text);
+                if (propertyName == "name")
+                {
+                    UpdateEntityNameInTree(entityId, text);
+                }
             }
-            
             _propertiesDirty = true;
         }
         
@@ -629,7 +671,12 @@ namespace Hezhou
             if (_selectedEntityId == 0 || _gameScene == null) return;
             if (int.TryParse(text, out int value))
             {
-                UI.EntitySetPropertyValueString(_gameScene.ScenePtr, _selectedEntityId, propertyName, value.ToString());
+                CaptureUndoSnapshot();
+                List<ulong> targets = GetSelectedEntityIdsForEdit();
+                for (int i = 0; i < targets.Count; i++)
+                {
+                    UI.EntitySetPropertyValueString(_gameScene.ScenePtr, targets[i], propertyName, value.ToString());
+                }
                 _propertiesDirty = true;
             }
         }
@@ -639,7 +686,12 @@ namespace Hezhou
             if (_selectedEntityId == 0 || _gameScene == null) return;
             if (float.TryParse(text, out float value))
             {
-                UI.EntitySetPropertyValueFloat(_gameScene.ScenePtr, _selectedEntityId, propertyName, value);
+                CaptureUndoSnapshot();
+                List<ulong> targets = GetSelectedEntityIdsForEdit();
+                for (int i = 0; i < targets.Count; i++)
+                {
+                    UI.EntitySetPropertyValueFloat(_gameScene.ScenePtr, targets[i], propertyName, value);
+                }
                 _propertiesDirty = true;
             }
         }
@@ -648,16 +700,18 @@ namespace Hezhou
         {
             if (_selectedEntityId == 0 || _gameScene == null) return;
             string lowerText = text.ToLower();
-            if (lowerText == "true" || lowerText == "1")
+            string boolValue = null;
+            if (lowerText == "true" || lowerText == "1") boolValue = "true";
+            else if (lowerText == "false" || lowerText == "0") boolValue = "false";
+            if (boolValue == null) return;
+
+            CaptureUndoSnapshot();
+            List<ulong> targets = GetSelectedEntityIdsForEdit();
+            for (int i = 0; i < targets.Count; i++)
             {
-                UI.EntitySetPropertyValueString(_gameScene.ScenePtr, _selectedEntityId, propertyName, "true");
-                _propertiesDirty = true;
+                UI.EntitySetPropertyValueString(_gameScene.ScenePtr, targets[i], propertyName, boolValue);
             }
-            else if (lowerText == "false" || lowerText == "0")
-            {
-                UI.EntitySetPropertyValueString(_gameScene.ScenePtr, _selectedEntityId, propertyName, "false");
-                _propertiesDirty = true;
-            }
+            _propertiesDirty = true;
         }
         
         private static void UpdateScriptBindingsList(ulong entityId)
@@ -974,6 +1028,7 @@ namespace Hezhou
                 return;
             }
             
+            CaptureUndoSnapshot();
             ulong entityId = _gameScene.CreateEntity();
             if (entityId != 0)
             {
@@ -995,19 +1050,122 @@ namespace Hezhou
             if (_gameScene == null) return;
             _gameScene.SelectEntity(entityId);
             _selectedEntityId = entityId;
+            _selectedEntityIds.Clear();
+            _selectedEntityIds.Add(entityId);
+            ClearEntityNodeSelectionHighlights();
             UpdatePropertiesPanel(entityId);
             if (_entityNodeMap.TryGetValue(entityId, out var nodeId))
             {
                 UI.TreeViewSetSelected(_projectTreeViewId, nodeId);
+                UI.TreeNodeSetSelected(nodeId, true);
+            }
+        }
+
+        /// <summary>
+        /// Ctrl+Click 多选：保持 Rust 侧主选中项为最后点击的实体，
+        /// C# 侧维护完整 id 列表用于批量属性编辑。
+        /// </summary>
+        private static void ToggleEntitySelection(ulong entityId)
+        {
+            if (_gameScene == null || entityId == 0) return;
+
+            if (_selectedEntityIds.Contains(entityId))
+            {
+                _selectedEntityIds.Remove(entityId);
+                if (_selectedEntityIds.Count == 0)
+                {
+                    _gameScene.ClearSelection();
+                    _selectedEntityId = 0;
+                    ClearPropertiesPanel();
+                    ClearEntityNodeSelectionHighlights();
+                    return;
+                }
+                _selectedEntityId = _selectedEntityIds[_selectedEntityIds.Count - 1];
+            }
+            else
+            {
+                _selectedEntityIds.Add(entityId);
+                _selectedEntityId = entityId;
+            }
+
+            // Rust Scene 只保留一个 outline 主选中；批量编辑由 C# 列表完成。
+            _gameScene.SelectEntity(_selectedEntityId);
+            for (int i = 0; i < _selectedEntityIds.Count; i++)
+            {
+                if (_entityNodeMap.TryGetValue(_selectedEntityIds[i], out ulong nodeId))
+                {
+                    UI.TreeNodeSetSelected(nodeId, true);
+                }
+            }
+            UpdatePropertiesPanel(_selectedEntityId);
+            _statusItem.Text = "已选中 " + _selectedEntityIds.Count + " 个实体";
+        }
+
+        private static void ClearEntityNodeSelectionHighlights()
+        {
+            foreach (var entry in _entityNodeMap)
+            {
+                UI.TreeNodeSetSelected(entry.Value, false);
             }
         }
 
         private static void AddEntityToTree(ulong entityId, string name)
         {
-            if (_projectTreeViewId != 0 && _entitiesNodeId != 0)
+            if (_projectTreeViewId == 0 || _entitiesNodeId == 0) return;
+
+            ulong parentNodeId = _entitiesNodeId;
+            ulong parentEntityId = _gameScene != null ? _gameScene.GetParent(entityId) : 0;
+            if (parentEntityId != 0 && _entityNodeMap.TryGetValue(parentEntityId, out ulong parentNode))
             {
-                ulong nodeId = UI.TreeViewAddNode(_projectTreeViewId, _entitiesNodeId, "🔷 " + name, entityId, false);
-                _entityNodeMap[entityId] = nodeId;
+                parentNodeId = parentNode;
+            }
+
+            ulong nodeId = UI.TreeViewAddNode(_projectTreeViewId, parentNodeId, "🔷 " + name, entityId, false);
+            _entityNodeMap[entityId] = nodeId;
+            _nodeIdToName[nodeId] = name;
+            _expandedNodeNames.Add(name);
+        }
+
+        /// <summary>
+        /// 根据 Rust Scene 的 parent/children 关系重建实体层级树。
+        /// 用于父子关系变更、删除父实体、工程加载后的 UI 同步。
+        /// </summary>
+        private static void RefreshEntityTree()
+        {
+            if (_projectTreeViewId == 0 || _entitiesNodeId == 0 || _gameScene == null) return;
+
+            List<ulong> oldEntityIds = new List<ulong>(_entityNodeMap.Keys);
+            for (int i = 0; i < oldEntityIds.Count; i++)
+            {
+                RemoveEntityFromTree(oldEntityIds[i]);
+            }
+            _entityNodeMap.Clear();
+            _nodeIdToName.Clear();
+
+            uint rootCount = UI.SceneRootEntityCount(_gameScene.ScenePtr);
+            for (uint i = 0; i < rootCount; i++)
+            {
+                ulong eid = UI.SceneGetRootEntityIdAt(_gameScene.ScenePtr, i);
+                if (eid != 0)
+                {
+                    AddEntityNodeRecursive(eid);
+                }
+            }
+        }
+
+        private static void AddEntityNodeRecursive(ulong entityId)
+        {
+            string name = UI.SceneGetEntityName(_gameScene.ScenePtr, entityId);
+            AddEntityToTree(entityId, name);
+
+            ulong childCount = UI.SceneGetChildCount(_gameScene.ScenePtr, entityId);
+            for (ulong i = 0; i < childCount; i++)
+            {
+                ulong childId = UI.SceneGetChildId(_gameScene.ScenePtr, entityId, i);
+                if (childId != 0)
+                {
+                    AddEntityNodeRecursive(childId);
+                }
             }
         }
         
@@ -1015,7 +1173,8 @@ namespace Hezhou
         {
             if (_entityNodeMap.TryGetValue(entityId, out var nodeId))
             {
-                UI.TreeNodeSetText(nodeId, newName);
+                UI.TreeNodeSetText(nodeId, "🔷 " + newName);
+                _nodeIdToName[nodeId] = newName;
             }
         }
         
@@ -1030,8 +1189,8 @@ namespace Hezhou
 
         private static void OnTreeNodeSelect(ulong widgetId, ulong userData)
         {
-            // Clear previous node selection highlight
-            if (_lastSelectedNodeId != 0 && _lastSelectedNodeId != widgetId)
+            // Ctrl+Click 多选时保留已有节点高亮；普通点击清除上一个高亮。
+            if (!_ctrlPressed && _lastSelectedNodeId != 0 && _lastSelectedNodeId != widgetId)
             {
                 UI.TreeNodeSetSelected(_lastSelectedNodeId, false);
             }
@@ -1057,7 +1216,14 @@ namespace Hezhou
             // Project tree entity selection
             if (userData != 0)
             {
-                SelectEntity(userData);
+                if (_ctrlPressed)
+                {
+                    ToggleEntitySelection(userData);
+                }
+                else
+                {
+                    SelectEntity(userData);
+                }
             }
         }
 
@@ -1102,6 +1268,9 @@ namespace Hezhou
             {
                 _contextMenuId = UI.CreatePopupMenu(0);
                 UI.PopupMenuAddItem(_contextMenuId, "Delete Entity", "", 0);
+                UI.PopupMenuAddSeparator(_contextMenuId);
+                UI.PopupMenuAddItem(_contextMenuId, "设为选中实体的子级", "", 1);
+                UI.PopupMenuAddItem(_contextMenuId, "脱离父级", "", 2);
                 _contextMenuTargetNodeId = widgetId;
                 _contextMenuTargetEntityId = entityId;
                 
@@ -1140,6 +1309,36 @@ namespace Hezhou
                     }
                 }
             }
+            else if (actionId == 1)
+            {
+                // 将右键目标设为当前选中实体的子级。
+                if (_gameScene != null && _contextMenuTargetEntityId != 0 && _selectedEntityId != 0
+                    && _contextMenuTargetEntityId != _selectedEntityId)
+                {
+                    CaptureUndoSnapshot();
+                    _gameScene.SetParent(_contextMenuTargetEntityId, _selectedEntityId);
+                    RefreshEntityTree();
+                    if (_gameScene.GetParent(_contextMenuTargetEntityId) == _selectedEntityId)
+                    {
+                        _statusItem.Text = "已设置父子层级";
+                    }
+                    else
+                    {
+                        _statusItem.Text = "层级设置失败（不能形成循环）";
+                    }
+                }
+            }
+            else if (actionId == 2)
+            {
+                // 从父级脱离，回到根层级。
+                if (_gameScene != null && _contextMenuTargetEntityId != 0)
+                {
+                    CaptureUndoSnapshot();
+                    _gameScene.SetParent(_contextMenuTargetEntityId, 0);
+                    RefreshEntityTree();
+                    _statusItem.Text = "已脱离父级";
+                }
+            }
             UI.PopupMenuHide(popupMenuId);
         }
 
@@ -1168,6 +1367,7 @@ private static void OnGridViewClick(ulong widgetId, int index, ulong userData)
                 int meshType = (int)userData - 1;
                 // Special case: CornellBox userData=8 → meshType=7
                 if (userData == 8) meshType = 7;
+                CaptureUndoSnapshot();
                 ulong entityId = _gameScene.CreateMeshEntity(meshType);
                 if (entityId != 0)
                 {
@@ -1264,6 +1464,47 @@ UI.SetText(_runButtonId, "运行");
             {
                 _isTransitioning = false;
             }
+        }
+
+        // === Console Panel ===
+
+        private static void OnConsoleClick(ulong widgetId)
+        {
+            if (_consoleDialogId != 0)
+            {
+                UI.DialogShow(_consoleDialogId);
+                return;
+            }
+
+            ulong rootId = UI.GetRootId();
+            float dialogWidth = 760f;
+            float dialogHeight = 480f;
+
+            _consoleDialogId = UI.CreateDialog(rootId, "Console", dialogWidth, dialogHeight);
+            UI.DialogSetOnResult(_consoleDialogId, _consoleDialogResultCallback);
+
+            ulong contentId = UI.CreateVStack(_consoleDialogId, 8f);
+            UI.CreateLabel(contentId, dialogWidth - 50f, 24f,
+                "最近日志（Warn/Error 会同时进入自动化测试报告）:");
+            _consoleTextEditId = UI.CreateTextEdit(contentId, dialogWidth - 50f, 370f);
+
+            string logs = TestTelemetry.GetRecentLogs(300);
+            if (string.IsNullOrEmpty(logs))
+            {
+                logs = "(暂无日志)";
+            }
+            UI.TextEditSetText(_consoleTextEditId, logs);
+
+            UI.DialogSetContent(_consoleDialogId, contentId);
+            UI.DialogAddButton(_consoleDialogId, "Close", 0);
+            UI.DialogShow(_consoleDialogId);
+        }
+
+        private static void OnConsoleDialogResult(ulong dialogId, int result)
+        {
+            UI.DialogHide(_consoleDialogId);
+            _consoleDialogId = 0;
+            _consoleTextEditId = 0;
         }
 
         private static void OpenInExplorer(ulong widgetId)
@@ -1390,6 +1631,8 @@ UI.SetText(_runButtonId, "运行");
                 Log.Error("Editor", "无可用脚本!");
                 return;
             }
+
+            CaptureUndoSnapshot();
             
             // ★ 绑定脚本始终触发热重载：确保DLL descriptor与.cs文件一致
             // 原因：.cs的config值(Min/Max/Step/Initial)修改后如果不重新编译DLL，
@@ -1471,6 +1714,7 @@ UI.SetText(_runButtonId, "运行");
                     }
                 }
                 
+                CaptureUndoSnapshot();
                 _gameScene.RemoveScriptBinding(_selectedEntityId, index);
                 
                 // 强制刷新属性面板 — 必须设_propertiesDirty=true才能绕过UpdatePropertiesPanel自身的缓存检查
@@ -1967,8 +2211,9 @@ UI.SetText(_runButtonId, "运行");
             if (result == 1 && _selectedEntityId != 0 && _gameScene != null)
             {
                 ulong entityId = _selectedEntityId;
+                CaptureUndoSnapshot();
                 _gameScene.RemoveEntity(entityId);
-                RemoveEntityFromTree(entityId);
+                RefreshEntityTree();
                 _gameScene.ClearSelection();
                 ClearPropertiesPanel();
                 _selectedEntityId = 0;
@@ -2018,6 +2263,12 @@ UI.SetText(_runButtonId, "运行");
         private static void NewScene()
         {
             if (_gameScene == null) return;
+
+            // 新建场景也可撤销。
+            CaptureUndoSnapshot();
+
+            // 场景即将整体替换，先销毁旧 C# 脚本实例，避免 Mono 侧残留。
+            CleanupScriptInstancesBeforeSceneReplace();
 
             // 先复制 key 列表，RemoveEntityFromTree 会修改 _entityNodeMap，
             // 直接遍历 Keys 会抛 InvalidOperationException。
@@ -2160,8 +2411,10 @@ UI.SetText(_runButtonId, "运行");
                     bool success = Project.Load(selectedPath);
                     if (success)
                     {
+                        CleanupScriptInstancesBeforeSceneReplace();
                         Project.SyncToScene(_gameScene.ScenePtr);
                         RefreshSceneTreeAfterLoad();
+                        ResetUndoHistory();
                         _statusItem.Text = "场景加载成功";
                         Log.Info("Editor", "打开场景: " + selectedPath);
                     }
@@ -2210,8 +2463,10 @@ UI.SetText(_runButtonId, "运行");
                     bool success = Project.Load(selectedPath);
                     if (success)
                     {
+                        CleanupScriptInstancesBeforeSceneReplace();
                         Project.SyncToScene(_gameScene.ScenePtr);
                         RefreshSceneTreeAfterLoad();
+                        ResetUndoHistory();
                         _statusItem.Text = "项目加载成功: " + Project.GetName();
                         Log.Info("Editor", "打开项目: " + selectedPath);
                     }
@@ -2225,19 +2480,91 @@ UI.SetText(_runButtonId, "运行");
         }
         
         /// <summary>
+        /// 工程/场景整体替换前，销毁所有已绑定的 C# 脚本实例。
+        /// 否则旧 Entity 被 Rust Scene 清掉后，Mono 的 _instances 字典仍持有对象，
+        /// 热重载/重新加载后会残留并继续被引用。
+        /// </summary>
+        private static void CleanupScriptInstancesBeforeSceneReplace()
+        {
+            if (_gameScene == null) return;
+
+            int destroyed = 0;
+            int failed = 0;
+            int entityCount = _gameScene.GetEntityCount();
+
+            for (int e = 0; e < entityCount; e++)
+            {
+                ulong eid = _gameScene.GetEntityId(e);
+                int bindingCount = _gameScene.GetScriptBindingCount(eid);
+
+                for (int b = 0; b < bindingCount; b++)
+                {
+                    ulong instanceId = UI.SceneGetScriptBindingInstanceId(
+                        _gameScene.ScenePtr, eid, (ulong)b);
+                    if (instanceId == 0) continue;
+
+                    var info = _gameScene.GetScriptBindingInfo(eid, b);
+                    Type scriptType;
+                    if (!_scriptTypeRegistry.TryGetValue(info.ClassName, out scriptType) || scriptType == null)
+                    {
+                        failed++;
+                        Log.Warn("Editor", "无法清理未注册脚本实例: " + info.ClassName + ", entityId=" + eid);
+                        continue;
+                    }
+
+                    try
+                    {
+                        MethodInfo destroyMethod = scriptType.GetMethod("DestroyInstance",
+                            BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
+                        if (destroyMethod != null)
+                        {
+                            destroyMethod.Invoke(null, new object[] { new IntPtr((long)instanceId) });
+                            destroyed++;
+                        }
+                        else
+                        {
+                            failed++;
+                        }
+
+                        // 让旧 Scene 中的绑定不再指向已销毁实例。
+                        UI.SceneSetScriptBindingInstanceId(_gameScene.ScenePtr, eid, (ulong)b, 0);
+                    }
+                    catch (Exception ex)
+                    {
+                        failed++;
+                        Log.Error("Editor", "清理脚本实例失败: " + info.ClassName + ", id=" + instanceId + ", " + ex.Message);
+                    }
+                }
+            }
+
+            // 属性面板中的脚本控件与映射也属于旧场景，下一轮选中时重建。
+            for (int i = 0; i < _scriptPropertyWidgetIds.Count; i++)
+            {
+                UI.RemoveWidget(_scriptPropertyWidgetIds[i]);
+            }
+            _scriptPropertyWidgetIds.Clear();
+            _scriptPropertyInfoMap.Clear();
+            _scriptPropertySliderCallbacks.Clear();
+            _scriptPropertyInputCallbacks.Clear();
+            _scriptMinMaxInitialToMainWidgetMap.Clear();
+            _prevScriptPropertyValues.Clear();
+            _savedScriptPropertyValues.Clear();
+            _scriptRowIds.Clear();
+            _removeScriptBtnIndices.Clear();
+            _scriptToggleBtnIndices.Clear();
+            _lastScriptBindingCount = -1;
+            _propertiesDirty = true;
+
+            Log.Info("Editor", "场景替换前清理脚本实例: destroyed=" + destroyed + ", failed=" + failed);
+        }
+
+        /// <summary>
         /// 工程/场景加载后重建实体树，并清理旧的选中态与属性面板。
         /// 加载会替换整个场景，旧的 entity id 已失效，不能继续保留在 UI 状态中。
         /// </summary>
         private static void RefreshSceneTreeAfterLoad()
         {
             if (_gameScene == null) return;
-
-            List<ulong> oldEntityIds = new List<ulong>(_entityNodeMap.Keys);
-            for (int i = 0; i < oldEntityIds.Count; i++)
-            {
-                RemoveEntityFromTree(oldEntityIds[i]);
-            }
-            _entityNodeMap.Clear();
 
             _gameScene.ClearSelection();
             _selectedEntityId = 0;
@@ -2246,13 +2573,8 @@ UI.SetText(_runButtonId, "运行");
             _lastScriptBindingCount = -1;
             ClearPropertiesPanel();
 
-            int entityCount = _gameScene.GetEntityCount();
-            for (int i = 0; i < entityCount; i++)
-            {
-                ulong eid = _gameScene.GetEntityId(i);
-                string name = UI.SceneGetEntityName(_gameScene.ScenePtr, eid);
-                AddEntityToTree(eid, name);
-            }
+            // 按 parent/children 递归重建，保留父子层级。
+            RefreshEntityTree();
 
             if (_projectItem != null && Project.IsLoaded())
             {
@@ -2322,6 +2644,248 @@ UI.SetText(_runButtonId, "运行");
             }
         }
 
+        // === Undo / Redo (场景 JSON 快照) ===
+
+        private static void ResetUndoHistory()
+        {
+            _undoSnapshots.Clear();
+            _redoSnapshots.Clear();
+        }
+
+        /// <summary>
+        /// 在修改场景之前调用。保存完整场景快照，支持层级/组件/脚本绑定回滚。
+        /// </summary>
+        private static void CaptureUndoSnapshot()
+        {
+            if (_isRestoringSnapshot || _gameScene == null) return;
+
+            string snapshot = UI.SceneSnapshotJson(_gameScene.ScenePtr);
+            if (string.IsNullOrEmpty(snapshot)) return;
+
+            // 连续输入时避免压入完全相同快照。
+            if (_undoSnapshots.Count > 0
+                && _undoSnapshots[_undoSnapshots.Count - 1] == snapshot)
+            {
+                return;
+            }
+
+            _undoSnapshots.Add(snapshot);
+            if (_undoSnapshots.Count > MAX_UNDO_SNAPSHOTS)
+            {
+                _undoSnapshots.RemoveAt(0);
+            }
+            _redoSnapshots.Clear();
+        }
+
+        private static void Undo()
+        {
+            if (_undoSnapshots.Count == 0)
+            {
+                if (_statusItem != null) _statusItem.Text = "没有可撤销的操作";
+                return;
+            }
+
+            string current = UI.SceneSnapshotJson(_gameScene.ScenePtr);
+            string target = _undoSnapshots[_undoSnapshots.Count - 1];
+            _undoSnapshots.RemoveAt(_undoSnapshots.Count - 1);
+            if (!string.IsNullOrEmpty(current))
+            {
+                _redoSnapshots.Add(current);
+            }
+
+            RestoreSceneSnapshot(target);
+            if (_statusItem != null) _statusItem.Text = "已撤销";
+        }
+
+        private static void Redo()
+        {
+            if (_redoSnapshots.Count == 0)
+            {
+                if (_statusItem != null) _statusItem.Text = "没有可重做的操作";
+                return;
+            }
+
+            string current = UI.SceneSnapshotJson(_gameScene.ScenePtr);
+            string target = _redoSnapshots[_redoSnapshots.Count - 1];
+            _redoSnapshots.RemoveAt(_redoSnapshots.Count - 1);
+            if (!string.IsNullOrEmpty(current))
+            {
+                _undoSnapshots.Add(current);
+            }
+
+            RestoreSceneSnapshot(target);
+            if (_statusItem != null) _statusItem.Text = "已重做";
+        }
+
+        private static void RestoreSceneSnapshot(string json)
+        {
+            if (_gameScene == null || string.IsNullOrEmpty(json)) return;
+
+            _isRestoringSnapshot = true;
+            try
+            {
+                CleanupScriptInstancesBeforeSceneReplace();
+                if (!UI.SceneRestoreJson(_gameScene.ScenePtr, json))
+                {
+                    Log.Error("Editor", "撤销/重做快照恢复失败");
+                    return;
+                }
+
+                RefreshSceneTreeAfterLoad();
+                RecreateAllScriptInstances();
+            }
+            finally
+            {
+                _isRestoringSnapshot = false;
+            }
+        }
+
+        // === Test Hooks (供 IntentTestRunner / 外部自动化调用，不属于运行时业务逻辑) ===
+
+        public static int TestGetEntityCount()
+        {
+            return _gameScene != null ? _gameScene.GetEntityCount() : -1;
+        }
+
+        public static int TestGetGameState()
+        {
+            return _gameScene != null ? (int)_gameScene.GetGameState() : -1;
+        }
+
+        public static ulong TestGetSelectedEntityId()
+        {
+            return _selectedEntityId;
+        }
+
+        public static ulong TestCreateMeshEntity(int meshType)
+        {
+            if (_gameScene == null) return 0;
+
+            CaptureUndoSnapshot();
+            ulong entityId = _gameScene.CreateMeshEntity(meshType);
+            if (entityId != 0)
+            {
+                string name = "IntentEntity_" + entityId;
+                UI.SceneSetEntityName(_gameScene.ScenePtr, entityId, name);
+                AddEntityToTree(entityId, name);
+                SelectEntity(entityId);
+            }
+            return entityId;
+        }
+
+        public static bool TestSelectEntity(ulong entityId)
+        {
+            if (_gameScene == null || entityId == 0) return false;
+            SelectEntity(entityId);
+            return _selectedEntityId == entityId;
+        }
+
+        public static bool TestDeleteSelectedEntity()
+        {
+            if (_gameScene == null || _selectedEntityId == 0) return false;
+
+            ulong entityId = _selectedEntityId;
+            _gameScene.RemoveEntity(entityId);
+            RemoveEntityFromTree(entityId);
+            _gameScene.ClearSelection();
+            ClearPropertiesPanel();
+            _selectedEntityId = 0;
+            _propertiesDirty = true;
+            _lastScriptBindingCount = -1;
+            return _gameScene.GetEntityCount() >= 0;
+        }
+
+        public static bool TestSetGameState(int state)
+        {
+            if (_gameScene == null) return false;
+            if (state < 0 || state > 2) return false;
+            _gameScene.SetGameState((GameState)state);
+            UI.SetRendererGameState(state);
+            return (int)_gameScene.GetGameState() == state;
+        }
+
+        public static bool TestSetParent(ulong entityId, ulong parentId)
+        {
+            if (_gameScene == null || entityId == 0) return false;
+            _gameScene.SetParent(entityId, parentId);
+            RefreshEntityTree();
+            return _gameScene.GetParent(entityId) == parentId;
+        }
+
+        public static ulong TestGetParent(ulong entityId)
+        {
+            return _gameScene != null ? _gameScene.GetParent(entityId) : 0;
+        }
+
+        public static int TestGetChildCount(ulong parentId)
+        {
+            return _gameScene != null ? (int)_gameScene.GetChildCount(parentId) : -1;
+        }
+
+        public static void TestNewScene()
+        {
+            NewScene();
+        }
+
+        public static void TestCaptureUndo()
+        {
+            CaptureUndoSnapshot();
+        }
+
+        public static void TestUndo()
+        {
+            Undo();
+        }
+
+        public static void TestRedo()
+        {
+            Redo();
+        }
+
+        public static bool TestSetPosition(ulong entityId, float x, float y, float z)
+        {
+            if (_gameScene == null || entityId == 0) return false;
+            return UI.EntitySetPropertyValueFloat3(_gameScene.ScenePtr, entityId, "position", x, y, z);
+        }
+
+        public static float[] TestGetPosition(ulong entityId)
+        {
+            float x = 0, y = 0, z = 0;
+            if (_gameScene == null || entityId == 0) return new float[] { 0, 0, 0 };
+            UI.EntityGetPropertyValueFloat3(_gameScene.ScenePtr, entityId, "position", out x, out y, out z);
+            return new float[] { x, y, z };
+        }
+
+        public static void TestToggleEntitySelection(ulong entityId)
+        {
+            ToggleEntitySelection(entityId);
+        }
+
+        public static int TestGetSelectionCount()
+        {
+            return _selectedEntityIds.Count;
+        }
+
+        /// <summary>通过真实属性编辑路径批量设置选中实体的 position.x。</summary>
+        public static void TestBatchSetPositionX(float x)
+        {
+            HandleFloat3ComponentChange("position", 0, 0, x.ToString());
+        }
+
+        public static bool TestOpenConsole()
+        {
+            OnConsoleClick(0);
+            return _consoleDialogId != 0;
+        }
+
+        public static void TestCloseConsole()
+        {
+            if (_consoleDialogId != 0)
+            {
+                OnConsoleDialogResult(_consoleDialogId, 0);
+            }
+        }
+
         // === Script Toggle Handler ===
 
         private static void OnScriptToggleClick(ulong widgetId)
@@ -2333,6 +2897,7 @@ UI.SetText(_runButtonId, "运行");
                 var info = _gameScene.GetScriptBindingInfo(_selectedEntityId, scriptIndex);
                 bool newEnabled = !info.Enabled;
                 
+                CaptureUndoSnapshot();
                 _gameScene.SetScriptBindingEnabled(_selectedEntityId, scriptIndex, newEnabled);
                 
                 // Update button text and color

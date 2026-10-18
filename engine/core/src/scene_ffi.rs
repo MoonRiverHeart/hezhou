@@ -116,7 +116,7 @@ pub extern "C" fn scene_set_entity_scale(scene: *mut Scene, entity_id: u64, x: f
 
 #[no_mangle]
 pub extern "C" fn scene_attach_script(scene: *mut Scene, entity_id: u64, script_path: *const i8, class_name: *const i8) {
-    if scene.is_null() {
+    if scene.is_null() || script_path.is_null() || class_name.is_null() {
         return;
     }
     let script_path_str = unsafe {
@@ -389,7 +389,7 @@ pub extern "C" fn scene_get_entity_name(scene: *const Scene, entity_id: u64, buf
 
 #[no_mangle]
 pub extern "C" fn scene_attach_script_binding(scene: *mut Scene, entity_id: u64, script_path: *const i8, class_name: *const i8) {
-    if scene.is_null() {
+    if scene.is_null() || script_path.is_null() || class_name.is_null() {
         return;
     }
     let script_path_str = unsafe {

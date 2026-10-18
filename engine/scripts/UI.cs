@@ -783,6 +783,15 @@ namespace Hezhou
         public delegate bool ProjectRemoveEntityDelegate(ulong entityId);
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate IntPtr SceneSnapshotJsonDelegate(IntPtr scene);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void SceneFreeJsonDelegate(IntPtr ptr);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate bool SceneRestoreJsonDelegate(IntPtr scene, IntPtr json);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public delegate void SetWidgetVisibleDelegate(IntPtr handle, ulong widgetId, bool visible);
 
         // Automated UI Testing delegates
@@ -1103,6 +1112,10 @@ namespace Hezhou
             public IntPtr get_pipeline_names;
             public IntPtr switch_pipeline;
             public IntPtr get_active_pipeline_name;
+            // Scene snapshot / undo-redo FFI (must stay at the tail to match Rust FfiContext)
+            public IntPtr scene_snapshot_json;
+            public IntPtr scene_free_json;
+            public IntPtr scene_restore_json;
         }
 
         public static void InitFromContext(IntPtr contextPtr)

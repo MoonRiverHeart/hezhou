@@ -141,6 +141,13 @@ namespace Hezhou
 
         private static void CallDfxLog(byte level, string module, string message)
         {
+            // Console 面板需要全部级别；测试报告只采集 Warn/Error/Fatal。
+            TestTelemetry.RecordAll((LogLevel)level, module, message);
+            if (level >= (byte)LogLevel.Warn)
+            {
+                TestTelemetry.Record((LogLevel)level, module, message);
+            }
+
             if (_dfxLog != null && _dfxHandle != IntPtr.Zero)
                 _dfxLog(_dfxHandle, level, module, message, "", 0);
             else if (_dfxHandle != IntPtr.Zero)

@@ -23,3 +23,8 @@ pub type ProjectSetSettingsFn = extern "C" fn(u32, u32, u32) -> bool;
 pub type ProjectGetEntityInfoFn = extern "C" fn(u64, *mut c_char, usize, *mut f32, *mut f32, *mut f32, *mut c_char, usize) -> bool;
 pub type ProjectAddEntityFn = extern "C" fn(u64, *const c_char, f32, f32, f32, f32, f32, f32, f32, f32, f32, *const c_char) -> bool;
 pub type ProjectRemoveEntityFn = extern "C" fn(u64) -> bool;
+
+// Scene snapshot FFI for undo/redo.
+pub type SceneSnapshotJsonFn = extern "C" fn(*const c_void) -> *mut c_char;
+pub type SceneFreeJsonFn = extern "C" fn(*mut c_char);
+pub type SceneRestoreJsonFn = extern "C" fn(*mut c_void, *const c_char) -> bool;

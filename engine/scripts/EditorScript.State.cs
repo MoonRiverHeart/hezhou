@@ -50,6 +50,8 @@ namespace Hezhou
 
         // === Entity Selection State ===
         private static ulong _selectedEntityId = 0;
+        private static List<ulong> _selectedEntityIds = new List<ulong>();
+        private static bool _ctrlPressed = false;
         private static bool _propertiesDirty = false;
         private static ulong _lastPropertiesEntityId = 0;
         private static int _lastScriptBindingCount = -1;
@@ -129,6 +131,18 @@ namespace Hezhou
         private static ulong _saveAsDialogId;
         private static ulong _saveAsFileBrowserId;
         private static UI.DialogResultCallbackDelegate _saveAsDialogResultCallback;
+
+        // === Undo/Redo State ===
+        private static List<string> _undoSnapshots = new List<string>();
+        private static List<string> _redoSnapshots = new List<string>();
+        private static bool _isRestoringSnapshot = false;
+        private const int MAX_UNDO_SNAPSHOTS = 100;
+
+        // === Console Panel State ===
+        private static ulong _consoleDialogId;
+        private static ulong _consoleTextEditId;
+        private static UI.DialogResultCallbackDelegate _consoleDialogResultCallback;
+        private static UI.WidgetCallbackDelegate _consoleClickCallback;
 
         // === Script Editor State ===
         private static Panel _scriptEditorPanel;

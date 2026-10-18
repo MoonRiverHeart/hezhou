@@ -1,4 +1,4 @@
-param(
+﻿param(
     [string]$ScriptDir = "scripts",
     [string]$OutputDir = "scripts/bin/Mono",
     [string]$ScriptName = "UIScript"
@@ -36,7 +36,8 @@ $scriptsToCompile = @(
     "$ScriptDir/UI.NewWidgets.cs",
     "$ScriptDir/UI.Scene.cs",
     "$ScriptDir/UI.Pipeline.cs",
-    "$ScriptDir/UI.AssetProject.cs"
+    "$ScriptDir/UI.AssetProject.cs",
+    "$ScriptDir/TestTelemetry.cs"
 )
 
 foreach ($script in $scriptsToCompile) {

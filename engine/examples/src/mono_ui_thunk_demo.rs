@@ -411,6 +411,9 @@ fn main() {
         get_pipeline_names: unsafe { std::mem::transmute(stub_get_pipeline_names as *const std::ffi::c_void) },
         switch_pipeline: unsafe { std::mem::transmute(stub_switch_pipeline as *const std::ffi::c_void) },
         get_active_pipeline_name: unsafe { std::mem::transmute(stub_get_active_pipeline_name as *const std::ffi::c_void) },
+        scene_snapshot_json: unsafe { std::mem::transmute(stub_scene_snapshot_json as *const std::ffi::c_void) },
+        scene_free_json: stub_scene_free_json,
+        scene_restore_json: unsafe { std::mem::transmute(stub_scene_restore_json as *const std::ffi::c_void) },
     };
     hezhou_scripting::ffi_context::set_ffi_context(ffi_ctx);
     let ffi_ptr = hezhou_scripting::ffi_context::get_ffi_context_ptr();
@@ -528,6 +531,19 @@ extern "C" fn stub_set_widget_visible(_: hezhou_ui::ffi::WidgetTreeHandle, _: u6
 extern "C" fn stub_get_pipeline_names(_: hezhou_scripting::ffi_context::WidgetTreeHandle, _: *mut std::ffi::c_char, _: usize) -> usize { 0 }
 extern "C" fn stub_switch_pipeline(_: hezhou_scripting::ffi_context::WidgetTreeHandle, _: *const std::ffi::c_char) -> i32 { -1 }
 extern "C" fn stub_get_active_pipeline_name(_: hezhou_scripting::ffi_context::WidgetTreeHandle, _: *mut std::ffi::c_char, _: usize) -> usize { 0 }
+
+#[unsafe(no_mangle)]
+extern "C" fn stub_scene_snapshot_json(_: *const std::ffi::c_void) -> *mut std::ffi::c_char {
+    std::ptr::null_mut()
+}
+
+#[unsafe(no_mangle)]
+extern "C" fn stub_scene_free_json(_: *mut std::ffi::c_char) {}
+
+#[unsafe(no_mangle)]
+extern "C" fn stub_scene_restore_json(_: *mut std::ffi::c_void, _: *const std::ffi::c_char) -> bool {
+    false
+}
 
 // 新增stub函数 — Feature 1脚本绑定
 pub extern "C" fn scene_get_existing_ptr_stub() -> *mut std::ffi::c_void { std::ptr::null_mut() }

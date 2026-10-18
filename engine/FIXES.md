@@ -1,5 +1,38 @@
 # Bug Fixes Log
 
+## 2026-10-18: Layered Tests, DFX Automation, Editor P0
+
+### Added
+- **UT**: core scene/property/hierarchy/cycle tests; UI hit-test test; deterministic fuzz smoke.
+- **FUZZ**: `engine/fuzz` cargo-fuzz `project_json` target + 3000-round malformed JSON smoke.
+- **Interface**: FFI contract checker for all 261 FfiContext fields across Rust, C#, and editor assembly; FFI null/roundtrip tests.
+- **E2E**: `scripts/run_autotest.ps1`, `UITestRunner.Report.cs`, `TestTelemetry.cs`
+  - random/sequential/stress/intent modes
+  - stable seed, interactive-widget filtering, periodic screenshots
+  - `report.json`, `summary.txt`, `ui_tree.txt`, `final.png`, `DONE`
+  - frame metrics, stalls, C# Warn/Error/Fatal telemetry
+- **Intent**: `IntentTestRunner.cs` for new scene, create/select/delete, parent/child, undo/redo, multi-select batch edit, Console, run/pause.
+- **P0 editor**:
+  - Undo/redo via scene JSON snapshots (`Ctrl+Z/Y`), ID-preserving restore
+  - Entity hierarchy UI (recursive tree, context menu attach/detach, cycle rejection, orphan promotion)
+  - Multi-select (`Ctrl+Click`) + batch property edits
+  - Console panel reading recent logs
+  - C# script instance cleanup before scene replacement
+- **DFX**: UI tree dump query-size support, dynamic buffer; C# log ring buffer.
+
+### Verified
+```text
+scripts/run_tests.ps1 -Offline
+  Rust UT/integration: PASS
+  fuzz smoke: PASS
+  FFI contract: 261/261/261 PASS
+  random autotest: 30/30 PASS
+  intent autotest: 7/7 PASS
+  stress autotest: 79/79 PASS over 8s
+```
+
+---
+
 ## 2026-10-18: Project Save/Load Round-Trip + Editor File Shortcuts
 
 ### Problems

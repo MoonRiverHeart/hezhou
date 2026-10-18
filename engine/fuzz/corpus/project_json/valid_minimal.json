@@ -1,0 +1,21 @@
+{
+  "version": "1.0",
+  "name": "fuzz",
+  "path": ".",
+  "created_at": "2026-01-01T00:00:00Z",
+  "modified_at": "2026-01-01T00:00:00Z",
+  "settings": {
+    "game_width": 1280,
+    "game_height": 720,
+    "fps": 60
+  },
+  "entities": [],
+  "assets": [],
+  "scripts": [],
+  "current_state": {
+    "selected_entity_id": null,
+    "camera_position": [0.0, 0.0, 3.0],
+    "camera_rotation": [0.0, 0.0, 0.0],
+    "game_state": "Editing"
+  }
+}

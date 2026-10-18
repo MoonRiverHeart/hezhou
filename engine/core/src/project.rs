@@ -5,7 +5,8 @@ use serde::{Serialize, Deserialize};
 use chrono::{DateTime, Utc};
 use crate::math::{Vec3, Quaternion};
 use crate::ecs::{
-    DirectionalLightComponent, Entity, GameState, LocalTransform, RenderableComponent, Scene,
+    BoundsComponent, DirectionalLightComponent, Entity, GameState, LocalTransform,
+    RenderableComponent, Scene,
 };
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -91,6 +92,9 @@ pub struct ProjectEntity {
     /// 仅方向光实体使用；旧版工程文件缺少该字段时为 None。
     #[serde(default)]
     pub light: Option<ProjectLight>,
+    /// 父实体的工程 ID；None 表示根实体。旧版工程默认 None。
+    #[serde(default)]
+    pub parent_id: Option<u64>,
 }
 
 fn default_visible() -> bool {
@@ -108,6 +112,7 @@ impl Default for ProjectEntity {
             components: HashMap::new(),
             visible: true,
             light: None,
+            parent_id: None,
         }
     }
 }
@@ -351,12 +356,31 @@ impl Project {
         // 加载是“替换”而不是“追加”：先清空旧场景，避免重复实体。
         scene.clear();
 
+        // 父子关系需要两阶段：先创建所有实体并建立“工程 ID → 新 Entity”映射，
+        // 再设置 parent，避免父实体尚未创建或 ID 变化导致丢层级。
+        let mut entity_map: Vec<(u64, Entity)> = Vec::new();
+
         for project_entity in &self.file.entities {
-            let entity = match project_entity.mesh_type.as_str() {
-                "DirectionalLight" => scene.create_directional_light(),
-                "None" | "" => scene.create_entity(),
-                mesh_type => scene.create_render_entity(Self::mesh_type_to_path(mesh_type)),
-            };
+            // 保留工程中的实体 ID，撤销/重做和脚本绑定才能继续引用同一实体。
+            let entity = scene
+                .create_entity_with_id(project_entity.id)
+                .unwrap_or_else(|| scene.create_entity());
+
+            match project_entity.mesh_type.as_str() {
+                "DirectionalLight" => {
+                    scene
+                        .world
+                        .add_component(entity, DirectionalLightComponent::default());
+                }
+                "None" | "" => {}
+                mesh_type => {
+                    scene.world.add_component(
+                        entity,
+                        RenderableComponent::new(Self::mesh_type_to_path(mesh_type)),
+                    );
+                    scene.world.add_component(entity, BoundsComponent::cube(2.0));
+                }
+            }
             
             let mut transform = LocalTransform::new();
             transform.position = Vec3::new(
@@ -402,20 +426,56 @@ impl Project {
                 );
                 scene.set_script_binding_enabled(entity, scene.get_script_binding_count(entity) - 1, script_binding.enabled);
             }
+
+            entity_map.push((project_entity.id, entity));
+        }
+
+        // 第二阶段：按工程 ID 映射恢复父子层级。
+        for project_entity in &self.file.entities {
+            if let Some(parent_project_id) = project_entity.parent_id {
+                if let Some((_, entity)) = entity_map
+                    .iter()
+                    .find(|(project_id, _)| *project_id == project_entity.id)
+                {
+                    if let Some((_, parent)) = entity_map
+                        .iter()
+                        .find(|(project_id, _)| *project_id == parent_project_id)
+                    {
+                        scene.set_parent(*entity, Some(*parent));
+                    }
+                }
+            }
         }
 
         // 工程加载后回到编辑模式，避免直接以运行态启动脚本。
         scene.state = GameState::Editing;
     }
     
+    /// 将当前场景序列化为完整快照（含层级、组件、脚本绑定），用于撤销/重做。
+    pub fn snapshot_to_json(scene: &Scene) -> Result<String, ProjectError> {
+        let mut snapshot = Project::new("__scene_snapshot__".to_string(), PathBuf::from("."));
+        snapshot.sync_from_scene(scene);
+        serde_json::to_string(&snapshot.file).map_err(ProjectError::from)
+    }
+
+    /// 从快照恢复场景。恢复采用“替换”语义，实体 ID 会重新分配；
+    /// 调用方需要重建 UI 树和脚本实例。
+    pub fn restore_from_json(json: &str, scene: &mut Scene) -> Result<(), ProjectError> {
+        let file: ProjectFile = serde_json::from_str(json)?;
+        let mut snapshot = Project::new(file.name.clone(), PathBuf::from("."));
+        snapshot.file = file;
+        snapshot.sync_to_scene(scene);
+        Ok(())
+    }
+
     pub fn sync_from_scene(&mut self, scene: &Scene) {
         self.file.entities.clear();
         
-        for entity in &scene.root_entities {
-            if let Some(name) = scene.get_entity_name(*entity) {
-                let transform = scene.world.get_component::<LocalTransform>(*entity);
-                let renderable = scene.world.get_component::<RenderableComponent>(*entity);
-                let light = scene.world.get_component::<DirectionalLightComponent>(*entity);
+        for entity in scene.get_all_entities() {
+            if let Some(name) = scene.get_entity_name(entity) {
+                let transform = scene.world.get_component::<LocalTransform>(entity);
+                let renderable = scene.world.get_component::<RenderableComponent>(entity);
+                let light = scene.world.get_component::<DirectionalLightComponent>(entity);
                 
                 let project_entity = ProjectEntity {
                     id: entity.id,
@@ -436,7 +496,7 @@ impl Project {
                     } else {
                         "None".to_string()
                     },
-                    scripts: Self::collect_scripts(scene, *entity),
+                    scripts: Self::collect_scripts(scene, entity),
                     components: HashMap::new(),
                     visible: renderable.as_ref().map(|r| r.visible).unwrap_or(true),
                     light: light.map(|l| ProjectLight {
@@ -444,6 +504,7 @@ impl Project {
                         color: [l.color.x, l.color.y, l.color.z],
                         intensity: l.intensity,
                     }),
+                    parent_id: scene.get_parent(entity).map(|p| p.id),
                 };
                 
                 self.file.entities.push(project_entity);

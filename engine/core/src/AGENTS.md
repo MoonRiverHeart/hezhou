@@ -80,3 +80,12 @@ core/src/
 2. `rhi-vulkan`: `collect_mesh_data` 覆盖全部8种MeshType(Cube/Sphere/Plane/Cylinder/Cone/Bunny/CornellBox/Custom) — Bunny/CornellBox用空数据+Bvh::empty()回退(C#端不再自动创建bunny entity)
 3. `core/src/project.rs`: Bunny/CornellBox双向路径映射 — 保存时"Bunny"→"bunny.obj"，加载时"bunny.obj"→"Bunny"
 **修改文件**: `geometry/src/mesh.rs`, `rhi-vulkan` collect_mesh_data, `core/src/project.rs`
+
+### 2026-10-18: 工程层级/快照/ID 稳定
+- `ProjectEntity.parent_id` + 两阶段 `sync_to_scene` 恢复父子层级
+- `Project::snapshot_to_json` / `restore_from_json`，`scene_snapshot_json` / `scene_restore_json` FFI
+- `World::create_entity_with_id` / `Scene::create_entity_with_id`：撤销恢复保持 Entity ID
+- `Scene::remove_entity` 删除父实体时把子实体提升为根
+- `Scene::set_parent` 拒绝自环/祖先环
+- `World::clear` / `Scene::clear` 供工程整体替换
+- 测试：`project_roundtrip.rs`、`scene_properties.rs`、`scene_hierarchy_cycles.rs`、`ffi_contract.rs`

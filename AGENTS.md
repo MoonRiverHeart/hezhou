@@ -56,7 +56,17 @@ cargo run --bin trace_viewer_demo --release           # Trace viewer
 
 cd engine/scripts
 powershell -ExecutionPolicy Bypass -File build_mono.ps1  # Compile C# (mcs)
+
+# Layered tests + E2E automation (2026-10-18)
+powershell -ExecutionPolicy Bypass -File scripts/run_tests.ps1 -Offline
+powershell -ExecutionPolicy Bypass -File scripts/run_autotest.ps1 -Mode intent
 ```
+
+## TESTING / DFX
+- UT / FUZZ / FFI contract / E2E 入口见 `engine/docs/ai_intent_testing.md`
+- E2E 报告：`test-results/<mode>/{report.json,summary.txt,ui_tree.txt,final.png}`
+- 意图测试：`IntentTestRunner.cs`；新 P0 功能必须加一个 intent case
+- DFX：`TestTelemetry.cs` 采集 Warn/Error/Fatal；Rust 主循环检测 `DONE` 后保存 trace
 
 ## NOTES
 - No CI/CD pipeline — zero `.github/workflows`

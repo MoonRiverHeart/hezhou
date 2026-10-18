@@ -7,7 +7,8 @@ namespace Hezhou
     {
         SequentialTraversal = 0,
         RandomTraversal = 1,
-        StressTest = 2
+        StressTest = 2,
+        IntentTest = 3
     }
 
     public class TestStep
@@ -24,7 +25,7 @@ namespace Hezhou
         public string WidgetPath;
     }
 
-    public static class UITestRunner
+    public static partial class UITestRunner
     {
         // === Test State ===
         private static bool _running = false;
@@ -77,7 +78,8 @@ namespace Hezhou
         private static Random _random = new Random();
 
         // === Public Properties ===
-        public static bool IsRunning { get { return _running; } }
+        // IsRunning 包含“等待自动测试启动”的短窗口，确保 EditorScript.Update 会把帧时间喂给测试运行器。
+        public static bool IsRunning { get { return _running || _autoStartPending; } }
         public static bool IsCompleted { get { return _completed; } }
 
         // === Config Dialog ===
@@ -212,8 +214,13 @@ namespace Hezhou
             _elapsedTime = 0f;
             _passedCount = 0;
             _failedCount = 0;
-            _random = new Random();
+            _random = CreateRandom();
             _completed = false;
+
+            if (_autoMode)
+            {
+                BeginAutoTestMetrics();
+            }
 
             // Collect all widget IDs via tree traversal
             CollectWidgetIds();
@@ -249,10 +256,22 @@ namespace Hezhou
 
         public static void Update(float deltaTime)
         {
+            // 自动测试模式：等待首帧布局完成后启动，避免 UI 树尚未生成。
+            if (_autoStartPending)
+            {
+                UpdateAutoStart(deltaTime);
+                return;
+            }
+
             if (!_running) return;
 
             // deltaTime in milliseconds from editor
             float dtSeconds = deltaTime / 1000f;
+
+            if (_autoMode)
+            {
+                CollectFrameMetrics(deltaTime);
+            }
 
             // No-response timeout detection: if a single frame delta > 3s, engine was frozen
             if (deltaTime > 3000f && _lastFrameDelta > 0f)
@@ -342,13 +361,46 @@ namespace Hezhou
         {
             if (id == 0) return;
 
-            _widgetIds.Add(id);
+            // 只点击可交互控件，避免随机点到 Panel/VStack 等纯容器。
+            string widgetType = UI.WidgetGetType(id);
+            if (IsInteractiveWidgetType(widgetType))
+            {
+                float[] layout = UI.WidgetGetLayout(id);
+                if (layout != null && layout.Length >= 4 && layout[2] > 1f && layout[3] > 1f)
+                {
+                    _widgetIds.Add(id);
+                }
+            }
 
             uint childCount = UI.WidgetGetChildCount(id);
             for (uint i = 0; i < childCount; i++)
             {
                 ulong childId = UI.WidgetGetChildId(id, i);
                 TraverseWidgetTree(childId);
+            }
+        }
+
+        private static bool IsInteractiveWidgetType(string widgetType)
+        {
+            if (string.IsNullOrEmpty(widgetType)) return false;
+
+            switch (widgetType)
+            {
+                case "Button":
+                case "InputField":
+                case "Dropdown":
+                case "Checkbox":
+                case "Slider":
+                case "TreeNode":
+                case "TreeView":
+                case "GridView":
+                case "TabWidget":
+                case "ListItem":
+                case "TextEdit":
+                case "FileBrowser":
+                    return true;
+                default:
+                    return false;
             }
         }
 
@@ -392,6 +444,7 @@ namespace Hezhou
                 {
                     step.Success = true;
                     step.ErrorMessage = "Skipped (zero-size widget)";
+                    _passedCount++;
                     _steps.Add(step);
                     return;
                 }
@@ -403,26 +456,38 @@ namespace Hezhou
                 // Simulate click
                 UI.SimulateClickAt(step.ClickX, step.ClickY);
 
-                // Capture screenshot
-                string screenshotPath = "screenshots/step_" + step.StepNumber + ".png";
-                int result = UI.CaptureScreenshotToFile(screenshotPath);
-                if (result == 0)
-                {
-                    step.ScreenshotPath = screenshotPath;
-                }
-                else
-                {
-                    step.ScreenshotPath = "(screenshot failed: code " + result + ")";
-                }
-
+                // 点击已成功完成；先置位，截图策略才能据此只做定期采样。
                 step.Success = true;
                 _passedCount++;
+
+                // 自动模式下只定期截图 + 失败截图，避免压力测试产生海量 PNG。
+                bool shouldCapture = !_autoMode
+                    || (_screenshotEvery > 0 && (step.StepNumber % _screenshotEvery) == 0);
+                if (shouldCapture)
+                {
+                    string screenshotPath = "screenshots/step_" + step.StepNumber + ".png";
+                    int result = UI.CaptureScreenshotToFile(screenshotPath);
+                    if (result == 0)
+                    {
+                        step.ScreenshotPath = screenshotPath;
+                    }
+                    else
+                    {
+                        step.ScreenshotPath = "(screenshot failed: code " + result + ")";
+                    }
+                }
+
             }
             catch (Exception ex)
             {
+                if (step.Success && _passedCount > 0)
+                {
+                    _passedCount--;
+                }
                 step.Success = false;
                 step.ErrorMessage = ex.Message;
                 _failedCount++;
+                TestTelemetry.RecordError("UITest", "Step " + step.StepNumber + " " + step.WidgetType + ": " + ex.Message);
 
                 // Attempt error screenshot
                 try
@@ -479,6 +544,38 @@ namespace Hezhou
             return result;
         }
 
+        // === Intent Test Support ===
+
+        /// <summary>
+        /// 记录一条“意图级”测试步骤。IntentTestRunner 用它复用自动测试报告/退出机制。
+        /// </summary>
+        public static void RecordIntentStep(string intentName, bool success, string detail)
+        {
+            TestStep step = new TestStep();
+            step.StepNumber = _steps.Count + 1;
+            step.WidgetId = 0;
+            step.WidgetType = "Intent";
+            step.WidgetPath = intentName;
+            step.Success = success;
+            step.ErrorMessage = detail ?? "";
+            step.ScreenshotPath = "";
+            step.ClickX = 0;
+            step.ClickY = 0;
+            _steps.Add(step);
+
+            if (success)
+            {
+                _passedCount++;
+                Log.Info("IntentTest", "PASS " + intentName + " - " + detail);
+            }
+            else
+            {
+                _failedCount++;
+                TestTelemetry.RecordError("IntentTest", intentName + ": " + detail);
+                Log.Error("IntentTest", "FAIL " + intentName + " - " + detail);
+            }
+        }
+
         // === Test Completion ===
 
         private static void CompleteTest()
@@ -488,6 +585,12 @@ namespace Hezhou
 
             string modeStr = ModeToString(_mode);
             Log.Info("UITest", "Test completed: mode=" + modeStr + " steps=" + _steps.Count + " passed=" + _passedCount + " failed=" + _failedCount + " time=" + _elapsedTime.ToString("F1") + "s");
+
+            if (_autoMode)
+            {
+                FinishAutoTest();
+                return;
+            }
 
             ShowReport();
         }
@@ -839,6 +942,7 @@ namespace Hezhou
         {
             if (mode == TestMode.SequentialTraversal) return "Sequential Traversal";
             if (mode == TestMode.RandomTraversal) return "Random Traversal";
+            if (mode == TestMode.IntentTest) return "Intent Test";
             return "Stress Test";
         }
     }

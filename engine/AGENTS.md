@@ -114,6 +114,15 @@ cargo run --bin trace_viewer_demo --release           # Trace viewer
 cd engine/scripts
 powershell -ExecutionPolicy Bypass -File build_mono.ps1  # Compile C# (mcs)
 
+# Layered tests (UT + fuzz smoke + FFI contract + C# build + E2E autotest)
+powershell -ExecutionPolicy Bypass -File scripts/run_tests.ps1 -Offline
+powershell -ExecutionPolicy Bypass -File scripts/run_autotest.ps1 -Mode random -Steps 30 -Duration 10 -Seed 42
+powershell -ExecutionPolicy Bypass -File scripts/run_autotest.ps1 -Mode intent
+
+# Fuzz (nightly / cargo-fuzz)
+cd fuzz
+cargo +nightly fuzz run project_json -- -max_total_time=60
+
 # MCP server (LLM集成 — 编辑器内嵌模式):
 HEZHOU_MCP=1 cargo run --bin mono_editor_demo --features "mono,mcp" --release      # Editor + MCP (HTTP, 默认端口3000)
 HEZHOU_MCP=1 HEZHOU_MCP_PORT=8080 cargo run --bin mono_editor_demo --features "mono,mcp" --release  # Editor + MCP (HTTP, 自定义端口)
@@ -235,3 +244,21 @@ glslc shaders/rotation.frag -o shaders/rotation.frag.spv
 - 右键删除改为与Delete键相同的确认流程
 **测试**: `cargo test -p hezhou-core --offline`（`project_roundtrip.rs` 2个用例）；编辑器启动自检 `PASS=35, FAIL=0`
 **文件**: `core/src/project.rs`, `core/src/ecs/scene.rs`, `core/src/ecs/world.rs`, `scripts/EditorScript.Presenter.cs`
+
+### 14. 分层测试 / DFX / 编辑器 P0 (2026-10-18)
+**新增测试**:
+- UT: `core/tests/{scene_properties,scene_hierarchy_cycles,project_fuzz_smoke}.rs`、`ui/tests/widget_tree_hit_test.rs`
+- 接口: `core/tests/{ffi_contract,project_ffi_contract}.rs` + `scripts/check_ffi_contract.py`（261 个 FfiContext 字段三方一致）
+- FUZZ: `engine/fuzz/` cargo-fuzz target + 3000 组畸形 JSON 确定性 smoke
+- E2E: `scripts/run_autotest.ps1`、`UITestRunner.Report.cs`、`TestTelemetry.cs`
+  - random/sequential/stress/intent 模式
+  - report.json / summary.txt / ui_tree.txt / final.png / DONE
+  - 帧时间、FPS、卡顿、Warn/Error/Fatal 自动采集
+- 意图: `IntentTestRunner.cs` 覆盖新场景、创建/选择/删除、父子层级、撤销重做、多选批量属性、Console、运行/暂停状态
+**编辑器 P0**:
+- 撤销/重做：场景 JSON 快照 + `scene_snapshot_json/scene_restore_json` FFI，ID 稳定的恢复，Ctrl+Z/Y
+- 父子层级：TreeView 递归重建、右键设置/脱离父级、循环检测、删除父实体提升子实体
+- 多选：Ctrl+Click、批量属性编辑
+- Console：工具栏 Console 按钮，读取 C# 日志 ring buffer（最近 300 条）
+- 加载工程前清理旧 C# 脚本实例（`CleanupScriptInstancesBeforeSceneReplace`）
+**文件**: `scripts/{run_tests,run_autotest,check_ffi_contract,check_autotest_report}.*`, `docs/ai_intent_testing.md`, `core/src/{asset_ffi,project}.rs`, `core/src/ecs/*`, `ui/src/ffi/misc.rs`, `scripts/*.cs`

@@ -24,3 +24,13 @@ screenshots/
 *~
 .DS_Store
 Thumbs.db
+
+# Automated test artifacts
+autotest/
+autotest-*/
+test-results/
+.hezhou_config
+.hezhou_hotreload_property
+
+# Keep fuzz seed corpus in VCS (despite the broad *.json rule above)
+!fuzz/corpus/**/*.json

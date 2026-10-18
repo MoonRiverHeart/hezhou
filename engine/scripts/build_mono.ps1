@@ -75,6 +75,9 @@ $AllSourceFiles = @(
     "$ScriptsDir/EditorScript.Presenter.cs",
     "$ScriptsDir/AssetProjectTest.cs",
     "$ScriptsDir/UITestRunner.cs",
+    "$ScriptsDir/UITestRunner.Report.cs",
+    "$ScriptsDir/IntentTestRunner.cs",
+    "$ScriptsDir/TestTelemetry.cs",
     "$ScriptsDir/ExposeAttribute.cs",
     "$ScriptsDir/IScriptEntity.cs",
     "$ScriptsDir/RotatingEntity.cs",
@@ -90,7 +93,8 @@ $UiSourceFiles = @(
     "$ScriptsDir/UI.Scene.cs",
     "$ScriptsDir/UI.Pipeline.cs",
     "$ScriptsDir/UI.AssetProject.cs",
-    "$ScriptsDir/DFX.cs"
+    "$ScriptsDir/DFX.cs",
+    "$ScriptsDir/TestTelemetry.cs"
 )
 
 # ============================================================

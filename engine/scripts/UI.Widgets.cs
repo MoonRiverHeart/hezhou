@@ -415,6 +415,57 @@ public static ulong GetRootId()
             return func(_widgetTree, _eventDispatcher, x, y);
         }
 
+        // ========== Scene Snapshot / Undo-Redo ==========
+
+        public static string SceneSnapshotJson(IntPtr scene)
+        {
+            if (_ffi.scene_snapshot_json == IntPtr.Zero)
+            {
+                Log.Error("C#", "SceneSnapshotJson函数指针为空");
+                return null;
+            }
+
+            var func = Marshal.GetDelegateForFunctionPointer<SceneSnapshotJsonDelegate>(_ffi.scene_snapshot_json);
+            IntPtr ptr = func(scene);
+            if (ptr == IntPtr.Zero)
+            {
+                return null;
+            }
+
+            try
+            {
+                return Marshal.PtrToStringAnsi(ptr);
+            }
+            finally
+            {
+                if (_ffi.scene_free_json != IntPtr.Zero)
+                {
+                    var freeFunc = Marshal.GetDelegateForFunctionPointer<SceneFreeJsonDelegate>(_ffi.scene_free_json);
+                    freeFunc(ptr);
+                }
+            }
+        }
+
+        public static bool SceneRestoreJson(IntPtr scene, string json)
+        {
+            if (_ffi.scene_restore_json == IntPtr.Zero || json == null)
+            {
+                Log.Error("C#", "SceneRestoreJson函数指针为空或json为null");
+                return false;
+            }
+
+            IntPtr jsonPtr = Marshal.StringToHGlobalAnsi(json);
+            try
+            {
+                var func = Marshal.GetDelegateForFunctionPointer<SceneRestoreJsonDelegate>(_ffi.scene_restore_json);
+                return func(scene, jsonPtr);
+            }
+            finally
+            {
+                Marshal.FreeHGlobal(jsonPtr);
+            }
+        }
+
         public static string WidgetGetType(ulong widgetId)
         {
             if (_ffi.ui_widget_get_type == IntPtr.Zero)
@@ -525,18 +576,30 @@ public static ulong GetRootId()
                 Log.Error("C#", "DebugDumpTree函数指针为空");
                 return "";
             }
-            const uint BUF_SIZE = 8192;
-            IntPtr buf = Marshal.AllocHGlobal((int)BUF_SIZE);
             var func = Marshal.GetDelegateForFunctionPointer<DebugDumpTreeToBufferDelegate>(_ffi.ui_debug_dump_tree_to_buffer);
-            uint written = func(_widgetTree, buf, BUF_SIZE);
-            if (written == 0)
+
+            // 先查询所需大小（Rust 在 buf=null/len=0 时返回包含 NUL 的长度）
+            uint needed = func(_widgetTree, IntPtr.Zero, 0);
+            if (needed == 0)
             {
-                Marshal.FreeHGlobal(buf);
                 return "";
             }
-            string result = Marshal.PtrToStringAnsi(buf);
-            Marshal.FreeHGlobal(buf);
-            return result ?? "";
+
+            IntPtr buf = Marshal.AllocHGlobal((int)needed);
+            try
+            {
+                uint written = func(_widgetTree, buf, needed);
+                if (written == 0)
+                {
+                    return "";
+                }
+                string result = Marshal.PtrToStringAnsi(buf);
+                return result ?? "";
+            }
+            finally
+            {
+                Marshal.FreeHGlobal(buf);
+            }
         }
 
         public static int CaptureScreenshotToFile(string path)

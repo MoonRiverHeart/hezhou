@@ -43,6 +43,8 @@ namespace Hezhou
             _saveClickCallback = OnSaveClick;
             _runClickCallback = OnRunClick;
             _toggleEditorClickCallback = OnToggleEditorClick;
+            _consoleClickCallback = OnConsoleClick;
+            _consoleDialogResultCallback = OnConsoleDialogResult;
             _hotReloadClickCallback = OnHotReloadClick;
             _newScriptClickCallback = OnNewScriptClick;
             _openInExplorerCallback = OpenInExplorer;
@@ -109,6 +111,16 @@ _bindScriptClickCallback = OnBindScriptClick;
                 }
             }
             catch (Exception) { }
+
+            // 自动化测试模式：跳过工作目录对话框，直接使用默认 scripts 目录。
+            string autoTestEnv = Environment.GetEnvironmentVariable("HEZHOU_AUTOTEST");
+            bool autoTestMode = autoTestEnv == "1"
+                || string.Equals(autoTestEnv, "true", StringComparison.OrdinalIgnoreCase);
+            if (autoTestMode)
+            {
+                _currentDirectory = "scripts";
+                _workingDirectorySet = true;
+            }
             
             if (_workingDirectorySet)
             {
@@ -118,6 +130,11 @@ _bindScriptClickCallback = OnBindScriptClick;
             else
             {
                 ShowWorkingDirectoryDialog();
+            }
+
+            if (autoTestMode)
+            {
+                UITestRunner.RequestAutoRunFromEnvironment();
             }
             
             UI.RegisterResizeCallback(_resizeCallback);

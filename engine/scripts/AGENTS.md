@@ -30,7 +30,10 @@ C# scripts create all editor UI, manage Scene entities, handle user interaction.
 | `EditorScript.Presenter.cs` | Editor presenter logic, property panel, callbacks | ~1483 |
 | `EditorScript.State.cs` | Editor state management, Editing/Running/Paused | ~78 |
 | `DFX.cs` | Logging bridge | ~50 |
-| `UITestRunner.cs` | Automated UI test runner (called from EditorScript.Update) | ~708 |
+| `UITestRunner.cs` | Automated UI test runner (called from EditorScript.Update) | ~900 |
+| `UITestRunner.Report.cs` | Auto test env config, metrics, JSON report, DONE signal | ~300 |
+| `IntentTestRunner.cs` | Intent-level tests (scene/hierarchy/undo/multi-select/console) | ~160 |
+| `TestTelemetry.cs` | C# log ring buffer + Warn/Error/Fatal collection | ~180 |
 | `AssetProjectTest.cs` | Asset/Project test script | ~100 |
 
 ## Conventions

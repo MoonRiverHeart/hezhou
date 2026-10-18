@@ -1,6 +1,6 @@
-use std::ffi::c_char;
+use std::ffi::{c_char, CStr, CString};
 use crate::asset_library::{get_asset_library, MeshType};
-use crate::project::{get_project, ProjectSettings, ProjectEntity, ProjectEntityTransform};
+use crate::project::{get_project, Project, ProjectSettings, ProjectEntity, ProjectEntityTransform};
 use crate::ecs::Scene;
 
 #[unsafe(no_mangle)]
@@ -363,6 +363,7 @@ pub extern "C" fn project_add_entity(
         components: std::collections::HashMap::new(),
         visible: true,
         light: None,
+        parent_id: None,
     });
     true
 }
@@ -372,4 +373,39 @@ pub extern "C" fn project_remove_entity(entity_id: u64) -> bool {
     let mut project = get_project().lock().unwrap();
     project.remove_entity(entity_id);
     true
+}
+
+// ===== 场景快照 FFI（撤销/重做） =====
+
+/// 返回由调用方释放的 JSON 字符串；失败返回 null。
+#[unsafe(no_mangle)]
+pub extern "C" fn scene_snapshot_json(scene: *const Scene) -> *mut c_char {
+    if scene.is_null() {
+        return std::ptr::null_mut();
+    }
+    match Project::snapshot_to_json(unsafe { &*scene }) {
+        Ok(json) => CString::new(json)
+            .map(|s| s.into_raw())
+            .unwrap_or(std::ptr::null_mut()),
+        Err(_) => std::ptr::null_mut(),
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn scene_free_json(ptr: *mut c_char) {
+    if ptr.is_null() {
+        return;
+    }
+    unsafe {
+        drop(CString::from_raw(ptr));
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn scene_restore_json(scene: *mut Scene, json: *const c_char) -> bool {
+    if scene.is_null() || json.is_null() {
+        return false;
+    }
+    let text = unsafe { CStr::from_ptr(json) }.to_string_lossy();
+    Project::restore_from_json(&text, unsafe { &mut *scene }).is_ok()
 }

@@ -42,6 +42,20 @@ pub(crate) static mut SAVED_BINDINGS: Vec<SavedEntityBinding> = Vec::new();
 
 pub fn run() {
     let args: Vec<String> = std::env::args().collect();
+
+    // 无人值守自动测试：--auto-test 等价于 HEZHOU_AUTOTEST=1。
+    // C# TestRunner 会点击 UI、采集指标并写 autotest/DONE，Rust 主循环检测后退出。
+    if args.iter().any(|a| a == "--auto-test") {
+        std::env::set_var("HEZHOU_AUTOTEST", "1");
+    }
+    let auto_test_mode = std::env::var("HEZHOU_AUTOTEST")
+        .ok()
+        .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
+        .unwrap_or(false);
+    let mut auto_test_status = String::new();
+    let auto_test_dir = std::env::var("HEZHOU_AUTOTEST_DIR").unwrap_or_else(|_| "autotest".to_string());
+    let auto_test_done = std::path::Path::new(&auto_test_dir).join("DONE");
+
     let screenshot_mode = args.iter().any(|a| a == "--screenshot");
     let screenshot_delay = if screenshot_mode { 
         args.iter().position(|a| a == "--delay")
@@ -344,6 +358,13 @@ ui_widget_get_layout: unsafe { std::mem::transmute(ui_ffi::ui_widget_get_layout 
         project_get_entity_info: hezhou_core::project_get_entity_info,
         project_add_entity: hezhou_core::project_add_entity,
         project_remove_entity: hezhou_core::project_remove_entity,
+        scene_snapshot_json: unsafe {
+            std::mem::transmute(hezhou_core::scene_snapshot_json as *const std::ffi::c_void)
+        },
+        scene_free_json: hezhou_core::scene_free_json,
+        scene_restore_json: unsafe {
+            std::mem::transmute(hezhou_core::scene_restore_json as *const std::ffi::c_void)
+        },
         ui_set_widget_visible: unsafe { std::mem::transmute(ffi_impl::set_widget_visible as *const std::ffi::c_void) },
         get_pipeline_names: unsafe { std::mem::transmute(ffi_impl::get_pipeline_names as *const std::ffi::c_void) },
         switch_pipeline: unsafe { std::mem::transmute(ffi_impl::switch_pipeline as *const std::ffi::c_void) },
@@ -514,6 +535,16 @@ dfx_trace_begin!("ProcessEvents", "ui");
             }
         }
         
+        // 自动测试完成后由 C# 写 autotest/DONE，Rust 主循环负责干净退出并保存 trace。
+        if auto_test_mode && auto_test_done.exists() {
+            auto_test_status = std::fs::read_to_string(&auto_test_done)
+                .unwrap_or_else(|_| "fail".to_string())
+                .trim()
+                .to_string();
+            dfx_info!("AutoTest", "DONE detected: status={}", auto_test_status);
+            break;
+        }
+
         // P键截图：在draw_frame后调用，确保offscreen_image已渲染完成且layout正确
         if renderer.is_p_pressed() {
             renderer.consume_p_press();
@@ -566,5 +597,6 @@ dfx_trace_begin!("ProcessEvents", "ui");
     }
     
     dfx_info!("Demo", "=== Editor Closed ===");
-    std::process::exit(0);
+    let exit_code = if auto_test_mode && auto_test_status != "pass" { 2 } else { 0 };
+    std::process::exit(exit_code);
 }
