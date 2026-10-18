@@ -40,6 +40,10 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
+      - name: Install Mono
+        shell: pwsh
+        run: choco install mono --no-progress -y
+
       - name: Local CI mirror (Rust/FFI/fuzz/icons)
         working-directory: engine
         shell: pwsh
@@ -114,6 +118,8 @@ jobs:
   package-linux:
     if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-22.04
+    env:
+      CMAKE_GENERATOR: Ninja
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
@@ -130,7 +136,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
-            build-essential cmake pkg-config python3 \
+            build-essential cmake ninja-build pkg-config python3 \
             libvulkan-dev libglfw3-dev libx11-dev libxrandr-dev \
             libxi-dev libxcursor-dev libxinerama-dev libxkbcommon-dev \
             libxkbcommon-x11-dev libwayland-dev wayland-protocols libdecor-0-dev \
