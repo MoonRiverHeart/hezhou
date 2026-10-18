@@ -48,6 +48,7 @@ test-results/random/
 | `random` | 固定 seed 随机点击 |
 | `stress` | 持续随机点击直到 duration |
 | `intent` | 运行 `IntentTestRunner` 的意图用例 |
+| `visual` | 关键 UI 状态截图（脚本绑定/Console/搜索/多选） |
 
 可交互类型过滤在 `UITestRunner.TraverseWidgetTree`，排除了 Panel/VStack 等纯容器。
 
@@ -78,6 +79,37 @@ engine\target\release\mono_editor_demo.exe --auto-test
 cd engine
 powershell -ExecutionPolicy Bypass -File scripts/run_autotest.ps1 -Mode intent -ReportDir test-results/intent
 ```
+
+### 视觉截图检查
+
+```powershell
+cd engine
+powershell -ExecutionPolicy Bypass -File scripts/run_autotest.ps1 `
+  -Mode visual -ReportDir test-results/visual
+
+python scripts/check_visual.py test-results/visual
+```
+
+产物：
+
+```text
+test-results/visual/visual/
+├── 01_rotation_script_binding.png
+├── 02_console.png
+├── 03_asset_search.png
+├── 04_project_search.png
+└── 05_multi_select.png
+```
+
+`visual` 模式通过真实编辑器渲染截图，适合验证：
+
+- 脚本绑定后运动标签页是否出现绑定行
+- Console 对话框是否越界/被裁剪
+- 搜索框是否被 ScrollView 拉伸
+- 属性面板 tab / Min-Max 配置行是否溢出
+- 多选 Entity 是否同时出现 outline
+
+`check_visual.py` 校验截图存在、1280x720 尺寸和非空；进一步的人工/AI 检查直接读取 PNG。
 
 ### AI 如何新增意图
 

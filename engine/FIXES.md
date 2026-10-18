@@ -1,5 +1,45 @@
 # Bug Fixes Log
 
+## 2026-10-18: UI Visual Regression Fixes
+
+### Problems
+1. `RotationScript.cs` 绑定后无脚本行/无属性：文件中的类是 `RotationController`，
+   而绑定逻辑按文件名推导 className=`RotationScript`，类型注册表中不存在。
+2. 资产面板搜索框被放进 ScrollView 直接子级，ScrollView 会把子节点拉伸到
+   整个视口，输入框占满面板。
+3. 属性面板 5 个 Tab 在 320px 宽度下显示成“几...”，Min/Max/Step/Init 行
+   横向溢出、互相覆盖。
+4. Console Dialog 使用 760x480 逻辑尺寸，超过 853x480 的逻辑屏幕，标题被裁剪。
+5. 新建场景/加载工程后，旧脚本绑定 UI 变成“幽灵行”残留。
+
+### Fixes
+- `RotationScript.cs` 新增逐实体 `RotationScript` 类（`[Expose]` 属性、
+  CreateInstance/DestroyInstance/UpdateInstance/Get/SetPropertyValue），
+  并注册到 `_scriptTypeRegistry`。
+- 资产模型 Tab 使用 `ScrollView → VStack → InputField + GridView`，搜索框固定
+  320x24，不再被 ScrollView 拉伸。
+- 属性面板 Tab 宽度提升（outer split 0.72）；`TabWidget::truncate_text` 先判断
+  完整文字是否放得下，避免“几何”被截成“几...”。
+- Min/Max/Step/Init 改为两行布局（每行 40 label + 70 input）。
+- Console Dialog 改为 680x360，TextEdit 250 高。
+- `ClearScriptBindingUI` 按容器实际子节点清理，避免旧绑定行残留。
+- 工具栏配色统一为深蓝灰 + 绿色运行 + 蓝色编辑器 + 橙色强调线；项目树加宽。
+
+### Verification
+新增 `-Mode visual`：输出 5 张关键 UI 截图，人工/工具检查后修复了
+Tab 截断、配置行溢出、Console 越界、幽灵绑定、搜索框拉伸问题。
+
+```text
+test-results/visual/visual/
+├── 01_rotation_script_binding.png   # RotationScript 行 + 属性可见
+├── 02_console.png                   # 对话框完整、不裁剪
+├── 03_asset_search.png              # 搜索框不再占满
+├── 04_project_search.png
+└── 05_multi_select.png
+```
+
+---
+
 ## 2026-10-18: Editor P1 — Multi-select Outline, Console Filters, Search, CI
 
 ### Added

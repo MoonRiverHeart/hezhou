@@ -55,6 +55,13 @@ try {
     & python "scripts/check_autotest_report.py" "test-results/intent"
     if ($LASTEXITCODE -ne 0) { throw "intent report validation failed" }
 
+    & powershell -ExecutionPolicy Bypass -File "scripts/run_autotest.ps1" -Mode visual -ReportDir "test-results/visual"
+    if ($LASTEXITCODE -ne 0) { throw "visual check failed" }
+    & python "scripts/check_autotest_report.py" "test-results/visual"
+    if ($LASTEXITCODE -ne 0) { throw "visual report validation failed" }
+    & python "scripts/check_visual.py" "test-results/visual"
+    if ($LASTEXITCODE -ne 0) { throw "visual screenshot validation failed" }
+
     if (-not $SkipStress) {
         & powershell -ExecutionPolicy Bypass -File "scripts/run_autotest.ps1" -Mode stress -Duration 8 -Interval 0.1 -Seed 7 -ReportDir "test-results/stress"
         if ($LASTEXITCODE -ne 0) { throw "stress autotest failed" }

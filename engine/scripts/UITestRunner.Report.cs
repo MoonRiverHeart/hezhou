@@ -92,6 +92,15 @@ namespace Hezhou
                 return;
             }
 
+            if (string.Equals(_envMode, "visual", StringComparison.OrdinalIgnoreCase))
+            {
+                _mode = TestMode.VisualCheck;
+                _running = true;
+                BeginAutoTestMetrics();
+                BeginVisualCheck();
+                return;
+            }
+
             TestMode mode = TestMode.RandomTraversal;
             if (string.Equals(_envMode, "sequential", StringComparison.OrdinalIgnoreCase))
             {
@@ -315,6 +324,130 @@ namespace Hezhou
                 return parsed;
             }
             return fallback;
+        }
+
+        // === Visual Check ===
+
+        private class VisualStep
+        {
+            public string Name;
+            public Action Setup;
+
+            public VisualStep(string name, Action setup)
+            {
+                Name = name;
+                Setup = setup;
+            }
+        }
+
+        private static List<VisualStep> _visualSteps;
+        private static int _visualIndex = 0;
+        private static int _visualWaitFrames = 0;
+        private static string _visualDir = "autotest/visual";
+
+        private static void BeginVisualCheck()
+        {
+            _visualDir = Path.Combine(_reportDir, "visual");
+            Directory.CreateDirectory(_visualDir);
+            _visualIndex = 0;
+            _visualWaitFrames = 0;
+
+            _visualSteps = new List<VisualStep>();
+            _visualSteps.Add(new VisualStep("01_rotation_script_binding", VisualRotationBinding));
+            _visualSteps.Add(new VisualStep("02_console", VisualConsole));
+            _visualSteps.Add(new VisualStep("03_asset_search", VisualAssetSearch));
+            _visualSteps.Add(new VisualStep("04_project_search", VisualProjectSearch));
+            _visualSteps.Add(new VisualStep("05_multi_select", VisualMultiSelect));
+
+            RunNextVisualStep();
+        }
+
+        private static void VisualRotationBinding()
+        {
+            EditorScript.TestNewScene();
+            ulong entity = EditorScript.TestCreateMeshEntity(0);
+            EditorScript.TestSelectEntity(entity);
+            EditorScript.TestBindScript("RotationScript.cs");
+            EditorScript.TestSetPropertyTab(3);
+        }
+
+        private static void VisualConsole()
+        {
+            EditorScript.TestOpenConsole();
+        }
+
+        private static void VisualAssetSearch()
+        {
+            EditorScript.TestCloseConsole();
+            EditorScript.TestSetAssetSearch("Cube");
+        }
+
+        private static void VisualProjectSearch()
+        {
+            EditorScript.TestSetAssetSearch("");
+            EditorScript.TestSetProjectSearch("Cube");
+        }
+
+        private static void VisualMultiSelect()
+        {
+            EditorScript.TestSetProjectSearch("");
+            EditorScript.TestNewScene();
+            ulong first = EditorScript.TestCreateMeshEntity(0);
+            ulong second = EditorScript.TestCreateMeshEntity(0);
+            EditorScript.TestSetPosition(first, -2f, 0.5f, 0f);
+            EditorScript.TestSetPosition(second, 2f, 0.5f, 0f);
+            EditorScript.TestSelectEntity(first);
+            EditorScript.TestToggleEntitySelection(second);
+        }
+
+        private static void RunNextVisualStep()
+        {
+            if (_visualSteps == null || _visualIndex >= _visualSteps.Count)
+            {
+                CompleteTest();
+                return;
+            }
+
+            _visualSteps[_visualIndex].Setup();
+            _visualWaitFrames = 3;
+        }
+
+        private static void UpdateVisualCheck()
+        {
+            if (_visualWaitFrames > 0)
+            {
+                _visualWaitFrames--;
+                return;
+            }
+
+            string name = _visualSteps[_visualIndex].Name;
+            string path = Path.Combine(_visualDir, name + ".png");
+            int result = UI.CaptureScreenshotToFile(path);
+
+            TestStep step = new TestStep();
+            step.StepNumber = _steps.Count + 1;
+            step.WidgetType = "Visual";
+            step.WidgetPath = name;
+            step.Success = result == 0;
+            step.ErrorMessage = result == 0 ? "" : "screenshot failed: code " + result;
+            step.ScreenshotPath = result == 0 ? path : "";
+            _steps.Add(step);
+            if (step.Success) _passedCount++;
+            else
+            {
+                _failedCount++;
+                TestTelemetry.RecordError("VisualCheck", step.ErrorMessage);
+            }
+
+            _visualIndex++;
+            if (_visualIndex >= _visualSteps.Count)
+            {
+                CompleteTest();
+            }
+            else
+            {
+                RunNextVisualStep();
+            }
         }
     }
 }

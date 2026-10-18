@@ -8,7 +8,8 @@ namespace Hezhou
         SequentialTraversal = 0,
         RandomTraversal = 1,
         StressTest = 2,
-        IntentTest = 3
+        IntentTest = 3,
+        VisualCheck = 4
     }
 
     public class TestStep
@@ -264,6 +265,13 @@ namespace Hezhou
             }
 
             if (!_running) return;
+
+            if (_mode == TestMode.VisualCheck)
+            {
+                CollectFrameMetrics(deltaTime);
+                UpdateVisualCheck();
+                return;
+            }
 
             // deltaTime in milliseconds from editor
             float dtSeconds = deltaTime / 1000f;
@@ -943,6 +951,7 @@ namespace Hezhou
             if (mode == TestMode.SequentialTraversal) return "Sequential Traversal";
             if (mode == TestMode.RandomTraversal) return "Random Traversal";
             if (mode == TestMode.IntentTest) return "Intent Test";
+            if (mode == TestMode.VisualCheck) return "Visual Check";
             return "Stress Test";
         }
     }

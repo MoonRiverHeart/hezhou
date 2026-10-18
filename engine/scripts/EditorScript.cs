@@ -163,6 +163,13 @@ _bindScriptClickCallback = OnBindScriptClick;
                 HezhouScripts.ScriptEntityHelper.ReflectProperties(rotType);
             }
             _scriptTypeRegistry["RotatingEntity"] = rotType;
+
+            Type rotationScriptType = currentAssembly.GetType("HezhouScripts.RotationScript");
+            if (rotationScriptType != null)
+            {
+                HezhouScripts.ScriptEntityHelper.ReflectProperties(rotationScriptType);
+                _scriptTypeRegistry["RotationScript"] = rotationScriptType;
+            }
             
             // 保存配置文件（只保存workingDir，Scene指针通过Rust FFI获取）
             if (_workingDirectorySet)

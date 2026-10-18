@@ -1,5 +1,5 @@
 ﻿param(
-    [ValidateSet("random", "sequential", "stress", "intent")]
+    [ValidateSet("random", "sequential", "stress", "intent", "visual")]
     [string]$Mode = "random",
     [int]$Steps = 50,
     [double]$Duration = 15,

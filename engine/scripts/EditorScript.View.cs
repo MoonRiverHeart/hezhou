@@ -92,47 +92,60 @@ namespace Hezhou
             ulong rootId = UI.GetRootId();
 
             // === Toolbar (fixed, top) ===
-            _toolbar = new Panel(rootId, 0, toolbarY, _screenWidth, TOOLBAR_HEIGHT, 0.15f, 0.15f, 0.15f, 1.0f);
+            _toolbar = new Panel(rootId, 0, toolbarY, _screenWidth, TOOLBAR_HEIGHT, 0.07f, 0.09f, 0.12f, 1.0f);
             _toolbarButtons = new HStack(_toolbar.Id, 10f);
             _toolbarButtons.SetPosition(10f, 5f);
-            
+
+            // 工具栏底部强调线，划分工具栏与主工作区。
+            new Panel(rootId, 0, TOOLBAR_HEIGHT - 2f, _screenWidth, 2f,
+                0.95f, 0.55f, 0.16f, 1.0f);
+
             CreateToolbarMenus();
             
             var fileMenuLabel = _toolbarButtons.AddLabel(80f, 30f, "文件");
             UI.SetOnClick(fileMenuLabel, _newClickCallback);
+            UI.SetWidgetBackgroundColor(fileMenuLabel, 0.07f, 0.09f, 0.12f, 1.0f);
             _menuBarLabelIds[0] = fileMenuLabel;
             
             var openMenuLabel = _toolbarButtons.AddLabel(80f, 30f, "打开");
             UI.SetOnClick(openMenuLabel, _openClickCallback);
+            UI.SetWidgetBackgroundColor(openMenuLabel, 0.07f, 0.09f, 0.12f, 1.0f);
             _menuBarLabelIds[1] = openMenuLabel;
             
             var saveMenuLabel = _toolbarButtons.AddLabel(80f, 30f, "保存");
             UI.SetOnClick(saveMenuLabel, _saveClickCallback);
+            UI.SetWidgetBackgroundColor(saveMenuLabel, 0.07f, 0.09f, 0.12f, 1.0f);
             _menuBarLabelIds[2] = saveMenuLabel;
             
             var runBtn = _toolbarButtons.AddButton(100f, 30f, "运行");
             _runButtonId = runBtn.Id;
             runBtn.SetOnClick(_runClickCallback);
+            UI.SetWidgetBackgroundColor(_runButtonId, 0.16f, 0.52f, 0.40f, 1.0f);
             
             _pauseButtonId = UI.CreateButton(_toolbar.Id, 80f, 30f, "暂停");
             UI.SetOnClick(_pauseButtonId, _pauseClickCallback);
             UI.SetWidgetLayout(_pauseButtonId, -100f, -100f, 80f, 30f);
+            UI.SetWidgetBackgroundColor(_pauseButtonId, 0.72f, 0.45f, 0.14f, 1.0f);
             
             _toggleEditorBtn = new Button(_toolbar.Id, 100f, 30f, "编辑器");
             UI.SetWidgetLayout(_toggleEditorBtn.Id, _screenWidth - 120f, 5f, 100f, 30f);
             _toggleEditorBtn.SetOnClick(_toggleEditorClickCallback);
+            UI.SetWidgetBackgroundColor(_toggleEditorBtn.Id, 0.22f, 0.40f, 0.64f, 1.0f);
 
-            _undoButtonId = UI.CreateButton(_toolbar.Id, 70f, 30f, "撤销");
-            UI.SetWidgetLayout(_undoButtonId, _screenWidth - 380f, 5f, 70f, 30f);
+            _undoButtonId = UI.CreateButton(_toolbar.Id, 80f, 30f, "撤销");
+            UI.SetWidgetLayout(_undoButtonId, _screenWidth - 400f, 5f, 80f, 30f);
             UI.SetOnClick(_undoButtonId, _undoClickCallback);
+            UI.SetWidgetBackgroundColor(_undoButtonId, 0.15f, 0.21f, 0.30f, 1.0f);
 
-            _redoButtonId = UI.CreateButton(_toolbar.Id, 70f, 30f, "重做");
-            UI.SetWidgetLayout(_redoButtonId, _screenWidth - 300f, 5f, 70f, 30f);
+            _redoButtonId = UI.CreateButton(_toolbar.Id, 80f, 30f, "重做");
+            UI.SetWidgetLayout(_redoButtonId, _screenWidth - 310f, 5f, 80f, 30f);
             UI.SetOnClick(_redoButtonId, _redoClickCallback);
+            UI.SetWidgetBackgroundColor(_redoButtonId, 0.15f, 0.21f, 0.30f, 1.0f);
 
             ulong consoleBtnId = UI.CreateButton(_toolbar.Id, 80f, 30f, "Console");
             UI.SetWidgetLayout(consoleBtnId, _screenWidth - 220f, 5f, 80f, 30f);
             UI.SetOnClick(consoleBtnId, _consoleClickCallback);
+            UI.SetWidgetBackgroundColor(consoleBtnId, 0.15f, 0.21f, 0.30f, 1.0f);
 
             // === SplitView-based Main Layout ===
             // Structure:
@@ -143,16 +156,16 @@ namespace Hezhou
 
             // Outer Horizontal SplitView: Left+Center (75%) | Properties (25%)
             _outerSplitViewId = UI.CreateSplitView(rootId, 0, mainY, _screenWidth, mainHeight, 0);
-            UI.SplitViewSetSplitRatio(_outerSplitViewId, 0.75f);
+            UI.SplitViewSetSplitRatio(_outerSplitViewId, 0.72f);
             UI.SplitViewSetMinRatio(_outerSplitViewId, 0.4f);
             UI.SplitViewSetMaxRatio(_outerSplitViewId, 0.9f);
             UI.SplitViewSetOnRatioChange(_outerSplitViewId, _outerSplitViewRatioCallback);
 
             // First pane of outer SplitView: LeftCenter zone
-            _leftCenterPanel = new Panel(_outerSplitViewId, 0, 0, 0, 0, 0.18f, 0.18f, 0.22f, 1.0f);
+            _leftCenterPanel = new Panel(_outerSplitViewId, 0, 0, 0, 0, 0.09f, 0.11f, 0.15f, 1.0f);
             
             // Second pane of outer SplitView: Properties panel
-            _rightPanel = new Panel(_outerSplitViewId, 0, 0, 0, 0, 0.2f, 0.2f, 0.2f, 1.0f);
+            _rightPanel = new Panel(_outerSplitViewId, 0, 0, 0, 0, 0.10f, 0.12f, 0.17f, 1.0f);
 
             // LeftCenter Vertical SplitView: Top (70%) | Asset (30%)
             _leftCenterSplitViewId = UI.CreateSplitView(_leftCenterPanel.Id, 0, 0, 0, 0, 1);
@@ -162,25 +175,25 @@ namespace Hezhou
             UI.SplitViewSetOnRatioChange(_leftCenterSplitViewId, _leftCenterSplitViewRatioCallback);
 
             // First pane of LeftCenter SplitView: Top zone
-            _topPanel = new Panel(_leftCenterSplitViewId, 0, 0, 0, 0, 0.18f, 0.18f, 0.22f, 1.0f);
+            _topPanel = new Panel(_leftCenterSplitViewId, 0, 0, 0, 0, 0.09f, 0.11f, 0.15f, 1.0f);
 
             // Second pane of LeftCenter SplitView: Asset panel
-            _assetPanel = new Panel(_leftCenterSplitViewId, 0, 0, 0, 0, 0.2f, 0.2f, 0.2f, 1.0f);
+            _assetPanel = new Panel(_leftCenterSplitViewId, 0, 0, 0, 0, 0.10f, 0.12f, 0.17f, 1.0f);
 
             // Inner Horizontal SplitView: Project (33%) | Preview (67%)
             _innerHorizontalSplitViewId = UI.CreateSplitView(_topPanel.Id, 0, 0, 0, 0, 0);
-            UI.SplitViewSetSplitRatio(_innerHorizontalSplitViewId, 0.33f);
+            UI.SplitViewSetSplitRatio(_innerHorizontalSplitViewId, 0.38f);
             UI.SplitViewSetMinRatio(_innerHorizontalSplitViewId, 0.15f);
             UI.SplitViewSetMaxRatio(_innerHorizontalSplitViewId, 0.5f);
             UI.SplitViewSetOnRatioChange(_innerHorizontalSplitViewId, _innerHorizontalSplitViewRatioCallback);
 
             // First pane of Inner SplitView: Project panel
-            _projectPanel = new Panel(_innerHorizontalSplitViewId, 0, 0, 0, 0, 0.2f, 0.2f, 0.2f, 1.0f);
+            _projectPanel = new Panel(_innerHorizontalSplitViewId, 0, 0, 0, 0, 0.105f, 0.13f, 0.18f, 1.0f);
             UI.CreateLabel(_projectPanel.Id, 10f, 10f, 200f, 25f, "项目结构");
             CreateProjectStructureTree();
 
             // Second pane of Inner SplitView: Preview panel
-            _previewPanel = new Panel(_innerHorizontalSplitViewId, 0, 0, 0, 0, 0.08f, 0.08f, 0.08f, 0.3f);
+            _previewPanel = new Panel(_innerHorizontalSplitViewId, 0, 0, 0, 0, 0.035f, 0.045f, 0.065f, 1.0f);
             UI.CreateLabel(_previewPanel.Id, 10f, 10f, 200f, 25f, "游戏预览");
             
             float initialPreviewWidth = _screenWidth * 0.75f * 0.67f - 20f;
@@ -196,11 +209,17 @@ namespace Hezhou
             _assetTabWidget = new TabWidget(_assetPanel.Id, 5f, 5f, 0, 0);
             
             ulong modelTabContent = UI.CreateScrollView(_assetTabWidget.Id, 0, 0, 0, 0);
-            _assetSearchInputId = UI.CreateInputField(modelTabContent, 190f, 24f);
-            UI.SetWidgetLayout(_assetSearchInputId, 5f, 5f, 190f, 24f);
+            // ScrollView 会把直接子节点强制拉伸到整个视口；用 VStack 包一层，
+            // 让“搜索框 + 模型网格”保持自身尺寸，而不是输入框占满面板。
+            ulong modelContentStack = UI.CreateVStack(modelTabContent, 6f);
+            UI.SetWidgetLayout(modelContentStack, 5f, 5f, 880f, 300f);
+
+            _assetSearchInputId = UI.CreateInputField(modelContentStack, 320f, 24f);
+            UI.SetWidgetLayout(_assetSearchInputId, 0f, 0f, 320f, 24f);
             UI.InputFieldSetPlaceholder(_assetSearchInputId, "搜索资产...");
             UI.InputFieldSetOnChange(_assetSearchInputId, _assetSearchChangeCallback);
-            _assetModelGridViewId = UI.CreateGridView(modelTabContent, 5f, 35f, 0, 0, 64);
+
+            _assetModelGridViewId = UI.CreateGridView(modelContentStack, 0f, 0f, 860f, 240f, 64);
             _assetGridViewId = _assetModelGridViewId; // Legacy alias
             RefreshAssetGridView();
             UI.GridViewSetOnClick(_assetModelGridViewId, _gridViewClickCallback);
@@ -329,7 +348,7 @@ namespace Hezhou
             _propsTabWidget.SetOnSelect(_tabSelectCallback);
 
             // === Status Bar (fixed, bottom) ===
-            _statusBar = new Panel(rootId, 0, statusY, _screenWidth, STATUS_BAR_HEIGHT, 0.12f, 0.12f, 0.12f, 1.0f);
+            _statusBar = new Panel(rootId, 0, statusY, _screenWidth, STATUS_BAR_HEIGHT, 0.065f, 0.08f, 0.11f, 1.0f);
             _statusItems = new List(_statusBar.Id, 0f, true);
             UI.SetWidgetLayout(_statusItems.Id, 10f, 0f, _screenWidth - 20f, STATUS_BAR_HEIGHT);
             
@@ -625,36 +644,38 @@ namespace Hezhou
             }
             info.MainWidgetId = mainWidgetId;
 
-            // === Min/Max/Step/Initial HStack ===
-            ulong configHStack = UI.CreateHStack(parentId, 5f);
+            // === Min/Max/Step/Initial: 两行布局，避免窄属性面板横向溢出 ===
+            ulong configVStack = UI.CreateVStack(parentId, 3f);
 
+            ulong configRow1 = UI.CreateHStack(configVStack, 6f);
             // Min
-            ulong minLabelId = UI.CreateLabel(configHStack, 30f, 20f, "Min:");
-            ulong minInputId = UI.CreateInputField(configHStack, 50f, 24f);
+            ulong minLabelId = UI.CreateLabel(configRow1, 40f, 20f, "Min");
+            ulong minInputId = UI.CreateInputField(configRow1, 70f, 24f);
             UI.InputFieldSetText(minInputId, effectiveMin.ToString());
             UI.InputFieldSetPlaceholder(minInputId, "Min");
             info.MinInputId = minInputId;
             info.CurrentMin = effectiveMin;
 
             // Max
-            ulong maxLabelId = UI.CreateLabel(configHStack, 30f, 20f, "Max:");
-            ulong maxInputId = UI.CreateInputField(configHStack, 50f, 24f);
+            ulong maxLabelId = UI.CreateLabel(configRow1, 40f, 20f, "Max");
+            ulong maxInputId = UI.CreateInputField(configRow1, 70f, 24f);
             UI.InputFieldSetText(maxInputId, effectiveMax.ToString());
             UI.InputFieldSetPlaceholder(maxInputId, "Max");
             info.MaxInputId = maxInputId;
             info.CurrentMax = effectiveMax;
 
+            ulong configRow2 = UI.CreateHStack(configVStack, 6f);
             // Step
-            ulong stepLabelId = UI.CreateLabel(configHStack, 30f, 20f, "Step:");
-            ulong stepInputId = UI.CreateInputField(configHStack, 50f, 24f);
+            ulong stepLabelId = UI.CreateLabel(configRow2, 40f, 20f, "Step");
+            ulong stepInputId = UI.CreateInputField(configRow2, 70f, 24f);
             UI.InputFieldSetText(stepInputId, effectiveStep.ToString());
             UI.InputFieldSetPlaceholder(stepInputId, "Step");
             info.StepInputId = stepInputId;
             info.CurrentStep = effectiveStep;
 
             // Init
-            ulong initLabelId = UI.CreateLabel(configHStack, 30f, 20f, "Init:");
-            ulong initInputId = UI.CreateInputField(configHStack, 50f, 24f);
+            ulong initLabelId = UI.CreateLabel(configRow2, 40f, 20f, "Init");
+            ulong initInputId = UI.CreateInputField(configRow2, 70f, 24f);
             UI.InputFieldSetText(initInputId, effectiveInitial.ToString());
             UI.InputFieldSetPlaceholder(initInputId, "Init");
             info.InitialInputId = initInputId;
@@ -679,7 +700,7 @@ namespace Hezhou
             UI.CreateLabel(motionTabContentId, RIGHT_PANEL_WIDTH - 40f, 20f, "脚本绑定:");
             
             ulong scriptHStack = UI.CreateHStack(motionTabContentId, 5f);
-            _scriptDropdownId = UI.CreateDropdown(scriptHStack, RIGHT_PANEL_WIDTH - 70f, 25f);
+            _scriptDropdownId = UI.CreateDropdown(scriptHStack, 220f, 25f);
             string[] scriptOptions = _availableScripts.Count > 0 ? _availableScripts.ToArray() : new string[] { "无可用脚本" };
             UI.DropdownSetOptions(_scriptDropdownId, scriptOptions);
             UI.DropdownSetOnSelect(_scriptDropdownId, _scriptDropdownSelectCallback);
@@ -887,12 +908,12 @@ namespace Hezhou
             float estimatedProjectHeight = mainHeight * 0.7f * 0.67f - 50f;
             if (estimatedProjectHeight < 100f) estimatedProjectHeight = 100f;
             
-            _projectSearchInputId = UI.CreateInputField(_projectPanel.Id, 180f, 26f);
-            UI.SetWidgetLayout(_projectSearchInputId, 10f, 8f, 180f, 26f);
+            _projectSearchInputId = UI.CreateInputField(_projectPanel.Id, 240f, 26f);
+            UI.SetWidgetLayout(_projectSearchInputId, 10f, 8f, 240f, 26f);
             UI.InputFieldSetPlaceholder(_projectSearchInputId, "搜索实体...");
             UI.InputFieldSetOnChange(_projectSearchInputId, _projectSearchChangeCallback);
 
-            _projectTreeViewId = UI.CreateTreeView(_projectPanel.Id, 10, 40, 200f, estimatedProjectHeight);
+            _projectTreeViewId = UI.CreateTreeView(_projectPanel.Id, 10, 40, 340f, estimatedProjectHeight);
             
             _assetsNodeId = UI.TreeViewAddNode(_projectTreeViewId, 0, "📦 Assets", 0, true);
             _scenesNodeId = UI.TreeViewAddNode(_projectTreeViewId, 0, "🎬 Scenes", 0, true);

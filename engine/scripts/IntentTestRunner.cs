@@ -18,6 +18,7 @@ namespace Hezhou
             RunCase("intent.parent_child_hierarchy", ParentChildHierarchy);
             RunCase("intent.undo_redo_property", UndoRedoProperty);
             RunCase("intent.multi_select_batch", MultiSelectBatch);
+            RunCase("intent.bind_rotation_script", BindRotationScript);
             RunCase("intent.console_open_close", ConsoleOpenClose);
             RunCase("intent.running_paused_editing", RunningPausedEditing);
         }
@@ -186,6 +187,27 @@ namespace Hezhou
                 throw new Exception("multi-select delete did not remove both entities");
             }
             return "2 entities selected, batch edit + multi-delete passed";
+        }
+
+        private static string BindRotationScript()
+        {
+            EditorScript.TestNewScene();
+            ulong entityId = EditorScript.TestCreateMeshEntity(0);
+            if (entityId == 0 || !EditorScript.TestSelectEntity(entityId))
+            {
+                throw new Exception("failed to prepare entity for script binding");
+            }
+
+            if (!EditorScript.TestBindScript("RotationScript.cs"))
+            {
+                throw new Exception("RotationScript.cs binding failed");
+            }
+            string className = EditorScript.TestGetLastBindingClass();
+            if (className != "RotationScript")
+            {
+                throw new Exception("expected className RotationScript, actual=" + className);
+            }
+            return "RotationScript bound to entity " + entityId;
         }
 
         private static string ConsoleOpenClose()

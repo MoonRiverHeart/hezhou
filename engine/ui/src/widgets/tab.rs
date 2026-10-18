@@ -154,6 +154,16 @@ impl TabWidget {
         if text_width <= 0.0 {
             return text.to_string();
         }
+        // 先判断完整文字是否放得下。原实现无条件预留省略号宽度，
+        // 导致“几何/位置”这类两字标签在还有空间时也被截成“几...”。
+        let full_width: f32 = text
+            .chars()
+            .map(|ch| if ch.len_utf8() > 1 { font_size } else { font_size * 0.6 })
+            .sum();
+        if full_width <= text_width {
+            return text.to_string();
+        }
+
         let ellipsis_width = font_size * 1.5;
         let max_text_width = text_width - ellipsis_width;
         if max_text_width <= 0.0 {

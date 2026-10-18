@@ -265,5 +265,16 @@ glslc shaders/rotation.frag -o shaders/rotation.frag.spv
 - 多选真正驱动 renderer outline：`scene_add_to_selection/remove/toggle` FFI + `Scene` additive selection API
 - 多选删除（单个撤销快照 + 删除数量确认）
 - 撤销/重做工具栏计数；项目树实体搜索；资产模型搜索；Console 级别过滤/搜索/30 帧自动刷新
+- `visual` E2E 模式：脚本绑定/Console/搜索/多选 5 张关键截图 + `check_visual.py` 尺寸/非空校验
 - CI：`.github/workflows/ci.yml`（Rust/FFI/fuzz harness/C#）
 **文件**: `scripts/{run_tests,run_autotest,check_ffi_contract,check_autotest_report}.*`, `docs/ai_intent_testing.md`, `core/src/{asset_ffi,project,scene_ffi}.rs`, `core/src/ecs/*`, `ui/src/ffi/misc.rs`, `scripts/*.cs`
+
+### 15. UI 视觉回归修复 (2026-10-18)
+**问题**: RotationScript 绑定无显示；资产搜索框填满面板；属性 Tab/配置行溢出；Console 对话框越界；新建场景残留旧脚本绑定行。
+**修复**:
+- `RotationScript.cs` 增加逐实体 `RotationScript` 类并注册，保留旧 `RotationController`
+- 资产模型 Tab: `ScrollView → VStack → InputField + GridView`
+- `TabWidget::truncate_text` 先判断完整宽度；属性面板加宽，Min/Max/Step/Init 两行布局
+- Console Dialog 680x360；`ClearScriptBindingUI` 按容器子节点清理
+- 工具栏深蓝灰主题 + 运行绿/编辑器蓝/橙色强调线
+**视觉验证**: `run_autotest.ps1 -Mode visual` 输出 5 张截图，`check_visual.py` 校验尺寸/非空；人工检查确认绑定行、Console、搜索框、属性面板、多选

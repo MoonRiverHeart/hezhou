@@ -252,6 +252,11 @@ powershell -ExecutionPolicy Bypass -File scripts/run_autotest.ps1 `
 # 压力模式
 powershell -ExecutionPolicy Bypass -File scripts/run_autotest.ps1 `
   -Mode stress -Duration 8 -Interval 0.1 -ReportDir test-results/stress
+
+# 关键 UI 视觉截图
+powershell -ExecutionPolicy Bypass -File scripts/run_autotest.ps1 `
+  -Mode visual -ReportDir test-results/visual
+python scripts/check_visual.py test-results/visual
 ```
 
 报告产物：

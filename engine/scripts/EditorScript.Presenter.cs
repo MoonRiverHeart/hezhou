@@ -540,12 +540,51 @@ namespace Hezhou
             }
         }
         
+        /// <summary>
+        /// 清空运动/脚本标签页中属于旧场景的绑定行与属性控件。
+        /// 仅清场景不清这些控件会留下“幽灵绑定”（新场景仍显示上一个实体的脚本）。
+        /// </summary>
+        private static void ClearScriptBindingUI()
+        {
+            // 先按容器实际子节点清理，避免只移除父 HStack 后子 Label/Button 变成孤儿。
+            if (_scriptsListContainerId != 0)
+            {
+                while (UI.WidgetGetChildCount(_scriptsListContainerId) > 0)
+                {
+                    ulong childId = UI.WidgetGetChildId(_scriptsListContainerId, 0);
+                    if (childId == 0) break;
+                    UI.RemoveWidget(childId);
+                }
+            }
+
+            for (int i = 0; i < _scriptRowIds.Count; i++)
+            {
+                UI.RemoveWidget(_scriptRowIds[i]);
+            }
+            _scriptRowIds.Clear();
+
+            for (int i = 0; i < _scriptPropertyWidgetIds.Count; i++)
+            {
+                UI.RemoveWidget(_scriptPropertyWidgetIds[i]);
+            }
+            _scriptPropertyWidgetIds.Clear();
+
+            _scriptPropertyInfoMap.Clear();
+            _scriptPropertySliderCallbacks.Clear();
+            _scriptPropertyInputCallbacks.Clear();
+            _scriptMinMaxInitialToMainWidgetMap.Clear();
+            _removeScriptBtnIndices.Clear();
+            _scriptToggleBtnIndices.Clear();
+            _lastScriptBindingCount = -1;
+        }
+
         private static void ClearPropertiesPanel()
         {
             if (_propsTabWidget == null) return;
             
             _selectedEntityId = 0;
             _selectedEntityIds.Clear();
+            ClearScriptBindingUI();
             ClearEntityNodeSelectionHighlights();
             
             for (int i = 0; i < _propertyDescriptors.Count; i++)
@@ -775,11 +814,10 @@ namespace Hezhou
         // 创建单个脚本绑定行 (HStack + Label + Toggle + Remove)
         private static void CreateScriptBindingRow(ulong entityId, int bindingIndex, ScriptBindingInfo info)
         {
-            string scriptName = Path.GetFileName(info.ScriptPath);
-            string labelText = scriptName + " (" + info.ClassName + ")";
+            string labelText = info.ClassName;
             
             ulong scriptRow = UI.CreateHStack(_scriptsListContainerId, 5f);
-            UI.CreateLabel(scriptRow, RIGHT_PANEL_WIDTH - 130f, 20f, labelText);
+            UI.CreateLabel(scriptRow, 160f, 20f, labelText);
             
             // Toggle button: [ON] or [OFF] with colored background
             ulong toggleBtnId = UI.CreateButton(scriptRow, 40f, 20f, info.Enabled ? "[ON]" : "[OFF]");
@@ -1518,8 +1556,9 @@ UI.SetText(_runButtonId, "运行");
             }
 
             ulong rootId = UI.GetRootId();
-            float dialogWidth = 760f;
-            float dialogHeight = 480f;
+            // 逻辑坐标下窗口约 853x480（1280x720 / DPI 1.5），对话框不能超过该范围。
+            float dialogWidth = 680f;
+            float dialogHeight = 360f;
 
             _consoleDialogId = UI.CreateDialog(rootId, "Console", dialogWidth, dialogHeight);
             UI.DialogSetOnResult(_consoleDialogId, _consoleDialogResultCallback);
@@ -1541,7 +1580,7 @@ UI.SetText(_runButtonId, "运行");
             _consoleRefreshBtnId = UI.CreateButton(filterRow, 80f, 26f, "刷新");
             UI.SetOnClick(_consoleRefreshBtnId, _consoleRefreshCallback);
 
-            _consoleTextEditId = UI.CreateTextEdit(contentId, dialogWidth - 50f, 360f);
+            _consoleTextEditId = UI.CreateTextEdit(contentId, dialogWidth - 50f, 250f);
             RefreshConsoleText();
 
             UI.DialogSetContent(_consoleDialogId, contentId);
@@ -2969,6 +3008,77 @@ UI.SetText(_runButtonId, "运行");
             NewScene();
         }
 
+        /// <summary>测试用：按脚本文件名绑定到当前选中实体，覆盖 UI 脚本列表路径。</summary>
+        public static bool TestBindScript(string fileName)
+        {
+            if (_gameScene == null || _selectedEntityId == 0 || string.IsNullOrEmpty(fileName))
+            {
+                return false;
+            }
+
+            string className = Path.GetFileNameWithoutExtension(fileName);
+            string scriptPath = "scripts/" + fileName;
+
+            for (int i = 0; i < _availableScripts.Count; i++)
+            {
+                if (_availableScripts[i] == fileName)
+                {
+                    _selectedScriptIndex = i;
+                    if (_scriptDropdownId != 0)
+                    {
+                        UI.DropdownSetSelected(_scriptDropdownId, (ulong)i);
+                    }
+                    break;
+                }
+            }
+
+            int existing = _gameScene.GetScriptBindingCount(_selectedEntityId);
+            for (int i = 0; i < existing; i++)
+            {
+                if (_gameScene.GetScriptBindingInfo(_selectedEntityId, i).ClassName == className)
+                {
+                    return true;
+                }
+            }
+
+            CaptureUndoSnapshot("绑定脚本 " + className);
+            _gameScene.AttachScriptBinding(_selectedEntityId, scriptPath, className);
+            int bindingIndex = _gameScene.GetScriptBindingCount(_selectedEntityId) - 1;
+
+            Type scriptType;
+            if (_scriptTypeRegistry.TryGetValue(className, out scriptType) && scriptType != null)
+            {
+                MethodInfo setScenePtr = scriptType.GetMethod("SetScenePtr",
+                    BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
+                if (setScenePtr != null) setScenePtr.Invoke(null, new object[] { _gameScene.ScenePtr });
+
+                MethodInfo createInstance = scriptType.GetMethod("CreateInstance",
+                    BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
+                if (createInstance != null)
+                {
+                    IntPtr instancePtr = (IntPtr)createInstance.Invoke(null, null);
+                    UI.SceneSetScriptBindingInstanceId(
+                        _gameScene.ScenePtr,
+                        _selectedEntityId,
+                        (ulong)bindingIndex,
+                        (ulong)instancePtr.ToInt64());
+                }
+            }
+
+            _propertiesDirty = true;
+            _lastScriptBindingCount = -1;
+            UpdatePropertiesPanel(_selectedEntityId);
+            return _gameScene.GetScriptBindingCount(_selectedEntityId) > 0;
+        }
+
+        public static string TestGetLastBindingClass()
+        {
+            if (_gameScene == null || _selectedEntityId == 0) return "";
+            int count = _gameScene.GetScriptBindingCount(_selectedEntityId);
+            if (count == 0) return "";
+            return _gameScene.GetScriptBindingInfo(_selectedEntityId, count - 1).ClassName;
+        }
+
         public static void TestCaptureUndo()
         {
             CaptureUndoSnapshot();
@@ -3012,6 +3122,28 @@ UI.SetText(_runButtonId, "运行");
         public static void TestBatchSetPositionX(float x)
         {
             HandleFloat3ComponentChange("position", 0, 0, x.ToString());
+        }
+
+        public static void TestSetAssetSearch(string text)
+        {
+            _assetSearchQuery = text ?? "";
+            if (_assetSearchInputId != 0) UI.InputFieldSetText(_assetSearchInputId, _assetSearchQuery);
+            RefreshAssetGridView();
+        }
+
+        public static void TestSetProjectSearch(string text)
+        {
+            _projectSearchQuery = text ?? "";
+            if (_projectSearchInputId != 0) UI.InputFieldSetText(_projectSearchInputId, _projectSearchQuery);
+            RefreshEntityTree();
+        }
+
+        public static void TestSetPropertyTab(ulong index)
+        {
+            if (_propsTabWidget != null)
+            {
+                _propsTabWidget.SetActive(index);
+            }
         }
 
         public static bool TestOpenConsole()
