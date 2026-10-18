@@ -17,6 +17,8 @@ namespace Hezhou
             public string Level;
             public string Module;
             public string Message;
+            public string SourceFile;
+            public int SourceLine;
         }
 
         private static readonly object _lock = new object();
@@ -61,13 +63,15 @@ namespace Hezhou
         /// <summary>
         /// 记录全部级别日志，供 Console 面板显示。最多保留 500 条。
         /// </summary>
-        public static void RecordAll(LogLevel level, string module, string message)
+        public static void RecordAll(LogLevel level, string module, string message, string sourceFile = "", int sourceLine = 0)
         {
             Entry entry = new Entry();
             entry.Timestamp = DateTime.Now.ToString("HH:mm:ss.fff");
             entry.Level = level.ToString();
             entry.Module = module ?? "";
             entry.Message = message ?? "";
+            entry.SourceFile = sourceFile ?? "";
+            entry.SourceLine = sourceLine;
 
             lock (_lock)
             {
@@ -105,7 +109,8 @@ namespace Hezhou
                         if (haystack.IndexOf(normalizedQuery, StringComparison.Ordinal) < 0) continue;
                     }
 
-                    lines.Add(e.Timestamp + " [" + e.Level + "] [" + e.Module + "] " + e.Message);
+                    string location = string.IsNullOrEmpty(e.SourceFile) ? "" : " [" + System.IO.Path.GetFileName(e.SourceFile) + ":" + e.SourceLine + "]";
+                    lines.Add(e.Timestamp + " [" + e.Level + "] [" + e.Module + "]" + location + " " + e.Message);
                     matched++;
                 }
 
@@ -137,7 +142,7 @@ namespace Hezhou
             return level == filter;
         }
 
-        public static void Record(LogLevel level, string module, string message)
+        public static void Record(LogLevel level, string module, string message, string sourceFile = "", int sourceLine = 0)
         {
             if (level < LogLevel.Warn)
             {
@@ -149,6 +154,8 @@ namespace Hezhou
             entry.Level = level.ToString();
             entry.Module = module ?? "";
             entry.Message = message ?? "";
+            entry.SourceFile = sourceFile ?? "";
+            entry.SourceLine = sourceLine;
 
             lock (_lock)
             {
@@ -164,6 +171,26 @@ namespace Hezhou
                 else if (level == LogLevel.Error) _errorCount++;
                 else if (level == LogLevel.Fatal) _fatalCount++;
             }
+        }
+
+        public static bool GetLastErrorLocation(out string sourceFile, out int sourceLine)
+        {
+            lock (_lock)
+            {
+                for (int i = _entries.Count - 1; i >= 0; i--)
+                {
+                    Entry e = _entries[i];
+                    if (e.Level == "Error" || e.Level == "Fatal")
+                    {
+                        sourceFile = e.SourceFile;
+                        sourceLine = e.SourceLine;
+                        return !string.IsNullOrEmpty(sourceFile);
+                    }
+                }
+            }
+            sourceFile = "";
+            sourceLine = 0;
+            return false;
         }
 
         public static void RecordError(string module, string message)

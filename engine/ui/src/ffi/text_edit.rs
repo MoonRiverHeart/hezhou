@@ -214,3 +214,24 @@ pub extern "C" fn ui_text_edit_get_text(
         }
     }
 }
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ui_text_edit_set_cursor_line(
+    handle: WidgetTreeHandle,
+    widget_id: u64,
+    line: u32,
+) {
+    if handle.is_null() { return; }
+    unsafe {
+        let arc = &*(handle as *const Arc<Mutex<WidgetTree>>);
+        let mut tree = arc.lock();
+        let id = WidgetId::from_raw(widget_id);
+        if let Some(widget) = tree.get_widget_mut(id) {
+            if widget.widget_type() == "TextEdit" {
+                if let Some(edit) = widget.as_any_mut().downcast_mut::<crate::widgets::TextEdit>() {
+                    edit.set_cursor_to_line(line as usize);
+                }
+            }
+        }
+    }
+}

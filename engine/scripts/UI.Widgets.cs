@@ -150,6 +150,13 @@ namespace Hezhou
             return func(_widgetTree, parentId, width, height);
         }
 
+        public static void TextEditSetCursorLine(ulong widgetId, uint line)
+        {
+            if (_ffi.ui_text_edit_set_cursor_line == IntPtr.Zero) return;
+            var func = Marshal.GetDelegateForFunctionPointer<TextEditSetCursorLineDelegate>(_ffi.ui_text_edit_set_cursor_line);
+            func(_widgetTree, widgetId, line);
+        }
+
         public static void TextEditSetText(ulong widgetId, string text)
         {
             if (_ffi.ui_text_edit_set_text == IntPtr.Zero)

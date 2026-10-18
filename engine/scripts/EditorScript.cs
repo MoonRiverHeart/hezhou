@@ -51,6 +51,7 @@ namespace Hezhou
             _rightMaxClickCallback = OnRightMaxClick;
             _consoleDialogResultCallback = OnConsoleDialogResult;
             _consoleRefreshCallback = OnConsoleRefresh;
+            _consoleJumpCallback = OnConsoleJumpToSource;
             _consoleLevelSelectCallback = OnConsoleLevelSelect;
             _consoleSearchChangeCallback = OnConsoleSearchChange;
             _undoClickCallback = OnUndoClick;

@@ -1,4 +1,5 @@
 using System;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
 namespace Hezhou
@@ -139,19 +140,19 @@ namespace Hezhou
                 _dfxPerfEndFrame = Marshal.GetDelegateForFunctionPointer<DfxPerfEndFrameDelegate>(perfEndFramePtr);
         }
 
-        private static void CallDfxLog(byte level, string module, string message)
+        private static void CallDfxLog(byte level, string module, string message, string sourceFile = "", int sourceLine = 0)
         {
             // Console 面板需要全部级别；测试报告只采集 Warn/Error/Fatal。
-            TestTelemetry.RecordAll((LogLevel)level, module, message);
+            TestTelemetry.RecordAll((LogLevel)level, module, message, sourceFile, sourceLine);
             if (level >= (byte)LogLevel.Warn)
             {
-                TestTelemetry.Record((LogLevel)level, module, message);
+                TestTelemetry.Record((LogLevel)level, module, message, sourceFile, sourceLine);
             }
 
             if (_dfxLog != null && _dfxHandle != IntPtr.Zero)
-                _dfxLog(_dfxHandle, level, module, message, "", 0);
+                _dfxLog(_dfxHandle, level, module, message, sourceFile, (uint)sourceLine);
             else if (_dfxHandle != IntPtr.Zero)
-                DfxNativeMethods.dfx_log(_dfxHandle, level, module, message, "", 0);
+                DfxNativeMethods.dfx_log(_dfxHandle, level, module, message, sourceFile, (uint)sourceLine);
             else
                 Console.WriteLine($"[{level}][{module}] {message}");
         }
@@ -171,19 +172,19 @@ namespace Hezhou
             CallDfxLog((byte)LogLevel.Info, module, message);
         }
 
-        public static void Warn(string module, string message)
+        public static void Warn(string module, string message, [CallerFilePath] string sourceFile = "", [CallerLineNumber] int sourceLine = 0)
         {
-            CallDfxLog((byte)LogLevel.Warn, module, message);
+            CallDfxLog((byte)LogLevel.Warn, module, message, sourceFile, sourceLine);
         }
 
-        public static void Error(string module, string message)
+        public static void Error(string module, string message, [CallerFilePath] string sourceFile = "", [CallerLineNumber] int sourceLine = 0)
         {
-            CallDfxLog((byte)LogLevel.Error, module, message);
+            CallDfxLog((byte)LogLevel.Error, module, message, sourceFile, sourceLine);
         }
 
-        public static void Fatal(string module, string message)
+        public static void Fatal(string module, string message, [CallerFilePath] string sourceFile = "", [CallerLineNumber] int sourceLine = 0)
         {
-            CallDfxLog((byte)LogLevel.Fatal, module, message);
+            CallDfxLog((byte)LogLevel.Fatal, module, message, sourceFile, sourceLine);
         }
 
         public static void TraceBegin(string name, string category = "ui")

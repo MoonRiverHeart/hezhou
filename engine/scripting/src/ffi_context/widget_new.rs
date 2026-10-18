@@ -95,3 +95,4 @@ pub type ImageSetTextureIdFn = extern "C" fn(WidgetTreeHandle, u64, u64);
 pub type ImageGetTextureIdFn = extern "C" fn(WidgetTreeHandle, u64) -> u64;
 pub type ImageSetScaleModeFn = extern "C" fn(WidgetTreeHandle, u64, u32);
 pub type ImageSetUvFn = extern "C" fn(WidgetTreeHandle, u64, f32, f32, f32, f32);
+pub type TextEditSetCursorLineFn = extern "C" fn(WidgetTreeHandle, u64, u32);

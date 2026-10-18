@@ -162,6 +162,8 @@ namespace Hezhou
         private static ulong _consoleLevelDropdownId;
         private static ulong _consoleSearchInputId;
         private static ulong _consoleRefreshBtnId;
+        private static ulong _consoleJumpBtnId;
+        private static UI.WidgetCallbackDelegate _consoleJumpCallback;
         private static string _consoleLevelFilter = "Warn+";
         private static string _consoleSearchQuery = "";
         private static int _consoleRefreshFrame = 0;

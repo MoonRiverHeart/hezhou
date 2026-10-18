@@ -303,6 +303,7 @@ pub project_add_entity: ProjectAddEntityFn,
         pub ui_icon_set_color: IconSetColorFn,
         pub ui_icon_count: IconCountFn,
         pub ui_grid_view_set_item_thumbnail: GridViewSetItemThumbnailFn,
+        pub ui_text_edit_set_cursor_line: TextEditSetCursorLineFn,
     }
 
 static mut FFI_CONTEXT: Option<Box<FfiContext>> = None;

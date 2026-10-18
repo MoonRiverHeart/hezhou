@@ -92,6 +92,9 @@ namespace Hezhou
         public delegate void GridViewSetItemThumbnailDelegate(IntPtr handle, ulong gridId, int index, string thumbnail);
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void TextEditSetCursorLineDelegate(IntPtr handle, ulong widgetId, uint line);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public delegate ulong GetRootIdDelegate(IntPtr handle);
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public delegate void ClearWidgetTreeDelegate(IntPtr handle);
@@ -1170,6 +1173,7 @@ namespace Hezhou
             public IntPtr ui_icon_set_color;
             public IntPtr ui_icon_count;
             public IntPtr ui_grid_view_set_item_thumbnail;
+            public IntPtr ui_text_edit_set_cursor_line;
         }
 
         public static void InitFromContext(IntPtr contextPtr)

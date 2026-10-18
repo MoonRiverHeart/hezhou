@@ -1656,6 +1656,9 @@ UI.SetText(_runButtonId, "运行");
             _consoleRefreshBtnId = UI.CreateButton(filterRow, 80f, 26f, "刷新");
             UI.SetOnClick(_consoleRefreshBtnId, _consoleRefreshCallback);
 
+            _consoleJumpBtnId = UI.CreateButton(filterRow, 90f, 26f, "跳转源码");
+            UI.SetOnClick(_consoleJumpBtnId, _consoleJumpCallback);
+
             _consoleTextEditId = UI.CreateTextEdit(contentId, dialogWidth - 50f, 250f);
             RefreshConsoleText();
 
@@ -1681,6 +1684,32 @@ UI.SetText(_runButtonId, "运行");
             string[] levels = new string[] { "All", "Info", "Warn+", "Error+" };
             _consoleLevelFilter = index < (ulong)levels.Length ? levels[index] : "All";
             RefreshConsoleText();
+        }
+
+        private static void OnConsoleJumpToSource(ulong widgetId)
+        {
+            string sourceFile;
+            int sourceLine;
+            if (!TestTelemetry.GetLastErrorLocation(out sourceFile, out sourceLine))
+            {
+                if (_statusItem != null) _statusItem.Text = "没有可跳转的错误日志";
+                return;
+            }
+            if (!File.Exists(sourceFile))
+            {
+                if (_statusItem != null) _statusItem.Text = "错误源文件不存在: " + sourceFile;
+                return;
+            }
+            LoadFileToEditor(sourceFile);
+            if (_scriptTextEditId != 0 && sourceLine > 0)
+            {
+                UI.TextEditSetCursorLine(_scriptTextEditId, (uint)sourceLine);
+            }
+            if (_statusItem != null)
+            {
+                _statusItem.Text = "已跳转: " + Path.GetFileName(sourceFile) + ":" + sourceLine;
+            }
+            UI.DialogHide(_consoleDialogId);
         }
 
         private static void OnConsoleSearchChange(ulong widgetId, string text)

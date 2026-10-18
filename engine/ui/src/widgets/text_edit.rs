@@ -113,6 +113,29 @@ impl TextEdit {
         self.flags.dirty_render = true;
     }
 
+    /// 将光标移动到指定行（1-based），并滚动到可视区域。
+    pub fn set_cursor_to_line(&mut self, line: usize) {
+        let target_line = line.max(1);
+        let mut byte_index = 0usize;
+        let mut current = 1usize;
+        for (i, ch) in self.text.char_indices() {
+            if current >= target_line { break; }
+            if ch == '\n' {
+                current += 1;
+                byte_index = i + 1;
+            }
+        }
+        self.cursor_byte_index = byte_index.min(self.text.len());
+        self.cursor_grapheme_index = self.byte_index_to_grapheme_index(self.cursor_byte_index);
+        self.selection_start = self.cursor_byte_index;
+        self.selection_end = self.cursor_byte_index;
+        self.focused = true;
+        let line_h = self.text_style.font_size * 1.4;
+        self.scroll_offset_y = ((target_line.saturating_sub(2)) as f32) * line_h;
+        self.layout_dirty = true;
+        self.flags.dirty_render = true;
+    }
+
     pub fn get_text_style(&self) -> &TextStyle {
         &self.text_style
     }

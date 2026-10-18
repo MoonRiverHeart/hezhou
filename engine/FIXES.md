@@ -1,5 +1,14 @@
 # Bug Fixes Log
 
+## 2026-10-18: Console 源码定位与跳转
+
+- `Log.Warn/Error/Fatal` 增加 `[CallerFilePath]` / `[CallerLineNumber]`。
+- `TestTelemetry` 记录 SourceFile/SourceLine，Console 行尾显示 `[文件:行]`。
+- Console 新增“跳转源码”按钮：取最近 Error/Fatal，打开脚本编辑器并定位到对应行。
+- TextEdit 新增 `set_cursor_to_line` + FFI `ui_text_edit_set_cursor_line`。
+- FFI 276 字段；visual 02 Console 显示跳转按钮。
+
+
 ## 2026-10-18: 资产缩略图（SVG 图标）
 
 - GridView 支持 `icon:<id>` 缩略图，并在 `thumbnail` 缺失时按资产名回退到图标。
