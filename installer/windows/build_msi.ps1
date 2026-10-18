@@ -2,7 +2,9 @@
 param(
     [string]$Version = "",
     [switch]$SkipBuild,
-    [string]$StageDir = ""
+    [string]$StageDir = "",
+    [string]$MonoRoot = "",
+    [switch]$NoRuntime
 )
 $ErrorActionPreference = "Stop"
 $Root = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
@@ -36,17 +38,48 @@ if (Test-Path $Stage) { Remove-Item $Stage -Recurse -Force }
 New-Item -ItemType Directory -Force $Stage | Out-Null
 
 Copy-Item (Join-Path $Engine "target\release\mono_editor_demo.exe") $Stage
-Copy-Item (Join-Path $Engine "scripts") (Join-Path $Stage "scripts") -Recurse
+$scriptsStage = Join-Path $Stage "scripts"
+New-Item -ItemType Directory -Force $scriptsStage | Out-Null
+Copy-Item (Join-Path $Engine "scripts\*.cs") $scriptsStage
+$editorDll = Join-Path $Engine "scripts\bin\Mono\EditorScript.dll"
+if (Test-Path $editorDll) {
+    New-Item -ItemType Directory -Force (Join-Path $scriptsStage "bin\Mono") | Out-Null
+    Copy-Item $editorDll (Join-Path $scriptsStage "bin\Mono\EditorScript.dll") -Force
+}
 Copy-Item (Join-Path $Engine "assets") (Join-Path $Stage "assets") -Recurse
 Copy-Item (Join-Path $Engine "fonts") (Join-Path $Stage "fonts") -Recurse
 Copy-Item (Join-Path $Engine "FIXES.md") (Join-Path $Stage "CHANGELOG.md") -ErrorAction SilentlyContinue
 
-# 只保留部署所需的 C# 运行文件，去掉测试/中间产物
-$scriptsStage = Join-Path $Stage "scripts"
-Get-ChildItem $scriptsStage -Recurse -Directory | Where-Object {
-    $_.FullName -match '\\bin\\Mono\\Release' -or $_.FullName -match '\\bin\\Mono\\Debug'
-} | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
-Get-ChildItem $scriptsStage -Recurse -File -Include *.pdb | Remove-Item -Force -ErrorAction SilentlyContinue
+if (-not $NoRuntime) {
+    # Vulkan loader + MSVC runtime: copy next to the executable so the MSI is
+    # self-contained on machines without the Vulkan SDK/VC redist.
+    foreach ($dll in @("vulkan-1.dll", "vcruntime140.dll", "vcruntime140_1.dll", "msvcp140.dll")) {
+        $src = Join-Path $env:WINDIR "System32\$dll"
+        if (Test-Path $src) { Copy-Item $src (Join-Path $Stage $dll) -Force }
+    }
+
+    # Bundle a minimal Mono runtime (runtime DLLs, mcs, 4.5 assemblies, config).
+    if (-not $MonoRoot) {
+        if ($env:MONO_HOME) { $MonoRoot = $env:MONO_HOME }
+        elseif (Test-Path "C:\Program Files\Mono") { $MonoRoot = "C:\Program Files\Mono" }
+    }
+    if ($MonoRoot -and (Test-Path $MonoRoot)) {
+        $runtime = Join-Path $Stage "runtime\mono"
+        New-Item -ItemType Directory -Force $runtime | Out-Null
+        foreach ($part in @("bin", "etc")) {
+            Copy-Item (Join-Path $MonoRoot $part) (Join-Path $runtime $part) -Recurse -Force
+        }
+        $libRoot = Join-Path $runtime "lib\mono"
+        New-Item -ItemType Directory -Force $libRoot | Out-Null
+        foreach ($asm in @("4.5", "4.5-api", "4.0-api")) {
+            $src = Join-Path $MonoRoot "lib\mono\$asm"
+            if (Test-Path $src) { Copy-Item $src (Join-Path $libRoot $asm) -Recurse -Force }
+        }
+        Write-Host "Bundled Mono runtime: $MonoRoot"
+    } else {
+        Write-Warning "Mono runtime not found; MSI relies on a system Mono installation"
+    }
+}
 
 $wix = Get-Command wix -ErrorAction SilentlyContinue
 if (-not $wix) {

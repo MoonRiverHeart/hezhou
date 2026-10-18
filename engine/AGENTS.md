@@ -429,3 +429,7 @@ glslc shaders/rotation.frag -o shaders/rotation.frag.spv
 - WiX v4 MSI + PowerShell 构建脚本；DEB 由 Python ar/tar 构建，无需 dpkg-deb。
 - 安装布局：Windows Program Files\Hezhou；Linux /opt/hezhou/editor + /usr/bin/hezhou-editor。
 - CI 手动任务 package-windows / package-linux。
+
+### 49. 安装包内置运行时 (2026-10-18)
+- runtime/mono 自动打包（bin/etc/4.5/4.5-api）；Windows 含 Vulkan/VC runtime DLL。
+- 编辑器与启动器设置 Mono 环境；hot reload 优先内置 mcs。

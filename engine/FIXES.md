@@ -1,5 +1,18 @@
 # Bug Fixes Log
 
+## 2026-10-18: 安装包内置运行时依赖
+
+- Windows/ Linux 打包脚本在构建机上存在 Mono 时，复制最小 Mono 运行时到
+  `runtime/mono`：bin、etc、lib/mono/4.5、4.5-api。
+- Windows 额外复制 `vulkan-1.dll`、`vcruntime140.dll`、`vcruntime140_1.dll`、
+  `msvcp140.dll` 到安装根目录。
+- 编辑器启动时自动把 `runtime/mono/bin` 加入 PATH，并设置 `MONO_PATH`、
+  `MONO_CFG_DIR`、`MONO_GAC_PREFIX`；hot reload 优先使用内置 `mcs`。
+- Linux 启动器设置同样的 PATH/LD_LIBRARY_PATH/MONO_* 环境；检测到内置 Mono 时
+  从 deb Depends 中移除 mono-runtime/mono-mcs。
+- 包内 scripts 目录只保留 `.cs` 与 `EditorScript.dll`，不再携带 obj/测试产物。
+
+
 ## 2026-10-18: Windows MSI / Linux DEB 打包
 
 - `installer/windows/HezhouEditor.wxs`：WiX v4 MSI，安装到 Program Files，

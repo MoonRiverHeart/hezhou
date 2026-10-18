@@ -40,7 +40,37 @@ pub(crate) struct SavedEntityBinding {
 
 pub(crate) static mut SAVED_BINDINGS: Vec<SavedEntityBinding> = Vec::new();
 
+fn setup_bundled_runtime() {
+    let exe_dir = match std::env::current_exe().ok().and_then(|p| p.parent().map(|p| p.to_path_buf())) {
+        Some(d) => d,
+        None => return,
+    };
+    let mono_root = exe_dir.join("runtime").join("mono");
+    if !mono_root.exists() {
+        return;
+    }
+    let bin = mono_root.join("bin");
+    let assemblies = mono_root.join("lib").join("mono").join("4.5");
+    let sep = if cfg!(windows) { ";" } else { ":" };
+    let old_path = std::env::var("PATH").unwrap_or_default();
+    if bin.exists() {
+        std::env::set_var("PATH", format!("{}{}{}", bin.display(), sep, old_path));
+    }
+    if assemblies.exists() {
+        std::env::set_var("MONO_PATH", assemblies.display().to_string());
+        std::env::set_var("MONO_GAC_PREFIX", mono_root.display().to_string());
+    }
+    let cfg = mono_root.join("etc");
+    if cfg.exists() {
+        std::env::set_var("MONO_CFG_DIR", cfg.display().to_string());
+    }
+    // Mono derives its install prefix from the loaded runtime DLL; the bundled
+    // layout keeps bin/, lib/mono/4.5/ and etc/ siblings under runtime/mono.
+    dfx_info!("Demo", "Bundled Mono runtime: {}", mono_root.display());
+}
+
 pub fn run() {
+    setup_bundled_runtime();
     let args: Vec<String> = std::env::args().collect();
 
     // 无人值守自动测试：--auto-test 等价于 HEZHOU_AUTOTEST=1。

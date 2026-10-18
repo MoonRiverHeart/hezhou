@@ -53,6 +53,8 @@ def main():
     ap.add_argument("--version", default="0.1.0")
     ap.add_argument("--arch", default="amd64")
     ap.add_argument("--out", default=str(ROOT / "dist"))
+    ap.add_argument("--mono-root", default="/usr")
+    ap.add_argument("--no-bundle-mono", action="store_true")
     args = ap.parse_args()
 
     binary = Path(args.binary)
@@ -70,14 +72,20 @@ def main():
 
     # Application payload
     shutil.copy2(binary, app / "mono_editor_demo")
-    for name in ("scripts", "assets", "fonts"):
+    script_src = ENGINE / "scripts"
+    if script_src.exists():
+        dst_scripts = app / "scripts"
+        dst_scripts.mkdir(parents=True)
+        for cs in script_src.glob("*.cs"):
+            shutil.copy2(cs, dst_scripts / cs.name)
+        dll = script_src / "bin" / "Mono" / "EditorScript.dll"
+        if dll.exists():
+            (dst_scripts / "bin" / "Mono").mkdir(parents=True)
+            shutil.copy2(dll, dst_scripts / "bin" / "Mono" / "EditorScript.dll")
+    for name in ("assets", "fonts"):
         src = ENGINE / name
         if src.exists():
             shutil.copytree(src, app / name)
-    # Remove build intermediates from the staged scripts folder
-    for sub in (app / "scripts" / "bin").glob("Mono/*/*"):
-        if sub.is_dir():
-            shutil.rmtree(sub, ignore_errors=True)
     for p in app.rglob("*.pdb"):
         p.unlink(missing_ok=True)
 
@@ -86,7 +94,16 @@ def main():
     bin_dir.mkdir(parents=True)
     launcher = bin_dir / "hezhou-editor"
     launcher.write_text(
-        "#!/bin/sh\ncd /opt/hezhou/editor || exit 1\nexec ./mono_editor_demo \"$@\"\n",
+        "#!/bin/sh\n"
+        "cd /opt/hezhou/editor || exit 1\n"
+        "if [ -d /opt/hezhou/runtime/mono/bin ]; then\n"
+        "  export PATH=/opt/hezhou/runtime/mono/bin:$PATH\n"
+        "  export LD_LIBRARY_PATH=/opt/hezhou/runtime/mono/lib:${LD_LIBRARY_PATH:-}\n"
+        "  export MONO_PATH=/opt/hezhou/runtime/mono/lib/mono/4.5\n"
+        "  export MONO_CFG_DIR=/opt/hezhou/runtime/mono/etc\n"
+        "  export MONO_GAC_PREFIX=/opt/hezhou/runtime/mono\n"
+        "fi\n"
+        "exec ./mono_editor_demo \"$@\"\n",
         encoding="utf-8",
     )
     launcher.chmod(0o755)
@@ -110,6 +127,41 @@ def main():
     if icon_src.exists():
         shutil.copy2(icon_src, icon_dst)
 
+    bundle_mono = False
+    mono_root = Path(args.mono_root)
+    if not args.no_bundle_mono and (mono_root / "bin" / "mono").exists():
+        runtime = build / "opt" / "hezhou" / "runtime" / "mono"
+        rb = runtime / "bin"
+        rl = runtime / "lib"
+        rb.mkdir(parents=True)
+        rl.mkdir(parents=True)
+        shutil.copy2(mono_root / "bin" / "mono", rb / "mono")
+        for asm in ("4.5", "4.5-api"):
+            src = mono_root / "lib" / "mono" / asm
+            if src.exists():
+                shutil.copytree(src, runtime / "lib" / "mono" / asm)
+        etc = mono_root / "etc" / "mono"
+        if etc.exists():
+            shutil.copytree(etc, runtime / "etc" / "mono")
+        # Mono native runtime libraries (best effort; glibc/driver libs stay system)
+        for libdir in (mono_root / "lib" / "x86_64-linux-gnu", mono_root / "lib64"):
+            if libdir.exists():
+                for so in libdir.glob("libmono*.so*"):
+                    if so.is_file():
+                        shutil.copy2(so, rl / so.name)
+        mcs_exe = mono_root / "lib" / "mono" / "4.5" / "mcs.exe"
+        if mcs_exe.exists():
+            mcs = rb / "mcs"
+            mcs.write_text(
+                "#!/bin/sh\n"
+                "exec /opt/hezhou/runtime/mono/bin/mono "
+                "/opt/hezhou/runtime/mono/lib/mono/4.5/mcs.exe \"$@\"\n",
+                encoding="utf-8",
+            )
+            mcs.chmod(0o755)
+        bundle_mono = True
+        print(f"Bundled Mono runtime from {mono_root}")
+
     debian = build / "DEBIAN"
     debian.mkdir()
     installed_kb = int(sum(p.stat().st_size for p in build.rglob("*") if p.is_file()) / 1024) + 1
@@ -120,7 +172,8 @@ def main():
         f"Priority: optional\n"
         f"Architecture: {args.arch}\n"
         f"Installed-Size: {installed_kb}\n"
-        f"Depends: libc6, libvulkan1, libglfw3, libx11-6, libxrandr2, libxi6, libxcursor1, libxinerama1, libfontconfig1, mono-runtime, mono-mcs\n"
+        f"Depends: libc6, libvulkan1, libglfw3, libx11-6, libxrandr2, libxi6, libxcursor1, libxinerama1, libfontconfig1"
+        + ("" if bundle_mono else ", mono-runtime, mono-mcs") + "\n"
         f"Maintainer: Hezhou <dev@hezhou.local>\n"
         f"Homepage: https://github.com/MoonRiverHeart/hezhou\n"
         f"Description: Hezhou game editor\n"

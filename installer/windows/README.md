@@ -20,4 +20,12 @@ Options:
 Output: `dist/HezhouEditor-<version>.msi`
 
 The MSI installs to `%ProgramFiles%\Hezhou`, with a Start Menu shortcut.
-Runtime requirements: Vulkan-capable GPU/driver; Mono runtime for C# scripting/hot reload.
+
+Runtime dependencies bundled when available at build time:
+- `vulkan-1.dll` (Vulkan loader)
+- `vcruntime140.dll`, `vcruntime140_1.dll`, `msvcp140.dll` (MSVC runtime)
+- `runtime/mono/` (Mono runtime DLLs, `mcs`, 4.5 assemblies and config)
+
+The editor prepends `runtime/mono/bin` to PATH and sets `MONO_PATH`/
+`MONO_CFG_DIR` before initializing Mono, so a system Mono install is not required
+when the bundle is present. A Vulkan-capable GPU driver is still required.

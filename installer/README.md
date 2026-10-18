@@ -15,6 +15,13 @@ Linux DEB
 - `data.tar.gz` contains `/opt/hezhou/editor`, `/usr/bin/hezhou-editor`,
   desktop entry and icon.
 
+Bundled runtime
+--------------
+Windows and Linux builders copy a minimal Mono runtime into `runtime/mono`
+when Mono is present at build time. The Windows MSI also bundles the Vulkan
+loader and MSVC runtime DLLs next to the executable. Linux keeps Vulkan/GLFW/X11
+as Debian dependencies because the GPU driver cannot be bundled.
+
 CI
 --
 `.github/workflows/ci.yml` has `package-windows` and `package-linux` jobs,

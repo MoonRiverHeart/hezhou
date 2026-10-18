@@ -66,12 +66,24 @@ fn restore_scene_bindings(saved: &[super::SavedEntityBinding]) {
 pub fn compile_editor_script() {
     use std::process::Command;
     
-    if !std::path::Path::new("C:\\Program Files\\Mono\\bin\\mcs.bat").exists() {
-        dfx_info!("Demo", "mcs.bat not found - standalone release mode, skipping compilation");
-        return;
-    }
+    let mcs = std::env::current_exe()
+        .ok()
+        .and_then(|p| p.parent().map(|p| p.to_path_buf()))
+        .map(|p| p.join("runtime").join("mono").join("bin").join(if cfg!(windows) { "mcs.bat" } else { "mcs" }))
+        .filter(|p| p.exists())
+        .or_else(|| {
+            let p = std::path::PathBuf::from("C:\\Program Files\\Mono\\bin\\mcs.bat");
+            if p.exists() { Some(p) } else { None }
+        });
+    let mcs = match mcs {
+        Some(p) => p,
+        None => {
+            dfx_info!("Demo", "mcs not found - standalone release mode, skipping compilation");
+            return;
+        }
+    };
     
-    let result = Command::new("C:\\Program Files\\Mono\\bin\\mcs.bat")
+    let result = Command::new(&mcs)
         .args([
             "-target:library",
             "-out:scripts/bin/Mono/EditorScript.dll",

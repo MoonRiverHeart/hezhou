@@ -48,3 +48,4 @@ engine/test-results/
 /installer/stage/
 /installer/build/
 dist-test/
+__pycache__/

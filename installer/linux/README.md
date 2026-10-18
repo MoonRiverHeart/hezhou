@@ -27,5 +27,7 @@ hezhou-editor
 ```
 
 The package installs to `/opt/hezhou/editor`, adds `/usr/bin/hezhou-editor`
-and a desktop entry. Runtime dependencies include Vulkan, GLFW, Mono runtime
-and Mono C# compiler.
+and a desktop entry. If Mono is available on the build host, `build_deb.py`
+bundles `runtime/mono` (mono, mcs wrapper, 4.5 assemblies and native libmono
+libraries) and removes Mono from the package dependencies. Vulkan/GLFW/X11
+system libraries remain package dependencies because GPU drivers are host-specific.
