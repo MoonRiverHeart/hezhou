@@ -374,6 +374,8 @@ namespace Hezhou
             _visualSteps.Add(new VisualStep("11_right_panel_max", VisualRightPanelMax, 10));
             _visualSteps.Add(new VisualStep("12_dock_restored", VisualDockRestore, 10));
             _visualSteps.Add(new VisualStep("13_shift_range_select", VisualShiftRangeSelect, 10));
+            _visualSteps.Add(new VisualStep("14_command_palette", VisualCommandPalette, 10));
+            _visualSteps.Add(new VisualStep("15_palette_closed", VisualCommandPaletteClose, 10));
 
             RunNextVisualStep();
         }
@@ -454,6 +456,16 @@ namespace Hezhou
             EditorScript.TestSetPosition(c, 2f, 0.5f, 0f);
             EditorScript.TestSelectEntity(a);
             EditorScript.TestShiftRangeSelect(a, c);
+        }
+
+        private static void VisualCommandPalette()
+        {
+            EditorScript.TestShowCommandPalette();
+        }
+
+        private static void VisualCommandPaletteClose()
+        {
+            EditorScript.TestHideCommandPalette();
         }
 
         private static void VisualMultiSelect()

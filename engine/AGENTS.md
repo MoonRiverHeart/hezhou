@@ -315,3 +315,8 @@ glslc shaders/rotation.frag -o shaders/rotation.frag.spv
 - `_entityDisplayOrder` + `_selectionAnchorEntityId`；Shift 点击按树可见顺序范围选择。
 - 同步 Rust selection / C# 多选列表 / TreeView 高亮 / 属性面板。
 - intent 10/10；visual 13 张（新增 `13_shift_range_select.png`）。
+
+### 21. Command Palette (2026-10-18)
+- `EditorScript.CommandPalette.cs`：Ctrl+Shift+P 打开，输入过滤，Esc 关闭。
+- 11 个命令：新建/保存/撤销/重做/运行暂停/Console/主题/Gallery/Dock 最大化/重置/打开项目。
+- intent 11/11；visual 15 张（新增 14/15 命令面板与关闭恢复）。

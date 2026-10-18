@@ -196,6 +196,7 @@ namespace Hezhou
             const uint KEY_D = 4;
             const uint KEY_N = 14;
             const uint KEY_O = 15;
+            const uint KEY_P = 16;
             const uint KEY_S = 19;
             const uint KEY_Y = 25;
             const uint KEY_Z = 26;
@@ -208,6 +209,17 @@ namespace Hezhou
             bool shift = (modifiers & 1) != 0;
             _ctrlPressed = ctrl;
             _shiftPressed = shift;
+
+            if (pressed && ctrl && shift && keycode == KEY_P)
+            {
+                ToggleCommandPalette();
+                return;
+            }
+            if (pressed && keycode == KEY_ESC && IsCommandPaletteOpen)
+            {
+                HideCommandPalette();
+                return;
+            }
 
             // 文件快捷键：Ctrl+S 保存、Ctrl+Shift+S 另存为、Ctrl+O 打开项目、Ctrl+N 新建场景
             if (pressed && ctrl)

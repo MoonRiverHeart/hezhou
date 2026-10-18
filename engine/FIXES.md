@@ -1,5 +1,15 @@
 # Bug Fixes Log
 
+## 2026-10-18: Command Palette（Ctrl+Shift+P）
+
+- 新增 `EditorScript.CommandPalette.cs`：Cmd/Ctrl+Shift+P 打开，Esc 关闭。
+- 支持输入过滤；命令覆盖新建/保存/撤销/重做/运行暂停/Console/主题/Gallery/
+  最大化属性面板/重置 Dock/打开项目。
+- 遮罩层 + 居中卡片，非阻塞编辑器状态。
+- intent `intent.command_palette`（11/11）；visual `14_command_palette`、
+  `15_palette_closed`，总计 15 张。
+
+
 ## 2026-10-18: Shift 范围多选（Selection v1）
 
 - Hierarchy 维护当前可见实体顺序 `_entityDisplayOrder`。

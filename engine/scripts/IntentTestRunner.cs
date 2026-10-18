@@ -21,6 +21,7 @@ namespace Hezhou
             RunCase("intent.bind_rotation_script", BindRotationScript);
             RunCase("intent.icon_system", IconSystem);
             RunCase("intent.shift_range_select", ShiftRangeSelect);
+            RunCase("intent.command_palette", CommandPalette);
             RunCase("intent.console_open_close", ConsoleOpenClose);
             RunCase("intent.running_paused_editing", RunningPausedEditing);
         }
@@ -189,6 +190,15 @@ namespace Hezhou
                 throw new Exception("multi-select delete did not remove both entities");
             }
             return "2 entities selected, batch edit + multi-delete passed";
+        }
+
+        private static string CommandPalette()
+        {
+            EditorScript.TestShowCommandPalette();
+            if (!EditorScript.IsCommandPaletteOpen) throw new Exception("command palette did not open");
+            EditorScript.TestHideCommandPalette();
+            if (EditorScript.IsCommandPaletteOpen) throw new Exception("command palette did not close");
+            return "command palette open/close";
         }
 
         private static string ShiftRangeSelect()

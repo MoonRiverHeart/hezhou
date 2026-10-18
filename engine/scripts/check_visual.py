@@ -25,6 +25,8 @@ EXPECTED = [
     "11_right_panel_max.png",
     "12_dock_restored.png",
     "13_shift_range_select.png",
+    "14_command_palette.png",
+    "15_palette_closed.png",
 ]
 
 
