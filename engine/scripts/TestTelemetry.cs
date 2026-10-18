@@ -81,20 +81,60 @@ namespace Hezhou
 
         public static string GetRecentLogs(int maxLines)
         {
+            return GetRecentLogs(maxLines, null, null);
+        }
+
+        public static string GetRecentLogs(int maxLines, string levelFilter, string query)
+        {
             if (maxLines <= 0) maxLines = 200;
+            string normalizedQuery = string.IsNullOrEmpty(query) ? null : query.Trim().ToLowerInvariant();
 
             lock (_lock)
             {
                 StringBuilder sb = new StringBuilder();
-                int start = _allEntries.Count > maxLines ? _allEntries.Count - maxLines : 0;
-                for (int i = start; i < _allEntries.Count; i++)
+                int matched = 0;
+                // 从旧到新收集，最后只保留最近 maxLines 条匹配项。
+                List<string> lines = new List<string>();
+                for (int i = 0; i < _allEntries.Count; i++)
                 {
                     Entry e = _allEntries[i];
-                    sb.Append(e.Timestamp).Append(" [").Append(e.Level).Append("] [")
-                      .Append(e.Module).Append("] ").AppendLine(e.Message);
+                    if (!MatchesLevel(e.Level, levelFilter)) continue;
+                    if (normalizedQuery != null)
+                    {
+                        string haystack = (e.Module + " " + e.Message).ToLowerInvariant();
+                        if (haystack.IndexOf(normalizedQuery, StringComparison.Ordinal) < 0) continue;
+                    }
+
+                    lines.Add(e.Timestamp + " [" + e.Level + "] [" + e.Module + "] " + e.Message);
+                    matched++;
+                }
+
+                int start = lines.Count > maxLines ? lines.Count - maxLines : 0;
+                for (int i = start; i < lines.Count; i++)
+                {
+                    sb.AppendLine(lines[i]);
+                }
+
+                if (matched == 0)
+                {
+                    sb.AppendLine("(无匹配日志)");
                 }
                 return sb.ToString();
             }
+        }
+
+        private static bool MatchesLevel(string level, string filter)
+        {
+            if (string.IsNullOrEmpty(filter) || filter == "All") return true;
+            if (filter == "Warn+")
+            {
+                return level == "Warn" || level == "Error" || level == "Fatal";
+            }
+            if (filter == "Error+")
+            {
+                return level == "Error" || level == "Fatal";
+            }
+            return level == filter;
         }
 
         public static void Record(LogLevel level, string module, string message)

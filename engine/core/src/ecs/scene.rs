@@ -240,6 +240,44 @@ impl Scene {
         self.selected_entities.push(entity);
     }
     
+    /// 追加选择：保留已有选中项，供 Ctrl+Click 多选使用。
+    pub fn add_to_selection(&mut self, entity: Entity) {
+        if !self.world.entity_exists(entity) || self.selected_entities.contains(&entity) {
+            return;
+        }
+        if let Some(mut selection) = self.world.get_component::<SelectionComponent>(entity) {
+            selection.selected = true;
+            selection.level = SelectionLevel::Entity;
+            self.world.add_component(entity, selection);
+        }
+        self.selected_entities.push(entity);
+    }
+
+    /// 从多选集合移除。
+    pub fn remove_from_selection(&mut self, entity: Entity) {
+        if !self.selected_entities.contains(&entity) {
+            return;
+        }
+        if let Some(mut selection) = self.world.get_component::<SelectionComponent>(entity) {
+            selection.clear();
+            self.world.add_component(entity, selection);
+        }
+        self.selected_entities.retain(|e| *e != entity);
+    }
+
+    /// 切换单个实体的选中状态。
+    pub fn toggle_selection(&mut self, entity: Entity) {
+        if self.selected_entities.contains(&entity) {
+            self.remove_from_selection(entity);
+        } else {
+            self.add_to_selection(entity);
+        }
+    }
+
+    pub fn get_selected_entity_ids(&self) -> Vec<u64> {
+        self.selected_entities.iter().map(|e| e.id).collect()
+    }
+
     pub fn select_submesh(&mut self, entity: Entity, index: u32) {
         if !self.world.entity_exists(entity) {
             return;

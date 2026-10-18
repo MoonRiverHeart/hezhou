@@ -45,6 +45,12 @@ namespace Hezhou
             _toggleEditorClickCallback = OnToggleEditorClick;
             _consoleClickCallback = OnConsoleClick;
             _consoleDialogResultCallback = OnConsoleDialogResult;
+            _consoleRefreshCallback = OnConsoleRefresh;
+            _consoleLevelSelectCallback = OnConsoleLevelSelect;
+            _consoleSearchChangeCallback = OnConsoleSearchChange;
+            _undoClickCallback = OnUndoClick;
+            _redoClickCallback = OnRedoClick;
+            _projectSearchChangeCallback = OnProjectSearchChange;
             _hotReloadClickCallback = OnHotReloadClick;
             _newScriptClickCallback = OnNewScriptClick;
             _openInExplorerCallback = OpenInExplorer;
@@ -179,6 +185,8 @@ _bindScriptClickCallback = OnBindScriptClick;
                 UITestRunner.Update(deltaTime);
                 return;
             }
+
+            RefreshConsoleIfOpen();
 
             if (deltaTime > 0 && _fpsItem != null)
             {

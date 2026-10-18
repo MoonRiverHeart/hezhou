@@ -1072,9 +1072,10 @@ namespace Hezhou
             if (_selectedEntityIds.Contains(entityId))
             {
                 _selectedEntityIds.Remove(entityId);
+                _gameScene.RemoveFromSelection(entityId);
                 if (_selectedEntityIds.Count == 0)
                 {
-                    _gameScene.ClearSelection();
+                    UI.SetSelectedEntity(0, false);
                     _selectedEntityId = 0;
                     ClearPropertiesPanel();
                     ClearEntityNodeSelectionHighlights();
@@ -1084,12 +1085,18 @@ namespace Hezhou
             }
             else
             {
+                if (_selectedEntityIds.Count == 0)
+                {
+                    _gameScene.SelectEntity(entityId);
+                }
+                else
+                {
+                    _gameScene.AddToSelection(entityId);
+                }
                 _selectedEntityIds.Add(entityId);
                 _selectedEntityId = entityId;
             }
 
-            // Rust Scene 只保留一个 outline 主选中；批量编辑由 C# 列表完成。
-            _gameScene.SelectEntity(_selectedEntityId);
             for (int i = 0; i < _selectedEntityIds.Count; i++)
             {
                 if (_entityNodeMap.TryGetValue(_selectedEntityIds[i], out ulong nodeId))
@@ -1142,6 +1149,22 @@ namespace Hezhou
             _entityNodeMap.Clear();
             _nodeIdToName.Clear();
 
+            if (!string.IsNullOrEmpty(_projectSearchQuery))
+            {
+                // 搜索模式：扁平显示匹配实体，避免父节点被过滤后子节点无处挂载。
+                int entityCount = _gameScene.GetEntityCount();
+                for (int i = 0; i < entityCount; i++)
+                {
+                    ulong eid = _gameScene.GetEntityId(i);
+                    string name = UI.SceneGetEntityName(_gameScene.ScenePtr, eid);
+                    if (name != null && name.IndexOf(_projectSearchQuery, StringComparison.OrdinalIgnoreCase) >= 0)
+                    {
+                        AddEntityToTree(eid, name);
+                    }
+                }
+                return;
+            }
+
             uint rootCount = UI.SceneRootEntityCount(_gameScene.ScenePtr);
             for (uint i = 0; i < rootCount; i++)
             {
@@ -1151,6 +1174,12 @@ namespace Hezhou
                     AddEntityNodeRecursive(eid);
                 }
             }
+        }
+
+        private static void OnProjectSearchChange(ulong widgetId, string text)
+        {
+            _projectSearchQuery = text ?? "";
+            RefreshEntityTree();
         }
 
         private static void AddEntityNodeRecursive(ulong entityId)
@@ -1485,19 +1514,63 @@ UI.SetText(_runButtonId, "运行");
 
             ulong contentId = UI.CreateVStack(_consoleDialogId, 8f);
             UI.CreateLabel(contentId, dialogWidth - 50f, 24f,
-                "最近日志（Warn/Error 会同时进入自动化测试报告）:");
-            _consoleTextEditId = UI.CreateTextEdit(contentId, dialogWidth - 50f, 370f);
+                "日志（打开期间每 30 帧自动刷新；Warn/Error 同时进入测试报告）:");
 
-            string logs = TestTelemetry.GetRecentLogs(300);
-            if (string.IsNullOrEmpty(logs))
-            {
-                logs = "(暂无日志)";
-            }
-            UI.TextEditSetText(_consoleTextEditId, logs);
+            ulong filterRow = UI.CreateHStack(contentId, 8f);
+            _consoleLevelDropdownId = UI.CreateDropdown(filterRow, 120f, 26f);
+            UI.DropdownSetOptions(_consoleLevelDropdownId, new string[] { "All", "Info", "Warn+", "Error+" });
+            UI.DropdownSetSelected(_consoleLevelDropdownId, 2);
+            UI.DropdownSetOnSelect(_consoleLevelDropdownId, _consoleLevelSelectCallback);
+
+            _consoleSearchInputId = UI.CreateInputField(filterRow, 220f, 26f);
+            UI.InputFieldSetPlaceholder(_consoleSearchInputId, "搜索模块/消息...");
+            UI.InputFieldSetOnChange(_consoleSearchInputId, _consoleSearchChangeCallback);
+
+            _consoleRefreshBtnId = UI.CreateButton(filterRow, 80f, 26f, "刷新");
+            UI.SetOnClick(_consoleRefreshBtnId, _consoleRefreshCallback);
+
+            _consoleTextEditId = UI.CreateTextEdit(contentId, dialogWidth - 50f, 360f);
+            RefreshConsoleText();
 
             UI.DialogSetContent(_consoleDialogId, contentId);
             UI.DialogAddButton(_consoleDialogId, "Close", 0);
             UI.DialogShow(_consoleDialogId);
+        }
+
+        private static void RefreshConsoleText()
+        {
+            if (_consoleTextEditId == 0) return;
+            string logs = TestTelemetry.GetRecentLogs(300, _consoleLevelFilter, _consoleSearchQuery);
+            UI.TextEditSetText(_consoleTextEditId, logs);
+        }
+
+        private static void OnConsoleRefresh(ulong widgetId)
+        {
+            RefreshConsoleText();
+        }
+
+        private static void OnConsoleLevelSelect(ulong widgetId, ulong index)
+        {
+            string[] levels = new string[] { "All", "Info", "Warn+", "Error+" };
+            _consoleLevelFilter = index < (ulong)levels.Length ? levels[index] : "All";
+            RefreshConsoleText();
+        }
+
+        private static void OnConsoleSearchChange(ulong widgetId, string text)
+        {
+            _consoleSearchQuery = text ?? "";
+            RefreshConsoleText();
+        }
+
+        /// <summary>Console 打开时每 30 帧刷新一次，避免每帧重建 TextEdit 文本。</summary>
+        private static void RefreshConsoleIfOpen()
+        {
+            if (_consoleDialogId == 0 || _consoleTextEditId == 0) return;
+            _consoleRefreshFrame++;
+            if ((_consoleRefreshFrame % 30) == 0)
+            {
+                RefreshConsoleText();
+            }
         }
 
         private static void OnConsoleDialogResult(ulong dialogId, int result)
@@ -1505,6 +1578,10 @@ UI.SetText(_runButtonId, "运行");
             UI.DialogHide(_consoleDialogId);
             _consoleDialogId = 0;
             _consoleTextEditId = 0;
+            _consoleLevelDropdownId = 0;
+            _consoleSearchInputId = 0;
+            _consoleRefreshBtnId = 0;
+            _consoleRefreshFrame = 0;
         }
 
         private static void OpenInExplorer(ulong widgetId)
@@ -2650,12 +2727,15 @@ UI.SetText(_runButtonId, "运行");
         {
             _undoSnapshots.Clear();
             _redoSnapshots.Clear();
+            _undoLabels.Clear();
+            _redoLabels.Clear();
         }
 
         /// <summary>
         /// 在修改场景之前调用。保存完整场景快照，支持层级/组件/脚本绑定回滚。
+        /// label 用于状态栏/按钮显示“撤销 创建实体”等可读描述。
         /// </summary>
-        private static void CaptureUndoSnapshot()
+        private static void CaptureUndoSnapshot(string label = "编辑")
         {
             if (_isRestoringSnapshot || _gameScene == null) return;
 
@@ -2670,11 +2750,15 @@ UI.SetText(_runButtonId, "运行");
             }
 
             _undoSnapshots.Add(snapshot);
+            _undoLabels.Add(label ?? "编辑");
             if (_undoSnapshots.Count > MAX_UNDO_SNAPSHOTS)
             {
                 _undoSnapshots.RemoveAt(0);
+                _undoLabels.RemoveAt(0);
             }
             _redoSnapshots.Clear();
+            _redoLabels.Clear();
+            UpdateUndoRedoButtons();
         }
 
         private static void Undo()
@@ -2687,14 +2771,18 @@ UI.SetText(_runButtonId, "运行");
 
             string current = UI.SceneSnapshotJson(_gameScene.ScenePtr);
             string target = _undoSnapshots[_undoSnapshots.Count - 1];
+            string label = _undoLabels.Count > 0 ? _undoLabels[_undoLabels.Count - 1] : "编辑";
             _undoSnapshots.RemoveAt(_undoSnapshots.Count - 1);
+            if (_undoLabels.Count > 0) _undoLabels.RemoveAt(_undoLabels.Count - 1);
             if (!string.IsNullOrEmpty(current))
             {
                 _redoSnapshots.Add(current);
+                _redoLabels.Add(label);
             }
 
             RestoreSceneSnapshot(target);
-            if (_statusItem != null) _statusItem.Text = "已撤销";
+            if (_statusItem != null) _statusItem.Text = "已撤销: " + label;
+            UpdateUndoRedoButtons();
         }
 
         private static void Redo()
@@ -2707,14 +2795,46 @@ UI.SetText(_runButtonId, "运行");
 
             string current = UI.SceneSnapshotJson(_gameScene.ScenePtr);
             string target = _redoSnapshots[_redoSnapshots.Count - 1];
+            string label = _redoLabels.Count > 0 ? _redoLabels[_redoLabels.Count - 1] : "编辑";
             _redoSnapshots.RemoveAt(_redoSnapshots.Count - 1);
+            if (_redoLabels.Count > 0) _redoLabels.RemoveAt(_redoLabels.Count - 1);
             if (!string.IsNullOrEmpty(current))
             {
                 _undoSnapshots.Add(current);
+                _undoLabels.Add(label);
             }
 
             RestoreSceneSnapshot(target);
-            if (_statusItem != null) _statusItem.Text = "已重做";
+            if (_statusItem != null) _statusItem.Text = "已重做: " + label;
+            UpdateUndoRedoButtons();
+        }
+
+        private static void OnUndoClick(ulong widgetId)
+        {
+            Undo();
+        }
+
+        private static void OnRedoClick(ulong widgetId)
+        {
+            Redo();
+        }
+
+        private static void UpdateUndoRedoButtons()
+        {
+            if (_undoButtonId != 0)
+            {
+                string text = _undoSnapshots.Count > 0
+                    ? "撤销 " + _undoSnapshots.Count
+                    : "撤销";
+                UI.SetText(_undoButtonId, text);
+            }
+            if (_redoButtonId != 0)
+            {
+                string text = _redoSnapshots.Count > 0
+                    ? "重做 " + _redoSnapshots.Count
+                    : "重做";
+                UI.SetText(_redoButtonId, text);
+            }
         }
 
         private static void RestoreSceneSnapshot(string json)

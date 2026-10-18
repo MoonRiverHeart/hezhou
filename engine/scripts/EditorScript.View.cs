@@ -122,8 +122,16 @@ namespace Hezhou
             UI.SetWidgetLayout(_toggleEditorBtn.Id, _screenWidth - 120f, 5f, 100f, 30f);
             _toggleEditorBtn.SetOnClick(_toggleEditorClickCallback);
 
+            _undoButtonId = UI.CreateButton(_toolbar.Id, 70f, 30f, "撤销");
+            UI.SetWidgetLayout(_undoButtonId, _screenWidth - 380f, 5f, 70f, 30f);
+            UI.SetOnClick(_undoButtonId, _undoClickCallback);
+
+            _redoButtonId = UI.CreateButton(_toolbar.Id, 70f, 30f, "重做");
+            UI.SetWidgetLayout(_redoButtonId, _screenWidth - 300f, 5f, 70f, 30f);
+            UI.SetOnClick(_redoButtonId, _redoClickCallback);
+
             ulong consoleBtnId = UI.CreateButton(_toolbar.Id, 80f, 30f, "Console");
-            UI.SetWidgetLayout(consoleBtnId, _screenWidth - 210f, 5f, 80f, 30f);
+            UI.SetWidgetLayout(consoleBtnId, _screenWidth - 220f, 5f, 80f, 30f);
             UI.SetOnClick(consoleBtnId, _consoleClickCallback);
 
             // === SplitView-based Main Layout ===
@@ -875,6 +883,11 @@ namespace Hezhou
             float estimatedProjectHeight = mainHeight * 0.7f * 0.67f - 50f;
             if (estimatedProjectHeight < 100f) estimatedProjectHeight = 100f;
             
+            _projectSearchInputId = UI.CreateInputField(_projectPanel.Id, 180f, 26f);
+            UI.SetWidgetLayout(_projectSearchInputId, 10f, 8f, 180f, 26f);
+            UI.InputFieldSetPlaceholder(_projectSearchInputId, "搜索实体...");
+            UI.InputFieldSetOnChange(_projectSearchInputId, _projectSearchChangeCallback);
+
             _projectTreeViewId = UI.CreateTreeView(_projectPanel.Id, 10, 40, 200f, estimatedProjectHeight);
             
             _assetsNodeId = UI.TreeViewAddNode(_projectTreeViewId, 0, "📦 Assets", 0, true);

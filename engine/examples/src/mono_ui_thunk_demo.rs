@@ -23,6 +23,9 @@ pub extern "C" fn scene_set_game_state_stub(_scene: *mut std::ffi::c_void, _stat
 pub extern "C" fn scene_get_game_state_stub(_scene: *mut std::ffi::c_void) -> i32 { 0 }
 pub extern "C" fn scene_pick_entity_stub(_scene: *mut std::ffi::c_void, _ox: f32, _oy: f32, _oz: f32, _dx: f32, _dy: f32, _dz: f32) -> u64 { 0 }
 pub extern "C" fn scene_select_entity_stub(_scene: *mut std::ffi::c_void, _id: u64) {}
+pub extern "C" fn scene_add_to_selection_stub(_scene: *mut std::ffi::c_void, _id: u64) {}
+pub extern "C" fn scene_remove_from_selection_stub(_scene: *mut std::ffi::c_void, _id: u64) {}
+pub extern "C" fn scene_toggle_selection_stub(_scene: *mut std::ffi::c_void, _id: u64) {}
 pub extern "C" fn scene_update_stub(_scene: *mut std::ffi::c_void, _dt: f32) {}
 pub extern "C" fn set_renderer_game_state_stub(_state: i32) {}
 pub extern "C" fn get_renderer_game_state_stub() -> i32 { 0 }
@@ -315,6 +318,9 @@ fn main() {
         scene_get_game_state: scene_get_game_state_stub,
         scene_pick_entity: scene_pick_entity_stub,
         scene_select_entity: scene_select_entity_stub,
+        scene_add_to_selection: scene_add_to_selection_stub,
+        scene_remove_from_selection: scene_remove_from_selection_stub,
+        scene_toggle_selection: scene_toggle_selection_stub,
         scene_update: scene_update_stub,
         set_renderer_game_state: set_renderer_game_state_stub,
         get_renderer_game_state: get_renderer_game_state_stub,

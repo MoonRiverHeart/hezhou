@@ -204,6 +204,36 @@ pub extern "C" fn scene_select_entity(scene: *mut Scene, entity_id: u64) {
 }
 
 #[no_mangle]
+pub extern "C" fn scene_add_to_selection(scene: *mut Scene, entity_id: u64) {
+    if scene.is_null() {
+        return;
+    }
+    unsafe {
+        (*scene).add_to_selection(Entity::new(entity_id));
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn scene_remove_from_selection(scene: *mut Scene, entity_id: u64) {
+    if scene.is_null() {
+        return;
+    }
+    unsafe {
+        (*scene).remove_from_selection(Entity::new(entity_id));
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn scene_toggle_selection(scene: *mut Scene, entity_id: u64) {
+    if scene.is_null() {
+        return;
+    }
+    unsafe {
+        (*scene).toggle_selection(Entity::new(entity_id));
+    }
+}
+
+#[no_mangle]
 pub extern "C" fn scene_clear_selection(scene: *mut Scene) {
     if scene.is_null() {
         return;

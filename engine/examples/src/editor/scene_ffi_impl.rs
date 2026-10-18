@@ -203,6 +203,39 @@ pub extern "C" fn scene_select_entity_editor(scene: *mut std::ffi::c_void, entit
 }
 
 #[unsafe(no_mangle)]
+pub extern "C" fn scene_add_to_selection_editor(scene: *mut std::ffi::c_void, entity_id: u64) {
+    if scene.is_null() {
+        return;
+    }
+    unsafe {
+        let scene_ptr = scene as *mut hezhou_core::Scene;
+        (*scene_ptr).add_to_selection(hezhou_core::Entity::new(entity_id));
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn scene_remove_from_selection_editor(scene: *mut std::ffi::c_void, entity_id: u64) {
+    if scene.is_null() {
+        return;
+    }
+    unsafe {
+        let scene_ptr = scene as *mut hezhou_core::Scene;
+        (*scene_ptr).remove_from_selection(hezhou_core::Entity::new(entity_id));
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn scene_toggle_selection_editor(scene: *mut std::ffi::c_void, entity_id: u64) {
+    if scene.is_null() {
+        return;
+    }
+    unsafe {
+        let scene_ptr = scene as *mut hezhou_core::Scene;
+        (*scene_ptr).toggle_selection(hezhou_core::Entity::new(entity_id));
+    }
+}
+
+#[unsafe(no_mangle)]
 pub extern "C" fn scene_update_editor(scene: *mut std::ffi::c_void, dt: f32) {
     if scene.is_null() {
         return;

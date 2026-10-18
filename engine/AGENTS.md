@@ -144,7 +144,7 @@ glslc shaders/rotation.frag -o shaders/rotation.frag.spv
 - FontAtlas first init ~0.23s (OnceLock), subsequent calls instant
 - Editor startup: FontAtlas init + C# compile + Mono load ≈ 2-3s
 - 3 inconsistent Mono build scripts (build_mono.ps1 hardcoded mcs path, build_mono_ui.ps1 uses PATH + -unsafe flag, build_ui_mono.ps1 hardcoded + subset) — should consolidate
-- No CI/CD pipeline — zero `.github/workflows`
+- CI: `.github/workflows/ci.yml`（Rust UT/UI/DFX、FFI 契约、fuzz harness、C# 编译）；E2E 需本地 Vulkan/GPU
 - No rust-toolchain.toml — no pinned toolchain
 - workspace.dependencies under-used: only 3 deps (parking_lot, tokio unused, wrapped_mono) — version skew risk
 - editor/mod.rs uses 7 `static mut` globals — soundness hazard (undefined behavior from multiple threads)
@@ -248,7 +248,7 @@ glslc shaders/rotation.frag -o shaders/rotation.frag.spv
 ### 14. 分层测试 / DFX / 编辑器 P0 (2026-10-18)
 **新增测试**:
 - UT: `core/tests/{scene_properties,scene_hierarchy_cycles,project_fuzz_smoke}.rs`、`ui/tests/widget_tree_hit_test.rs`
-- 接口: `core/tests/{ffi_contract,project_ffi_contract}.rs` + `scripts/check_ffi_contract.py`（261 个 FfiContext 字段三方一致）
+- 接口: `core/tests/{ffi_contract,project_ffi_contract}.rs` + `scripts/check_ffi_contract.py`（264 个 FfiContext 字段三方一致）
 - FUZZ: `engine/fuzz/` cargo-fuzz target + 3000 组畸形 JSON 确定性 smoke
 - E2E: `scripts/run_autotest.ps1`、`UITestRunner.Report.cs`、`TestTelemetry.cs`
   - random/sequential/stress/intent 模式
@@ -261,4 +261,8 @@ glslc shaders/rotation.frag -o shaders/rotation.frag.spv
 - 多选：Ctrl+Click、批量属性编辑
 - Console：工具栏 Console 按钮，读取 C# 日志 ring buffer（最近 300 条）
 - 加载工程前清理旧 C# 脚本实例（`CleanupScriptInstancesBeforeSceneReplace`）
-**文件**: `scripts/{run_tests,run_autotest,check_ffi_contract,check_autotest_report}.*`, `docs/ai_intent_testing.md`, `core/src/{asset_ffi,project}.rs`, `core/src/ecs/*`, `ui/src/ffi/misc.rs`, `scripts/*.cs`
+**P1 追加**:
+- 多选真正驱动 renderer outline：`scene_add_to_selection/remove/toggle` FFI + `Scene` additive selection API
+- 撤销/重做工具栏计数；项目树实体搜索；Console 级别过滤/搜索/30 帧自动刷新
+- CI：`.github/workflows/ci.yml`（Rust/FFI/fuzz harness/C#）
+**文件**: `scripts/{run_tests,run_autotest,check_ffi_contract,check_autotest_report}.*`, `docs/ai_intent_testing.md`, `core/src/{asset_ffi,project,scene_ffi}.rs`, `core/src/ecs/*`, `ui/src/ffi/misc.rs`, `scripts/*.cs`

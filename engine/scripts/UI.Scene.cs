@@ -287,6 +287,21 @@ UI.SceneSelectEntity(_scenePtr, entityId);
             UI.SetSelectedEntity(0, false);
         }
 
+        public void AddToSelection(ulong entityId)
+        {
+            UI.SceneAddToSelection(_scenePtr, entityId);
+        }
+
+        public void RemoveFromSelection(ulong entityId)
+        {
+            UI.SceneRemoveFromSelection(_scenePtr, entityId);
+        }
+
+        public void ToggleSelection(ulong entityId)
+        {
+            UI.SceneToggleSelection(_scenePtr, entityId);
+        }
+
         public void SetParent(ulong entityId, ulong parentId)
         {
             UI.SceneSetParent(_scenePtr, entityId, parentId);
@@ -467,6 +482,27 @@ UI.SceneSelectEntity(_scenePtr, entityId);
                 return;
             }
             var func = Marshal.GetDelegateForFunctionPointer<SceneSelectEntityDelegate>(_ffi.scene_select_entity);
+            func(scene, entityId);
+        }
+
+        public static void SceneAddToSelection(IntPtr scene, ulong entityId)
+        {
+            if (_ffi.scene_add_to_selection == IntPtr.Zero) return;
+            var func = Marshal.GetDelegateForFunctionPointer<SceneAddToSelectionDelegate>(_ffi.scene_add_to_selection);
+            func(scene, entityId);
+        }
+
+        public static void SceneRemoveFromSelection(IntPtr scene, ulong entityId)
+        {
+            if (_ffi.scene_remove_from_selection == IntPtr.Zero) return;
+            var func = Marshal.GetDelegateForFunctionPointer<SceneRemoveFromSelectionDelegate>(_ffi.scene_remove_from_selection);
+            func(scene, entityId);
+        }
+
+        public static void SceneToggleSelection(IntPtr scene, ulong entityId)
+        {
+            if (_ffi.scene_toggle_selection == IntPtr.Zero) return;
+            var func = Marshal.GetDelegateForFunctionPointer<SceneToggleSelectionDelegate>(_ffi.scene_toggle_selection);
             func(scene, entityId);
         }
 

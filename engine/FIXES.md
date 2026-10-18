@@ -1,11 +1,40 @@
 # Bug Fixes Log
 
+## 2026-10-18: Editor P1 — Multi-select Outline, Console Filters, Search, CI
+
+### Added
+- Additive scene selection API: `Scene::{add_to_selection,remove_from_selection,toggle_selection,get_selected_entity_ids}` + 3 FFI functions, so multi-select now drives the renderer's real outline list (not only primary selection).
+- Undo/redo toolbar buttons with operation counts; `Ctrl+Z/Y` still works.
+- Project tree search InputField; typing filters entities live (flat result list while searching).
+- Console panel:
+  - live refresh every 30 frames while open
+  - level filter `All/Info/Warn+/Error+`
+  - module/message search
+  - manual refresh button
+- GitHub Actions `.github/workflows/ci.yml`:
+  - Rust UT/UI/DFX
+  - FFI contract
+  - fuzz harness `cargo check`
+  - C# build on Windows
+- Core test for additive selection/toggle.
+- Intent suite remains 7 cases and passes; random autotest 30/30.
+
+### Verified
+```text
+cargo test -j 1 -p hezhou-core -p hezhou-ui --offline   PASS (14 tests)
+python scripts/check_ffi_contract.py                    264/264/264 PASS
+run_autotest.ps1 -Mode intent                            7/7 PASS
+run_autotest.ps1 -Mode random 30 steps                   30/30 PASS, avg 7.12ms
+```
+
+---
+
 ## 2026-10-18: Layered Tests, DFX Automation, Editor P0
 
 ### Added
 - **UT**: core scene/property/hierarchy/cycle tests; UI hit-test test; deterministic fuzz smoke.
 - **FUZZ**: `engine/fuzz` cargo-fuzz `project_json` target + 3000-round malformed JSON smoke.
-- **Interface**: FFI contract checker for all 261 FfiContext fields across Rust, C#, and editor assembly; FFI null/roundtrip tests.
+- **Interface**: FFI contract checker for all 264 FfiContext fields across Rust, C#, and editor assembly; FFI null/roundtrip tests.
 - **E2E**: `scripts/run_autotest.ps1`, `UITestRunner.Report.cs`, `TestTelemetry.cs`
   - random/sequential/stress/intent modes
   - stable seed, interactive-widget filtering, periodic screenshots

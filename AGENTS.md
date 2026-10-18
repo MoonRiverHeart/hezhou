@@ -69,7 +69,7 @@ powershell -ExecutionPolicy Bypass -File scripts/run_autotest.ps1 -Mode intent
 - DFX：`TestTelemetry.cs` 采集 Warn/Error/Fatal；Rust 主循环检测 `DONE` 后保存 trace
 
 ## NOTES
-- No CI/CD pipeline — zero `.github/workflows`
+- CI: `.github/workflows/ci.yml` 覆盖 Rust UT/UI/DFX、FFI 契约、fuzz harness、C# 编译；E2E 需本地 Vulkan/GPU
 - No rust-toolchain.toml — no pinned toolchain
 - `demo/rust/Cargo.toml` uses edition = "2024" (very new Rust edition)
 - Hardcoded absolute paths in `demo/rust/` (Mono lib path, Windows SDK paths)

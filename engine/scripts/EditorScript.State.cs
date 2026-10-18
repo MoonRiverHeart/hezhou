@@ -98,6 +98,9 @@ namespace Hezhou
         private static ulong[] _menuBarLabelIds = new ulong[3];
 
         // === Project Tree State ===
+        private static ulong _projectSearchInputId;
+        private static string _projectSearchQuery = "";
+        private static UI.InputFieldChangeCallbackDelegate _projectSearchChangeCallback;
         private static ulong _projectTreeViewId;
         private static ulong _assetsNodeId;
         private static ulong _scenesNodeId;
@@ -135,14 +138,29 @@ namespace Hezhou
         // === Undo/Redo State ===
         private static List<string> _undoSnapshots = new List<string>();
         private static List<string> _redoSnapshots = new List<string>();
+        private static List<string> _undoLabels = new List<string>();
+        private static List<string> _redoLabels = new List<string>();
         private static bool _isRestoringSnapshot = false;
         private const int MAX_UNDO_SNAPSHOTS = 100;
+        private static ulong _undoButtonId;
+        private static ulong _redoButtonId;
+        private static UI.WidgetCallbackDelegate _undoClickCallback;
+        private static UI.WidgetCallbackDelegate _redoClickCallback;
 
         // === Console Panel State ===
         private static ulong _consoleDialogId;
         private static ulong _consoleTextEditId;
+        private static ulong _consoleLevelDropdownId;
+        private static ulong _consoleSearchInputId;
+        private static ulong _consoleRefreshBtnId;
+        private static string _consoleLevelFilter = "Warn+";
+        private static string _consoleSearchQuery = "";
+        private static int _consoleRefreshFrame = 0;
         private static UI.DialogResultCallbackDelegate _consoleDialogResultCallback;
         private static UI.WidgetCallbackDelegate _consoleClickCallback;
+        private static UI.WidgetCallbackDelegate _consoleRefreshCallback;
+        private static UI.DropdownSelectCallbackDelegate _consoleLevelSelectCallback;
+        private static UI.InputFieldChangeCallbackDelegate _consoleSearchChangeCallback;
 
         // === Script Editor State ===
         private static Panel _scriptEditorPanel;

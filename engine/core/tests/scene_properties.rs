@@ -66,6 +66,37 @@ fn scene_hierarchy_roundtrip_and_root_bookkeeping() {
 }
 
 #[test]
+fn additive_selection_supports_multi_select_and_toggle() {
+    let mut scene = Scene::new();
+    let a = scene.create_entity();
+    let b = scene.create_entity();
+    let c = scene.create_entity();
+
+    scene.add_to_selection(a);
+    scene.add_to_selection(b);
+    assert_eq!(scene.get_selected_entity_ids(), vec![a.id, b.id]);
+    assert!(scene.is_entity_selected(a));
+    assert!(scene.is_entity_selected(b));
+
+    // 重复 add 不产生重复项
+    scene.add_to_selection(a);
+    assert_eq!(scene.get_selected_entity_ids().len(), 2);
+
+    scene.remove_from_selection(a);
+    assert!(!scene.is_entity_selected(a));
+    assert_eq!(scene.get_selected_entity_ids(), vec![b.id]);
+
+    scene.toggle_selection(c);
+    assert!(scene.is_entity_selected(c));
+    scene.toggle_selection(b);
+    assert!(!scene.is_entity_selected(b));
+    assert_eq!(scene.get_selected_entity_ids(), vec![c.id]);
+
+    scene.clear_selection();
+    assert!(scene.get_selected_entity_ids().is_empty());
+}
+
+#[test]
 fn property_reflection_handles_transforms_lights_and_read_only_fields() {
     let mut scene = Scene::new();
     let cube = scene.create_cube();

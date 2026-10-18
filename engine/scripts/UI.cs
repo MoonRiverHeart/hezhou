@@ -586,6 +586,15 @@ namespace Hezhou
         
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public delegate void SceneSelectEntityDelegate(IntPtr scene, ulong entityId);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void SceneAddToSelectionDelegate(IntPtr scene, ulong entityId);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void SceneRemoveFromSelectionDelegate(IntPtr scene, ulong entityId);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void SceneToggleSelectionDelegate(IntPtr scene, ulong entityId);
         
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public delegate void SceneUpdateDelegate(IntPtr scene, float deltaTime);
@@ -1017,6 +1026,9 @@ namespace Hezhou
             public IntPtr scene_get_game_state;
             public IntPtr scene_pick_entity;
             public IntPtr scene_select_entity;
+            public IntPtr scene_add_to_selection;
+            public IntPtr scene_remove_from_selection;
+            public IntPtr scene_toggle_selection;
             public IntPtr scene_update;
             public IntPtr set_renderer_game_state;
             public IntPtr get_renderer_game_state;

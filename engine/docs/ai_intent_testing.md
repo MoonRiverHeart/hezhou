@@ -57,6 +57,10 @@ test-results/random/
 
 - `intent.new_scene_defaults`
 - `intent.create_select_delete_entity`
+- `intent.parent_child_hierarchy`
+- `intent.undo_redo_property`
+- `intent.multi_select_batch`
+- `intent.console_open_close`
 - `intent.running_paused_editing`
 
 运行：
