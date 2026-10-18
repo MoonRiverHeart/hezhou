@@ -375,3 +375,7 @@ glslc shaders/rotation.frag -o shaders/rotation.frag.spv
 ### 34. Dock v2 浮动面板拖动 (2026-10-18)
 - 浮动资产面板可拖动；intent 21/21；visual 27 张。
 - 跨区域停靠仍未实现。
+
+### 35. CI 本地镜像校验 (2026-10-18)
+- `scripts/ci_local.ps1` 本地复刻 CI 步骤（离线），执行通过。
+- GitHub runner 实跑仍待推送。

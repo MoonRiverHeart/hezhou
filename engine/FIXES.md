@@ -1,5 +1,14 @@
 # Bug Fixes Log
 
+## 2026-10-18: CI 本地镜像校验
+
+- 新增 `scripts/ci_local.ps1`：本地复刻 GitHub Actions 的 Rust 测试、FFI 契约、
+  fuzz check、C# 编译、图标生成一致性。
+- 默认离线（`CARGO_NET_OFFLINE=true`）并使用临时 CARGO_HOME。
+- 本地执行通过：`CI LOCAL OK`。
+- GitHub runner 仍需要推送后实跑。
+
+
 ## 2026-10-18: Dock v2 浮动面板拖动
 
 - 浮动资产面板支持按住标题区域拖动；位置实时更新。
