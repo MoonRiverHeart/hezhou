@@ -201,3 +201,12 @@ pub extern "C" fn get_active_pipeline_name(
         }
     }
 }
+
+#[unsafe(no_mangle)]
+pub extern "C" fn set_gizmo_3d(visible: i32, x: f32, y: f32, z: f32) {
+    unsafe {
+        if let Some(renderer_ptr) = super::RENDERER {
+            (*renderer_ptr).set_gizmo_3d(visible != 0, x, y, z);
+        }
+    }
+}

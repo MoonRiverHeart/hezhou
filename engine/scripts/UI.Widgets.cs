@@ -356,6 +356,13 @@ public static ulong GetRootId()
             func(_widgetTree, widgetId, fill ? 1u : 0u);
         }
 
+        public static void SetWidgetTextColor(ulong widgetId, float r, float g, float b, float a)
+        {
+            if (_ffi.ui_widget_set_text_color == IntPtr.Zero) return;
+            var func = Marshal.GetDelegateForFunctionPointer<SetWidgetTextColorDelegate>(_ffi.ui_widget_set_text_color);
+            func(_widgetTree, widgetId, r, g, b, a);
+        }
+
         public static void SetWidgetBackgroundColor(ulong widgetId, float r, float g, float b, float a)
         {
             if (_ffi.ui_widget_set_background_color == IntPtr.Zero)

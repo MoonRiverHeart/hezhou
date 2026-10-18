@@ -59,7 +59,7 @@ void main() {
     vec3 color = ambient + diffuse + specular;
     
     if (fragOutline > 0.5) {
-        color = vec3(1.0, 0.5, 0.0);
+        color = pc.outline_color;
     }
     
     outColor = vec4(color, 1.0);

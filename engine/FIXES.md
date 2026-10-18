@@ -1,5 +1,17 @@
 # Bug Fixes Log
 
+## 2026-10-18: 3D renderer Gizmo 轴线段
+
+- `RasterPipeline` 在实体绘制后增加 Gizmo 轴线段绘制：以实体世界坐标为原点，
+  三轴各两条交叉的 0.05 宽薄四边形，避免依赖 editor 的 UI 叠加层。
+- 复用 outline pipeline；`rotation.frag` 的 outline 输出改为 `pc.outline_color`，
+  这样三轴可以分别用红/绿/蓝绘制，选中描边仍传橙色。
+- `RenderContext` 新增 `gizmo_visible/gizmo_position`；UIVulkanRenderer 新增
+  `set_gizmo_3d` FFI（283 字段），C# 每帧同步选中实体坐标。
+- UI Button 轴条保留为透明命中区域用于拖拽，不参与显示；Button 背景 alpha=0
+  时不再绘制边框。
+
+
 ## 2026-10-18: PNG 完整解码 + UI 纹理上传
 
 - 新增 `png` 依赖和 `FontAtlas::load_png_image`：完整解码 PNG（RGBA/RGB/

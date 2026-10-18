@@ -41,6 +41,13 @@ namespace Hezhou
             func(_widgetTree, tabWidgetId, enabled);
         }
 
+        public static void SetGizmo3D(bool visible, float x, float y, float z)
+        {
+            if (_ffi.set_gizmo_3d == IntPtr.Zero) return;
+            var func = Marshal.GetDelegateForFunctionPointer<SetGizmo3DDelegate>(_ffi.set_gizmo_3d);
+            func(visible ? 1 : 0, x, y, z);
+        }
+
         public static ulong LoadImageTexture(string path)
         {
             if (_ffi.ui_load_image_texture == IntPtr.Zero) return 0;

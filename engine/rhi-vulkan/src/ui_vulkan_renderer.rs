@@ -218,6 +218,10 @@ pub struct UIVulkanRenderer {
     // 可扩展渲染管线系统（可选启用）
     // 默认None走legacy路径，启用后委托给PipelineRegistry
     pipeline_registry: Option<hezhou_render_pipeline::PipelineRegistry>,
+    gizmo_vertex_buffer: Option<vk::Buffer>,
+    gizmo_vertex_memory: Option<vk::DeviceMemory>,
+    gizmo_visible: bool,
+    gizmo_position: [f32; 3],
     
     // 截图源图像 — 记录当前帧实际渲染结果的image和extent
     // rasterization模式: offscreen_image(经FXAA后)
@@ -1760,6 +1764,10 @@ p_multisample_state: &vk::PipelineMultisampleStateCreateInfo {
                 
                 // 可扩展渲染管线系统（默认不启用，保持向后兼容）
                 pipeline_registry: None,
+                gizmo_vertex_buffer: None,
+                gizmo_vertex_memory: None,
+                gizmo_visible: false,
+                gizmo_position: [0.0, 0.0, 0.0],
                 // 截图源初始为offscreen_image（初始化时尚未渲染，后续draw_frame会更新）
                 screenshot_source_image: offscreen_image,
                 screenshot_source_extent: offscreen_extent,
@@ -1777,6 +1785,40 @@ p_multisample_state: &vk::PipelineMultisampleStateCreateInfo {
     /// 将现有Vulkan资源传入RasterPipeline，创建PipelineRegistry。
     /// 启用后，draw_frame()的游戏渲染部分将委托给PipelineRegistry。
     /// 不启用时，走现有legacy渲染路径（向后兼容）。
+    /// C# 每帧同步选中实体的世界坐标与可见性，供 RasterPipeline 画 3D 轴线。
+    pub fn set_gizmo_3d(&mut self, visible: bool, x: f32, y: f32, z: f32) {
+        self.gizmo_visible = visible;
+        self.gizmo_position = [x, y, z];
+    }
+
+    fn build_gizmo_vertices() -> Vec<f32> {
+        let mut out = Vec::new();
+        let axes = [
+            ([1.0f32, 0.0, 0.0], [0.0f32, 1.0, 0.0], [0.0f32, 0.0, 1.0]),
+            ([0.0f32, 1.0, 0.0], [1.0f32, 0.0, 0.0], [0.0f32, 0.0, 1.0]),
+            ([0.0f32, 0.0, 1.0], [1.0f32, 0.0, 0.0], [0.0f32, 1.0, 0.0]),
+        ];
+        let len = 2.0f32;
+        let w = 0.05f32;
+        for (d, u, v) in axes {
+            for plane in [u, v] {
+                let a = [-plane[0] * w, -plane[1] * w, -plane[2] * w];
+                let b = [plane[0] * w, plane[1] * w, plane[2] * w];
+                let c = [d[0] * len + a[0], d[1] * len + a[1], d[2] * len + a[2]];
+                let e = [d[0] * len + b[0], d[1] * len + b[1], d[2] * len + b[2]];
+                let mut push = |p: [f32; 3]| {
+                    out.extend_from_slice(&[p[0], p[1], p[2], d[0], d[1], d[2], 0.0, 0.0]);
+                };
+                // 双面：正反各两个三角形
+                push(a); push(b); push(c);
+                push(c); push(b); push(e);
+                push(a); push(c); push(b);
+                push(c); push(e); push(b);
+            }
+        }
+        out
+    }
+
     pub fn enable_pipeline_system(&mut self) {
         if self.pipeline_registry.is_some() {
             return;  // 已经启用
@@ -1823,6 +1865,19 @@ p_multisample_state: &vk::PipelineMultisampleStateCreateInfo {
         
         // 创建RasterPipeline — 传入所有现有Vulkan资源handle
         // RasterPipeline只引用handle，不拥有资源（资源所有权仍在UIVulkanRenderer）
+        let vertices = Self::build_gizmo_vertices();
+        let (gizmo_buf, gizmo_mem) = Self::create_vertex_buffer(
+            &self.instance, &self.device, self.physical_device, (vertices.len() * 4) as vk::DeviceSize,
+        ).expect("Failed to create gizmo vertex buffer");
+        unsafe {
+            let ptr = self.device.map_memory(gizmo_mem, 0, (vertices.len() * 4) as vk::DeviceSize, vk::MemoryMapFlags::empty())
+                .expect("Failed to map gizmo vertex buffer");
+            std::ptr::copy_nonoverlapping(vertices.as_ptr() as *const u8, ptr as *mut u8, vertices.len() * 4);
+            self.device.unmap_memory(gizmo_mem);
+        }
+        self.gizmo_vertex_buffer = Some(gizmo_buf);
+        self.gizmo_vertex_memory = Some(gizmo_mem);
+
         let raster_pipeline = hezhou_render_pipeline::RasterPipeline::new(
             self.game_pipeline,
             self.game_pipeline_layout,
@@ -1846,6 +1901,7 @@ p_multisample_state: &vk::PipelineMultisampleStateCreateInfo {
             self.game_mesh_buffer_memory,
             self.game_index_buffer,
             self.game_index_buffer_memory,
+            gizmo_buf,
             self.offscreen_fxaa_image,
             self.offscreen_fxaa_image_memory,
             self.offscreen_fxaa_image_view,
@@ -1979,6 +2035,8 @@ p_multisample_state: &vk::PipelineMultisampleStateCreateInfo {
                 Vec::new()
             },
             frame_index: self.frame_count as u32,
+            gizmo_visible: self.gizmo_visible,
+            gizmo_position: self.gizmo_position,
         };
         
 // 5. 在switch_pipeline前，从active_resources取出renderer自有资源
@@ -3065,7 +3123,9 @@ self.device.wait_for_fences(&[self.in_flight_fences[self.current_frame]], true, 
                     } else {
                         Vec::new()
                     },
-                    frame_index: self.frame_count as u32,  // 用frame_count而非current_frame（不循环）
+                    frame_index: self.frame_count as u32,
+                    gizmo_visible: self.gizmo_visible,
+                    gizmo_position: self.gizmo_position,  // 用frame_count而非current_frame（不循环）
                 };
                 
                 // 委托给PipelineRegistry执行完整渲染帧

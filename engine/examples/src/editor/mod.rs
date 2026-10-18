@@ -408,6 +408,7 @@ ui_widget_get_layout: unsafe { std::mem::transmute(ui_ffi::ui_widget_get_layout 
             std::mem::transmute(hezhou_ui::ffi::ui_register_tab_drag_end_thunk_ptr as *const std::ffi::c_void)
         },
         ui_load_image_texture: hezhou_ui::ffi::ui_load_image_texture,
+        set_gizmo_3d: ffi_impl::set_gizmo_3d,
         ui_set_widget_visible: unsafe { std::mem::transmute(ffi_impl::set_widget_visible as *const std::ffi::c_void) },
         get_pipeline_names: unsafe { std::mem::transmute(ffi_impl::get_pipeline_names as *const std::ffi::c_void) },
         switch_pipeline: unsafe { std::mem::transmute(ffi_impl::switch_pipeline as *const std::ffi::c_void) },

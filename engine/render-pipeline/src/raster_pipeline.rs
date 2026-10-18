@@ -341,6 +341,8 @@ pub struct RasterPipeline {
     game_index_buffer: vk::Buffer,
     /// 游戏mesh index buffer memory
     game_index_buffer_memory: vk::DeviceMemory,
+    /// 3D Gizmo 轴线 vertex buffer
+    gizmo_vertex_buffer: vk::Buffer,
 
     /// FXAA offscreen image（FXAA输出目标）
     offscreen_fxaa_image: vk::Image,
@@ -400,6 +402,7 @@ impl RasterPipeline {
         game_mesh_buffer_memory: vk::DeviceMemory,
         game_index_buffer: vk::Buffer,
         game_index_buffer_memory: vk::DeviceMemory,
+        gizmo_vertex_buffer: vk::Buffer,
         offscreen_fxaa_image: vk::Image,
         offscreen_fxaa_image_memory: vk::DeviceMemory,
         offscreen_fxaa_image_view: vk::ImageView,
@@ -431,6 +434,7 @@ impl RasterPipeline {
             game_mesh_buffer_memory,
             game_index_buffer,
             game_index_buffer_memory,
+            gizmo_vertex_buffer,
             offscreen_fxaa_image,
             offscreen_fxaa_image_memory,
             offscreen_fxaa_image_view,
@@ -955,6 +959,48 @@ impl RenderPipeline for RasterPipeline {
                             );
                         }
                     }
+                }
+            }
+
+            // 6.5 3D Gizmo 轴线（game pipeline + 交叉薄四边形，normal 决定轴颜色）
+            if ctx.gizmo_visible {
+                let model = Mat4::translate(Vec3::new(
+                    ctx.gizmo_position[0], ctx.gizmo_position[1], ctx.gizmo_position[2],
+                )).data;
+                let colors = [[0.95, 0.25, 0.25], [0.3, 0.95, 0.4], [0.3, 0.55, 1.0]];
+                self.device.cmd_bind_pipeline(cmd_buffer, vk::PipelineBindPoint::GRAPHICS, self.outline_pipeline);
+                self.device.cmd_bind_descriptor_sets(
+                    cmd_buffer,
+                    vk::PipelineBindPoint::GRAPHICS,
+                    self.game_pipeline_layout,
+                    0,
+                    &[self.light_descriptor_set, self.default_texture_descriptor_set],
+                    &[],
+                );
+                self.device.cmd_bind_vertex_buffers(cmd_buffer, 0, &[self.gizmo_vertex_buffer], &[0]);
+                for axis in 0..3 {
+                    let push_data = build_push_constant(
+                        model,
+                        colors[axis],
+                        true,
+                        extent.width as f32,
+                        extent.height as f32,
+                        ctx.camera.position,
+                        ctx.camera.yaw,
+                        ctx.camera.pitch,
+                        false,
+                        0.0,
+                        0.0,
+                        1.0,
+                    );
+                    self.device.cmd_push_constants(
+                        cmd_buffer,
+                        self.game_pipeline_layout,
+                        vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT,
+                        0,
+                        bytemuck::cast_slice(&[push_data]),
+                    );
+                    self.device.cmd_draw(cmd_buffer, 24, 1, (axis * 24) as u32, 0);
                 }
             }
 

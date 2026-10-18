@@ -96,6 +96,10 @@ pub struct RenderContext {
     pub selected_entity_ids: Vec<hezhou_core::ecs::EntityId>,
     /// 当前帧索引（用于动态资源轮转）
     pub frame_index: u32,
+    /// 是否绘制 3D Gizmo 轴线段
+    pub gizmo_visible: bool,
+    /// Gizmo 世界坐标
+    pub gizmo_position: [f32; 3],
 }
 
 impl Default for RenderContext {
@@ -107,6 +111,8 @@ impl Default for RenderContext {
             viewport_extent: ViewportExtent::new(1280, 720),
             selected_entity_ids: Vec::new(),
             frame_index: 0,
+            gizmo_visible: false,
+            gizmo_position: [0.0, 0.0, 0.0],
         }
     }
 }

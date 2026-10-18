@@ -568,7 +568,7 @@ namespace Hezhou
             EditorScript.TestNewScene();
             ulong cube = EditorScript.TestCreateMeshEntity(0);
             EditorScript.TestSelectEntity(cube);
-            EditorScript.TestGizmoNudge(1.5f, 0.8f);
+            EditorScript.TestGizmoNudge(-2f, -0.5f);
         }
 
         private static void VisualMaterialTab()

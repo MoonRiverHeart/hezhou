@@ -310,6 +310,7 @@ pub project_add_entity: ProjectAddEntityFn,
         pub ui_tab_widget_set_reorderable: TabWidgetSetReorderableFn,
         pub ui_register_tab_drag_end_thunk_ptr: RegisterTabDragEndThunkPtrFn,
         pub ui_load_image_texture: LoadImageTextureFn,
+        pub set_gizmo_3d: SetGizmo3DFn,
     }
 
 static mut FFI_CONTEXT: Option<Box<FfiContext>> = None;

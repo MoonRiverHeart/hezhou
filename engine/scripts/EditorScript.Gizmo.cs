@@ -24,9 +24,13 @@ namespace Hezhou
             _gizmoXBarId = UI.CreateButton(root, 70f, 24f, "X");
             _gizmoYBarId = UI.CreateButton(root, 24f, 70f, "Y");
             _gizmoZBarId = UI.CreateButton(root, 60f, 24f, "Z");
-            UI.SetWidgetBackgroundColor(_gizmoXBarId, 0.95f, 0.30f, 0.30f, 1f);
-            UI.SetWidgetBackgroundColor(_gizmoYBarId, 0.35f, 0.90f, 0.45f, 1f);
-            UI.SetWidgetBackgroundColor(_gizmoZBarId, 0.35f, 0.60f, 1.0f, 1f);
+            // 3D 轴线由 renderer 绘制；Button 仅保留透明命中区域用于拖拽。
+            UI.SetWidgetBackgroundColor(_gizmoXBarId, 0f, 0f, 0f, 0f);
+            UI.SetWidgetBackgroundColor(_gizmoYBarId, 0f, 0f, 0f, 0f);
+            UI.SetWidgetBackgroundColor(_gizmoZBarId, 0f, 0f, 0f, 0f);
+            UI.SetWidgetTextColor(_gizmoXBarId, 0f, 0f, 0f, 0f);
+            UI.SetWidgetTextColor(_gizmoYBarId, 0f, 0f, 0f, 0f);
+            UI.SetWidgetTextColor(_gizmoZBarId, 0f, 0f, 0f, 0f);
             _gizmoPanelId = _gizmoXBarId; // marker: overlay exists
             UI.SetWidgetLayer(_gizmoXBarId, 3);
             UI.SetWidgetLayer(_gizmoYBarId, 3);
@@ -81,10 +85,21 @@ namespace Hezhou
             UI.SetWidgetVisible(_gizmoXBarId, visible);
             UI.SetWidgetVisible(_gizmoYBarId, visible);
             UI.SetWidgetVisible(_gizmoZBarId, visible);
-            if (!visible) return;
+            if (!visible)
+            {
+                UI.SetGizmo3D(false, 0f, 0f, 0f);
+                return;
+            }
 
             float[] preview = UI.WidgetGetAbsoluteLayout(_previewWindowId);
-            if (preview == null || preview.Length < 4 || preview[2] <= 0f) return;
+            if (preview == null || preview.Length < 4 || preview[2] <= 0f)
+            {
+                UI.SetGizmo3D(false, 0f, 0f, 0f);
+                return;
+            }
+            float ex = 0f, ey = 0f, ez = 0f;
+            UI.SceneGetEntityPosition(_gameScene.ScenePtr, _selectedEntityId, out ex, out ey, out ez);
+            UI.SetGizmo3D(true, ex, ey, ez);
             float cx = _screenWidth * 0.5f;
             float cy = _screenHeight * 0.42f;
             UI.SetWidgetLayout(_gizmoXBarId, cx - 35f, cy - 12f, 70f, 24f);
@@ -174,6 +189,15 @@ namespace Hezhou
         }
 
         public static int TestGetGizmoMode() { return _gizmoMode; }
+
+        public static void TestFocusGizmoEntity()
+        {
+            if (_gameScene == null || _selectedEntityId == 0) return;
+            UI.SceneGetEntityPosition(_gameScene.ScenePtr, _selectedEntityId, out float x, out float y, out float z);
+            _cameraX = x; _cameraY = y; _cameraZ = z + 3f;
+            _cameraYaw = 0f; _cameraPitch = 0f;
+            UI.SetCameraParams(_cameraYaw, _cameraPitch, _cameraX, _cameraY, _cameraZ);
+        }
 
         public static void TestGizmoNudge(float dx, float dy)
         {

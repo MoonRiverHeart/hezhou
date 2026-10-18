@@ -172,7 +172,7 @@ impl Widget for Button {
         let padding = 15.0;
 
         let base = self.style.background_color;
-        let current_style = match self.state {
+        let mut current_style = match self.state {
             WidgetState::Hovered => Style::new()
                 .with_background(lighten(base, 0.06))
                 .with_border(crate::theme::colors().border_strong, 1.0, 6.0),
@@ -184,6 +184,10 @@ impl Widget for Button {
                 .with_border(crate::theme::colors().border, 1.0, 6.0),
             _ => self.style,
         };
+        if base.a <= 0.01 {
+            current_style.border_color = Color::transparent();
+            current_style.border_width = 0.0;
+        }
 
         canvas.draw_rect(Rect::new(0.0, 0.0, width, height), &current_style);
 
