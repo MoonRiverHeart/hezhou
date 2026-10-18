@@ -22,6 +22,7 @@ namespace Hezhou
             RunCase("intent.icon_system", IconSystem);
             RunCase("intent.shift_range_select", ShiftRangeSelect);
             RunCase("intent.command_palette", CommandPalette);
+            RunCase("intent.console_source_location", ConsoleSourceLocation);
             RunCase("intent.console_open_close", ConsoleOpenClose);
             RunCase("intent.running_paused_editing", RunningPausedEditing);
         }
@@ -190,6 +191,18 @@ namespace Hezhou
                 throw new Exception("multi-select delete did not remove both entities");
             }
             return "2 entities selected, batch edit + multi-delete passed";
+        }
+
+        private static string ConsoleSourceLocation()
+        {
+            Log.Error("IntentTest", "console source probe");
+            string file;
+            int line;
+            bool ok = TestTelemetry.GetLastErrorLocation(out file, out line);
+            TestTelemetry.Clear();
+            if (!ok || string.IsNullOrEmpty(file) || line <= 0)
+                throw new Exception("console source location missing");
+            return System.IO.Path.GetFileName(file) + ":" + line;
         }
 
         private static string CommandPalette()
