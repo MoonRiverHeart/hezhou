@@ -100,6 +100,9 @@ jobs:
           Start-Process msiexec.exe -ArgumentList "/i `"$msi`" /qn /norestart" -Wait
           & "C:\Program Files\Mono\bin\mono.exe" --version
 
+      - name: Install WiX
+        shell: pwsh
+        run: dotnet tool install --global wix --version 5.0.2
 
       - name: Build editor
         working-directory: engine
@@ -123,12 +126,19 @@ jobs:
           powershell -ExecutionPolicy Bypass -File installer/windows/build_msix.ps1 -SkipBuild `
             -CertificatePath $pfx -CertificatePassword "hezhou-msix"
 
+      - name: Build MSI
+        shell: pwsh
+        run: |
+          $env:PATH = "$env:USERPROFILE\.dotnet\tools;$env:PATH"
+          powershell -ExecutionPolicy Bypass -File installer/windows/build_msi.ps1 -SkipBuild
+
       - uses: actions/upload-artifact@v4
         with:
           name: hezhou-editor-windows-msix
           path: |
             dist/*.msix
             dist/*.cer
+            dist/*.msi
 
   package-linux:
     if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/v')
@@ -190,4 +200,5 @@ jobs:
           files: |
             artifacts/**/*.msix
             artifacts/**/*.cer
+            artifacts/**/*.msi
             artifacts/**/*.deb
