@@ -1,11 +1,12 @@
 = Hezhou Editor Packaging
 
-Windows MSIX
-------------
+Windows MSIX / MSI
+------------------
 - Manifest: `installer/windows/msix/AppxManifest.xml`
 - Builder: `installer/windows/build_msix.ps1`
 - Output: `dist/HezhouEditor-<version>.msix`
-- CI produces a self-signed certificate (`dist/HezhouEditor.cer`) alongside it.
+- MSI builder: `installer/windows/build_msi.ps1` (WiX v5)
+- CI produces a self-signed certificate (`dist/HezhouEditor.cer`) alongside MSIX.
 
 Linux DEB
 ---------

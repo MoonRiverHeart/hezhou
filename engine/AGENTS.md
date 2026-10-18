@@ -435,5 +435,5 @@ glslc shaders/rotation.frag -o shaders/rotation.frag.spv
 - 编辑器与启动器设置 Mono 环境；hot reload 优先内置 mcs。
 
 ### 50. MSIX 与无终端启动 (2026-10-18)
-- MSI 改为 MSIX；launcher GUI 子进程启动编辑器（CREATE_NO_WINDOW）。
+- 同时发布 MSIX 与 MSI；launcher GUI 子进程启动编辑器（CREATE_NO_WINDOW）。
 - 只读安装目录自动复制运行时资源到 LOCALAPPDATA；字体进入安装包。

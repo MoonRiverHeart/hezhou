@@ -2,7 +2,7 @@
 
 ## 2026-10-18: MSIX 与启动器
 
-- Windows 安装包从 MSI 切换为 MSIX（MakeAppx + 自签名证书，发布 `.msix` 与 `.cer`）。
+- Windows 安装包同时发布 MSIX（MakeAppx + 自签名证书，`.msix` 与 `.cer`）和 MSI（WiX v5）。
 - 新增 `hezhou_launcher.exe` GUI 启动器：创建无窗口子进程运行编辑器，
   去掉了安装后点击出现的终端。
 - 编辑器启动时检测安装目录是否可写；MSIX/Program Files 只读时把
