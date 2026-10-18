@@ -54,7 +54,7 @@ jobs:
       - name: Install pinned Mono
         shell: pwsh
         run: |
-          choco install mono --version=${{ env.MONO_VERSION }} --no-progress -y
+          choco install mono --no-progress -y
           & "C:\Program Files\Mono\bin\mono.exe" --version
 
       - name: Compile editor C# scripts
@@ -86,7 +86,7 @@ jobs:
       - name: Install Mono
         shell: pwsh
         run: |
-          choco install mono --version=${{ env.MONO_VERSION }} --no-progress -y
+          choco install mono --no-progress -y
 
       - name: Install WiX
         shell: pwsh
@@ -132,8 +132,11 @@ jobs:
           sudo apt-get install -y --no-install-recommends \
             build-essential cmake pkg-config python3 \
             libvulkan-dev libglfw3-dev libx11-dev libxrandr-dev \
-            libxi-dev libxcursor-dev libxinerama-dev \
-            mono-devel
+            libxi-dev libxcursor-dev libxinerama-dev libxkbcommon-dev \
+            libxkbcommon-x11-dev libwayland-dev wayland-protocols libdecor-0-dev \
+            libx11-xcb-dev libxcb1-dev libxcb-randr0-dev libxcb-xinerama0-dev \
+            libxcb-xkb-dev libxcb-shape0-dev libxcb-xfixes0-dev libasound2-dev \
+            mono-devel libmono-2.0-dev
 
       - name: Build editor
         working-directory: engine

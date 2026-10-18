@@ -10,7 +10,14 @@ fn unique_temp_dir() -> PathBuf {
         .duration_since(UNIX_EPOCH)
         .unwrap()
         .as_nanos();
-    std::env::temp_dir().join(format!("hezhou_ffi_{}_{}", std::process::id(), nanos))
+    // Use the workspace target directory instead of the system temp directory:
+    // some sandboxed CI/test environments deny writes to TEMP.
+    let base = std::env::current_dir()
+        .unwrap_or_else(|_| PathBuf::from("."))
+        .join("target")
+        .join("project_ffi_tmp");
+    let _ = std::fs::create_dir_all(&base);
+    base.join(format!("hezhou_ffi_{}_{}", std::process::id(), nanos))
 }
 
 #[test]

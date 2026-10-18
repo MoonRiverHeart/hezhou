@@ -10,12 +10,12 @@ fn unique_temp_dir(tag: &str) -> PathBuf {
         .duration_since(UNIX_EPOCH)
         .unwrap()
         .as_nanos();
-    std::env::temp_dir().join(format!(
-        "hezhou_{}_{}_{}",
-        tag,
-        std::process::id(),
-        nanos
-    ))
+    let base = std::env::current_dir()
+        .unwrap_or_else(|_| PathBuf::from("."))
+        .join("target")
+        .join("project_roundtrip_tmp");
+    let _ = std::fs::create_dir_all(&base);
+    base.join(format!("hezhou_{}_{}_{}", tag, std::process::id(), nanos))
 }
 
 fn find_entity(scene: &Scene, name: &str) -> u64 {
