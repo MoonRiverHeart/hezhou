@@ -111,7 +111,7 @@ impl CrashHandler {
                 _ => CrashType::Custom,
             };
 
-            Self::capture_crash(crash_type, &format!("Signal received: {}", sig));
+            CrashHandler::capture_crash(crash_type, &format!("Signal received: {}", sig));
         }
 
         unsafe {
