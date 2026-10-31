@@ -1,7 +1,7 @@
 # Hezhou Engine Knowledge Base
 
-**Generated:** 2026-05-25
-**Commit:** afb4f7d
+**Generated:** 2026-10-31
+**Commit:** 09d60d5
 **Branch:** main
 
 ## Overview
@@ -33,7 +33,8 @@ engine/
 ├── 📱 harmony/        # HarmonyEngine + OpenHarmony native window
 ├── 📐 geometry/       # BoundingBox, MeshData, Vertex layouts
 ├── 🎮 examples/src/   # 15 demo programs (see examples/src/AGENTS.md)
-│   └── ✏️ editor/     # Main editor module (see examples/src/editor/AGENTS.md)
+│   ├── ✏️ editor/     # Main editor module (see examples/src/editor/AGENTS.md)
+│   └── 🚀 hezhou_launcher.rs # Windows GUI launcher (no console)
 ├── 🔮 shaders/        # rotation.vert/frag + ui shaders (manually compiled to .spv)
 └── 🔤 fonts/          # HarmonyOS_Sans_SC.ttf (bundled)
 ```
@@ -144,14 +145,31 @@ glslc shaders/rotation.frag -o shaders/rotation.frag.spv
 - FontAtlas first init ~0.23s (OnceLock), subsequent calls instant
 - Editor startup: FontAtlas init + C# compile + Mono load ≈ 2-3s
 - 3 inconsistent Mono build scripts (build_mono.ps1 hardcoded mcs path, build_mono_ui.ps1 uses PATH + -unsafe flag, build_ui_mono.ps1 hardcoded + subset) — should consolidate
-- CI: `.github/workflows/ci.yml`（Rust UT/UI/DFX、FFI 契约、fuzz harness、C# 编译）；E2E 需本地 Vulkan/GPU
+- CI: `.github/workflows/ci.yml`（rust-tests / csharp-build / package-windows / package-linux / publish-release）；tag `v*` 触发 MSI+MSIX+DEB 打包并发布 GitHub Release
 - No rust-toolchain.toml — no pinned toolchain
 - workspace.dependencies under-used: only 3 deps (parking_lot, tokio unused, wrapped_mono) — version skew risk
 - editor/mod.rs uses 7 `static mut` globals — soundness hazard (undefined behavior from multiple threads)
-- `.gitignore` excludes `*.json` and `*.png` — overly broad, blocks legitimate asset files
+- `.gitignore` 已排除 `dist/`、`installer/stage/`、`build-temp/`、`download/` 等构建产物；字体和 assets 已入库
 - Shader compilation has NO automation — .spv files manually compiled via glslc and committed
 
-## Bug Fix History (2026-05-25 ~ 2026-05-26)
+### Release / Installer (2026-10-31)
+
+- 版本号：`engine/Cargo.toml` 的 `[workspace.package].version`（当前 0.1.0）。
+- Windows MSI：`installer/windows/build_msi.ps1` + `HezhouEditor.wxs`（WiX v5）。
+  Start Menu 指向 `hezhou_launcher.exe`，不是 `mono_editor_demo.exe`。
+- Windows MSIX：`installer/windows/build_msix.ps1` + `installer/windows/msix/AppxManifest.xml`；
+  CI 用 `New-SelfSignedCertificate` 生成证书，`signtool` 签名，`.cer` 随 Release 上传。
+- Linux DEB：`installer/linux/build_deb.sh` + `build_deb.py`（标准 ar + control/data）。
+- 安装目录只读：`prepare_runtime_dir()` 在首次启动时把 `scripts/assets/fonts`
+  复制到 `%LOCALAPPDATA%\Hezhou\Editor`（Linux 为 `$XDG_DATA_HOME/hezhou/editor`），
+  并切换工作目录；`runtime/mono` 保留在安装目录。
+- 无终端启动：`hezhou_launcher.exe` 是 GUI 子系统，使用 `CREATE_NO_WINDOW`
+  启动 `mono_editor_demo.exe`，并把子进程 stdio 指向 NUL。
+- 安装包必须包含 `engine/fonts/HarmonyOS_Sans_SC.ttf`，否则 UI 文字空白。
+- 当前 Release：https://github.com/MoonRiverHeart/hezhou/releases/tag/v0.1.0
+  （MSI、MSIX、.cer、DEB）。
+
+# Bug Fix History (2026-05-25 ~ 2026-05-26)
 
 ### 1. FBO销毁崩溃 — VK_ERROR_DEVICE_LOST Heisenbug
 **现象**: 编辑器随机崩溃，Vulkan返回VK_ERROR_DEVICE_LOST
@@ -426,9 +444,9 @@ glslc shaders/rotation.frag -o shaders/rotation.frag.spv
 - 全屏天空盒渐变 pipeline；视觉测试 33 / 意图 26 全通过。
 
 ### 48. 安装包：Windows MSI / Linux DEB (2026-10-18)
-- WiX v4 MSIX + PowerShell 构建脚本；DEB 由 Python ar/tar 构建，无需 dpkg-deb。
+- WiX v5 MSI + MakeAppx MSIX + PowerShell 构建脚本；DEB 由 Python ar/tar 构建，无需 dpkg-deb。
 - 安装布局：Windows Program Files\Hezhou；Linux /opt/hezhou/editor + /usr/bin/hezhou-editor。
-- CI 手动任务 package-windows / package-linux。
+- CI tag `v*` 触发 package-windows（MSI + MSIX）/ package-linux，并由 publish-release 上传附件。
 
 ### 49. 安装包内置运行时 (2026-10-18)
 - runtime/mono 自动打包（bin/etc/4.5/4.5-api）；Windows 含 Vulkan/VC runtime DLL。
@@ -437,3 +455,10 @@ glslc shaders/rotation.frag -o shaders/rotation.frag.spv
 ### 50. MSIX 与无终端启动 (2026-10-18)
 - 同时发布 MSIX 与 MSI；launcher GUI 子进程启动编辑器（CREATE_NO_WINDOW）。
 - 只读安装目录自动复制运行时资源到 LOCALAPPDATA；字体进入安装包。
+
+### 51. 发布收尾：MSI/MSIX 双包与安装版启动 (2026-10-31)
+- Windows Release 同时提供 MSI、MSIX、自签名 `.cer`；旧 MSI 资产已清理并重新上传。
+- 安装版通过 `hezhou_launcher.exe` 启动，无控制台窗口；MSI 快捷方式与 MSIX 应用入口均指向它。
+- 修复只读安装目录启动失败：资源复制到 LOCALAPPDATA，字体入库并随包分发。
+- CI 全绿：rust-tests、csharp-build、package-windows、package-linux、publish-release。
+- 当前 tag/Release：`v0.1.0`；四类附件（MSI/MSIX/CER/DEB）已确认存在。

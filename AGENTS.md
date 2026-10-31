@@ -1,82 +1,114 @@
 # HEZHOU PROJECT KNOWLEDGE BASE
 
-**Generated:** 2026-05-25
-**Commit:** afb4f7d
+**Generated:** 2026-10-31
+**Commit:** 09d60d5
 **Branch:** main
 
 ## OVERVIEW
-Cross-platform game engine: Rust core + C# scripting (Mono JIT/NativeAOT) + HarmonyOS port. Vulkan rendering, custom UI system (17 widget types), ECS Scene, asset library, project file system.
+跨平台游戏引擎与编辑器：Rust core + C# scripting（Mono JIT）+ Vulkan 渲染 + 自绘 Widget UI。
+当前发布版本 `v0.1.0`，Windows 同时提供 **MSI + MSIX**，Linux 提供 **DEB**。
 
 ## STRUCTURE
 ```
 hezhou/
-├── engine/      # Rust workspace — 12 crates (see engine/AGENTS.md)
-├── demo/        # Standalone interop demos (Rust↔C#, Rust↔Harmony)
-│   ├── rust/    # Rust→C# via Mono JIT (edition 2024)
-│   ├── csharp/  # C#→Rust via DllImport
-│   ├── callback/ # C#↔Rust callbacks via csbindgen
-│   └── harmony/ # OpenHarmony UIAbility + Rust libentry.so
-├── release/     # Packaged editor distribution (hezhou-editor.exe + start.bat)
-├── design/      # Design documents
-├── docs/        # Screenshots for README
-├── scripts/     # Top-level scripts (if any)
-└── hezhou.sln   # VS solution — only demo/csharp (NOT the engine)
+├── engine/          # Rust workspace — 13 crates（详见 engine/AGENTS.md）
+│   ├── examples/    # mono_editor_demo（编辑器主程序）
+│   │   └── src/hezhou_launcher.rs  # Windows GUI 启动器（无终端）
+│   ├── scripts/     # 34 个 C# 脚本 + build_mono.ps1
+│   ├── fonts/       # HarmonyOS_Sans_SC.ttf（已入库，安装包必须包含）
+│   └── target/      # 构建产物（gitignore）
+├── installer/
+│   ├── windows/     # MSI: build_msi.ps1 + HezhouEditor.wxs (WiX v5)
+│   │                # MSIX: build_msix.ps1 + msix/AppxManifest.xml
+│   └── linux/       # build_deb.sh + build_deb.py（ar/tar，无需 dpkg-deb）
+├── .github/workflows/ci.yml  # CI + 标签触发打包/发布
+├── dist/            # 本地打包输出（gitignore）
+├── demo/            # 旧版互操作示例（Rust↔C#/Harmony），非发布路径
+├── release/         # 旧版发布目录（历史遗留，当前以 installer/ 为准）
+├── design/ docs/    # 设计文档与截图
+└── scripts/         # 顶层辅助脚本
 ```
 
 ## WHERE TO LOOK
 | Task | Location | Notes |
 |------|----------|-------|
-| Engine architecture | `engine/AGENTS.md` | Full engine KB, 124 lines |
-| Run editor | `engine/examples/src/mono_editor_demo.rs` → `editor::run()` | `cd engine && cargo run --bin mono_editor_demo --features mono --release` |
-| C# scripting | `engine/scripts/` | 24 .cs files, mcs compiler only |
-| HarmonyOS port | `demo/harmony/` | EntryAbility.ets → Index.ets → libentry.so |
-| Release build | `release/hezhou-editor/` | start.bat wrapper |
-| Interop demo (Rust→C#) | `demo/rust/src/main.rs` | edition 2024, hardcoded Mono paths |
-| Interop demo (C#→Rust) | `demo/csharp/Program.cs` | DllImport-based |
+| 编辑器入口 | `engine/examples/src/mono_editor_demo.rs` | `main()` → `editor::run()` |
+| Windows 无终端启动 | `engine/examples/src/hezhou_launcher.rs` | GUI 子系统，`CREATE_NO_WINDOW` 启动编辑器 |
+| 安装目录只读适配 | `engine/examples/src/editor/mod.rs` → `prepare_runtime_dir()` | 复制 scripts/assets/fonts 到用户数据目录 |
+| 编辑器主体 | `engine/examples/src/editor/` | mod/ffi/hot_reload/mcp/scene_ffi |
+| C# 编辑器 | `engine/scripts/` | 34 个 `.cs`，只能用 Mono `mcs` |
+| 字体 | `engine/fonts/HarmonyOS_Sans_SC.ttf` | 缺失会导致 UI 文字空白，必须随包发布 |
+| Windows MSI | `installer/windows/build_msi.ps1` | WiX v5，Start Menu 指向 launcher |
+| Windows MSIX | `installer/windows/build_msix.ps1` | MakeAppx + signtool，自签名证书 |
+| Linux DEB | `installer/linux/build_deb.sh` | Python 生成 ar/control/data |
+| CI / 发布 | `.github/workflows/ci.yml` | tag `v*` 或 workflow_dispatch |
+| 引擎完整 KB | `engine/AGENTS.md` | 架构、FFI、Widget、测试细节 |
 
 ## CONVENTIONS
-- Workspace Cargo.toml is in `engine/` (NOT repo root) — `cd engine` before any cargo command
-- `.gitignore` excludes `*.json` and `*.png` — overly broad, blocks legitimate assets
-- hezhou.sln only contains `demo/csharp/CsharpCaller.csproj` — engine is NOT in the solution
-- Release: `release/hezhou-editor/start.bat` → `hezhou-editor.exe`
+- Cargo workspace 在 `engine/`，任何 cargo 命令先 `cd engine`。
+- 安装后的正常入口是 **`hezhou_launcher.exe`**（MSI 快捷方式/MSIX 应用入口）。
+  直接运行 `mono_editor_demo.exe` 会保留控制台，仅用于开发调试。
+- 安装目录（Program Files/WindowsApps）只读；运行时写操作走
+  `%LOCALAPPDATA%\Hezhou\Editor`（Linux 为 `$XDG_DATA_HOME/hezhou/editor`）。
+- 安装包必须包含 `fonts/`；打包脚本已内置 `engine/fonts`。
+- MSIX 是自签名包，发布时同时上传匹配的 `.cer`；安装前需信任根证书。
+- `dist/`、`installer/stage/`、`build-temp/`、`download/` 都是构建产物，不提交。
+- 版本号来源：`engine/Cargo.toml` 的 `[workspace.package].version`。
 
 ## ANTI-PATTERNS (THIS PROJECT)
-- **NEVER** run `cargo build` from repo root — must `cd engine` first
-- **NEVER** add .csproj files to hezhou.sln without checking engine .csproj files exist separately
-- **NEVER** commit `.json` or `.png` files to root — `.gitignore` blocks them (needs fix)
-- **NEVER** use .NET 8 DLLs with Mono — use `mcs` compiler
+- **NEVER** 从仓库根目录运行 `cargo build`，必须进入 `engine/`。
+- **NEVER** 让已安装应用直接双击 `mono_editor_demo.exe`；应使用 launcher/MSIX 入口。
+- **NEVER** 删除或漏打包 `engine/fonts/HarmonyOS_Sans_SC.ttf`。
+- **NEVER** 假设安装目录可写；所有运行态文件必须写用户数据目录。
+- **NEVER** 用 .NET 8 编译的 DLL 配 Mono；必须用 `mcs`。
+- **NEVER** 把 MSIX 证书私钥（`.pfx`）提交到仓库；CI 临时生成。
+- **NEVER** 提交 `dist/`、`installer/stage/`、`download/` 等构建/测试产物。
 
 ## COMMANDS
 ```bash
 cd engine
-cargo build                                          # Build all crates
-cargo run --bin mono_editor_demo --features mono --release  # Game Editor
-cargo run --bin mono_triangle_demo --features mono   # Hot reload demo
-cargo run --bin trace_viewer_demo --release           # Trace viewer
 
-cd engine/scripts
-powershell -ExecutionPolicy Bypass -File build_mono.ps1  # Compile C# (mcs)
+# 构建
+cargo build --release --features mono
+powershell -ExecutionPolicy Bypass -File scripts/build_mono.ps1
 
-# Layered tests + E2E automation (2026-10-18)
+# 开发运行（会显示控制台，正常）
+cargo run --bin mono_editor_demo --features mono --release
+
+# 测试
 powershell -ExecutionPolicy Bypass -File scripts/run_tests.ps1 -Offline
 powershell -ExecutionPolicy Bypass -File scripts/run_autotest.ps1 -Mode intent
+powershell -ExecutionPolicy Bypass -File scripts/ci_local.ps1 -SkipBuild
+
+# Windows MSI
+dotnet tool install --global wix --version 5.0.2
+$env:PATH = "$env:USERPROFILE\.dotnet\tools;$env:PATH"
+powershell -ExecutionPolicy Bypass -File installer/windows/build_msi.ps1
+
+# Windows MSIX（不带证书为未签名包）
+powershell -ExecutionPolicy Bypass -File installer/windows/build_msix.ps1
+
+# Linux DEB
+bash installer/linux/build_deb.sh
 ```
 
-## TESTING / DFX
-- UT / FUZZ / FFI contract / E2E 入口见 `engine/docs/ai_intent_testing.md`
-- E2E 报告：`test-results/<mode>/{report.json,summary.txt,ui_tree.txt,final.png}`
-- 意图测试：`IntentTestRunner.cs`；新 P0 功能必须加一个 intent case
-- DFX：`TestTelemetry.cs` 采集 Warn/Error/Fatal；Rust 主循环检测 `DONE` 后保存 trace
+## RELEASE / CI
+- 触发：push tag `v*`（例如 `v0.1.0`）或手动 `workflow_dispatch`。
+- 作业：`rust-tests`、`csharp-build`、`package-windows`、`package-linux`、
+  `publish-release`。
+- Windows 附件：`HezhouEditor-<version>.msix`、`HezhouEditor.cer`、
+  `HezhouEditor-<version>.msi`。
+- Linux 附件：`hezhou-editor_<version>_amd64.deb`。
+- 发布前必须确认五个作业全部 success，且 GitHub Release 中三种安装包都存在。
+- `v0.1.0` 发布页：https://github.com/MoonRiverHeart/hezhou/releases/tag/v0.1.0
 
 ## NOTES
-- CI: `.github/workflows/ci.yml` 覆盖 Rust UT/UI/DFX、FFI 契约、fuzz harness、C# 编译；E2E 需本地 Vulkan/GPU
-- No rust-toolchain.toml — no pinned toolchain
-- `demo/rust/Cargo.toml` uses edition = "2024" (very new Rust edition)
-- Hardcoded absolute paths in `demo/rust/` (Mono lib path, Windows SDK paths)
-- Inverted dependency: core → scripting (core needs FfiContext types)
+- CI 使用 Rust 1.95.0、Mono 6.12.0.199、Python 3.11；Windows 打包安装 WiX 5.0.2。
+- Linux 打包需要 CMake/Ninja + GLFW/X11/Wayland/Vulkan/Mono 依赖。
+- 编辑器启动时会做 C# 自检并输出 `PASS=35, FAIL=0`。
+- 主要运行日志：`logs/`（开发目录）或 `%LOCALAPPDATA%\Hezhou\Editor\logs`（安装版）。
+- `demo/` 与 `release/` 是历史目录，不参与当前 CI/发布流程。
 
 ## LANGUAGE POLICY
-- **全程使用中文** — 所有思考、回答、注释、对话必须用中文
-- 思考过程用中文，代码注释用中文，与用户交流用中文
-- 代码本身（Rust/C#/GLSL）保持英文，因为编程语言惯例如此
-- 但所有解释、诊断、计划、todo描述必须中文
+- **全程使用中文** — 所有思考、回答、注释、对话必须用中文。
+- 代码本身（Rust/C#/GLSL）保持英文，解释、诊断、计划和 todo 描述用中文。
