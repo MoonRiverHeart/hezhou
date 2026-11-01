@@ -19,6 +19,7 @@
 - ✅ Player：真实构建、cook manifest 接入、包内资产索引、`--validate`/`--run`/`--host` 与 Host 契约。
 - ✅ Core：Prefab（一层嵌套/覆盖/循环检测）与 SceneManager。
 - ✅ 本地 CI `ci_local.ps1 -Offline` 通过（默认测试 + feature 测试 + FFI 契约 + C# 编译 + 图标一致性）。
+- ✅ 验证证据：capability_demo 14/14 项通过；Player 72 tests；Core 43 tests；编辑器启动自检 PASS=57、FAIL=0；FFI 301/301/301。
 - ⏳ 未完成（0.2 验收尚未达成）：
   1. Player 真正 game host（窗口/Vulkan/Mono/C# Initialize/帧循环/AssetId 加载）；
   2. Editor 构建/导出面板与 Prefab 编辑 FFI/UI；

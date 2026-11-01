@@ -58,7 +58,7 @@ engine/
 ## Architecture Notes
 - **Inverted dependency**: core → scripting (core needs FfiContext types from scripting). Scripting is the leaf crate.
 - **4 mid-level crates produce cdylib**: scripting, ui, dfx, harmony — needed for standalone FFI export model
-- **FfiContext**: 283-field flat #[repr(C)] struct of function pointers, assembled in editor/mod.rs with transmute
+- **FfiContext**: 301-field flat #[repr(C)] struct of function pointers, assembled in editor/mod.rs with transmute
 - **C# has NO Main() methods**: All scripts are DLL assemblies, entry via static Initialize() called from Rust
 - **Shader compilation**: NO automated pipeline. `.spv` files manually compiled via glslc and committed to repo
 - **Mono build**: 3 inconsistent PowerShell scripts (build_mono.ps1, build_mono_ui.ps1, build_ui_mono.ps1)
