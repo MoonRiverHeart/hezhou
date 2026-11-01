@@ -89,3 +89,31 @@ core/src/
 - `Scene::set_parent` 拒绝自环/祖先环
 - `World::clear` / `Scene::clear` 供工程整体替换
 - 测试：`project_roundtrip.rs`、`scene_properties.rs`、`scene_hierarchy_cycles.rs`、`ffi_contract.rs`
+
+### 2026-11-01: Prefab 与场景切换（0.2 能力）
+
+**新增文件**：
+- `core/src/prefab.rs`：Prefab JSON 资产格式 + `Scene::instantiate_prefab` /
+  `instantiate_prefab_with` + `PrefabOverrides` + `PrefabRegistry` + `Prefab::capture_from_scene`
+- `core/src/scene_manager.rs`：`SceneManager`（load/switch/switch_back/unload/unload_all）
+- `core/tests/prefab.rs`、`core/tests/scene_manager.rs`
+
+**Prefab 约定**：
+- JSON 版本 `1.0`，主版本必须为 1（更高主版本拒绝）；未知字段忽略、缺失可选字段取默认值（前向兼容）。
+- `transform.rotation` 为欧拉角（度），与 `ProjectEntity.transform` 一致。
+- 实例化生成全新 Entity ID、重建父子层级/组件/脚本绑定；返回 `PrefabInstance`
+  （root + 深度优先实体列表 + 层级路径映射，重名路径追加 `#2`）。
+- 覆盖仅作用于 Prefab 根：`PrefabOverrides{ name/position/rotation/scale/visible }`。
+- 嵌套仅一层：`PrefabEntity.nested_prefab = PrefabReference{prefab, overrides}`，
+  实体本身作为父级/定位点，嵌套 Prefab 根作为其子实体；循环引用与超深嵌套分别报
+  `CircularReference` / `NestingTooDeep`。
+- 0.2 项目文件仍保存展开后的实体（不记录 prefab 引用），Project 格式不变。
+
+**SceneManager 约定**：
+- `load_scene` 注册/替换内存场景；`switch_to` 只切当前指针，场景实例保留（往返不丢状态）；
+- `unload_scene` 返回 `Scene` 所有权，并切回 `Editing`、标记脚本资源未加载；
+- `load_scene_from_project` / `load_scene_from_project_json` 复用 Project 同步/快照接口。
+
+**接入契约**：Asset 层按路径/AssetId 定位 Prefab JSON 并注册 `PrefabRegistry`；
+Editor 后续通过 FFI 暴露 capture/instantiate/switch（本任务只提供 Rust API）；Player
+启动时用 `load_scene_from_project_json` + `switch_to`。

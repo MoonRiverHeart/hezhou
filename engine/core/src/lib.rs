@@ -7,6 +7,8 @@ pub mod scene_ffi;
 pub mod property_ffi;
 pub mod asset_library;
 pub mod project;
+pub mod prefab;
+pub mod scene_manager;
 pub mod asset_ffi;
 
 pub use ecs::*;
@@ -17,6 +19,8 @@ pub use scene_ffi::*;
 pub use property_ffi::*;
 pub use asset_library::*;
 pub use project::*;
+pub use prefab::*;
+pub use scene_manager::*;
 pub use asset_ffi::*;
 
 pub struct Engine {
