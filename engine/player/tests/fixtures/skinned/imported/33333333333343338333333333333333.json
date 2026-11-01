@@ -1,0 +1,96 @@
+{
+  "format": "gltf",
+  "nodes": [
+    {
+      "name": "RootJoint",
+      "children": [1],
+      "local_transform": {
+        "translation": { "x": 0.0, "y": 0.0, "z": 0.0 },
+        "rotation": { "x": 0.0, "y": 0.0, "z": 0.0, "w": 1.0 },
+        "scale": { "x": 1.0, "y": 1.0, "z": 1.0 }
+      }
+    },
+    {
+      "name": "ChildJoint",
+      "parent": 0,
+      "children": [],
+      "local_transform": {
+        "translation": { "x": 0.0, "y": 1.0, "z": 0.0 },
+        "rotation": { "x": 0.0, "y": 0.0, "z": 0.0, "w": 1.0 },
+        "scale": { "x": 1.0, "y": 1.0, "z": 1.0 }
+      }
+    }
+  ],
+  "meshes": [
+    {
+      "name": "SkinnedTriangle",
+      "primitives": [
+        {
+          "positions": [
+            { "x": 0.0, "y": 0.0, "z": 0.0 },
+            { "x": 1.0, "y": 0.0, "z": 0.0 },
+            { "x": 0.0, "y": 1.0, "z": 0.0 }
+          ],
+          "normals": [
+            { "x": 0.0, "y": 0.0, "z": 1.0 },
+            { "x": 0.0, "y": 0.0, "z": 1.0 },
+            { "x": 0.0, "y": 0.0, "z": 1.0 }
+          ],
+          "uvs": [
+            { "x": 0.0, "y": 0.0 },
+            { "x": 1.0, "y": 0.0 },
+            { "x": 0.0, "y": 1.0 }
+          ],
+          "joints": [[0, 0, 0, 0], [0, 1, 0, 0], [1, 0, 0, 0]],
+          "weights": [[1.0, 0.0, 0.0, 0.0], [0.5, 0.5, 0.0, 0.0], [1.0, 0.0, 0.0, 0.0]],
+          "indices": [0, 1, 2],
+          "mode": "triangles",
+          "skeleton": 0,
+          "bounds": {
+            "min": { "x": 0.0, "y": 0.0, "z": 0.0 },
+            "max": { "x": 1.0, "y": 1.0, "z": 0.0 }
+          }
+        }
+      ]
+    }
+  ],
+  "materials": [],
+  "textures": [],
+  "skeletons": [
+    {
+      "name": "PlayerSkeleton",
+      "joints": [
+        {
+          "node": 0,
+          "name": "RootJoint",
+          "inverse_bind_matrix": { "cols": [[1.0, 0.0, 0.0, 0.0], [0.0, 1.0, 0.0, 0.0], [0.0, 0.0, 1.0, 0.0], [0.0, 0.0, 0.0, 1.0]] }
+        },
+        {
+          "node": 1,
+          "name": "ChildJoint",
+          "parent": 0,
+          "inverse_bind_matrix": { "cols": [[1.0, 0.0, 0.0, 0.0], [0.0, 1.0, 0.0, 0.0], [0.0, 0.0, 1.0, 0.0], [0.0, 0.0, 0.0, 1.0]] }
+        }
+      ],
+      "root_joint": 0
+    }
+  ],
+  "animations": [
+    {
+      "name": "Spin",
+      "channels": [
+        {
+          "target_node": 1,
+          "target_joint": 1,
+          "property": "rotation",
+          "interpolation": "linear",
+          "times": [0.0, 1.0],
+          "values": [0.0, 0.0, 0.0, 1.0, 0.0, 0.70710677, 0.0, 0.70710677]
+        }
+      ],
+      "duration": 1.0
+    }
+  ],
+  "external_files": [],
+  "warnings": []
+}

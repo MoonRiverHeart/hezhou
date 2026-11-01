@@ -156,6 +156,14 @@ pub fn cooked_fixture_dir() -> PathBuf {
         .join("cooked")
 }
 
+/// 蒙皮资产 fixture 目录（`tests/fixtures/skinned`）。
+pub fn skinned_fixture_dir() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("tests")
+        .join("fixtures")
+        .join("skinned")
+}
+
 /// 递归复制目录（fixture 损坏/缺失场景测试用）。
 pub fn copy_dir_all(source: &Path, destination: &Path) {
     std::fs::create_dir_all(destination).expect("创建复制目标目录");

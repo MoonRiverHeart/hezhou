@@ -34,6 +34,8 @@ use hezhou_rhi_vulkan::UIVulkanRenderer;
 
 use crate::host::{HostError, HostOutcome, PlayerHost, PlayerHostContext};
 use crate::logging::LogLevel;
+use crate::skinned_asset::{select_first_skinned_asset, SelectedSkinnedAsset};
+use crate::skinned_asset::PLAYER_SKINNED_ENTITY_ID;
 
 /// `--host window` 使用的 host 名称。
 pub const WINDOW_HOST_NAME: &str = "window";
@@ -153,6 +155,97 @@ impl PlayerHost for WindowPlayerHost {
         renderer.set_skybox([0.08, 0.10, 0.16], [0.02, 0.02, 0.03]);
         // GameState::Running = 1（见 engine/AGENTS.md）
         renderer.set_game_state(1);
+        // 质量档 → PBR draw path（0=Low/1=Medium/2=High；Ultra 本轮用 High）。
+        let quality_preset = match context.manifest.quality {
+            crate::config::QualityTier::Low => 0,
+            crate::config::QualityTier::Medium => 1,
+            crate::config::QualityTier::High | crate::config::QualityTier::Ultra => 2,
+        };
+        renderer.set_render_quality_preset_u32(quality_preset);
+        context.log.host_log(
+            LogLevel::Info,
+            &format!(
+                "渲染质量档：{}（preset {}）；PBR draw path 将在首帧创建",
+                context.manifest.quality.as_str(),
+                quality_preset
+            ),
+        );
+
+        // ---- 真实蒙皮资产：ImportedPrimitive → SkinnedVertex → task-28 上传 ----
+        let mut skinned: Option<PlayerSkinnedState> = None;
+        match select_first_skinned_asset(context.imported_assets) {
+            Ok(Some(asset)) => {
+                context.log.host_log(LogLevel::Info, &format!("{}", asset.summary()));
+                match asset.palette_at(0.0) {
+                    Ok(palette) => {
+                        let upload = hezhou_rhi_vulkan::SkinnedMeshUpload {
+                            entity_id: PLAYER_SKINNED_ENTITY_ID,
+                            vertices: asset.vertices.clone(),
+                            indices: asset.indices.clone(),
+                            material: None,
+                            texture_path: None,
+                        };
+                        match renderer.upload_skinned_mesh(upload) {
+                            Ok(()) => {
+                                let palette_bytes = palette.to_le_bytes();
+                                match renderer.upload_skin_palette(
+                                    PLAYER_SKINNED_ENTITY_ID,
+                                    &palette_bytes,
+                                ) {
+                                    Ok(_) => {
+                                        context.log.host_log(
+                                            LogLevel::Info,
+                                            &format!(
+                                                "蒙皮网格上传成功：{} 顶点 / {} 三角形 / {} 关节（entity {}），palette 每帧更新",
+                                                asset.vertex_count(),
+                                                asset.triangle_count(),
+                                                palette.len(),
+                                                PLAYER_SKINNED_ENTITY_ID
+                                            ),
+                                        );
+                                        skinned = Some(PlayerSkinnedState {
+                                            animated: asset.animation.is_some(),
+                                            asset,
+                                        });
+                                    }
+                                    Err(error) => {
+                                        let _ = renderer
+                                            .remove_skinned_mesh(PLAYER_SKINNED_ENTITY_ID);
+                                        context.log.host_log(
+                                            LogLevel::Warn,
+                                            &format!(
+                                                "初始 joint palette 上传失败：{error}；回退已加载场景（内置 cube）"
+                                            ),
+                                        );
+                                    }
+                                }
+                            }
+                            Err(error) => context.log.host_log(
+                                LogLevel::Warn,
+                                &format!(
+                                    "upload_skinned_mesh 失败：{error}；回退已加载场景（内置 cube）"
+                                ),
+                            ),
+                        }
+                    }
+                    Err(error) => context.log.host_log(
+                        LogLevel::Warn,
+                        &format!(
+                            "蒙皮 palette 计算失败：{error}；回退已加载场景（内置 cube）"
+                        ),
+                    ),
+                }
+            }
+            Ok(None) => context.log.host_log(
+                LogLevel::Warn,
+                "包内没有带 joints/weights 的蒙皮 mesh：渲染已加载场景/内置 cube；不创建真实蒙皮绘制",
+            ),
+            Err(error) => context.log.host_log(
+                LogLevel::Warn,
+                &format!("蒙皮资产解析失败：{error}；回退已加载场景（内置 cube）"),
+            ),
+        }
+        let mut palette_updates: u64 = 0;
 
         let started = Instant::now();
         let mut frames: u32 = 0;
@@ -181,6 +274,58 @@ impl PlayerHost for WindowPlayerHost {
                 closed_by_user = true;
                 break;
             }
+
+            // 首帧后确认 PBR 真实蒙皮绘制路径状态（便于自动化/手工排查）。
+            if frames == 1 {
+                context.log.host_log(
+                    LogLevel::Info,
+                    &format!(
+                        "PBR draw path 激活：{}；质量摘要：{}；已上传蒙皮网格：{}",
+                        renderer.pbr_forward_active(),
+                        renderer.render_quality_summary(),
+                        renderer.skinned_mesh_count()
+                    ),
+                );
+            }
+
+            // 每帧更新真实蒙皮 joint palette（无动画时为静态绑定姿态）。
+            if let Some(state) = &skinned {
+                let time = if state.animated {
+                    let duration = state
+                        .asset
+                        .animation
+                        .as_ref()
+                        .map(|animation| animation.duration)
+                        .unwrap_or(0.0);
+                    if duration > 0.0 {
+                        started.elapsed().as_secs_f32() % duration
+                    } else {
+                        0.0
+                    }
+                } else {
+                    0.0
+                };
+                match state.asset.palette_at(time) {
+                    Ok(palette) => {
+                        if let Err(error) = renderer.upload_skin_palette(
+                            PLAYER_SKINNED_ENTITY_ID,
+                            &palette.to_le_bytes(),
+                        ) {
+                            context.log.host_log(
+                                LogLevel::Warn,
+                                &format!("第 {frames} 帧 joint palette 上传失败：{error}"),
+                            );
+                        } else {
+                            palette_updates += 1;
+                        }
+                    }
+                    Err(error) => context.log.host_log(
+                        LogLevel::Warn,
+                        &format!("第 {frames} 帧 joint palette 计算失败：{error}"),
+                    ),
+                }
+            }
+
             if frames % 30 == 0 || frames == self.frame_limit {
                 context.log.host_log(
                     LogLevel::Info,
@@ -197,6 +342,23 @@ impl PlayerHost for WindowPlayerHost {
 
         // 不调用 renderer.cleanup()：见模块文档"已知限制（上游 rhi-vulkan）"。
         let elapsed_ms = started.elapsed().as_secs_f64() * 1000.0;
+        if let Some(state) = &skinned {
+            context.log.host_log(
+                LogLevel::Info,
+                &format!(
+                    "蒙皮绘制统计：{} 顶点 / {} 三角形 / {} 关节；palette 更新 {} 次（{}）",
+                    state.asset.vertex_count(),
+                    state.asset.triangle_count(),
+                    state.asset.joint_count(),
+                    palette_updates,
+                    if state.animated {
+                        "动画驱动"
+                    } else {
+                        "静态绑定姿态"
+                    }
+                ),
+            );
+        }
         context.log.host_log(
             LogLevel::Info,
             &format!(
@@ -212,6 +374,14 @@ impl PlayerHost for WindowPlayerHost {
             frames: u64::from(frames),
         })
     }
+}
+
+/// 当前窗口 host 已上传的真实蒙皮资产状态。
+struct PlayerSkinnedState {
+    /// CPU 侧 mesh/skeleton/animation 与 palette 采样数据。
+    asset: SelectedSkinnedAsset,
+    /// 是否有动画 clip（无动画时每帧上传静态绑定姿态 palette）。
+    animated: bool,
 }
 
 /// 从环境变量解析帧数；非法/缺省时用 [`DEFAULT_FRAME_LIMIT`]。

@@ -130,9 +130,13 @@ pub(crate) fn map_cooked_assets(
     }
 
     // 条目输出路径：规范化 + 保留名/冲突检查。
+    //
+    // glTF 子资产（mesh/material/skeleton/animation/texture）与父 glTF entry 共享同一个
+    // `imported/<uuid>.json` output：文件只复制一次，Player manifest 的 `assets[]` 只记录
+    // **文件级**条目（子资产映射在 index/bundle 中按 cook manifest 保留）。
     let mut assets = Vec::with_capacity(manifest.entries.len());
     let mut files = Vec::with_capacity(manifest.entries.len() + 1);
-    let mut seen_outputs: HashMap<String, String> = HashMap::new();
+    let mut inspected: HashMap<String, (String, PathBuf, u64, String)> = HashMap::new();
     for entry in &manifest.entries {
         let output = normalize_logical_path(&entry.output).map_err(|source| {
             BuildError::InvalidCookedOutput {
@@ -144,42 +148,72 @@ pub(crate) fn map_cooked_assets(
             return Err(BuildError::ReservedCookedOutput { output });
         }
         let key = case_collision_key(&output);
-        if let Some(previous) = seen_outputs.insert(key, output.clone()) {
-            return Err(BuildError::CaseCollision {
-                first: previous,
-                second: output,
-            });
-        }
-
-        let source = cooked.output_path(&output);
-        let (actual_size, actual_checksum) = inspect_cooked_output(&output, &source)?;
-        let actual_hash = actual_checksum
-            .strip_prefix("fnv1a64:")
-            .unwrap_or(actual_checksum.as_str())
-            .to_string();
-
-        // cook 对非 glTF/子资产是原样拷贝，source_size/source_hash 应与产物一致；
-        // imported/*.json 是重新生成的 JSON，不能用源文件大小/哈希校验。
-        if !is_generated_output(entry) {
-            if actual_size != entry.source_size {
-                return Err(BuildError::CookedSizeMismatch {
-                    output: output.clone(),
-                    expected: entry.source_size,
-                    actual: actual_size,
-                });
+        let (actual_size, actual_checksum) = match inspected.get(&key) {
+            Some((existing_output, _source, size, checksum)) => {
+                if existing_output != &output {
+                    return Err(BuildError::CaseCollision {
+                        first: existing_output.clone(),
+                        second: output,
+                    });
+                }
+                (*size, checksum.clone())
             }
-            if !actual_hash.eq_ignore_ascii_case(&entry.source_hash) {
-                return Err(BuildError::CookedChecksumMismatch {
-                    output: output.clone(),
-                    expected: entry.source_hash.clone(),
-                    actual: actual_hash,
-                });
-            }
-        }
+            None => {
+                let source = cooked.output_path(&output);
+                let (actual_size, actual_checksum) = inspect_cooked_output(&output, &source)?;
+                let actual_hash = actual_checksum
+                    .strip_prefix("fnv1a64:")
+                    .unwrap_or(actual_checksum.as_str())
+                    .to_string();
 
+                // cook 对非 glTF/子资产是原样拷贝，source_size/source_hash 应与产物一致；
+                // imported/*.json 是重新生成的 JSON，不能用源文件大小/哈希校验。
+                if !is_generated_output(entry) {
+                    if actual_size != entry.source_size {
+                        return Err(BuildError::CookedSizeMismatch {
+                            output: output.clone(),
+                            expected: entry.source_size,
+                            actual: actual_size,
+                        });
+                    }
+                    if !actual_hash.eq_ignore_ascii_case(&entry.source_hash) {
+                        return Err(BuildError::CookedChecksumMismatch {
+                            output: output.clone(),
+                            expected: entry.source_hash.clone(),
+                            actual: actual_hash,
+                        });
+                    }
+                }
+
+                inspected.insert(
+                    key,
+                    (
+                        output.clone(),
+                        source.clone(),
+                        actual_size,
+                        actual_checksum.clone(),
+                    ),
+                );
+                files.push(PlannedFile {
+                    relative_path: format!("{ASSETS_DIR}/{output}"),
+                    category: ArtifactCategory::Asset,
+                    size_bytes: Some(actual_size),
+                    checksum: Some(actual_checksum.clone()),
+                    executable: false,
+                    unix_mode: target.unix_data_mode(),
+                    source: Some(source),
+                });
+                (actual_size, actual_checksum)
+            }
+        };
+
+        // 只有文件级条目进 Player manifest assets[]；子资产由 cook_manifest/index/bundle 追踪。
+        if entry.locator.is_sub_asset() {
+            continue;
+        }
         let mut asset = ManifestAsset::new(output.clone(), entry.kind.as_str())
             .with_size(actual_size)
-            .with_checksum(actual_checksum.clone())
+            .with_checksum(actual_checksum)
             .with_cook_metadata(
                 entry.id.to_string(),
                 entry.locator.to_string(),
@@ -191,16 +225,6 @@ pub(crate) fn map_cooked_assets(
         // 保持与 cook manifest 的 `output` 字段原样一致（便于对照）。
         asset.output = Some(entry.output.clone());
         assets.push(asset);
-
-        files.push(PlannedFile {
-            relative_path: format!("{ASSETS_DIR}/{output}"),
-            category: ArtifactCategory::Asset,
-            size_bytes: Some(actual_size),
-            checksum: Some(actual_checksum),
-            executable: false,
-            unix_mode: target.unix_data_mode(),
-            source: Some(source),
-        });
     }
     assets.sort_by(|left, right| left.path.cmp(&right.path));
 

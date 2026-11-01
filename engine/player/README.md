@@ -23,7 +23,12 @@ Hezhou 0.2 **Player 导出构建器 + 最小运行时**（Windows / Linux）。
 7. **cook 导入资产 bundle**：解析包内 `assets/imported/*.json`（`hezhou_asset::ImportedScene`），
    建立 `AssetId → mesh/material/texture/skeleton/animation` 查询，严格核对
    `cook_manifest`（kind/index/数量/scene 数据一致性），启动打印加载统计；错误安全
-   （坏 JSON/不一致 → 可读 exit 2，未引用文件仅 WARN）。
+   （坏 JSON/不一致 → 可读 exit 2，未引用文件仅 WARN）；
+8. **真实蒙皮资产消费**：取第一个带 joints/weights 的 `ImportedPrimitive` 转
+   `hezhou_animation::SkinnedVertex`，选择第一个 skeleton/animation，计算
+   `world_joint * inverse_bind` joint palette；window host 通过 task-28
+   `upload_skinned_mesh`/`upload_skin_palette` 上传真实网格并每帧更新 palette
+   （无动画时静态绑定姿态）；无蒙皮/失败回退已加载场景（内置 cube）并 WARN。
 
 不绑定具体游戏内容；真实 cooker 产物可原样替换测试 fixture。
 
@@ -37,6 +42,7 @@ engine/player/
 │   ├── builder.rs    # 构建器：dry-run 计划 + 真实复制（预检/staging/校验/权限）
 │   ├── cook_bridge.rs# hezhou-asset CookManifest → Player assets[]/文件映射
 │   ├── imported_assets.rs# cook imported/*.json → ImportedScene / AssetId 查询（严格校验）
+│   ├── skinned_asset.rs# ImportedPrimitive → SkinnedVertex / skeleton+clip 选择 / joint palette
 │   ├── scene_loader.rs# 起始场景：Project JSON → Scene（失败回退内置 cube+light）
 │   ├── host.rs       # PlayerHost trait / HostOutcome / DefaultPlayerHost
 │   ├── window_host.rs# （feature window-host）WindowPlayerHost：窗口+Vulkan 固定帧渲染
@@ -50,7 +56,7 @@ engine/player/
 └── tests/
     ├── fixtures/minimal/  # 最小 fixture（legacy assets[]，空场景 + 占位 DLL/runtime）
     ├── fixtures/cooked/   # hezhou-asset 真实 cook 输出布局 fixture
-    └── *.rs               # 默认 89 个测试；--features window-host 共 92 个（+1 ignored 真窗口 smoke）
+    └── *.rs               # 默认 97 个测试；--features window-host 共 100 个（+2 ignored 真窗口 smoke）
 ```
 
 > 硬性边界：本 crate 只改 `engine/player/**`。installer、CI、examples、editor
@@ -348,7 +354,7 @@ cargo run -p hezhou-player --bin hezhou-player-build -- \
 6. 按模式结束：
    - 默认：记录"运行时骨架启动成功"并以 0 退出；
    - `--validate`：启动检查完成（含资产索引）并以 0 退出；
-   - `--run` / `--host <name>`：加载索引后调用 `PlayerHost`（见 §6.4），本轮默认 host
+   - `--run` / `--host <name>`：加载索引后调用 `PlayerHost`（见 §6.5），本轮默认 host
      返回 `Pending`，退出码 **3**（不是错误，表示 game host 尚未接入）。
 
 参数：
@@ -475,7 +481,44 @@ legacy/最小包得到空 bundle（不报错）。
   `ImportedSkeleton`（joints[node,parent,IBM]/root_joint）、
   `ImportedAnimation`（channels/property/times/values/duration）。
 
-### 6.4 `PlayerHost` 接口（game host 接入契约）
+### 6.4 真实蒙皮资产消费（`skinned_asset`）
+
+window host 在 PBR draw path 激活后消费 imported bundle 里的真实蒙皮数据：
+
+```rust
+let selected = select_first_skinned_asset(&bundle)?; // Option<SelectedSkinnedAsset>
+if let Some(asset) = selected {
+    asset.summary();                 // mesh/vertices/triangles/skeleton joints/animation/material
+    asset.palette_at(time)?;         // JointPalette：每关节 world_joint * inverse_bind（64B）
+    asset.upload_parts();            // (Vec<SkinnedVertex>, Vec<u32>) → task-28 SkinnedMeshUpload
+    asset.vertices / indices / animation / skeleton;
+}
+```
+
+- **选择规则**：按 AssetId 排序遍历 `mesh_entries()`，取第一个 joints/weights 非空且
+  长度与 positions 一致的 primitive；skeleton 用 primitive 指定（否则场景第一个），
+  动画用场景第一个 clip。只消费第一个 mesh/clip（0.2 限制）。
+- **顶点转换**：positions/normals/uvs/joints/weights → `hezhou_animation::SkinnedVertex`
+  （64B stride；joint_indices 是 palette 下标；weights 自动归一化）；只支持 Triangles，
+  索引必须为 3 的倍数且不越界；空索引自动生成三角形列表。
+- **palette**：节点绑定 TRS（动画通道覆盖）→ 关节层级 world 矩阵 → `world * IBM`；
+  动画采样支持 Linear（旋转 slerp 由四元数归一化 + 线性插值近似）与 Step，
+  CubicSpline 取关键帧中值；无动画时用静态绑定姿态；关节数 ≤ 256（GPU palette 上限）。
+- **window host 接入**：`renderer.set_render_quality_preset_u32(manifest.quality)`
+  打开 PBR draw path；`upload_skinned_mesh(SkinnedMeshUpload { entity_id, vertices,
+  indices, material: None, texture_path: None })` 上传真实网格（entity id 固定
+  `PLAYER_SKINNED_ENTITY_ID`，非 0），随后 `upload_skin_palette(entity_id, bytes)`；
+  每帧按 `elapsed % duration` 采样动画并上传 palette（静态时上传同一绑定姿态）。
+- **安全回退**：包内无 joints/weights、无 skeleton、上传/palette 失败、坏 imported JSON
+  → WARN 并保留已加载场景/内置 cube，窗口不崩溃；日志输出
+  `蒙皮资产：…`、`蒙皮网格上传成功：…`、`PBR draw path 激活：true … 已上传蒙皮网格：1`、
+  `蒙皮绘制统计：…；palette 更新 N 次`。
+- **fixture**：`tests/fixtures/skinned/` 手写 ImportedScene（2 关节 skeleton、1 三角形
+  蒙皮 mesh、1 个 `Spin` rotation clip），ignored smoke 构建包 + 真窗口 10/30 帧验证。
+- **限制（0.2）**：只渲染第一个蒙皮 mesh/clip；无材质/纹理（task-28 upload 传 None）；
+  无动画状态机/混合；CubicSpline 只近似；多蒙皮实体/多 primitive 留待后续。
+
+### 6.5 `PlayerHost` 接口（game host 接入契约）
 
 提供接口与两个实现：无窗口的 `DefaultPlayerHost`（`Pending`，退出码 3）与可选的
 `WindowPlayerHost`（`feature = "window-host"`，真实窗口/帧循环，`Running`，退出码 0）。
@@ -515,7 +558,7 @@ pub enum HostOutcome {
 - CI：默认 feature 下 `--run` 应视为"host pending = 退出码 3"；编译 `window-host` 后
   `--run` 会真实开窗（CI 无显示环境请用 `--host headless` 或 `--validate`）。
 
-### 6.5 可选窗口渲染 host（`feature = "window-host"`）
+### 6.6 可选窗口渲染 host（`feature = "window-host"`）
 
 默认构建**不编译** `hezhou-core`/`hezhou-rhi-vulkan`/`hezhou-platform` 依赖，二进制与
 依赖面保持最小；需要真实窗口渲染时显式开启 feature：
@@ -543,6 +586,10 @@ hezhou-player --run --host headless --manifest <pkg>/manifest.json
 - 使用运行时加载的起始场景（§6.2：`manifest.start_scene` 的 Project JSON → `Scene`；
   失败时 loader 已回退内置 cube+light），host 不再无条件自建 cube；
   `set_game_state(1)`（Running）+ 固定相机 + 天空盒；
+- 按 `manifest.quality` 设置渲染质量档（`set_render_quality_preset_u32`，low/medium/high；
+  ultra 本轮映射 high）以激活 PBR draw path；
+- 若 imported bundle 含真实蒙皮资产（§6.4）：`upload_skinned_mesh` + 每帧
+  `upload_skin_palette`，日志输出实体/网格/关节/动画统计；无蒙皮/失败 WARN 回退；
 - 跑固定帧数（`HEZHOU_PLAYER_WINDOW_FRAMES`，默认 120，上限 100000）或用户关闭窗口；
 - 每 30 帧/结束时写 `player.log`（窗口尺寸、起始场景实体数/来源、帧数、耗时），返回
   `HostOutcome::Running { frames }` → 进程退出码 0；
@@ -560,8 +607,20 @@ WindowPlayerHost：创建窗口 960x540 mode=windowed title="Hezhou Cooked Fixtu
 PlayerHost `window` 返回退出码 0
 ```
 
+蒙皮 fixture（`tests/fixtures/skinned/`）实测：
+
+```text
+渲染质量档：low（preset 0）；PBR draw path 将在首帧创建
+蒙皮资产：mesh aaaaaaaa-...（3 顶点 / 1 三角形），skeleton 2 关节，animation Spin（1.00s），材质 无
+蒙皮网格上传成功：3 顶点 / 1 三角形 / 2 关节（entity 5207667845165154305），palette 每帧更新
+PBR draw path 激活：true；质量摘要：quality=low shading=PBR ...；已上传蒙皮网格：1
+蒙皮绘制统计：3 顶点 / 1 三角形 / 2 关节；palette 更新 30 次（动画驱动）
+窗口 host 结束：30 帧，676.6 ms（达到固定帧数）
+```
+
 起始场景 3 个实体来自 cooked fixture 的真实 Project JSON（CubeA + 子 Cube + DirectionalLight），
-不再是内置测试 cube。
+不再是内置测试 cube；skinned fixture 的 2 个实体场景（fallback cube + directional light）
+同时叠加真实上传的蒙皮三角形。
 
 **已知限制**：
 
@@ -570,16 +629,16 @@ PlayerHost `window` 返回退出码 0
   即将退出，由操作系统回收 Vulkan/GLFW 资源。上游修复后应恢复显式 cleanup。
 - Esc 退出尚未接线：`process_events` 把按键交给 UI input handler，未暴露给 host；
   当前用固定帧数或窗口关闭（`draw_frame` 返回 false）退出（见 TODO）。
-- 场景内资产加载/C#：Project JSON 只恢复实体/组件；cook `imported/*.json` 内容、
-  C# `Initialize()`、Gameplay/Animation/Physics 运行时数据仍留待后续 game host。
+- 蒙皮消费只覆盖第一个 mesh/primitive/clip、无材质/纹理、无状态机/混合
+  （见 §6.4 限制）；C# `Initialize()`、Gameplay/Animation/Physics 运行时数据仍留待后续 host。
 
 ## 7. 测试
 
 ```bash
 cd engine
-cargo test -p hezhou-player                        # 默认 89 个测试
+cargo test -p hezhou-player                        # 默认 97 个测试
 cargo build -p hezhou-player                       # 构建两个二进制 + 库
-cargo test -p hezhou-player --features window-host # 92 个（含 window-host 单元/契约测试）
+cargo test -p hezhou-player --features window-host # 100 个（含 window-host 单元/契约测试）
 # 真实窗口 smoke：需显示环境 + Vulkan GPU，CI 跳过；本机已实测通过（30 帧，exit 0）
 cargo test -p hezhou-player --features window-host --test window_host -- --ignored --nocapture
 ```
@@ -588,17 +647,22 @@ cargo test -p hezhou-player --features window-host --test window_host -- --ignor
 双平台 dry-run 清单与指纹稳定性、版本兼容矩阵、真实构建（复制/清单一致/大小与
 校验和/失败清理/权限/跨平台拒绝）、fixture CLI 端到端（构建 → 复制出的 Player
 `--validate`）、**hezhou-asset cook 集成**（manifest 解析、AssetId/kind/locator/output
-映射、cook_manifest.json 入包、缺失输出、产物大小/哈希损坏、格式版本、启动场景/字体
-定位、CLI 真实构建 + validate）、**运行时资产索引**（按 AssetId/kind/locator/output
-查询、start_scene/font 解析、缺失 output、坏 JSON、manifest/索引不一致、legacy 空索引、
-`--run`/`--host` 退出码 3、未知 host、`--validate` 不回归）、**起始场景加载**
+映射、cook_manifest.json 入包、子资产共享 imported 文件、缺失输出、产物大小/哈希损坏、
+格式版本、启动场景/字体定位、CLI 真实构建 + validate）、**运行时资产索引**（按
+AssetId/kind/locator/output 查询、start_scene/font 解析、缺失 output、坏 JSON、
+manifest/索引不一致、legacy 空索引、`--run`/`--host` 退出码 3、未知 host、
+`--validate` 不回归）、**起始场景加载**
 （`hezhou_core::Project::restore_from_json`：实体/层级/Transform/方向光恢复、
 缺失文件/坏 JSON/空场景安全回退内置 cube+light、与 `PlayerAssetIndex.start_scene`
 output 对接、runtime 摘要/日志）、**cook imported 资产 bundle**
 （`ImportedScene` 解析、AssetId→mesh/material/texture/skeleton/animation 查询、
 kind/index/数量严格校验、坏 JSON/越界/数量不匹配错误、未引用文件 WARN、runtime 统计）、
-**window-host feature**（默认 host 选择、frame limit 解析/clamp、真实窗口固定帧渲染加载
-真实场景 + `Running`/退出码 0；真实窗口测试 `#[ignore]`，本机手工已验证）、日志时间戳。
+**真实蒙皮资产消费**（ImportedPrimitive→SkinnedVertex 转换/权重归一化、属性长度与拓扑
+校验、第一个蒙皮 mesh/skeleton/clip 选择、静态绑定姿态与线性/阶跃动画 palette 采样、
+无蒙皮回退、缺 skeleton 可读错误、AssetId 可追溯）、**window-host feature**
+（默认 host 选择、frame limit 解析/clamp、真实窗口固定帧渲染加载真实场景 + PBR draw path
++ 真实蒙皮上传/palette + `Running`/退出码 0；真实窗口测试 `#[ignore]`，本机已手工验证
+cooked 与 skinned 两个 fixture）、日志时间戳。
 
 最小 fixture（`tests/fixtures/minimal/`）依赖零外部资产：空场景 3 字节、字体占位
 12 字节、假 C# 程序集 21 字节、占位 runtime 库 19 字节，用于无真实 cook 数据时
@@ -609,6 +673,11 @@ kind/index/数量严格校验、坏 JSON/越界/数量不匹配错误、未引�
 （scene/font/texture/gltf 四个条目）。其中 scene 是真实 Project JSON（1488 字节、
 3 个实体：CubeA + 子 Cube + DirectionalLight），用于端到端验证
 "cook → Player 包 → 起始场景恢复 → 窗口渲染"。
+
+蒙皮 fixture（`tests/fixtures/skinned/`）额外模拟 glTF 子资产：
+`cook_manifest.json` 含 gltf + mesh/skeleton/animation 三条共享 `imported/<uuid>.json`
+的 entry，imported JSON 是手写 `ImportedScene`（2 关节 skeleton、1 个带 joints/weights
+的三角形蒙皮 mesh、1 个 `Spin` rotation clip），用于真实窗口渲染蒙皮网格并输出统计。
 
 ## 8. 与其它模块 / CI / installer 的集成点
 
@@ -635,6 +704,12 @@ kind/index/数量严格校验、坏 JSON/越界/数量不匹配错误、未引�
 `<PlayerRoot>/assets/` 下（见 §1.1），路径不变，运行时可用
 `manifest.paths.assets + assets[].path` 定位。
 
+**glTF 子资产（mesh/material/skeleton/animation/texture）**：它们与父 glTF entry
+共享同一个 `imported/<uuid>.json` output。构建器只复制该文件一次，Player manifest
+`assets[]` 只记录**文件级**条目（glTF 父文件），子资产 AssetId 保留在包内
+`cook_manifest.json` 中；运行时 `PlayerAssetIndex` 读取全部 entry 建立索引，
+`ImportedAssetBundle` 用 locator 子资产键（`#mesh:0` 等）映射到 `ImportedScene` 数组。
+
 **构建校验**（失败在写盘前报错、不留半成品）：
 
 - `format_version > 1`、entries 为空、`output` 非法/与 `cook_manifest.json` 撞名 →
@@ -651,9 +726,10 @@ kind/index/数量严格校验、坏 JSON/越界/数量不匹配错误、未引�
 
 - asset §6 建议启动时读 `cook_manifest.json` 建立 `id -> output` 索引；Player
   **运行时已实现**（`PlayerAssetIndex`，见 §6.1），并校验 output 存在、
-  start_scene/font 可解析、Player manifest 与索引一致。
-- `imported/*.json` 内容当前仍不解析/不校验（构建时只复制 + 校验文件存在/大小/哈希；
-  运行时由后续 game host 按 AssetId 加载并反序列化为 `ImportedScene` 等价结构）。
+  start_scene/font 可解析、Player manifest 与索引一致（子资产允许不单列于 manifest）。
+- `imported/*.json` 运行时由 `ImportedAssetBundle`（§6.3）解析为 `ImportedScene`；
+  bundle 严格核对 kind/index/数量/场景数据一致性与 `validate_imported_scene`，
+  坏 JSON/不一致使启动/`--validate` exit 2；真实蒙皮消费见 §6.4。
 - asset 依赖表/压缩标记等新增字段需先扩展 `ManifestAsset`（`assets[]` 严格反序列化）。
 - legacy `{ "assets": [...] }` 清单仍支持（`--assets-dir` 提供资产根目录），
   作为无 cooker 时的过渡；字段映射为：`path`（相对资产根）、`kind`、
@@ -680,8 +756,11 @@ kind/index/数量严格校验、坏 JSON/越界/数量不匹配错误、未引�
 
 - `scripts[]` 是预编译 C# 程序集（`mcs -target:library`，禁止 .NET 8 编译产物）；
 - C# 无 `Main()`，入口为静态 `Initialize()`，由 Rust 运行时调用；
-- 本轮 Player crate 故意**不依赖** core/render/scripting（保持构建器可独立编译）；
-  下一轮实现 `PlayerHost`（见 §6.4）时再启用 `mono` feature 并链接引擎 crate，
+- Player crate 当前默认依赖 `hezhou-core`（Project JSON → Scene）与
+  `hezhou-animation`（SkinnedVertex/JointPalette），`window-host` feature 依赖
+  `hezhou-rhi-vulkan`（窗口/渲染/task-28 skinned upload API）与 `hezhou-platform`；
+  仍不依赖 scripting/render（构建器可独立编译）。
+  下一轮实现 `PlayerHost`（见 §6.5）时再启用 `mono` feature 并链接引擎 crate，
   在 host 内加载 `manifest.scripts[]`、调用 C# 静态 `Initialize()`、按 AssetId
   从资产索引加载 gameplay/animation/physics/audio 数据。
 
@@ -735,6 +814,11 @@ kind/index/数量严格校验、坏 JSON/越界/数量不匹配错误、未引�
 - [x] cook 导入资产 bundle：解析 `assets/imported/*.json`（`ImportedScene`），
   AssetId→mesh/material/texture/skeleton/animation 查询，严格核对 cook manifest，
   启动统计 + 错误安全；
+- [x] 真实蒙皮资产消费：ImportedPrimitive→SkinnedVertex、第一个 skeleton/clip、
+  joint palette（静态绑定姿态 + Linear/Step 采样）、task-28 上传 + 每帧 palette、
+  PBR draw path 真实网格绘制、无蒙皮回退与窗口实测（skinned fixture）；
+- [ ] 多蒙皮 mesh/primitive、多 clip/状态机/混合、材质/纹理绑定（当前只第一个 mesh/clip，
+  upload material/texture_path 传 None）；
 - [ ] C# 脚本 `Initialize()`（scripting）与 host 消费 bundle（mesh/material/animation
   接入 render/animation/gameplay）；
 - [ ] 纹理/音频原始字节加载（`assets/*`，非 imported JSON）；

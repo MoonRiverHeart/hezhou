@@ -9,10 +9,10 @@
 mod common;
 
 use std::ffi::OsString;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use common::{cooked_fixture_dir, TempDir};
+use common::{cooked_fixture_dir, skinned_fixture_dir, TempDir};
 use hezhou_player::builder::{
     BuildSources, CookManifest, PlayerBuildInput, PlayerBuilder, RuntimePayload, ScriptAssembly,
 };
@@ -29,6 +29,49 @@ const PLAYER_BIN: &str = env!("CARGO_BIN_EXE_hezhou-player");
 
 fn host() -> TargetPlatform {
     TargetPlatform::host()
+}
+
+/// 用指定 cook fixture 构建 Player 包，返回 `(包目录, 可执行文件 stem)`。
+fn build_fixture_package(temp: &TempDir, fixture: &Path) -> (PathBuf, String) {
+    let config_text = std::fs::read_to_string(fixture.join("build-config.json")).unwrap();
+    let config: PlayerBuildConfig = serde_json::from_str(&config_text).unwrap();
+    let executable_stem = config.executable_stem().to_string();
+    let input = PlayerBuildInput {
+        config,
+        cook: CookManifest::default(),
+        scripts: ScriptAssembly::from_dir(&fixture.join("scripts")).unwrap(),
+        runtime: RuntimePayload::from_dir(&fixture.join("runtime")).unwrap(),
+        cooked: Some(CookedAssets::load(&fixture.join("cook_manifest.json")).unwrap()),
+    };
+    let builder = PlayerBuilder::new(input);
+    let sources = BuildSources {
+        executable: Some(PLAYER_BIN.into()),
+        assets_root: None,
+    };
+    let output = builder
+        .build(host(), &sources, &temp.join("dist/player"))
+        .expect("构建 fixture Player 包");
+    (output.output_dir, executable_stem)
+}
+
+fn run_window_host(package: &Path, stem: &str, frame_limit: &str, log_dir: &Path) -> std::process::Output {
+    let executable = package.join(host().executable_file_name(stem));
+    let args: Vec<OsString> = vec![
+        "--run".into(),
+        "--host".into(),
+        "window".into(),
+        "--player-root".into(),
+        package.as_os_str().to_owned(),
+        "--manifest".into(),
+        package.join("manifest.json").into(),
+        "--log-dir".into(),
+        log_dir.as_os_str().to_owned(),
+    ];
+    Command::new(&executable)
+        .args(args)
+        .env(FRAME_LIMIT_ENV, frame_limit)
+        .output()
+        .expect("运行窗口 host")
 }
 
 #[test]
@@ -69,42 +112,10 @@ fn frame_limit_contract() {
 fn actual_window_host_renders_fixed_frames() {
     let temp = TempDir::new("window-host-smoke");
     let fixture = cooked_fixture_dir();
-    let config_text = std::fs::read_to_string(fixture.join("build-config.json")).unwrap();
-    let config: PlayerBuildConfig = serde_json::from_str(&config_text).unwrap();
-    let input = PlayerBuildInput {
-        config,
-        cook: CookManifest::default(),
-        scripts: ScriptAssembly::from_dir(&fixture.join("scripts")).unwrap(),
-        runtime: RuntimePayload::from_dir(&fixture.join("runtime")).unwrap(),
-        cooked: Some(CookedAssets::load(&fixture.join("cook_manifest.json")).unwrap()),
-    };
-    let builder = PlayerBuilder::new(input);
-    let sources = BuildSources {
-        executable: Some(PLAYER_BIN.into()),
-        assets_root: None,
-    };
-    let output = builder
-        .build(host(), &sources, &temp.join("dist/player"))
-        .expect("构建 fixture Player 包");
-    let package = output.output_dir;
-    let executable = package.join(host().executable_file_name("cooked-fixture"));
+    let (package, stem) = build_fixture_package(&temp, &fixture);
     let log_dir = temp.join("logs");
 
-    let mut args: Vec<OsString> = vec![
-        "--run".into(),
-        "--host".into(),
-        "window".into(),
-        "--player-root".into(),
-        package.as_os_str().to_owned(),
-        "--manifest".into(),
-        package.join("manifest.json").into(),
-        "--log-dir".into(),
-        log_dir.as_os_str().to_owned(),
-    ];
-    let mut command = Command::new(&executable);
-    command.args(std::mem::take(&mut args));
-    command.env(FRAME_LIMIT_ENV, "5");
-    let result = command.output().expect("运行窗口 host");
+    let result = run_window_host(&package, &stem, "5", &log_dir);
     assert!(
         result.status.success(),
         "窗口 host 失败\nstdout: {}\nstderr: {}",
@@ -125,10 +136,57 @@ fn actual_window_host_renders_fixed_frames() {
         "日志：{log}"
     );
     assert!(log.contains("来源：Project JSON"), "日志：{log}");
+    assert!(log.contains("PBR draw path 激活：true"), "日志：{log}");
     assert!(log.contains("窗口 host 结束：5 帧"), "日志：{log}");
     assert!(log.contains("达到固定帧数"), "日志：{log}");
+    // cooked fixture 的 imported 场景没有 joints/weights → 蒙皮回退，窗口仍正常。
+    assert!(
+        log.contains("包内没有带 joints/weights 的蒙皮 mesh"),
+        "日志：{log}"
+    );
 }
 
-/// 确保包构建路径在 window-host feature 下也编译（不打开窗口）。
-#[allow(dead_code)]
-fn _package_path_type(_: PathBuf) {}
+/// 真实窗口渲染真实蒙皮 fixture：ImportedPrimitive → SkinnedVertex → task-28 上传 +
+/// 每帧 palette 更新；需要显示环境 + Vulkan GPU，CI 默认跳过。
+#[ignore = "需要显示环境 + Vulkan GPU；CI 默认跳过，本机手工验证"]
+#[test]
+fn actual_window_host_renders_real_skinned_asset() {
+    let temp = TempDir::new("window-host-skinned-smoke");
+    let fixture = skinned_fixture_dir();
+    let (package, stem) = build_fixture_package(&temp, &fixture);
+    let log_dir = temp.join("logs");
+
+    let result = run_window_host(&package, &stem, "10", &log_dir);
+    assert!(
+        result.status.success(),
+        "蒙皮窗口 host 失败\nstdout: {}\nstderr: {}",
+        String::from_utf8_lossy(&result.stdout),
+        String::from_utf8_lossy(&result.stderr)
+    );
+    assert_eq!(result.status.code(), Some(0));
+
+    let log = std::fs::read_to_string(log_dir.join("player.log")).expect("读取 player.log");
+    assert!(
+        log.contains("蒙皮资产：mesh aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa（3 顶点 / 1 三角形）"),
+        "日志：{log}"
+    );
+    assert!(log.contains("skeleton 2 关节"), "日志：{log}");
+    assert!(log.contains("animation Spin（1.00s）"), "日志：{log}");
+    assert!(
+        log.contains("蒙皮网格上传成功：3 顶点 / 1 三角形 / 2 关节"),
+        "日志：{log}"
+    );
+    assert!(
+        log.contains("PBR draw path 激活：true"),
+        "日志：{log}"
+    );
+    assert!(
+        log.contains("已上传蒙皮网格：1"),
+        "日志：{log}"
+    );
+    assert!(
+        log.contains("蒙皮绘制统计：3 顶点 / 1 三角形 / 2 关节；palette 更新 10 次（动画驱动）"),
+        "日志：{log}"
+    );
+    assert!(log.contains("窗口 host 结束：10 帧"), "日志：{log}");
+}

@@ -216,10 +216,21 @@ impl PlayerAssetIndex {
             seen.insert(entry.output.as_str(), entry);
         }
         for entry in self.entries.values() {
+            // 文件级条目必须出现在 Player manifest assets[]；glTF 子资产
+            // （mesh/material/skeleton/animation）与父文件共享 output，不单独列出。
+            let is_sub_asset = entry
+                .locator
+                .as_ref()
+                .map(|locator| locator.is_sub_asset())
+                .unwrap_or(false);
+            if is_sub_asset {
+                continue;
+            }
             if !seen.contains_key(entry.output.as_str()) {
                 return Err(AssetIndexError::ManifestIndexMismatch {
                     output: entry.output.clone(),
-                    reason: "cook 索引中的资产未出现在 Player manifest assets[] 中".to_string(),
+                    reason: "cook 索引中的文件级资产未出现在 Player manifest assets[] 中"
+                        .to_string(),
                 });
             }
         }

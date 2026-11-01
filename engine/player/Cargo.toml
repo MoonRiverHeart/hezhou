@@ -16,6 +16,10 @@ hezhou-asset = { path = "../asset", default-features = false }
 # 默认构建就需要（`--validate` 也会校验/加载起始场景），因此不作为可选依赖。
 hezhou-core = { path = "../core" }
 
+# hezhou-animation：蒙皮资产消费（ImportedPrimitive → SkinnedVertex、joint palette 计算）。
+# 默认构建就需要（CPU 转换/palette 单测），不依赖渲染 crate。
+hezhou-animation = { path = "../animation" }
+
 # 可选：真实窗口渲染 host（feature = window-host）。默认构建不编译这些依赖。
 # - rhi-vulkan 内部通过 GLFW + Vulkan 创建窗口/渲染器（UIVulkanRenderer）；
 # - platform 作为窗口/输入抽象的契约依赖保留（当前窗口由 UIVulkanRenderer 管理，

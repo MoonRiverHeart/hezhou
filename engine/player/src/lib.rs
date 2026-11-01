@@ -29,6 +29,7 @@ pub mod paths;
 pub mod platform;
 pub mod runtime;
 pub mod scene_loader;
+pub mod skinned_asset;
 pub mod version;
 
 /// 可选的真实窗口渲染 host（`--features window-host`）。
@@ -56,6 +57,11 @@ pub use imported_assets::{
 };
 pub use scene_loader::{
     builtin_test_scene, load_start_scene, LoadedStartScene, StartSceneSource, StartSceneSummary,
+};
+pub use skinned_asset::{
+    compute_joint_palette, primitive_to_skinned_mesh, select_first_skinned_asset,
+    SelectedSkinnedAsset, SkinnedAnimationInfo, SkinnedAssetError, SkinnedSkeletonInfo,
+    PLAYER_SKINNED_ENTITY_ID,
 };
 
 #[cfg(feature = "window-host")]

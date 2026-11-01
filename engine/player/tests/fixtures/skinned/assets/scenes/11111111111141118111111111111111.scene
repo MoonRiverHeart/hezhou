@@ -1,0 +1,41 @@
+{
+  "version": "1.0",
+  "name": "skinned-fixture-scene",
+  "path": "",
+  "created_at": "2026-11-01T00:00:00Z",
+  "modified_at": "2026-11-01T00:00:00Z",
+  "settings": { "game_width": 960, "game_height": 540, "fps": 60 },
+  "entities": [
+    {
+      "id": 1,
+      "name": "FallbackCube",
+      "transform": { "position": [0.0, 0.0, 0.0], "rotation": [0.0, 0.0, 0.0], "scale": [1.0, 1.0, 1.0] },
+      "mesh_type": "Cube",
+      "scripts": [],
+      "components": {},
+      "visible": true,
+      "parent_id": null,
+      "material": null
+    },
+    {
+      "id": 2,
+      "name": "Sun",
+      "transform": { "position": [0.0, 5.0, 0.0], "rotation": [0.0, 0.0, 0.0], "scale": [1.0, 1.0, 1.0] },
+      "mesh_type": "DirectionalLight",
+      "scripts": [],
+      "components": {},
+      "visible": true,
+      "parent_id": null,
+      "material": null,
+      "light": { "direction": [-0.5, -1.0, -0.3], "color": [1.0, 1.0, 1.0], "intensity": 1.0 }
+    }
+  ],
+  "assets": [],
+  "scripts": [],
+  "current_state": {
+    "selected_entity_id": null,
+    "camera_position": [10.0, 10.0, 10.0],
+    "camera_rotation": [-30.0, 45.0, 0.0],
+    "game_state": "Editing"
+  }
+}

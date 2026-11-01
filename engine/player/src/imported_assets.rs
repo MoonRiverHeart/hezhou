@@ -60,7 +60,6 @@ struct ElementRef {
 #[derive(Clone, Debug)]
 struct LoadedScene {
     scene: ImportedScene,
-    output: String,
 }
 
 /// 一个 gltf/imported 场景内的元素统计。
@@ -170,7 +169,6 @@ impl ImportedAssetBundle {
                 *id,
                 LoadedScene {
                     scene,
-                    output: output.clone(),
                 },
             );
         }
@@ -441,6 +439,65 @@ impl ImportedAssetBundle {
         None
     }
 
+    /// 所有已映射 mesh 的 AssetId（按 AssetId 排序）。
+    pub fn mesh_ids(&self) -> Vec<AssetId> {
+        self.meshes.keys().copied().collect()
+    }
+
+    /// 所有已映射 skeleton 的 AssetId（按 AssetId 排序）。
+    pub fn skeleton_ids(&self) -> Vec<AssetId> {
+        self.skeletons.keys().copied().collect()
+    }
+
+    /// 所有已映射 animation 的 AssetId（按 AssetId 排序）。
+    pub fn animation_ids(&self) -> Vec<AssetId> {
+        self.animations.keys().copied().collect()
+    }
+
+    /// 遍历所有 mesh：`(mesh AssetId, glTF 场景 AssetId, 场景内 mesh 下标, mesh 数据)`。
+    pub fn mesh_entries(&self) -> Vec<(AssetId, AssetId, usize, &ImportedMesh)> {
+        self.scenes
+            .iter()
+            .flat_map(|(scene_id, loaded)| {
+                loaded
+                    .scene
+                    .meshes
+                    .iter()
+                    .enumerate()
+                    .map(move |(index, mesh)| (*scene_id, index, mesh))
+            })
+            .filter_map(|(scene, index, mesh)| {
+                self.mesh_id_for(scene, index)
+                    .map(|id| (id, scene, index, mesh))
+            })
+            .collect()
+    }
+
+    /// 场景内 mesh 下标 → AssetId（cook manifest 没声明时 None）。
+    pub fn mesh_id_for(&self, scene: AssetId, index: usize) -> Option<AssetId> {
+        element_id_for(&self.meshes, scene, index)
+    }
+
+    /// 场景内 skeleton 下标 → AssetId。
+    pub fn skeleton_id_for(&self, scene: AssetId, index: usize) -> Option<AssetId> {
+        element_id_for(&self.skeletons, scene, index)
+    }
+
+    /// 场景内 animation 下标 → AssetId。
+    pub fn animation_id_for(&self, scene: AssetId, index: usize) -> Option<AssetId> {
+        element_id_for(&self.animations, scene, index)
+    }
+
+    /// 场景内 texture 下标 → AssetId。
+    pub fn texture_id_for(&self, scene: AssetId, index: usize) -> Option<AssetId> {
+        element_id_for(&self.textures, scene, index)
+    }
+
+    /// 场景内 material 下标 → AssetId。
+    pub fn material_id_for(&self, scene: AssetId, index: usize) -> Option<AssetId> {
+        element_id_for(&self.materials, scene, index)
+    }
+
     /// 单行摘要。
     pub fn summary(&self) -> String {
         self.summary_data().summary()
@@ -499,6 +556,17 @@ fn element_len(scene: &ImportedScene, kind: AssetKind) -> usize {
         AssetKind::Animation => scene.animations.len(),
         _ => 0,
     }
+}
+
+/// 在 `AssetId → ElementRef` 表中反查「场景 + 下标」对应的 AssetId。
+fn element_id_for(
+    map: &BTreeMap<AssetId, ElementRef>,
+    scene: AssetId,
+    index: usize,
+) -> Option<AssetId> {
+    map.iter()
+        .find(|(_, reference)| reference.scene == scene && reference.index == index)
+        .map(|(id, _)| *id)
 }
 
 /// 导入资产 bundle 错误（均为可读、可定位）。
