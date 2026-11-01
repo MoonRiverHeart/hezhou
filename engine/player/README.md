@@ -3,7 +3,7 @@
 Hezhou 0.2 **Player 导出构建器 + 最小运行时**（Windows / Linux）。
 
 本 crate 是 `engine/player`，对应 `docs/PROJECT_PLAN.md` §1.5 Player 导出与
-§9 AI 并行工作流中的 Player 工作流。已完成四轮：
+§9 AI 并行工作流中的 Player 工作流。已完成五轮：
 
 1. **格式契约 + dry-run**：产物目录、`manifest.json`、跨平台路径规则、双平台清单；
 2. **真实产物构建**：按计划复制 exe/assets/scripts/runtime/manifest，staging 原子提交、
@@ -14,7 +14,10 @@ Hezhou 0.2 **Player 导出构建器 + 最小运行时**（Windows / Linux）。
 4. **运行时资产索引 + host 接口**：运行时加载包内 `assets/cook_manifest.json` 建
    `AssetId → output/kind/locator` 索引并校验 output/start_scene/font；
    `--run`/`--host` 加载索引后调用 `PlayerHost` trait，默认 host 明确报告
-   "等待 game host 接入"（退出码 3），为下一轮窗口/Vulkan/Mono/C# 接入留好契约。
+   "等待 game host 接入"（退出码 3）；
+5. **可选窗口渲染 host**（`feature = "window-host"`）：`WindowPlayerHost` 按清单创建
+   GLFW 窗口 + `UIVulkanRenderer`，内置 cube + directional light 场景，跑固定帧数
+   （或窗口关闭）后返回 `Running`（退出码 0）；默认 feature 关闭仍为 Pending。
 
 不绑定具体游戏内容；真实 cooker 产物可原样替换测试 fixture。
 
@@ -28,6 +31,7 @@ engine/player/
 │   ├── builder.rs    # 构建器：dry-run 计划 + 真实复制（预检/staging/校验/权限）
 │   ├── cook_bridge.rs# hezhou-asset CookManifest → Player assets[]/文件映射
 │   ├── host.rs       # PlayerHost trait / HostOutcome / DefaultPlayerHost
+│   ├── window_host.rs# （feature window-host）WindowPlayerHost：窗口+Vulkan 固定帧渲染
 │   ├── paths.rs      # 逻辑路径规则（分隔符/大小写/保留名/权限位）
 │   ├── platform.rs   # 目标平台差异（exe 命名/动态库查找/rpath/归档）
 │   ├── logging.rs    # UTC 文件日志
@@ -38,7 +42,7 @@ engine/player/
 └── tests/
     ├── fixtures/minimal/  # 最小 fixture（legacy assets[]，空场景 + 占位 DLL/runtime）
     ├── fixtures/cooked/   # hezhou-asset 真实 cook 输出布局 fixture
-    └── *.rs               # 72 个测试（单元 + 集成）
+    └── *.rs               # 默认 73 个测试；--features window-host 共 76 个（+1 ignored 真窗口 smoke）
 ```
 
 > 硬性边界：本 crate 只改 `engine/player/**`。installer、CI、examples、editor
@@ -390,7 +394,8 @@ index.len();                                  // 条目数
 
 ### 6.2 `PlayerHost` 接口（game host 接入契约）
 
-本轮只提供接口与默认实现，不创建窗口/不初始化 Vulkan/Mono：
+提供接口与两个实现：无窗口的 `DefaultPlayerHost`（`Pending`，退出码 3）与可选的
+`WindowPlayerHost`（`feature = "window-host"`，真实窗口/帧循环，`Running`，退出码 0）。
 
 ```rust
 pub trait PlayerHost {
@@ -412,24 +417,86 @@ pub enum HostOutcome {
 }
 ```
 
-- 选择：`resolve_host("default" | "headless" | "null")`；未来新增 host 在此注册，
-  CLI `--host <name>` 选择（本轮未知名称 → 可读错误 + 退出码 2）。
-- 默认实现 `DefaultPlayerHost`：加载索引后记录资产数/启动场景/字体/窗口/quality，
-  明确输出"等待 game host 接入"（`WARN`）与下一轮接入顺序，返回
-  `HostOutcome::Pending`（退出码 3）。
+- 选择：`resolve_host("default" | "window" | "headless" | "null")`
+  - 未编译 `window-host`：`default`/`headless`/`null` → `DefaultPlayerHost`（Pending）；
+    `window` → 可读错误（提示开启 feature）；
+  - 编译 `window-host`：`default`/`window` → `WindowPlayerHost`；`headless`/`null` →
+    `DefaultPlayerHost`（CI/无 GPU 环境强制 pending）。
+- `DefaultPlayerHost`：加载索引后记录资产数/启动场景/字体/窗口/quality，
+  明确输出"等待 game host 接入"（`WARN`），返回 `HostOutcome::Pending`（退出码 3）。
 - 下一轮 game host 接入顺序（实现 `PlayerHost` 即可，无需改运行时）：
   `platform(window/input)` → `rhi`/`rhi-vulkan` → `render`/`render-pipeline`
   → `scripting`（加载 `scripts/*.dll` 并调用 C# 静态 `Initialize()`）
   → `gameplay`/`animation`/`physics`/`audio`（按 AssetId 从索引加载
   `assets/cook_manifest.json` / `imported/*.json` / 纹理音频字节）→ 帧循环。
-- `--run` 在 CI 中应视为"host pending = 退出码 3"；`--validate` 仍是 0 退出码的冒烟检查。
+- CI：默认 feature 下 `--run` 应视为"host pending = 退出码 3"；编译 `window-host` 后
+  `--run` 会真实开窗（CI 无显示环境请用 `--host headless` 或 `--validate`）。
+
+### 6.3 可选窗口渲染 host（`feature = "window-host"`）
+
+默认构建**不编译** `hezhou-core`/`hezhou-rhi-vulkan`/`hezhou-platform` 依赖，二进制与
+依赖面保持最小；需要真实窗口渲染时显式开启 feature：
+
+```bash
+# 编译（默认不发版；`hezhou-platform` 作为窗口/输入契约依赖，GLFW 窗口由
+# rhi-vulkan 内部的 UIVulkanRenderer 创建，Player 不重复初始化 GLFW）
+cargo build -p hezhou-player --features window-host --release
+# 注意：glfw 以 src-build 编译，release 构建需要 CMake/Ninja + VS/MSVC 环境；
+# 若 shell 未初始化 VS 环境，CMake/MSBuild 会失败（本机 debug feature 构建/运行已验证，
+# release 需在 CI 或 Developer PowerShell 中构建）。
+
+# 真实窗口 host（默认固定 120 帧；可用环境变量覆盖帧数）
+HEZHOU_PLAYER_WINDOW_FRAMES=30 \
+  hezhou-player --run --host window --manifest <pkg>/manifest.json --log-dir <logs>
+
+# 无窗口 pending（CI/无 GPU）
+hezhou-player --run --host headless --manifest <pkg>/manifest.json
+```
+
+`WindowPlayerHost` 行为：
+
+- 按 `manifest.window`（title/width/height）创建 GLFW 窗口 + `UIVulkanRenderer`
+  （Vulkan device/swapchain/render pass/pipeline/FXAA）；
+- 内置测试场景：`Scene::new()` + `create_cube()` + `create_directional_light()`，
+  `set_game_state(1)`（Running）+ 固定相机 + 天空盒；
+- 跑固定帧数（`HEZHOU_PLAYER_WINDOW_FRAMES`，默认 120，上限 100000）或用户关闭窗口；
+- 每 30 帧/结束时写 `player.log`（窗口尺寸、实体 id、帧数、耗时），返回
+  `HostOutcome::Running { frames }` → 进程退出码 0；
+- 窗口/Vulkan/GPU 不可用、渲染 panic 都转为可读 `HostError`（运行时退出码 2 +
+  `startup-error.log`），不 panic、不静默崩溃。
+
+**本机实测（2026-11-01，Windows + Intel Arc B370）**：
+
+```text
+WindowPlayerHost：创建窗口 960x540 mode=windowed title="Hezhou Cooked Fixture"
+内置测试场景：cube entity=1、directional light entity=2
+窗口与 Vulkan 渲染器创建成功：960x540，quality=low，frame_limit=30
+窗口渲染进度：30/30 帧，664.1 ms
+窗口 host 结束：30 帧，680.5 ms（达到固定帧数）
+PlayerHost `window` 返回退出码 0
+```
+
+**已知限制（上游 rhi-vulkan，未在本任务范围修复）**：
+
+- 本 host 结束时不调用 `UIVulkanRenderer::cleanup()`：当前该函数在"仅渲染内置场景"
+  路径下会触发 Windows 堆损坏（`0xC0000374`）；窗口 host 是一次性运行、返回后进程
+  即将退出，由操作系统回收 Vulkan/GLFW 资源。上游修复后应恢复显式 cleanup。
+- Esc 退出尚未接线：`process_events` 把按键交给 UI input handler，未暴露给 host；
+  当前用固定帧数或窗口关闭（`draw_frame` 返回 false）退出（见 TODO）。
+- 尚未加载 cooked 场景/资产/C#：窗口只是最小渲染验证，下一轮在 host 内按 AssetId
+  加载 `imported/*.json` 并调用 C# `Initialize()`。
+
+## 7. 测试
 
 ## 7. 测试
 
 ```bash
 cd engine
-cargo test -p hezhou-player     # 72 个测试
-cargo build -p hezhou-player    # 构建两个二进制 + 库
+cargo test -p hezhou-player                        # 默认 73 个测试（不编译窗口依赖）
+cargo build -p hezhou-player                       # 构建两个二进制 + 库
+cargo test -p hezhou-player --features window-host # 76 个（含 window-host 单元/契约测试）
+# 真实窗口 smoke：需显示环境 + Vulkan GPU，CI 跳过；本机已实测通过（30 帧，exit 0）
+cargo test -p hezhou-player --features window-host --test window_host -- --ignored --nocapture
 ```
 
 覆盖：manifest 读写/严格字段/格式版本、配置校验、路径规范化与大小写冲突、
@@ -439,7 +506,9 @@ cargo build -p hezhou-player    # 构建两个二进制 + 库
 映射、cook_manifest.json 入包、缺失输出、产物大小/哈希损坏、格式版本、启动场景/字体
 定位、CLI 真实构建 + validate）、**运行时资产索引**（按 AssetId/kind/locator/output
 查询、start_scene/font 解析、缺失 output、坏 JSON、manifest/索引不一致、legacy 空索引、
-`--run`/`--host` 退出码 3、未知 host、`--validate` 不回归）、日志时间戳。
+`--run`/`--host` 退出码 3、未知 host、`--validate` 不回归）、**window-host feature**
+（默认 host 选择、frame limit 解析/clamp、真实窗口固定帧渲染 + `Running`/退出码 0；
+真实窗口测试 `#[ignore]`，本机手工已验证）、日志时间戳。
 
 最小 fixture（`tests/fixtures/minimal/`）依赖零外部资产：空场景 3 字节、字体占位
 12 字节、假 C# 程序集 21 字节、占位 runtime 库 19 字节，用于无真实 cook 数据时
@@ -567,9 +636,13 @@ cargo build -p hezhou-player    # 构建两个二进制 + 库
 - [x] 运行时加载 `assets/cook_manifest.json`，建 `AssetId → output/kind/locator` 索引，
   校验 output/start_scene/font（`PlayerAssetIndex`）；
 - [x] `PlayerHost` trait + 默认 host + `--run`/`--host`（明确 host pending，退出码 3）；
-- [ ] 实现 game host：窗口/输入（platform）→ Vulkan（rhi-vulkan）→ render →
-  Mono 加载 + C# 静态 `Initialize()`（scripting）；
-- [ ] game host 按 AssetId 加载 `imported/*.json` / 纹理 / 音频字节并进入帧循环；
+- [x] 可选窗口渲染 host（feature `window-host`）：GLFW 窗口 + `UIVulkanRenderer` +
+  内置 cube/light 场景 + 固定帧循环（`Running`，退出码 0）；
+- [ ] WindowPlayerHost 加载 cooked 场景（按 AssetId 读 `imported/*.json`）替换内置 cube/light；
+- [ ] Mono 加载 + C# 静态 `Initialize()`（scripting）；
+- [ ] Esc 退出接线（`UIVulkanRenderer` 未把 ESC 暴露给 host；当前用固定帧数/窗口关闭）；
+- [ ] 上游修复 `UIVulkanRenderer::cleanup()` 堆损坏后恢复窗口 host 显式清理；
+- [ ] `window-host` release 构建/打包接入 CI（编译冒烟；真实开窗需显示环境，本地/自托管）；
 - [ ] Linux rpath 链接参数固化到构建脚本/CI（需要在 Linux job 注入 `RUSTFLAGS`）；
 - [ ] 跨平台构建（在 Windows 上产出 Linux 包）——不计划支持，由 CI 双平台分别执行；
 - [ ] 资产 pack/压缩格式（当前按 loose files 计划）；

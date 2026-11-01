@@ -198,10 +198,27 @@ fn default_host_registry_and_outcomes() {
     assert_eq!(DEFAULT_HOST_NAME, "default");
     assert_eq!(HOST_PENDING_EXIT_CODE, 3);
 
-    let host = resolve_host("default").expect("default host");
-    assert_eq!(host.name(), "default");
+    // 默认 host：编译 window-host 时是 window；否则是无窗口 pending host。
+    let default_host = resolve_host(DEFAULT_HOST_NAME).expect("default host");
+    if cfg!(feature = "window-host") {
+        assert_eq!(default_host.name(), "window");
+    } else {
+        assert_eq!(default_host.name(), "default");
+    }
     assert_eq!(resolve_host("headless").unwrap().name(), "default");
-    assert!(resolve_host("vulkan-host").is_err());
+    assert_eq!(resolve_host("null").unwrap().name(), "default");
+
+    // 未编译 window-host 时显式请求 window 应给出可读错误（含 feature 提示）。
+    if cfg!(feature = "window-host") {
+        assert_eq!(resolve_host("window").unwrap().name(), "window");
+    } else {
+        let window_error = match resolve_host("window") {
+            Ok(_) => panic!("未编译 window-host 时不应解析成功"),
+            Err(error) => error,
+        };
+        assert!(window_error.to_string().contains("window-host"));
+    }
+
     let unknown_error = match resolve_host("vulkan-host") {
         Ok(_) => panic!("未知 host 不应解析成功"),
         Err(error) => error,
@@ -228,7 +245,12 @@ fn run_flag_loads_index_and_reports_host_pending() {
     let (package, _manifest) = build_package(&temp);
     let log_dir = temp.join("logs");
 
-    let output = run_player(&package_args(&package, &log_dir, &["--run"]));
+    // 用 headless 强制无窗口 host（避免 feature 编译差异影响 CI）。
+    let output = run_player(&package_args(
+        &package,
+        &log_dir,
+        &["--run", "--host", "headless"],
+    ));
     assert_eq!(
         output.status.code(),
         Some(HOST_PENDING_EXIT_CODE),
@@ -260,14 +282,27 @@ fn host_flag_selects_host_and_unknown_host_fails() {
     let (package, _manifest) = build_package(&temp);
     let log_dir = temp.join("logs");
 
-    // --host default 隐含 --run，返回 3。
-    let output = run_player(&package_args(&package, &log_dir, &["--host", "default"]));
+    // --host headless 强制无窗口 host，返回 3。
+    let output = run_player(&package_args(&package, &log_dir, &["--host", "headless"]));
     assert_eq!(output.status.code(), Some(HOST_PENDING_EXIT_CODE));
 
     // 未知 host：可读错误 + 退出 2。
     let output = run_player(&package_args(&package, &log_dir, &["--host", "vulkan-host"]));
     assert_eq!(output.status.code(), Some(2));
     assert!(String::from_utf8_lossy(&output.stderr).contains("未知 host"));
+}
+
+/// 默认 feature（无 window-host）下，`--run` 应继续返回 pending（exit 3）。
+#[cfg(not(feature = "window-host"))]
+#[test]
+fn default_run_without_window_host_feature_is_pending() {
+    let temp = TempDir::new("index-run-default");
+    let (package, _manifest) = build_package(&temp);
+    let log_dir = temp.join("logs");
+    let output = run_player(&package_args(&package, &log_dir, &["--run"]));
+    assert_eq!(output.status.code(), Some(HOST_PENDING_EXIT_CODE));
+    let log = std::fs::read_to_string(log_dir.join("player.log")).expect("读取 player.log");
+    assert!(log.contains("等待 game host 接入"), "日志：{log}");
 }
 
 #[test]
@@ -301,7 +336,11 @@ fn legacy_package_without_cook_manifest_uses_empty_index() {
     assert!(index.start_scene().is_none());
 
     let log_dir = temp.join("logs");
-    let output = run_player(&package_args(&root, &log_dir, &["--run"]));
+    let output = run_player(&package_args(
+        &root,
+        &log_dir,
+        &["--run", "--host", "headless"],
+    ));
     assert_eq!(output.status.code(), Some(HOST_PENDING_EXIT_CODE));
     let log = std::fs::read_to_string(log_dir.join("player.log")).expect("读取 player.log");
     assert!(log.contains("资产索引为空"), "日志：{log}");

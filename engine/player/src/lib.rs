@@ -29,6 +29,10 @@ pub mod platform;
 pub mod runtime;
 pub mod version;
 
+/// 可选的真实窗口渲染 host（`--features window-host`）。
+#[cfg(feature = "window-host")]
+pub mod window_host;
+
 pub use asset_index::{AssetIndexEntry, AssetIndexError, PlayerAssetIndex};
 pub use builder::{
     checksum_bytes, checksum_file, normalize_asset_relative, ArtifactCategory, BuildError,
@@ -44,6 +48,12 @@ pub use cook_bridge::{find_entry_by_project_path, CookedAssets};
 pub use host::{
     resolve_host, DefaultPlayerHost, HostError, HostLog, HostOutcome, PlayerHost,
     PlayerHostContext, DEFAULT_HOST_NAME, HOST_PENDING_EXIT_CODE,
+};
+
+#[cfg(feature = "window-host")]
+pub use window_host::{
+    parse_frame_limit, WindowPlayerHost, DEFAULT_FRAME_LIMIT, FRAME_LIMIT_ENV, MAX_FRAME_LIMIT,
+    WINDOW_HOST_NAME,
 };
 pub use logging::{FileLogger, LogLevel};
 pub use manifest::{

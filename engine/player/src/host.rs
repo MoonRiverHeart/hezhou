@@ -209,12 +209,45 @@ impl PlayerHost for DefaultPlayerHost {
     }
 }
 
-/// 按名称选择 host 实现。本轮只有默认 host。
+/// 按名称选择 host 实现。
+///
+/// - `default`：编译了 `window-host` feature 时使用真实窗口渲染 host
+///   （[`crate::window_host::WindowPlayerHost`]），否则使用无窗口的
+///   [`DefaultPlayerHost`]（返回 `Pending`，退出码 3）；
+/// - `window`：显式选择窗口 host；未编译 feature 时返回可读错误；
+/// - `headless` / `null`：强制无窗口 host（CI/无 GPU 环境）。
 pub fn resolve_host(name: &str) -> Result<Box<dyn PlayerHost>, HostError> {
     match name.trim() {
-        DEFAULT_HOST_NAME | "headless" | "null" => Ok(Box::new(DefaultPlayerHost::new())),
+        DEFAULT_HOST_NAME => Ok(default_host()),
+        "headless" | "null" => Ok(Box::new(DefaultPlayerHost::new())),
+        "window" => window_host(),
         other => Err(HostError::new(format!(
-            "未知 host `{other}`：本轮只支持 default（别名 headless/null）"
+            "未知 host `{other}`：支持 default/window/headless/null（window 需 window-host feature）"
         ))),
+    }
+}
+
+fn default_host() -> Box<dyn PlayerHost> {
+    #[cfg(feature = "window-host")]
+    {
+        Box::new(crate::window_host::WindowPlayerHost::new())
+    }
+    #[cfg(not(feature = "window-host"))]
+    {
+        Box::new(DefaultPlayerHost::new())
+    }
+}
+
+fn window_host() -> Result<Box<dyn PlayerHost>, HostError> {
+    #[cfg(feature = "window-host")]
+    {
+        Ok(Box::new(crate::window_host::WindowPlayerHost::new()))
+    }
+    #[cfg(not(feature = "window-host"))]
+    {
+        Err(HostError::new(
+            "host `window` 需要编译 `window-host` feature：\
+             cargo build -p hezhou-player --features window-host",
+        ))
     }
 }
