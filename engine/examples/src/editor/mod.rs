@@ -11,6 +11,7 @@ pub mod ffi_impl;
 pub mod scene_ffi_impl;
 pub mod audio_asset_ffi;
 pub mod prefab_scene_player_ffi;
+pub mod pbr_sync;
 pub mod hot_reload;
 pub mod dfx_init;
 #[cfg(feature = "mcp")]
@@ -462,6 +463,13 @@ ui_tree_view_set_on_select_thunk_ptr: unsafe { std::mem::transmute(ui_ffi::ui_tr
         player_export_dry_run: prefab_scene_player_ffi::player_export_dry_run,
         player_export_build: prefab_scene_player_ffi::player_export_build,
         player_export_summary: prefab_scene_player_ffi::player_export_summary,
+        scene_set_entity_pbr_material_json: unsafe {
+            std::mem::transmute(hezhou_core::scene_ffi::scene_set_entity_pbr_material_json as *const std::ffi::c_void)
+        },
+        scene_get_entity_pbr_material_json: unsafe {
+            std::mem::transmute(hezhou_core::scene_ffi::scene_get_entity_pbr_material_json as *const std::ffi::c_void)
+        },
+        editor_sync_pbr_materials_now: pbr_sync::editor_sync_pbr_materials_now,
         on_hot_reload_complete: ffi_impl::on_hot_reload_complete_placeholder,
         register_hot_reload_complete_callback: unsafe { std::mem::transmute(hot_reload::register_hot_reload_complete_callback as *const std::ffi::c_void) },
         ui_debug_print_widget_tree: unsafe { std::mem::transmute(ui_ffi::ui_debug_print_widget_tree as *const std::ffi::c_void) },
@@ -685,6 +693,10 @@ dfx_trace_begin!("ProcessEvents", "ui");
                 unsafe { MCP_STARTED = true; }
                 mcp_init::start_mcp_server();
             }
+        }
+        // 0.2 每实体 PBR 材质：core RenderableComponent.pbr_material → renderer 覆盖表。
+        if let Some(scene_ptr) = unsafe { SCENE } {
+            pbr_sync::sync_pbr_materials(unsafe { &*scene_ptr }, &mut renderer);
         }
         match renderer.draw_frame() {
             Ok(running) => {

@@ -553,6 +553,31 @@ impl Scene {
             .and_then(|r| r.material_path)
     }
 
+    /// 设置/清除实体 PBR 材质（仅对有 `RenderableComponent` 的实体生效）。
+    ///
+    /// 参数会先经 [`PbrMaterial::sanitized`] 收敛；`None` 表示回退渲染层默认材质。
+    pub fn set_entity_pbr_material(
+        &mut self,
+        entity: Entity,
+        material: Option<PbrMaterial>,
+    ) -> bool {
+        if !self.world.entity_exists(entity) { return false; }
+        if let Some(mut renderable) = self.world.get_component::<RenderableComponent>(entity) {
+            renderable.pbr_material = material.map(PbrMaterial::sanitized);
+            self.world.add_component(entity, renderable);
+            true
+        } else {
+            false
+        }
+    }
+
+    /// 读取实体 PBR 材质（无渲染组件或未设置时返回 `None`）。
+    pub fn get_entity_pbr_material(&self, entity: Entity) -> Option<PbrMaterial> {
+        self.world
+            .get_component::<RenderableComponent>(entity)
+            .and_then(|r| r.pbr_material)
+    }
+
     // DirectionalLightComponent helpers
     pub fn set_light_direction(&mut self, entity: Entity, direction: Vec3) -> bool {
         if !self.world.entity_exists(entity) { return false; }

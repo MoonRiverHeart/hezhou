@@ -400,6 +400,9 @@ namespace Hezhou
             
             // 当前管线信息Label
             _pipelineInfoLabelId = UI.CreateLabel(renderVStack, RIGHT_PANEL_WIDTH - 40f, 20f, "当前管线: " + _currentPipeline);
+
+            // 0.2 per-entity PBR 材质编辑（task-26）
+            BuildPbrMaterialPanel(renderVStack);
             
             _motionTabContentId = UI.CreateVStack(_propsTabWidget.Id, 5f);
             

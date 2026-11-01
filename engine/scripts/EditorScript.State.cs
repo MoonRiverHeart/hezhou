@@ -225,6 +225,18 @@ namespace Hezhou
         private static int _sceneFileDialogMode; // 1=加载场景文件，2=实例化 Prefab
         private static string _lastPlayerExportSummary = "";
 
+        // === 0.2 per-entity PBR 材质（task-26） ===
+        // 字段顺序：albedo RGBA(0-3)、metallic(4)、roughness(5)、normal_scale(6)、ao(7)、
+        //          emissive RGB(8-10)、emissive_strength(11)、albedo_texture_path(12)
+        private static readonly ulong[] _pbrFieldIds = new ulong[13];
+        private static readonly System.Collections.Generic.Dictionary<ulong, int> _pbrFieldMap =
+            new System.Collections.Generic.Dictionary<ulong, int>();
+        private static UI.InputFieldChangeCallbackDelegate _pbrFieldChangeCallback;
+        private static ulong _pbrStatusLabelId;
+        private static ulong _pbrClearButtonId;
+        private static UI.WidgetCallbackDelegate _pbrClearCallback;
+        private static bool _pbrPanelBuilt;
+
         // === Dock / Layout State ===
         private static ulong _rightMaxButtonId;
         private static UI.WidgetCallbackDelegate _rightMaxClickCallback;

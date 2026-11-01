@@ -610,3 +610,72 @@ pub extern "C" fn scene_get_entity_material(scene: *const Scene, entity_id: u64,
         }
     }
 }
+
+/// 设置/清除实体 PBR 材质（JSON 字符串）。
+///
+/// - `json_ptr` 为 `null`/空串/`"null"` 时清除材质（回退渲染层默认材质）；
+/// - 返回 0=成功，-1=实体无渲染组件/场景为空，-2=JSON 解析失败。
+#[no_mangle]
+pub extern "C" fn scene_set_entity_pbr_material_json(
+    scene: *mut Scene,
+    entity_id: u64,
+    json_ptr: *const i8,
+) -> i32 {
+    if scene.is_null() {
+        return -1;
+    }
+    let material = if json_ptr.is_null() {
+        None
+    } else {
+        let text = unsafe { std::ffi::CStr::from_ptr(json_ptr).to_string_lossy() };
+        let trimmed = text.trim();
+        if trimmed.is_empty() || trimmed == "null" {
+            None
+        } else {
+            match PbrMaterial::from_json(trimmed) {
+                Ok(material) => Some(material),
+                Err(_) => return -2,
+            }
+        }
+    };
+    let ok = unsafe { (*scene).set_entity_pbr_material(Entity::new(entity_id), material) };
+    if ok { 0 } else { -1 }
+}
+
+/// 读取实体 PBR 材质（JSON 字符串）；无材质时写入空串并返回 0。
+#[no_mangle]
+pub extern "C" fn scene_get_entity_pbr_material_json(
+    scene: *const Scene,
+    entity_id: u64,
+    buffer_ptr: *mut i8,
+    buffer_size: usize,
+) -> usize {
+    if scene.is_null() || buffer_ptr.is_null() || buffer_size == 0 {
+        return 0;
+    }
+    unsafe {
+        match (*scene).get_entity_pbr_material(Entity::new(entity_id)) {
+            Some(material) => match material.to_json() {
+                Ok(json) => {
+                    let bytes = json.as_bytes();
+                    let copy_len = bytes.len().min(buffer_size - 1);
+                    std::ptr::copy_nonoverlapping(
+                        bytes.as_ptr(),
+                        buffer_ptr as *mut u8,
+                        copy_len,
+                    );
+                    *buffer_ptr.add(copy_len) = 0;
+                    copy_len
+                }
+                Err(_) => {
+                    *buffer_ptr = 0;
+                    0
+                }
+            },
+            None => {
+                *buffer_ptr = 0;
+                0
+            }
+        }
+    }
+}

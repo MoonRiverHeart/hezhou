@@ -52,7 +52,8 @@ use std::path::Path;
 use serde::{Deserialize, Serialize};
 
 use crate::ecs::{
-    BoundsComponent, DirectionalLightComponent, Entity, LocalTransform, RenderableComponent, Scene,
+    BoundsComponent, DirectionalLightComponent, Entity, LocalTransform, PbrMaterial,
+    RenderableComponent, Scene,
 };
 use crate::math::{Quaternion, Vec3};
 
@@ -232,6 +233,9 @@ pub struct PrefabRenderable {
     pub material: Option<String>,
     /// 纹理路径。
     pub texture: Option<String>,
+    /// PBR 材质（0.2）；缺省 None。
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pbr_material: Option<PbrMaterial>,
     /// 是否投射阴影。
     pub cast_shadow: bool,
     /// 是否接收阴影。
@@ -244,6 +248,7 @@ impl Default for PrefabRenderable {
             mesh_path: String::new(),
             material: None,
             texture: None,
+            pbr_material: None,
             cast_shadow: true,
             receive_shadow: true,
         }
@@ -724,6 +729,7 @@ fn capture_entity(scene: &Scene, entity: Entity) -> PrefabEntity {
             mesh_path: renderable.mesh_path,
             material: renderable.material_path,
             texture: renderable.texture_path,
+            pbr_material: renderable.pbr_material.clone(),
             cast_shadow: renderable.cast_shadow,
             receive_shadow: renderable.receive_shadow,
         }),
@@ -855,6 +861,7 @@ impl Scene {
                 visible: spec.visible,
                 cast_shadow: renderable.cast_shadow,
                 receive_shadow: renderable.receive_shadow,
+                pbr_material: renderable.pbr_material.clone().map(PbrMaterial::sanitized),
             };
             self.world.add_component(entity, component);
             self.world.add_component(entity, BoundsComponent::cube(2.0));
@@ -973,3 +980,4 @@ mod tests {
         assert!(PrefabOverrides::default().is_empty());
     }
 }
+

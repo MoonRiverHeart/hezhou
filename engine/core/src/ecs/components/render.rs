@@ -1,5 +1,101 @@
 use crate::ecs::Component;
 use crate::math::{Vec3, Quaternion};
+use serde::{Deserialize, Serialize};
+
+/// 每实体 PBR 材质（0.2，编辑器/Project 持久化用）。
+///
+/// 该结构是 core 的纯数据契约，不依赖渲染 crate；渲染层通过
+/// `UIVulkanRenderer::set_entity_pbr_material_params` / `set_entity_pbr_texture`
+/// 接收同一组参数。字段名与 `hezhou_render_pipeline::PbrMaterial` 保持一致。
+///
+/// 限制（0.2）：仅支持 albedo 单纹理槽（`albedo_texture_path`），
+/// metallic/roughness/normal/AO 纹理槽在后续版本扩展。
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct PbrMaterial {
+    /// 基础色 RGBA（线性空间）。
+    pub albedo: [f32; 4],
+    /// 金属度（0=非金属，1=金属）。
+    pub metallic: f32,
+    /// 粗糙度（0=镜面，1=完全粗糙）。
+    pub roughness: f32,
+    /// 法线贴图强度。
+    pub normal_scale: f32,
+    /// 环境光遮蔽强度。
+    pub ao: f32,
+    /// 自发光 RGB。
+    pub emissive: [f32; 3],
+    /// 自发光强度。
+    pub emissive_strength: f32,
+    /// 基础色（albedo）纹理路径；`None` 表示使用中性贴图。
+    pub albedo_texture_path: Option<String>,
+}
+
+impl Default for PbrMaterial {
+    fn default() -> Self {
+        Self {
+            albedo: [1.0, 1.0, 1.0, 1.0],
+            metallic: 0.0,
+            roughness: 0.5,
+            normal_scale: 1.0,
+            ao: 1.0,
+            emissive: [0.0, 0.0, 0.0],
+            emissive_strength: 1.0,
+            albedo_texture_path: None,
+        }
+    }
+}
+
+impl PbrMaterial {
+    /// 收敛非法值：NaN/∞ 回退默认值，数值 clamp 到合理范围。
+    ///
+    /// 用于编辑器输入/工程旧数据，保证渲染层不会收到 NaN。
+    pub fn sanitized(mut self) -> Self {
+        let defaults = Self::default();
+        let clamp_unit = |value: f32, fallback: f32| {
+            if value.is_finite() {
+                value.clamp(0.0, 1.0)
+            } else {
+                fallback
+            }
+        };
+        for (index, component) in self.albedo.iter_mut().enumerate() {
+            *component = clamp_unit(*component, defaults.albedo[index]);
+        }
+        for (index, component) in self.emissive.iter_mut().enumerate() {
+            *component = if component.is_finite() {
+                component.max(0.0)
+            } else {
+                defaults.emissive[index]
+            };
+        }
+        self.metallic = clamp_unit(self.metallic, defaults.metallic);
+        self.roughness = clamp_unit(self.roughness, defaults.roughness);
+        self.normal_scale = if self.normal_scale.is_finite() {
+            self.normal_scale.clamp(0.0, 8.0)
+        } else {
+            defaults.normal_scale
+        };
+        self.ao = clamp_unit(self.ao, defaults.ao);
+        self.emissive_strength = if self.emissive_strength.is_finite() {
+            self.emissive_strength.clamp(0.0, 64.0)
+        } else {
+            defaults.emissive_strength
+        };
+        self
+    }
+
+    /// 序列化为 JSON（编辑器 FFI / Project 共用）。
+    pub fn to_json(&self) -> Result<String, serde_json::Error> {
+        serde_json::to_string(self)
+    }
+
+    /// 从 JSON 解析（字段缺省取默认值，未知字段忽略）。
+    pub fn from_json(json: &str) -> Result<Self, serde_json::Error> {
+        let material: Self = serde_json::from_str(json)?;
+        Ok(material.sanitized())
+    }
+}
 
 #[repr(C)]
 #[derive(Clone, Debug)]
@@ -10,6 +106,8 @@ pub struct RenderableComponent {
     pub visible: bool,
     pub cast_shadow: bool,
     pub receive_shadow: bool,
+    /// 每实体 PBR 材质（编辑器 Inspector / Project 持久化）。
+    pub pbr_material: Option<PbrMaterial>,
 }
 
 impl Component for RenderableComponent {
@@ -26,6 +124,7 @@ impl Default for RenderableComponent {
             visible: true,
             cast_shadow: true,
             receive_shadow: true,
+            pbr_material: None,
         }
     }
 }

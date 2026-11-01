@@ -62,6 +62,8 @@ namespace Hezhou
             _prefabInstantiateCallback = OnPrefabInstantiateClick;
             _playerExportCallback = OnPlayerExportClick;
             _playerBuildCallback = OnPlayerBuildClick;
+            _pbrFieldChangeCallback = OnPbrFieldChanged;
+            _pbrClearCallback = OnPbrClearClick;
             _sceneFileDialogResultCallback = OnSceneFileDialogResult;
             _rightMaxClickCallback = OnRightMaxClick;
             _consoleDialogResultCallback = OnConsoleDialogResult;
@@ -969,6 +971,285 @@ _bindScriptClickCallback = OnBindScriptClick;
             return value.Replace("\\", "\\\\").Replace("\"", "\\\"");
         }
 
+        // === 0.2 per-entity PBR 材质面板（task-26） ===
+
+        /// <summary>在「渲染」属性 Tab 构建 PBR 材质编辑行（13 个输入 + 清除按钮 + 状态）。</summary>
+        private static void BuildPbrMaterialPanel(ulong parent)
+        {
+            // 主题切换会重建控件树：重置控件 ID 映射后重新创建。
+            _pbrFieldMap.Clear();
+            for (int i = 0; i < _pbrFieldIds.Length; i++)
+            {
+                _pbrFieldIds[i] = 0;
+            }
+            _pbrPanelBuilt = true;
+
+            UI.CreateLabel(parent, RIGHT_PANEL_WIDTH - 40f, 20f, "PBR 材质（当前实体）:");
+            BuildPbrRow(parent, "Albedo", new int[] { 0, 1, 2, 3 }, 70f);
+            BuildPbrRow(parent, "M / R", new int[] { 4, 5 }, 100f);
+            BuildPbrRow(parent, "N / AO", new int[] { 6, 7 }, 100f);
+            BuildPbrRow(parent, "Emissive", new int[] { 8, 9, 10 }, 60f);
+            BuildPbrRow(parent, "强度 / 纹理", new int[] { 11 }, 70f);
+
+            ulong textureRow = UI.CreateHStack(parent, 4f);
+            UI.CreateLabel(textureRow, 60f, 22f, "Tex");
+            _pbrFieldIds[12] = UI.CreateInputField(textureRow, 300f, 22f);
+            UI.InputFieldSetPlaceholder(_pbrFieldIds[12], "assets/tex/albedo.png（可空）");
+            UI.InputFieldSetOnChange(_pbrFieldIds[12], _pbrFieldChangeCallback);
+            _pbrFieldMap[_pbrFieldIds[12]] = 12;
+
+            ulong statusRow = UI.CreateHStack(parent, 6f);
+            _pbrStatusLabelId = UI.CreateLabel(statusRow, 300f, 22f, "PBR: 选择实体后编辑");
+            _pbrClearButtonId = UI.CreateButton(statusRow, 100f, 24f, "清除材质");
+            UI.SetOnClick(_pbrClearButtonId, _pbrClearCallback);
+            UI.ThemeSetBackground(_pbrClearButtonId, ThemeRole.ButtonSecondaryBg);
+            UI.ThemeSetText(_pbrClearButtonId, ThemeRole.TextPrimary);
+
+            ResetPbrFields();
+        }
+
+        private static void BuildPbrRow(ulong parent, string label, int[] fields, float fieldWidth)
+        {
+            ulong row = UI.CreateHStack(parent, 4f);
+            UI.CreateLabel(row, 100f, 22f, label);
+            for (int i = 0; i < fields.Length; i++)
+            {
+                ulong input = UI.CreateInputField(row, fieldWidth, 22f);
+                UI.InputFieldSetOnChange(input, _pbrFieldChangeCallback);
+                _pbrFieldIds[fields[i]] = input;
+                _pbrFieldMap[input] = fields[i];
+            }
+        }
+
+        private static void ResetPbrFields()
+        {
+            float[] defaults = new float[] {
+                1f, 1f, 1f, 1f,      // albedo
+                0f, 0.5f,            // metallic / roughness
+                1f, 1f,              // normal_scale / ao
+                0f, 0f, 0f, 1f,      // emissive / strength
+            };
+            for (int i = 0; i < 12; i++)
+            {
+                if (_pbrFieldIds[i] != 0)
+                {
+                    UI.InputFieldSetText(_pbrFieldIds[i], FormatPbrFloat(defaults[i]));
+                }
+            }
+            if (_pbrFieldIds[12] != 0) UI.InputFieldSetText(_pbrFieldIds[12], "");
+        }
+
+        private static void SetPbrField(int index, float value)
+        {
+            if (index >= 0 && index < _pbrFieldIds.Length && _pbrFieldIds[index] != 0)
+            {
+                UI.InputFieldSetText(_pbrFieldIds[index], FormatPbrFloat(value));
+            }
+        }
+
+        private static string FormatPbrFloat(float value)
+        {
+            return value.ToString("0.####", System.Globalization.CultureInfo.InvariantCulture);
+        }
+
+        private static float ParsePbrFloat(string text, float fallback)
+        {
+            float value;
+            if (float.TryParse(text, System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture, out value))
+            {
+                return value;
+            }
+            return fallback;
+        }
+
+        private static float GetPbrField(int index, float fallback)
+        {
+            if (index < 0 || index >= _pbrFieldIds.Length || _pbrFieldIds[index] == 0)
+            {
+                return fallback;
+            }
+            return ParsePbrFloat(UI.InputFieldGetText(_pbrFieldIds[index]), fallback);
+        }
+
+        private static string GetPbrTextureField()
+        {
+            if (_pbrFieldIds[12] == 0) return "";
+            return UI.InputFieldGetText(_pbrFieldIds[12]) ?? "";
+        }
+
+        /// <summary>当前选中实体的 PBR 面板状态。</summary>
+        private static ulong PbrTargetEntity()
+        {
+            return (_gameScene == null) ? 0UL : _selectedEntityId;
+        }
+
+        /// <summary>选择变化时把实体材质加载到 PBR 面板。</summary>
+        private static void RefreshPbrMaterialPanel(ulong entityId)
+        {
+            if (!_pbrPanelBuilt) return;
+            if (_gameScene == null || entityId == 0)
+            {
+                ResetPbrFields();
+                if (_pbrStatusLabelId != 0)
+                {
+                    UI.SetText(_pbrStatusLabelId, "PBR: 选择实体后编辑");
+                }
+                return;
+            }
+
+            string json = UI.SceneGetEntityPbrMaterial(_gameScene.ScenePtr, entityId);
+            if (string.IsNullOrEmpty(json))
+            {
+                ResetPbrFields();
+                if (_pbrStatusLabelId != 0)
+                {
+                    UI.SetText(_pbrStatusLabelId, "PBR: 未设置（编辑任意字段即创建）");
+                }
+                return;
+            }
+
+            float[] albedo = ParsePbrArray(json, "albedo", 4, new float[] { 1f, 1f, 1f, 1f });
+            float[] emissive = ParsePbrArray(json, "emissive", 3, new float[] { 0f, 0f, 0f });
+            SetPbrField(0, albedo[0]);
+            SetPbrField(1, albedo[1]);
+            SetPbrField(2, albedo[2]);
+            SetPbrField(3, albedo[3]);
+            SetPbrField(4, PbrJsonFloat(json, "metallic", 0f));
+            SetPbrField(5, PbrJsonFloat(json, "roughness", 0.5f));
+            SetPbrField(6, PbrJsonFloat(json, "normal_scale", 1f));
+            SetPbrField(7, PbrJsonFloat(json, "ao", 1f));
+            SetPbrField(8, emissive[0]);
+            SetPbrField(9, emissive[1]);
+            SetPbrField(10, emissive[2]);
+            SetPbrField(11, PbrJsonFloat(json, "emissive_strength", 1f));
+            if (_pbrFieldIds[12] != 0)
+            {
+                UI.InputFieldSetText(_pbrFieldIds[12], ParsePbrString(json, "albedo_texture_path"));
+            }
+            if (_pbrStatusLabelId != 0)
+            {
+                UI.SetText(_pbrStatusLabelId, "PBR: 已设置（实体 " + entityId + "）");
+            }
+        }
+
+        /// <summary>由面板输入构造 PBR 材质 JSON。</summary>
+        private static string BuildPbrJson()
+        {
+            string texture = GetPbrTextureField().Trim();
+            string textureJson = texture.Length == 0 ? "null" : "\"" + EscapeJsonPath(texture) + "\"";
+            return "{"
+                + "\"albedo\":[" + FormatPbrFloat(GetPbrField(0, 1f)) + ","
+                + FormatPbrFloat(GetPbrField(1, 1f)) + ","
+                + FormatPbrFloat(GetPbrField(2, 1f)) + ","
+                + FormatPbrFloat(GetPbrField(3, 1f)) + "],"
+                + "\"metallic\":" + FormatPbrFloat(GetPbrField(4, 0f)) + ","
+                + "\"roughness\":" + FormatPbrFloat(GetPbrField(5, 0.5f)) + ","
+                + "\"normal_scale\":" + FormatPbrFloat(GetPbrField(6, 1f)) + ","
+                + "\"ao\":" + FormatPbrFloat(GetPbrField(7, 1f)) + ","
+                + "\"emissive\":[" + FormatPbrFloat(GetPbrField(8, 0f)) + ","
+                + FormatPbrFloat(GetPbrField(9, 0f)) + ","
+                + FormatPbrFloat(GetPbrField(10, 0f)) + "],"
+                + "\"emissive_strength\":" + FormatPbrFloat(GetPbrField(11, 1f)) + ","
+                + "\"albedo_texture_path\":" + textureJson
+                + "}";
+        }
+
+        private static void OnPbrFieldChanged(ulong widgetId, string text)
+        {
+            ulong entityId = PbrTargetEntity();
+            if (_gameScene == null || entityId == 0)
+            {
+                if (_pbrStatusLabelId != 0) UI.SetText(_pbrStatusLabelId, "PBR: 请先选择实体");
+                return;
+            }
+            int rc = UI.SceneSetEntityPbrMaterial(_gameScene.ScenePtr, entityId, BuildPbrJson());
+            if (rc == 0)
+            {
+                int synced = UI.EditorSyncPbrMaterialsNow();
+                if (_pbrStatusLabelId != 0)
+                {
+                    UI.SetText(_pbrStatusLabelId, "PBR: 已更新（renderer 覆盖 " + synced + "）");
+                }
+                _propertiesDirty = true;
+            }
+            else
+            {
+                Log.Warn("PBR", "更新实体 PBR 材质失败: entity=" + entityId + ", rc=" + rc);
+                if (_pbrStatusLabelId != 0) UI.SetText(_pbrStatusLabelId, "PBR: 更新失败 rc=" + rc);
+            }
+        }
+
+        private static void OnPbrClearClick(ulong widgetId)
+        {
+            ulong entityId = PbrTargetEntity();
+            if (_gameScene == null || entityId == 0)
+            {
+                if (_pbrStatusLabelId != 0) UI.SetText(_pbrStatusLabelId, "PBR: 请先选择实体");
+                return;
+            }
+            int rc = UI.SceneSetEntityPbrMaterial(_gameScene.ScenePtr, entityId, "null");
+            if (rc == 0)
+            {
+                int synced = UI.EditorSyncPbrMaterialsNow();
+                ResetPbrFields();
+                Log.Info("PBR", "已清除实体 PBR 材质: entity=" + entityId + "（renderer 覆盖 " + synced + "）");
+                if (_pbrStatusLabelId != 0)
+                {
+                    UI.SetText(_pbrStatusLabelId, "PBR: 已清除（renderer 覆盖 " + synced + "）");
+                }
+                _propertiesDirty = true;
+            }
+            else
+            {
+                Log.Warn("PBR", "清除实体 PBR 材质失败: entity=" + entityId + ", rc=" + rc);
+            }
+        }
+
+        /// <summary>从 JSON 数组字段解析前 count 个 float。</summary>
+        private static float[] ParsePbrArray(string json, string key, int count, float[] fallback)
+        {
+            float[] result = new float[count];
+            System.Array.Copy(fallback, result, count);
+            if (string.IsNullOrEmpty(json)) return result;
+            int keyIndex = json.IndexOf("\"" + key + "\":");
+            if (keyIndex < 0) return result;
+            int start = json.IndexOf('[', keyIndex);
+            int end = json.IndexOf(']', start + 1);
+            if (start < 0 || end < 0) return result;
+            string body = json.Substring(start + 1, end - start - 1);
+            string[] parts = body.Split(',');
+            for (int i = 0; i < count && i < parts.Length; i++)
+            {
+                result[i] = ParsePbrFloat(parts[i].Trim(), fallback[i]);
+            }
+            return result;
+        }
+
+        private static float PbrJsonFloat(string json, string key, float fallback)
+        {
+            if (string.IsNullOrEmpty(json)) return fallback;
+            int keyIndex = json.IndexOf("\"" + key + "\":");
+            if (keyIndex < 0) return fallback;
+            int start = keyIndex + key.Length + 3;
+            int end = start;
+            while (end < json.Length && json[end] != ',' && json[end] != '}') end++;
+            return ParsePbrFloat(json.Substring(start, end - start).Trim(), fallback);
+        }
+
+        private static string ParsePbrString(string json, string key)
+        {
+            if (string.IsNullOrEmpty(json)) return "";
+            int keyIndex = json.IndexOf("\"" + key + "\":");
+            if (keyIndex < 0) return "";
+            int start = keyIndex + key.Length + 3;
+            while (start < json.Length && char.IsWhiteSpace(json[start])) start++;
+            if (start >= json.Length || json[start] != '"') return "";
+            int end = json.IndexOf('"', start + 1);
+            if (end < 0) return "";
+            return json.Substring(start + 1, end - start - 1);
+        }
+
         // === 自检用只读辅助（TestRunner 调用） ===
 
         /// <summary>当前编辑场景指针（0=未初始化）。</summary>
@@ -992,6 +1273,21 @@ _bindScriptClickCallback = OnBindScriptClick;
             IntPtr scenePtr = TestGetScenePtr();
             if (scenePtr == IntPtr.Zero) return 0;
             return (int)UI.SceneGetEntityCount(scenePtr);
+        }
+
+        /// <summary>自检用：创建 Cube 实体并返回 ID。</summary>
+        public static ulong TestCreateCubeEntity()
+        {
+            return _gameScene != null ? _gameScene.CreateCube() : 0;
+        }
+
+        /// <summary>自检用：删除实体。</summary>
+        public static void TestRemoveEntity(ulong entityId)
+        {
+            if (_gameScene != null && entityId != 0)
+            {
+                _gameScene.RemoveEntity(entityId);
+            }
         }
 
         public static void ApplyTheme(ThemeMode mode, bool rebuild)

@@ -5,7 +5,7 @@ use serde::{Serialize, Deserialize};
 use chrono::{DateTime, Utc};
 use crate::math::{Vec3, Quaternion};
 use crate::ecs::{
-    BoundsComponent, DirectionalLightComponent, Entity, GameState, LocalTransform,
+    BoundsComponent, DirectionalLightComponent, Entity, GameState, LocalTransform, PbrMaterial,
     RenderableComponent, Scene,
 };
 
@@ -98,6 +98,9 @@ pub struct ProjectEntity {
     /// 渲染材质；None 表示未赋材质。旧版工程默认 None。
     #[serde(default)]
     pub material: Option<String>,
+    /// PBR 材质（0.2）；旧工程缺少该字段时为 None（兼容）。
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pbr_material: Option<PbrMaterial>,
 }
 
 fn default_visible() -> bool {
@@ -117,6 +120,7 @@ impl Default for ProjectEntity {
             light: None,
             parent_id: None,
             material: None,
+            pbr_material: None,
         }
     }
 }
@@ -389,6 +393,9 @@ impl Project {
             if let Some(material) = &project_entity.material {
                 scene.set_renderable_material(entity, Some(material.clone()));
             }
+            if let Some(pbr_material) = &project_entity.pbr_material {
+                scene.set_entity_pbr_material(entity, Some(pbr_material.clone()));
+            }
 
             let mut transform = LocalTransform::new();
             transform.position = Vec3::new(
@@ -514,6 +521,7 @@ impl Project {
                     }),
                     parent_id: scene.get_parent(entity).map(|p| p.id),
                     material: renderable.as_ref().and_then(|r| r.material_path.clone()),
+                    pbr_material: renderable.as_ref().and_then(|r| r.pbr_material.clone()),
                 };
                 
                 self.file.entities.push(project_entity);

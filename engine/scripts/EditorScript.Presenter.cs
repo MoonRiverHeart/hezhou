@@ -475,6 +475,8 @@ namespace Hezhou
         private static void UpdatePropertiesPanel(ulong entityId)
         {
             if (_propsTabWidget == null || _gameScene == null) return;
+            // 0.2 per-entity PBR 材质：选择变化时同步到 Inspector「渲染」Tab 的材质行。
+            RefreshPbrMaterialPanel(entityId);
             
             // Bug1 fix: 保存当前active tab index，防止UI重建时跳转到其他标签页
             ulong savedActiveTab = _propsTabWidget.GetActive();

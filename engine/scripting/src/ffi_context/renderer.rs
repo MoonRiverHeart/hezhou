@@ -25,3 +25,21 @@ pub type RendererPbrActiveFn = extern "C" fn() -> i32;
 /// FFI 契约: `renderer_get_pbr_summary(buffer, buffer_size)` → usize
 /// 返回实际写入的字节数（不含末尾 `\0`），0 表示失败/缓冲区不可用。
 pub type RendererGetPbrSummaryFn = extern "C" fn(*mut std::ffi::c_char, usize) -> usize;
+
+// === 0.2 每实体 PBR 材质（core ↔ renderer） ===
+
+/// 设置/清除实体 PBR 材质（JSON 字符串，null/空串=清除）。
+///
+/// FFI 契约: `scene_set_entity_pbr_material_json(scene, entity_id, json)` → i32
+/// 返回 0=成功，-1=实体无渲染组件/场景为空，-2=JSON 解析失败。
+pub type SceneSetEntityPbrMaterialJsonFn =
+    extern "C" fn(*mut std::ffi::c_void, u64, *const std::ffi::c_char) -> i32;
+
+/// 读取实体 PBR 材质 JSON（无材质时写空串），返回写入字节数。
+pub type SceneGetEntityPbrMaterialJsonFn =
+    extern "C" fn(*const std::ffi::c_void, u64, *mut std::ffi::c_char, usize) -> usize;
+
+/// 立即把场景中所有 PBR 材质同步到 renderer，返回 renderer 覆盖数。
+///
+/// FFI 契约: `editor_sync_pbr_materials_now()` → i32
+pub type EditorSyncPbrMaterialsNowFn = extern "C" fn() -> i32;

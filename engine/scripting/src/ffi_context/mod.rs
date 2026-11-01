@@ -349,6 +349,10 @@ pub project_add_entity: ProjectAddEntityFn,
         pub player_export_dry_run: PlayerExportDryRunFn,
         pub player_export_build: PlayerExportBuildFn,
         pub player_export_summary: PlayerExportSummaryFn,
+        // 0.2 每实体 PBR 材质 FFI（tail；必须与 C# FfiContext 字段顺序一致）
+        pub scene_set_entity_pbr_material_json: SceneSetEntityPbrMaterialJsonFn,
+        pub scene_get_entity_pbr_material_json: SceneGetEntityPbrMaterialJsonFn,
+        pub editor_sync_pbr_materials_now: EditorSyncPbrMaterialsNowFn,
     }
 
 static mut FFI_CONTEXT: Option<Box<FfiContext>> = None;

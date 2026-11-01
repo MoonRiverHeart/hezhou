@@ -365,6 +365,7 @@ pub extern "C" fn project_add_entity(
         light: None,
         parent_id: None,
         material: None,
+        pbr_material: None,
     });
     true
 }

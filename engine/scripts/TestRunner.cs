@@ -49,6 +49,9 @@ namespace Hezhou
             try { TestPlayerBuildFfi(); }
             catch (Exception ex) { Log.Error("TestRunner", "TestPlayerBuildFfi异常: " + ex.Message); }
 
+            try { TestPbrMaterialFfi(); }
+            catch (Exception ex) { Log.Error("TestRunner", "TestPbrMaterialFfi异常: " + ex.Message); }
+
             Log.Info("TestRunner", "===== 测试完成: PASS=" + _passCount + ", FAIL=" + _failCount + " =====");
         }
 
@@ -603,6 +606,56 @@ namespace Hezhou
                 try { if (System.IO.Directory.Exists(fixture)) System.IO.Directory.Delete(fixture, true); } catch (Exception) { }
                 try { if (System.IO.Directory.Exists(outputDir)) System.IO.Directory.Delete(outputDir, true); } catch (Exception) { }
             }
+        }
+
+        /// <summary>
+        /// 0.2 per-entity PBR 材质自检（task-26）：
+        /// 创建测试 Cube → 设置 JSON 材质 → 读取 roundtrip → renderer 同步覆盖数 ≥1 →
+        /// 清除材质 → 读取为空 → 清理实体。
+        /// </summary>
+        private static void TestPbrMaterialFfi()
+        {
+            IntPtr scenePtr = EditorScript.TestGetScenePtr();
+            if (scenePtr == IntPtr.Zero)
+            {
+                AssertTrue("PbrMaterial", true, "场景未初始化，跳过 PBR 材质自检");
+                return;
+            }
+
+            ulong cube = EditorScript.TestCreateCubeEntity();
+            AssertTrue("PbrMaterial", cube != 0, "创建测试 Cube 实体 (id=" + cube + ")");
+
+            string json = "{"
+                + "\"albedo\":[0.8,0.2,0.1,1.0],"
+                + "\"metallic\":0.6,"
+                + "\"roughness\":0.3,"
+                + "\"normal_scale\":1.25,"
+                + "\"ao\":0.9,"
+                + "\"emissive\":[0.15,0.0,0.3],"
+                + "\"emissive_strength\":2.5,"
+                + "\"albedo_texture_path\":\"assets/tex/pbr_test.png\""
+                + "}";
+            int setRc = UI.SceneSetEntityPbrMaterial(scenePtr, cube, json);
+            AssertTrue("PbrMaterial", setRc == 0, "SceneSetEntityPbrMaterial 返回 0 (rc=" + setRc + ")");
+
+            string got = UI.SceneGetEntityPbrMaterial(scenePtr, cube);
+            bool roundtrip = got.IndexOf("\"metallic\":0.6") >= 0
+                && got.IndexOf("pbr_test.png") >= 0
+                && got.IndexOf("2.5") >= 0;
+            AssertTrue("PbrMaterial", roundtrip, "材质 JSON roundtrip (" + got + ")");
+
+            int synced = UI.EditorSyncPbrMaterialsNow();
+            AssertTrue("PbrMaterial", synced >= 1,
+                "renderer 收到每实体材质（覆盖数=" + synced + "）");
+
+            int clearRc = UI.SceneSetEntityPbrMaterial(scenePtr, cube, "null");
+            string cleared = UI.SceneGetEntityPbrMaterial(scenePtr, cube);
+            AssertTrue("PbrMaterial", clearRc == 0 && cleared.Length == 0,
+                "清除材质后读取为空 (rc=" + clearRc + ", len=" + cleared.Length + ")");
+
+            UI.EditorSyncPbrMaterialsNow();
+            EditorScript.TestRemoveEntity(cube);
+            AssertTrue("PbrMaterial", true, "PBR 材质自检实体已清理");
         }
 
         // 内存保存值结构（模拟SavedScriptPropertyValue，用于测试）

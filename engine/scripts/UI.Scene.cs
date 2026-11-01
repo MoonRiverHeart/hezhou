@@ -887,5 +887,62 @@ UI.SceneSelectEntity(_scenePtr, entityId);
             var func = Marshal.GetDelegateForFunctionPointer<SceneGetChildIdDelegate>(_ffi.scene_get_child_id);
             return func(scene, parentId, index);
         }
+
+        // === 0.2 per-entity PBR 材质（task-26） ===
+
+        /// <summary>设置/清除实体 PBR 材质（JSON；空串或 "null" 清除）。返回 0 成功。</summary>
+        public static int SceneSetEntityPbrMaterial(IntPtr scene, ulong entityId, string json)
+        {
+            if (_ffi.scene_set_entity_pbr_material_json == IntPtr.Zero)
+            {
+                return -1;
+            }
+            IntPtr jsonPtr = Marshal.StringToHGlobalAnsi(json ?? "");
+            try
+            {
+                var func = Marshal.GetDelegateForFunctionPointer<SceneSetEntityPbrMaterialDelegate>(
+                    _ffi.scene_set_entity_pbr_material_json);
+                return func(scene, entityId, jsonPtr);
+            }
+            finally
+            {
+                Marshal.FreeHGlobal(jsonPtr);
+            }
+        }
+
+        /// <summary>读取实体 PBR 材质 JSON（无材质返回空串）。</summary>
+        public static string SceneGetEntityPbrMaterial(IntPtr scene, ulong entityId)
+        {
+            if (_ffi.scene_get_entity_pbr_material_json == IntPtr.Zero)
+            {
+                return "";
+            }
+            const int bufferSize = 1024;
+            IntPtr buffer = Marshal.AllocHGlobal(bufferSize);
+            try
+            {
+                Marshal.WriteByte(buffer, 0, 0);
+                var func = Marshal.GetDelegateForFunctionPointer<SceneGetEntityPbrMaterialDelegate>(
+                    _ffi.scene_get_entity_pbr_material_json);
+                ulong written = func(scene, entityId, buffer, (ulong)bufferSize);
+                return written == 0UL ? "" : (Marshal.PtrToStringAnsi(buffer, (int)written) ?? "");
+            }
+            finally
+            {
+                Marshal.FreeHGlobal(buffer);
+            }
+        }
+
+        /// <summary>立即同步场景 PBR 材质到 renderer，返回 renderer 材质覆盖数。</summary>
+        public static int EditorSyncPbrMaterialsNow()
+        {
+            if (_ffi.editor_sync_pbr_materials_now == IntPtr.Zero)
+            {
+                return 0;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<EditorSyncPbrMaterialsNowDelegate>(
+                _ffi.editor_sync_pbr_materials_now);
+            return func();
+        }
     }
 }

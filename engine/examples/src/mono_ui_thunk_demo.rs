@@ -470,6 +470,9 @@ fn main() {
         player_export_dry_run: stub_player_export_dry_run,
         player_export_build: stub_player_export_build,
         player_export_summary: stub_player_export_summary,
+        scene_set_entity_pbr_material_json: stub_scene_set_pbr_material_json,
+        scene_get_entity_pbr_material_json: stub_scene_get_pbr_material_json,
+        editor_sync_pbr_materials_now: stub_editor_sync_pbr_materials_now,
     };
     hezhou_scripting::ffi_context::set_ffi_context(ffi_ctx);
     let ffi_ptr = hezhou_scripting::ffi_context::get_ffi_context_ptr();
@@ -697,6 +700,22 @@ extern "C" fn stub_scene_manager_names(_: *mut std::ffi::c_char, _: usize) -> us
 extern "C" fn stub_player_export_dry_run(_: *const std::ffi::c_char) -> i32 { 0 }
 extern "C" fn stub_player_export_build(_: *const std::ffi::c_char) -> i32 { 0 }
 extern "C" fn stub_player_export_summary(_: *mut std::ffi::c_char, _: usize) -> usize { 0 }
+extern "C" fn stub_scene_set_pbr_material_json(
+    _: *mut std::ffi::c_void,
+    _: u64,
+    _: *const std::ffi::c_char,
+) -> i32 {
+    0
+}
+extern "C" fn stub_scene_get_pbr_material_json(
+    _: *const std::ffi::c_void,
+    _: u64,
+    _: *mut std::ffi::c_char,
+    _: usize,
+) -> usize {
+    0
+}
+extern "C" fn stub_editor_sync_pbr_materials_now() -> i32 { 0 }
 
 // 新增stub函数 — Feature 1脚本绑定
 pub extern "C" fn scene_get_existing_ptr_stub() -> *mut std::ffi::c_void { std::ptr::null_mut() }

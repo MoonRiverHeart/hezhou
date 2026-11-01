@@ -984,6 +984,15 @@ namespace Hezhou
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public delegate ulong PlayerExportSummaryDelegate(IntPtr buffer, ulong bufferSize);
 
+        // 0.2 per-entity PBR 材质 FFI（task-26）
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate int SceneSetEntityPbrMaterialDelegate(IntPtr scene, ulong entityId, IntPtr json);
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate ulong SceneGetEntityPbrMaterialDelegate(
+            IntPtr scene, ulong entityId, IntPtr buffer, ulong bufferSize);
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate int EditorSyncPbrMaterialsNowDelegate();
+
 [StructLayout(LayoutKind.Sequential)]
         public struct FfiContext
         {
@@ -1311,6 +1320,10 @@ namespace Hezhou
             public IntPtr player_export_dry_run;
             public IntPtr player_export_build;
             public IntPtr player_export_summary;
+            // 0.2 per-entity PBR 材质 FFI（tail；必须与 Rust FfiContext 字段顺序一致）
+            public IntPtr scene_set_entity_pbr_material_json;
+            public IntPtr scene_get_entity_pbr_material_json;
+            public IntPtr editor_sync_pbr_materials_now;
         }
 
         public static void InitFromContext(IntPtr contextPtr)
