@@ -34,6 +34,8 @@ cargo test -j 1 -p hezhou-integration --no-default-features
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 cargo check -p hezhou-player --features window-host
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+cargo test -j 1 -p hezhou-player --features mono-host
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 Step "FFI contract"
 python scripts/check_ffi_contract.py
