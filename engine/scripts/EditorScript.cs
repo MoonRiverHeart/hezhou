@@ -49,6 +49,7 @@ namespace Hezhou
             _toggleEditorClickCallback = OnToggleEditorClick;
             _consoleClickCallback = OnConsoleClick;
             _themeClickCallback = OnThemeClick;
+            _qualityClickCallback = OnQualityClick;
             _rightMaxClickCallback = OnRightMaxClick;
             _consoleDialogResultCallback = OnConsoleDialogResult;
             _consoleRefreshCallback = OnConsoleRefresh;
@@ -389,6 +390,15 @@ _bindScriptClickCallback = OnBindScriptClick;
                     if (_selectionItem != null) _selectionItem.Text = "选择: " + _selectedEntityIds.Count;
                     if (_themeItem != null) _themeItem.Text = Theme.IsDark ? "主题: 深色" : "主题: 浅色";
                     if (_errorItem != null) _errorItem.Text = "错误: " + TestTelemetry.ErrorCount;
+                    // 0.2 渲染质量/PBR：状态栏显示实际 draw path 摘要（Legacy/PBR/pending）
+                    if (_renderItem != null)
+                    {
+                        _renderItem.Text = "渲染: " + ShortenRenderSummary(UI.RendererGetPbrSummary());
+                    }
+                    if (_qualityButtonId != 0)
+                    {
+                        UI.SetText(_qualityButtonId, "画质: " + UI.RendererQualityName(_qualityPreset));
+                    }
 
                     // === 脚本属性runtime值→UI同步 (每5帧) ===
                     SyncScriptPropertyValuesToUI();
@@ -445,6 +455,55 @@ _bindScriptClickCallback = OnBindScriptClick;
         private static void OnThemeClick(ulong widgetId)
         {
             ApplyTheme(Theme.IsDark ? ThemeMode.Light : ThemeMode.Dark, true);
+        }
+
+        // === 0.2 渲染质量 / PBR（FFI: UI.RendererSetQualityPreset / RendererGetPbrSummary） ===
+
+        /// <summary>工具栏画质按钮：Legacy(3) → Low(0) → Medium(1) → High(2) → Legacy 循环。</summary>
+        private static void OnQualityClick(ulong widgetId)
+        {
+            int next = (_qualityPreset + 1) % 4;
+            ApplyQualityPreset(next);
+        }
+
+        /// <summary>
+        /// 应用画质档：0=Low 1=Medium 2=High 3=Legacy。
+        /// 失败只记录日志/状态栏并保持当前档位，不抛异常、不崩溃。
+        /// </summary>
+        public static void ApplyQualityPreset(int preset)
+        {
+            int rc = UI.RendererSetQualityPreset(preset);
+            if (rc == 0)
+            {
+                _qualityPreset = preset;
+                if (_qualityButtonId != 0)
+                {
+                    UI.SetText(_qualityButtonId, "画质: " + UI.RendererQualityName(preset));
+                }
+                string summary = UI.RendererGetPbrSummary();
+                if (_statusItem != null)
+                {
+                    _statusItem.Text = "画质: " + UI.RendererQualityName(preset) + " | " + ShortenRenderSummary(summary);
+                }
+                Log.Info("Editor", "画质切换: " + UI.RendererQualityName(preset) + " | " + summary);
+            }
+            else
+            {
+                Log.Warn("Editor", "画质切换失败: preset=" + preset + ", rc=" + rc
+                    + "（0=成功,-1=renderer未初始化,-2=非法档位）");
+                if (_statusItem != null)
+                {
+                    _statusItem.Text = "画质切换失败: rc=" + rc;
+                }
+            }
+        }
+
+        /// <summary>状态栏摘要截断，避免超出工具栏/状态栏宽度。</summary>
+        private static string ShortenRenderSummary(string summary)
+        {
+            if (string.IsNullOrEmpty(summary)) return "Legacy";
+            const int max = 44;
+            return summary.Length <= max ? summary : summary.Substring(0, max - 3) + "...";
         }
 
         public static void ApplyTheme(ThemeMode mode, bool rebuild)

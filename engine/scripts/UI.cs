@@ -914,6 +914,14 @@ namespace Hezhou
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public delegate void RegisterUpdateDelegate(IntPtr callbackPtr);
 
+        // 0.2 渲染质量 / PBR FFI（Rust: engine/examples/src/editor/ffi_impl.rs）
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate int RendererSetQualityPresetDelegate(int preset);
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate int RendererPbrActiveDelegate();
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate ulong RendererGetPbrSummaryDelegate(IntPtr buffer, ulong bufferSize);
+
 [StructLayout(LayoutKind.Sequential)]
         public struct FfiContext
         {
@@ -1207,6 +1215,10 @@ namespace Hezhou
             public IntPtr ui_register_tab_drag_end_thunk_ptr;
             public IntPtr ui_load_image_texture;
             public IntPtr set_gizmo_3d;
+            // 0.2 渲染质量 / PBR FFI（tail；必须与 Rust FfiContext 字段顺序一致）
+            public IntPtr renderer_set_quality_preset;
+            public IntPtr renderer_pbr_active;
+            public IntPtr renderer_get_pbr_summary;
         }
 
         public static void InitFromContext(IntPtr contextPtr)
@@ -1522,6 +1534,69 @@ public static void RegisterResizeCallback(ResizeCallbackDelegate callback)
             Marshal.FreeHGlobal(namePtr);
             Marshal.FreeHGlobal(valuePtr);
             return result;
+        }
+
+        // === 0.2 渲染质量 / PBR（FFI: engine/examples/src/editor/ffi_impl.rs） ===
+
+        /// <summary>质量档整数 → 显示名（3/tail 默认 Legacy）。</summary>
+        public static string RendererQualityName(int preset)
+        {
+            switch (preset)
+            {
+                case 0: return "Low";
+                case 1: return "Medium";
+                case 2: return "High";
+                default: return "Legacy";
+            }
+        }
+
+        /// <summary>切换画质：0=Low 1=Medium 2=High 3=Legacy；返回 0 成功，负数失败。</summary>
+        public static int RendererSetQualityPreset(int preset)
+        {
+            if (_ffi.renderer_set_quality_preset == IntPtr.Zero)
+            {
+                Log.Warn("C#", "RendererSetQualityPreset函数指针为空");
+                return -1;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<RendererSetQualityPresetDelegate>(_ffi.renderer_set_quality_preset);
+            return func(preset);
+        }
+
+        /// <summary>PBR draw path 是否激活（false = legacy / 未初始化）。</summary>
+        public static bool RendererPbrActive()
+        {
+            if (_ffi.renderer_pbr_active == IntPtr.Zero)
+            {
+                return false;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<RendererPbrActiveDelegate>(_ffi.renderer_pbr_active);
+            return func() != 0;
+        }
+
+        /// <summary>PBR/质量档摘要字符串（状态栏展示；失败返回空串）。</summary>
+        public static string RendererGetPbrSummary()
+        {
+            if (_ffi.renderer_get_pbr_summary == IntPtr.Zero)
+            {
+                return "";
+            }
+            const int bufferSize = 512;
+            IntPtr buffer = Marshal.AllocHGlobal(bufferSize);
+            try
+            {
+                Marshal.WriteByte(buffer, 0, 0);
+                var func = Marshal.GetDelegateForFunctionPointer<RendererGetPbrSummaryDelegate>(_ffi.renderer_get_pbr_summary);
+                ulong written = func(buffer, (ulong)bufferSize);
+                if (written == 0UL)
+                {
+                    return "";
+                }
+                return Marshal.PtrToStringAnsi(buffer, (int)written) ?? "";
+            }
+            finally
+            {
+                Marshal.FreeHGlobal(buffer);
+            }
         }
     }
 }

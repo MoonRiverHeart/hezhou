@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.IO;
 using System.Collections.Generic;
 
@@ -159,6 +159,13 @@ namespace Hezhou
             UI.SetOnClick(_themeButtonId, _themeClickCallback);
             UI.ThemeSetBackground(_themeButtonId, ThemeRole.ButtonSecondaryBg);
             UI.ThemeSetText(_themeButtonId, ThemeRole.TextPrimary);
+
+            // 0.2 画质循环按钮：Legacy → Low → Medium → High → Legacy（默认 Legacy，零回归）
+            _qualityButtonId = UI.CreateButton(_toolbar.Id, 120f, 30f, "画质: Legacy");
+            UI.SetWidgetLayout(_qualityButtonId, _screenWidth - 640f, 5f, 120f, 30f);
+            UI.SetOnClick(_qualityButtonId, _qualityClickCallback);
+            UI.ThemeSetBackground(_qualityButtonId, ThemeRole.ButtonSecondaryBg);
+            UI.ThemeSetText(_qualityButtonId, ThemeRole.TextPrimary);
 
             // === SplitView-based Main Layout ===
             // Structure:
@@ -435,8 +442,13 @@ namespace Hezhou
             UI.SetWidgetLayout(_themeItem.Id, 580f, 2f, 140f, itemHeight);
             UI.SetListItemFontSize(_themeItem.Id, fontSize);
 
+            // 0.2 渲染质量/PBR 摘要（文本由 Update() 每帧刷新，见 EditorScript.cs）
+            _renderItem = _statusItems.AddItem("渲染: Legacy", true);
+            UI.SetWidgetLayout(_renderItem.Id, 730f, 2f, 300f, itemHeight);
+            UI.SetListItemFontSize(_renderItem.Id, fontSize);
+
             _errorItem = _statusItems.AddItem("错误: 0", true);
-            UI.SetWidgetLayout(_errorItem.Id, 730f, 2f, 120f, itemHeight);
+            UI.SetWidgetLayout(_errorItem.Id, 1040f, 2f, 120f, itemHeight);
             UI.SetListItemFontSize(_errorItem.Id, fontSize);
 
             // === Script Editor Panel (pre-created, initially hidden) ===

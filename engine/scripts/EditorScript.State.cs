@@ -188,6 +188,12 @@ namespace Hezhou
         private static UI.WidgetCallbackDelegate _themeClickCallback;
         private static ulong _themeButtonId;
 
+        // === 0.2 渲染质量 / PBR（toolbar 循环按钮 + 状态栏摘要） ===
+        private static UI.WidgetCallbackDelegate _qualityClickCallback;
+        private static ulong _qualityButtonId;
+        private static ListItem _renderItem;
+        private static int _qualityPreset = 3; // 3=Legacy（默认，不启用 PBR）
+
         // === Dock / Layout State ===
         private static ulong _rightMaxButtonId;
         private static UI.WidgetCallbackDelegate _rightMaxClickCallback;

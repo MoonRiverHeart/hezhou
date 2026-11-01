@@ -16,6 +16,11 @@ RUST_CONTEXT = ROOT / "engine" / "scripting" / "src" / "ffi_context" / "mod.rs"
 CSHARP_CONTEXT = ROOT / "engine" / "scripts" / "UI.cs"
 EDITOR_CONTEXT = ROOT / "engine" / "examples" / "src" / "editor" / "mod.rs"
 
+# 当前 FfiContext 字段基线（0.2 task-15：283 + 渲染质量/PBR 3 个 = 286）。
+# 新增/删除 FFI 字段时必须同步更新此常量：强制字段变更被显式评审，
+# 避免只改了 Rust 或只改了 C# 导致运行时函数指针错位。
+EXPECTED_FIELD_COUNT = 286
+
 
 def fields_between(text: str, start_pattern: str, field_pattern: str) -> list[str]:
     match = re.search(start_pattern, text)
@@ -63,6 +68,11 @@ def main() -> int:
     duplicate = len(rust) - len(rust_set)
     if duplicate:
         errors.append(f"Rust FfiContext 存在 {duplicate} 个重复字段")
+    if len(rust_set) != EXPECTED_FIELD_COUNT:
+        errors.append(
+            f"Rust FfiContext 字段数({len(rust_set)}) != 期望({EXPECTED_FIELD_COUNT})；"
+            "新增/删除 FFI 字段请同步更新 check_ffi_contract.py 的 EXPECTED_FIELD_COUNT"
+        )
     if len(set(csharp)) != len(csharp):
         errors.append("C# FfiContext 存在重复字段")
     if len(editor) != len(rust_set):

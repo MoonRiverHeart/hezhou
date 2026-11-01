@@ -311,6 +311,10 @@ pub project_add_entity: ProjectAddEntityFn,
         pub ui_register_tab_drag_end_thunk_ptr: RegisterTabDragEndThunkPtrFn,
         pub ui_load_image_texture: LoadImageTextureFn,
         pub set_gizmo_3d: SetGizmo3DFn,
+        // 0.2 渲染质量 / PBR FFI（tail；必须与 C# FfiContext 字段顺序一致）
+        pub renderer_set_quality_preset: RendererSetQualityPresetFn,
+        pub renderer_pbr_active: RendererPbrActiveFn,
+        pub renderer_get_pbr_summary: RendererGetPbrSummaryFn,
     }
 
 static mut FFI_CONTEXT: Option<Box<FfiContext>> = None;

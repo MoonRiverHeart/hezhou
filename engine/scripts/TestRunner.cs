@@ -37,6 +37,9 @@ namespace Hezhou
             try { TestSaveRestorePropertyValues(); }
             catch (Exception ex) { Log.Error("TestRunner", "TestSaveRestorePropertyValues异常: " + ex.Message); }
 
+            try { TestRendererQualityFfi(); }
+            catch (Exception ex) { Log.Error("TestRunner", "TestRendererQualityFfi异常: " + ex.Message); }
+
             Log.Info("TestRunner", "===== 测试完成: PASS=" + _passCount + ", FAIL=" + _failCount + " =====");
         }
 
@@ -288,6 +291,43 @@ namespace Hezhou
                 // 清理测试实例
                 RotatingEntity.DestroyInstance(instancePtr);
             }
+        }
+
+        /// <summary>
+        /// 0.2 渲染质量 / PBR FFI 自检（task-15）：
+        /// 默认 legacy；切 High 成功并反映到摘要；非法档位被拒绝；切回 Legacy 零回归。
+        /// </summary>
+        private static void TestRendererQualityFfi()
+        {
+            string summaryLegacy = UI.RendererGetPbrSummary();
+            AssertTrue("RendererFFI", summaryLegacy.Length > 0,
+                "RendererGetPbrSummary 返回非空 (len=" + summaryLegacy.Length + ")");
+            AssertTrue("RendererFFI", summaryLegacy.IndexOf("quality=") >= 0,
+                "默认摘要包含 quality= (" + summaryLegacy + ")");
+            AssertTrue("RendererFFI", !UI.RendererPbrActive(),
+                "默认 legacy：PBR draw path 未激活");
+
+            int rcHigh = UI.RendererSetQualityPreset(2);
+            AssertTrue("RendererFFI", rcHigh == 0, "切换到 High 返回 0 (rc=" + rcHigh + ")");
+            string summaryHigh = UI.RendererGetPbrSummary();
+            AssertTrue("RendererFFI", summaryHigh.ToLower().IndexOf("quality=high") >= 0,
+                "High 摘要包含 quality=high (" + summaryHigh + ")");
+
+            int rcBad = UI.RendererSetQualityPreset(99);
+            AssertTrue("RendererFFI", rcBad == -2, "非法档位 99 返回 -2 (rc=" + rcBad + ")");
+
+            int rcLegacy = UI.RendererSetQualityPreset(3);
+            AssertTrue("RendererFFI", rcLegacy == 0, "切回 Legacy 返回 0 (rc=" + rcLegacy + ")");
+            string summaryBack = UI.RendererGetPbrSummary();
+            AssertTrue("RendererFFI", summaryBack.StartsWith("Legacy"),
+                "恢复 Legacy 默认 (" + summaryBack + ")");
+
+            // 工具栏按钮同一路径：EditorScript.ApplyQualityPreset（含按钮文本/状态栏/日志）
+            EditorScript.ApplyQualityPreset(0);
+            string summaryLow = UI.RendererGetPbrSummary();
+            AssertTrue("RendererFFI", summaryLow.ToLower().IndexOf("quality=low") >= 0,
+                "ApplyQualityPreset(Low) → quality=low (" + summaryLow + ")");
+            EditorScript.ApplyQualityPreset(3);
         }
 
         // 内存保存值结构（模拟SavedScriptPropertyValue，用于测试）
