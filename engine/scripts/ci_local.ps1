@@ -1,4 +1,4 @@
-# Local mirror of .github/workflows/ci.yml (no GUI/Vulkan required).
+﻿# Local mirror of .github/workflows/ci.yml (no GUI/Vulkan required).
 # Usage: powershell -ExecutionPolicy Bypass -File engine/scripts/ci_local.ps1
 param(
     [switch]$SkipBuild,
@@ -31,6 +31,8 @@ if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 cargo test -j 1 -p hezhou-gameplay --features physics
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 cargo test -j 1 -p hezhou-integration --no-default-features
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+cargo check -p hezhou-player --features window-host
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 Step "FFI contract"

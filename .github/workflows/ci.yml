@@ -234,6 +234,40 @@ jobs:
           name: hezhou-player-fixture-${{ matrix.os }}
           path: dist/player-fixture/**
 
+  player-window-host:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ env.RUST_VERSION }}
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: engine
+
+      - name: Install Linux window/Vulkan dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends             build-essential cmake ninja-build pkg-config             libvulkan-dev libglfw3-dev libx11-dev libxrandr-dev             libxi-dev libxcursor-dev libxinerama-dev libxkbcommon-dev             libxkbcommon-x11-dev libwayland-dev wayland-protocols libdecor-0-dev             libx11-xcb-dev libxcb1-dev
+
+      - name: Build Player window host
+        working-directory: engine
+        shell: pwsh
+        run: cargo build -p hezhou-player --features window-host
+
+      - name: Test Player host contracts
+        working-directory: engine
+        shell: pwsh
+        run: cargo test -p hezhou-player --features window-host
+
   publish-release:
     if: startsWith(github.ref, 'refs/tags/v')
     needs: [package-windows, package-linux]
