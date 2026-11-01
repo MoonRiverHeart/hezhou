@@ -17,13 +17,16 @@ use std::cell::UnsafeCell;
 use std::ffi::{c_char, c_void, CStr};
 use std::path::{Path, PathBuf};
 
+use hezhou_asset::cook::{COOK_MANIFEST_FILE, Cooker};
+use hezhou_asset::{AssetDatabase, AssetKind, LogicalPath};
 use hezhou_core::{
     Entity, Prefab, PrefabInstantiateOptions, PrefabOverrides, Project, Scene, SceneManager, Vec3,
 };
 use hezhou_dfx::*;
 use hezhou_player::{
-    CookManifest as PlayerCookManifest, ManifestAsset, PlayerBuildConfig, PlayerBuildInput,
-    PlayerBuilder, RuntimePayload, ScriptAssembly, TargetPlatform,
+    BuildSources, CookManifest as PlayerCookManifest, CookedAssets, ManifestAsset,
+    PlayerBuildConfig, PlayerBuildInput, PlayerBuilder, RuntimePayload, ScriptAssembly,
+    TargetPlatform,
 };
 use serde::Deserialize;
 
@@ -363,12 +366,23 @@ struct PlayerExportRequest {
     runtime_dir: String,
     #[serde(default)]
     required_font: Option<String>,
+    /// 真实构建：Player 可执行文件路径（空=自动查找编辑器同目录的 hezhou-player）。
+    #[serde(default)]
+    executable_path: String,
 }
 
-fn player_export_impl(request_json: &str) -> Result<String, String> {
-    let request: PlayerExportRequest =
-        serde_json::from_str(request_json).map_err(|error| format!("请求 JSON 解析失败: {error}"))?;
+/// 请求中的路径默认值解析（dry-run 与真实构建共用）。
+struct ResolvedExportPaths {
+    project_root: PathBuf,
+    output_dir: PathBuf,
+    product_name: String,
+    version: String,
+    start_scene: String,
+    scripts_dir: PathBuf,
+    runtime_dir: PathBuf,
+}
 
+fn resolve_export_paths(request: &PlayerExportRequest) -> Result<ResolvedExportPaths, String> {
     let cwd = std::env::current_dir().map_err(|error| format!("获取当前目录失败: {error}"))?;
     let project_root = if request.project_root.trim().is_empty() {
         cwd.clone()
@@ -405,6 +419,29 @@ fn player_export_impl(request_json: &str) -> Result<String, String> {
     } else {
         PathBuf::from(&request.runtime_dir)
     };
+    Ok(ResolvedExportPaths {
+        project_root,
+        output_dir,
+        product_name,
+        version,
+        start_scene,
+        scripts_dir,
+        runtime_dir,
+    })
+}
+
+fn player_export_impl(request_json: &str) -> Result<String, String> {
+    let request: PlayerExportRequest =
+        serde_json::from_str(request_json).map_err(|error| format!("请求 JSON 解析失败: {error}"))?;
+
+    let resolved = resolve_export_paths(&request)?;
+    let project_root = resolved.project_root;
+    let output_dir = resolved.output_dir;
+    let product_name = resolved.product_name;
+    let version = resolved.version;
+    let start_scene = resolved.start_scene;
+    let scripts_dir = resolved.scripts_dir;
+    let runtime_dir = resolved.runtime_dir;
 
     // 1) 资产清单：AssetDatabase 文件资产（相对 assets/ 路径）+ 启动场景/字体兜底条目。
     let rows = super::audio_asset_ffi::export_asset_rows();
@@ -526,6 +563,264 @@ fn player_export_impl(request_json: &str) -> Result<String, String> {
     Ok(summary)
 }
 
+// === Player 真实构建（Cooker + PlayerBuilder::build + validate） ===
+
+/// 解析真实构建使用的 Player 可执行文件。
+///
+/// 优先使用请求中的 `executable_path`；否则查找编辑器可执行文件同目录的
+/// `hezhou-player[.exe]`（`cargo build -p hezhou-player` 产物）。
+fn resolve_player_executable(request: &PlayerExportRequest) -> Result<PathBuf, String> {
+    if !request.executable_path.trim().is_empty() {
+        let path = PathBuf::from(request.executable_path.trim());
+        if !path.is_file() {
+            return Err(format!("指定的 Player 可执行文件不存在: {}", path.display()));
+        }
+        return Ok(path);
+    }
+
+    let exe_dir = std::env::current_exe()
+        .ok()
+        .and_then(|path| path.parent().map(Path::to_path_buf))
+        .unwrap_or_else(|| PathBuf::from("."));
+    let candidate = exe_dir.join(format!("hezhou-player{}", std::env::consts::EXE_SUFFIX));
+    if candidate.is_file() {
+        return Ok(candidate);
+    }
+    Err(format!(
+        "未找到 Player 可执行文件（{}）；请先 `cargo build -p hezhou-player`，或在请求 JSON 中提供 executable_path",
+        candidate.display()
+    ))
+}
+
+/// 真实构建入口：失败时清理 staging/半成品（`target_dir` 与 `cooked/`）。
+fn player_export_build_impl(request_json: &str) -> Result<String, String> {
+    let request: PlayerExportRequest =
+        serde_json::from_str(request_json).map_err(|error| format!("请求 JSON 解析失败: {error}"))?;
+    let parsed = resolve_export_paths(&request)?;
+    let target = TargetPlatform::host();
+    let target_dir = parsed.output_dir.join(target.as_str());
+    let cook_dir = parsed.output_dir.join("cooked");
+
+    let result = player_export_build_inner(request, parsed, target, target_dir.clone(), cook_dir.clone());
+    if result.is_err() {
+        let _ = std::fs::remove_dir_all(&target_dir);
+        let _ = std::fs::remove_dir_all(&cook_dir);
+    }
+    result
+}
+
+fn player_export_build_inner(
+    request: PlayerExportRequest,
+    parsed: ResolvedExportPaths,
+    target: TargetPlatform,
+    target_dir: PathBuf,
+    cook_dir: PathBuf,
+) -> Result<String, String> {
+    // 1) 工程资产数据库（独立实例，支持 fixture/非当前工程）。
+    let mut db = AssetDatabase::open(&parsed.project_root).map_err(|error| {
+        format!(
+            "打开资产数据库失败（{}）: {error}",
+            parsed.project_root.display()
+        )
+    })?;
+    let roots: Vec<hezhou_asset::AssetId> = db
+        .entries()
+        .filter(|entry| !entry.is_sub_asset())
+        .map(|entry| entry.id)
+        .collect();
+    if roots.is_empty() {
+        return Err(format!(
+            "工程 assets/ 为空（{}）",
+            parsed.project_root.join("assets").display()
+        ));
+    }
+
+    // 2) 启动场景：显式请求优先，否则取第一个 Scene 资产。
+    let start_scene = if !parsed.start_scene.trim().is_empty() {
+        parsed.start_scene.trim().to_string()
+    } else {
+        let scene_asset = db
+            .entries()
+            .find(|entry| entry.kind == AssetKind::Scene && !entry.is_sub_asset())
+            .ok_or_else(|| {
+                "工程缺少场景资产（.scene/.hzscene）；请在请求 JSON 指定 start_scene 或添加场景资产"
+                    .to_string()
+            })?;
+        scene_asset
+            .locator
+            .path()
+            .strip_prefix(db.assets_root())
+            .map(|path| path.as_str().to_string())
+            .ok_or_else(|| "场景资产不在 assets/ 根目录下".to_string())?
+    };
+    let start_locator = LogicalPath::new(format!("assets/{start_scene}"))
+        .map_err(|error| format!("启动场景路径非法（{start_scene}）: {error}"))?;
+    if db.id_of(&start_locator).is_none() {
+        return Err(format!(
+            "启动场景不在资产库: {}（先扫描工程或检查路径）",
+            start_locator.as_str()
+        ));
+    }
+
+    // 3) 字体：请求配置但资产不存在时关闭必检并告警（避免无字体工程无法构建）。
+    let mut required_font = request.required_font.clone();
+    if let Some(font) = required_font.clone() {
+        let font_locator = LogicalPath::new(format!("assets/{font}"))
+            .map_err(|error| format!("字体路径非法（{font}）: {error}"))?;
+        if db.id_of(&font_locator).is_none() {
+            dfx_warn!(
+                "Player",
+                "字体资产不存在，真实构建关闭字体必检: {}",
+                font_locator.as_str()
+            );
+            required_font = None;
+        }
+    }
+
+    // 4) Cooker：确定性 cook manifest + 产物（imported/ + assets/）。
+    if cook_dir.exists() {
+        std::fs::remove_dir_all(&cook_dir)
+            .map_err(|error| format!("清理旧 cook 目录失败（{}）: {error}", cook_dir.display()))?;
+    }
+    let cooker = Cooker::new(&db);
+    let manifest = cooker
+        .plan(&roots)
+        .map_err(|error| format!("cook 计划失败: {error}"))?;
+    if manifest.entries.is_empty() {
+        return Err("cook 计划为空（没有被引用资产）".to_string());
+    }
+    cooker
+        .cook_to_dir(&manifest, &cook_dir)
+        .map_err(|error| format!("cook 输出失败: {error}"))?;
+    let cooked = CookedAssets::load(&cook_dir.join(COOK_MANIFEST_FILE))
+        .map_err(|error| format!("读取 cook 清单失败: {error}"))?;
+    dfx_info!(
+        "Player",
+        "cook 完成: entries={} 输出={}",
+        manifest.entries.len(),
+        cook_dir.display()
+    );
+
+    // 5) 构建配置 + 脚本/运行时输入。
+    let mut config = PlayerBuildConfig::new(
+        parsed.product_name.clone(),
+        parsed.version.clone(),
+        start_scene.clone(),
+        target,
+    );
+    config = config.with_required_font(required_font.clone());
+    config
+        .validate()
+        .map_err(|errors| format!("Player 构建配置校验失败: {}", errors.summary()))?;
+
+    let scripts = match ScriptAssembly::from_dir(&parsed.scripts_dir) {
+        Ok(scripts) => scripts,
+        Err(error) => {
+            dfx_warn!(
+                "Player",
+                "脚本目录不可用（{}）: {}",
+                parsed.scripts_dir.display(),
+                error
+            );
+            Vec::new()
+        }
+    };
+    let runtime = if parsed.runtime_dir.is_dir() {
+        match RuntimePayload::from_dir(&parsed.runtime_dir) {
+            Ok(payload) => payload,
+            Err(error) => {
+                dfx_warn!(
+                    "Player",
+                    "运行时目录读取失败（{}）: {}",
+                    parsed.runtime_dir.display(),
+                    error
+                );
+                RuntimePayload::empty()
+            }
+        }
+    } else {
+        RuntimePayload::empty()
+    };
+    let script_count = scripts.len();
+
+    let mut input = PlayerBuildInput::new(config, PlayerCookManifest::default());
+    input.scripts = scripts;
+    input.runtime = runtime;
+    input.cooked = Some(cooked);
+
+    // 6) Player 可执行文件 + 真实构建（仅当前平台）。
+    let executable = resolve_player_executable(&request)?;
+    std::fs::create_dir_all(&parsed.output_dir).map_err(|error| {
+        format!(
+            "创建输出目录失败（{}）: {error}",
+            parsed.output_dir.display()
+        )
+    })?;
+    if target_dir.exists() {
+        std::fs::remove_dir_all(&target_dir)
+            .map_err(|error| format!("清理旧产物失败（{}）: {error}", target_dir.display()))?;
+    }
+    let sources = BuildSources::new(executable.clone(), parsed.project_root.join("assets"));
+    let output = PlayerBuilder::new(input)
+        .build(target, &sources, &target_dir)
+        .map_err(|error| format!("Player 真实构建失败: {error}"))?;
+    dfx_info!(
+        "Player",
+        "真实构建完成: {} 个文件，{} B -> {}",
+        output.files.len(),
+        output.total_bytes,
+        output.output_dir.display()
+    );
+
+    // 7) 用产物内可执行文件做 `--validate` 启动检查（含资产索引）。
+    let packaged_exe = output
+        .files
+        .iter()
+        .find(|file| file.executable)
+        .map(|file| target_dir.join(file.relative_path.replace('/', std::path::MAIN_SEPARATOR_STR)))
+        .ok_or_else(|| "构建产物中没有可执行文件".to_string())?;
+    let validate = std::process::Command::new(&packaged_exe)
+        .arg("--validate")
+        .arg("--player-root")
+        .arg(&target_dir)
+        .arg("--manifest")
+        .arg(&output.manifest_path)
+        .output()
+        .map_err(|error| format!("执行 Player --validate 失败（{}）: {error}", packaged_exe.display()))?;
+    let validate_stdout = String::from_utf8_lossy(&validate.stdout).to_string();
+    let validate_stderr = String::from_utf8_lossy(&validate.stderr).to_string();
+    if !validate.status.success() {
+        return Err(format!(
+            "Player 包 validate 失败（{}，exit={:?}）\nstdout:\n{}\nstderr:\n{}",
+            packaged_exe.display(),
+            validate.status.code(),
+            validate_stdout,
+            validate_stderr
+        ));
+    }
+
+    // 8) 摘要。
+    let mut summary = String::new();
+    summary.push_str(&output.report());
+    summary.push_str(&format!("  源工程  : {}\n", parsed.project_root.display()));
+    summary.push_str(&format!("  cook    : {}（{} 条 entries）\n", cook_dir.display(), manifest.entries.len()));
+    summary.push_str(&format!("  脚本    : {} 个程序集\n", script_count));
+    summary.push_str(&format!(
+        "  跨平台  : 仅构建当前平台 {}；其他平台需在对应平台构建\n",
+        target.as_str()
+    ));
+    summary.push_str(&format!(
+        "  validate: 通过（{} --validate）\n{}",
+        packaged_exe.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default(),
+        validate_stdout
+    ));
+    if !validate_stderr.trim().is_empty() {
+        summary.push_str(&format!("  validate stderr:\n{}\n", validate_stderr));
+    }
+    dfx_info!("Player", "Player 真实构建成功:\n{}", summary);
+    Ok(summary)
+}
+
 // === extern "C" FFI（注册到 FfiContext；见 scripting/src/ffi_context/prefab_scene_player.rs） ===
 
 #[unsafe(no_mangle)]
@@ -629,6 +924,28 @@ pub extern "C" fn player_export_dry_run(request_json: *const c_char) -> i32 {
         }
         Err(error) => {
             let text = format!("Player 导出失败: {error}");
+            dfx_error!("Player", "{}", text);
+            unsafe { LAST_EXPORT_SUMMARY = Some(text) };
+            -1
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn player_export_build(request_json: *const c_char) -> i32 {
+    let Some(request_json) = read_c_string(request_json) else {
+        let text = "Player 真实构建失败: 请求 JSON 为空".to_string();
+        dfx_error!("Player", "{}", text);
+        unsafe { LAST_EXPORT_SUMMARY = Some(text) };
+        return -1;
+    };
+    match player_export_build_impl(&request_json) {
+        Ok(summary) => {
+            unsafe { LAST_EXPORT_SUMMARY = Some(summary) };
+            0
+        }
+        Err(error) => {
+            let text = format!("Player 真实构建失败: {error}");
             dfx_error!("Player", "{}", text);
             unsafe { LAST_EXPORT_SUMMARY = Some(text) };
             -1

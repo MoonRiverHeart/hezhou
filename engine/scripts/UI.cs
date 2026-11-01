@@ -980,6 +980,8 @@ namespace Hezhou
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public delegate int PlayerExportDryRunDelegate(IntPtr requestJson);
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate int PlayerExportBuildDelegate(IntPtr requestJson);
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public delegate ulong PlayerExportSummaryDelegate(IntPtr buffer, ulong bufferSize);
 
 [StructLayout(LayoutKind.Sequential)]
@@ -1307,6 +1309,7 @@ namespace Hezhou
             public IntPtr scene_manager_current_name;
             public IntPtr scene_manager_names;
             public IntPtr player_export_dry_run;
+            public IntPtr player_export_build;
             public IntPtr player_export_summary;
         }
 
@@ -2052,7 +2055,24 @@ public static void RegisterResizeCallback(ResizeCallbackDelegate callback)
             }
         }
 
-        /// <summary>最近一次 Player dry-run 摘要。</summary>
+        /// <summary>真实构建当前平台 Player 包（0 成功，失败摘要见 PlayerExportSummary）。</summary>
+        public static int PlayerExportBuild(string requestJson)
+        {
+            if (_ffi.player_export_build == IntPtr.Zero) return -1;
+            IntPtr jsonPtr = Marshal.StringToHGlobalAnsi(requestJson ?? "");
+            try
+            {
+                var func = Marshal.GetDelegateForFunctionPointer<PlayerExportBuildDelegate>(
+                    _ffi.player_export_build);
+                return func(jsonPtr);
+            }
+            finally
+            {
+                Marshal.FreeHGlobal(jsonPtr);
+            }
+        }
+
+        /// <summary>最近一次 Player dry-run / 真实构建摘要。</summary>
         public static string PlayerExportSummary()
         {
             if (_ffi.player_export_summary == IntPtr.Zero) return "";

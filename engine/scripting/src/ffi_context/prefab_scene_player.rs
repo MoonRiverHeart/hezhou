@@ -55,5 +55,13 @@ pub type SceneManagerNamesFn = extern "C" fn(*mut c_char, usize) -> usize;
 /// 返回 0=成功；-1=JSON/配置/计划生成失败（失败摘要可通过 `player_export_summary` 读取）。
 pub type PlayerExportDryRunFn = extern "C" fn(*const c_char) -> i32;
 
+/// 真实构建当前平台 Player 包（Cooker + PlayerBuilder::build + `--validate`）。
+///
+/// FFI 契约: `player_export_build(request_json)` → i32
+/// 请求 JSON 与 dry-run 相同，额外支持 `executable_path`（空=自动查找编辑器同目录 hezhou-player）。
+/// 输出：`<output_dir>/cooked/` + `<output_dir>/<当前平台>/`（exe/assets/scripts/runtime/manifest）。
+/// 返回 0=成功（validate 通过）；-1=失败（摘要含原因，半成品已清理）。
+pub type PlayerExportBuildFn = extern "C" fn(*const c_char) -> i32;
+
 /// 最近一次 Player dry-run 摘要（多行文本），返回写入字节数。
 pub type PlayerExportSummaryFn = extern "C" fn(*mut c_char, usize) -> usize;

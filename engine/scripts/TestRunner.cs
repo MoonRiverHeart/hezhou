@@ -46,6 +46,9 @@ namespace Hezhou
             try { TestPrefabScenePlayerFfi(); }
             catch (Exception ex) { Log.Error("TestRunner", "TestPrefabScenePlayerFfi异常: " + ex.Message); }
 
+            try { TestPlayerBuildFfi(); }
+            catch (Exception ex) { Log.Error("TestRunner", "TestPlayerBuildFfi异常: " + ex.Message); }
+
             Log.Info("TestRunner", "===== 测试完成: PASS=" + _passCount + ", FAIL=" + _failCount + " =====");
         }
 
@@ -512,6 +515,94 @@ namespace Hezhou
             AssertTrue("PrefabScene", windowsPlan && linuxPlan,
                 "双平台 plan.json 已生成 (win=" + windowsPlan + ", linux=" + linuxPlan + ")");
             try { System.IO.Directory.Delete(outputDir, true); } catch (Exception) { }
+        }
+
+        /// <summary>
+        /// 0.2 Player 真实构建自检（task-25）：
+        /// 用 logs/ 下的最小 fixture 工程（scene+font+audio）跑 Cooker + PlayerBuilder::build，
+        /// 并通过产物内可执行文件的 `--validate`；需要 hezhou-player 可执行文件与编辑器同目录。
+        /// </summary>
+        private static void TestPlayerBuildFfi()
+        {
+            string exeDir = "";
+            try
+            {
+                exeDir = System.IO.Path.GetDirectoryName(
+                    System.Diagnostics.Process.GetCurrentProcess().MainModule.FileName);
+            }
+            catch (Exception) { }
+            if (string.IsNullOrEmpty(exeDir)) exeDir = ".";
+            bool playerExePresent = System.IO.File.Exists(System.IO.Path.Combine(exeDir, "hezhou-player.exe"))
+                || System.IO.File.Exists(System.IO.Path.Combine(exeDir, "hezhou-player"));
+            if (!playerExePresent)
+            {
+                AssertTrue("PlayerBuild", true,
+                    "未找到 hezhou-player 可执行文件，跳过真实构建自检（先 cargo build -p hezhou-player）");
+                return;
+            }
+
+            string cwd = System.IO.Directory.GetCurrentDirectory();
+            string fixture = System.IO.Path.Combine(cwd, "logs", "player_build_fixture");
+            string outputDir = System.IO.Path.Combine(cwd, "logs", "player_build_selftest");
+            try
+            {
+                System.IO.Directory.CreateDirectory(System.IO.Path.Combine(fixture, "assets", "scenes"));
+                System.IO.Directory.CreateDirectory(System.IO.Path.Combine(fixture, "assets", "fonts"));
+                System.IO.Directory.CreateDirectory(System.IO.Path.Combine(fixture, "assets", "audio"));
+                System.IO.Directory.CreateDirectory(System.IO.Path.Combine(fixture, "runtime"));
+                System.IO.File.WriteAllText(
+                    System.IO.Path.Combine(fixture, "runtime", "README.txt"),
+                    "self-test runtime marker");
+                System.IO.File.WriteAllText(
+                    System.IO.Path.Combine(fixture, "assets", "scenes", "main.scene"), "{}");
+                System.IO.File.WriteAllBytes(
+                    System.IO.Path.Combine(fixture, "assets", "fonts", "HarmonyOS_Sans_SC.ttf"),
+                    new byte[] { 0, 1, 2, 3 });
+                System.IO.File.WriteAllBytes(
+                    System.IO.Path.Combine(fixture, "assets", "audio", "test.wav"),
+                    new byte[] { 82, 73, 70, 70, 0, 0, 0, 0 });
+
+                string scriptsDir = System.IO.Path.Combine(cwd, "scripts", "bin", "Mono");
+                string json = "{"
+                    + "\"project_root\":\"" + fixture.Replace("\\", "\\\\") + "\","
+                    + "\"output_dir\":\"" + outputDir.Replace("\\", "\\\\") + "\","
+                    + "\"product_name\":\"HezhouBuildSelfTest\","
+                    + "\"version\":\"0.1.0\","
+                    + "\"start_scene\":\"scenes/main.scene\","
+                    + "\"scripts_dir\":\"" + scriptsDir.Replace("\\", "\\\\") + "\","
+                    + "\"runtime_dir\":\"" + System.IO.Path.Combine(fixture, "runtime").Replace("\\", "\\\\") + "\","
+                    + "\"required_font\":\"fonts/HarmonyOS_Sans_SC.ttf\","
+                    + "\"executable_path\":\"\""
+                    + "}";
+                int rc = UI.PlayerExportBuild(json);
+                string summary = UI.PlayerExportSummary();
+                AssertTrue("PlayerBuild", rc == 0,
+                    "PlayerExportBuild 返回 0 (rc=" + rc + ") summary=" + summary.Replace('\n', ' '));
+
+                bool manifestFound = false;
+                if (System.IO.Directory.Exists(outputDir))
+                {
+                    string[] targetDirs = System.IO.Directory.GetDirectories(outputDir);
+                    for (int i = 0; i < targetDirs.Length; i++)
+                    {
+                        if (System.IO.File.Exists(
+                            System.IO.Path.Combine(targetDirs[i], "manifest.json")))
+                        {
+                            manifestFound = true;
+                            break;
+                        }
+                    }
+                }
+                AssertTrue("PlayerBuild", manifestFound,
+                    "真实构建产物包含 manifest.json（" + outputDir + "）");
+                AssertTrue("PlayerBuild", summary.IndexOf("validate: 通过") >= 0,
+                    "构建摘要包含 validate 通过");
+            }
+            finally
+            {
+                try { if (System.IO.Directory.Exists(fixture)) System.IO.Directory.Delete(fixture, true); } catch (Exception) { }
+                try { if (System.IO.Directory.Exists(outputDir)) System.IO.Directory.Delete(outputDir, true); } catch (Exception) { }
+            }
         }
 
         // 内存保存值结构（模拟SavedScriptPropertyValue，用于测试）

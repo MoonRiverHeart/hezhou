@@ -16,10 +16,10 @@ RUST_CONTEXT = ROOT / "engine" / "scripting" / "src" / "ffi_context" / "mod.rs"
 CSHARP_CONTEXT = ROOT / "engine" / "scripts" / "UI.cs"
 EDITOR_CONTEXT = ROOT / "engine" / "examples" / "src" / "editor" / "mod.rs"
 
-# 当前 FfiContext 字段基线（0.2 task-21：301 + Prefab 2 + SceneManager 7 + Player 导出 2 = 312）。
+# 当前 FfiContext 字段基线（0.2 task-25：312 + Player 真实构建 1 = 313）。
 # 新增/删除 FFI 字段时必须同步更新此常量：强制字段变更被显式评审，
 # 避免只改了 Rust 或只改了 C# 导致运行时函数指针错位。
-EXPECTED_FIELD_COUNT = 312
+EXPECTED_FIELD_COUNT = 313
 
 
 def fields_between(text: str, start_pattern: str, field_pattern: str) -> list[str]:

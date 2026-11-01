@@ -468,6 +468,7 @@ fn main() {
         scene_manager_current_name: stub_scene_manager_current_name,
         scene_manager_names: stub_scene_manager_names,
         player_export_dry_run: stub_player_export_dry_run,
+        player_export_build: stub_player_export_build,
         player_export_summary: stub_player_export_summary,
     };
     hezhou_scripting::ffi_context::set_ffi_context(ffi_ctx);
@@ -694,6 +695,7 @@ extern "C" fn stub_scene_manager_count() -> i32 { 0 }
 extern "C" fn stub_scene_manager_current_name(_: *mut std::ffi::c_char, _: usize) -> usize { 0 }
 extern "C" fn stub_scene_manager_names(_: *mut std::ffi::c_char, _: usize) -> usize { 0 }
 extern "C" fn stub_player_export_dry_run(_: *const std::ffi::c_char) -> i32 { 0 }
+extern "C" fn stub_player_export_build(_: *const std::ffi::c_char) -> i32 { 0 }
 extern "C" fn stub_player_export_summary(_: *mut std::ffi::c_char, _: usize) -> usize { 0 }
 
 // 新增stub函数 — Feature 1脚本绑定

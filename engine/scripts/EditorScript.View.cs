@@ -323,6 +323,8 @@ namespace Hezhou
             UI.SetOnClick(prefabInstantiateButton, _prefabInstantiateCallback);
             ulong playerExportButton = UI.CreateButton(projectAssetTabContent, 180f, 26f, "导出 Player（DryRun）");
             UI.SetOnClick(playerExportButton, _playerExportCallback);
+            ulong playerBuildButton = UI.CreateButton(projectAssetTabContent, 180f, 26f, "导出 Player（Build）");
+            UI.SetOnClick(playerBuildButton, _playerBuildCallback);
             _sceneInfoLabelId = UI.CreateLabel(projectAssetTabContent, 720f, 24f, "场景: 未保存（槽 0）");
             _exportInfoLabelId = UI.CreateLabel(projectAssetTabContent, 720f, 24f, "Player 导出: 未执行");
             UI.CreateLabel(projectAssetTabContent, 720f, 22f, "Dry-run 输出到 logs/player_dry_run（双平台 manifest/plan/file-list）");

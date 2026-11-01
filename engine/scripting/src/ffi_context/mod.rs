@@ -347,6 +347,7 @@ pub project_add_entity: ProjectAddEntityFn,
         pub scene_manager_current_name: SceneManagerCurrentNameFn,
         pub scene_manager_names: SceneManagerNamesFn,
         pub player_export_dry_run: PlayerExportDryRunFn,
+        pub player_export_build: PlayerExportBuildFn,
         pub player_export_summary: PlayerExportSummaryFn,
     }
 

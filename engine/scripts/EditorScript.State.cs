@@ -216,6 +216,7 @@ namespace Hezhou
         private static UI.WidgetCallbackDelegate _prefabCaptureCallback;
         private static UI.WidgetCallbackDelegate _prefabInstantiateCallback;
         private static UI.WidgetCallbackDelegate _playerExportCallback;
+        private static UI.WidgetCallbackDelegate _playerBuildCallback;
         private static ulong _sceneInfoLabelId;
         private static ulong _exportInfoLabelId;
         private static ulong _sceneFileDialogId;

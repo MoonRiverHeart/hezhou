@@ -3,7 +3,7 @@
 本文档记录编辑器侧的 **Prefab 捕获/实例化**、**场景槽切换（SceneManager）**、
 **Player 导出 dry-run** 的 FFI 契约与 UI 用法。与 `FFI_RENDER_0_2.md`（task-15）、
 `FFI_AUDIO_ASSET_0_2.md`（task-16）配套：所有 FFI 以 **FfiContext tail 追加**，
-`engine/scripts/check_ffi_contract.py` 的 `EXPECTED_FIELD_COUNT = 312` 做字段数守卫。
+`engine/scripts/check_ffi_contract.py` 的 `EXPECTED_FIELD_COUNT = 313` 做字段数守卫。
 
 | 层 | 文件 |
 |---|---|
@@ -45,7 +45,7 @@
 - 切走前自动把当前编辑状态写回当前槽（`snapshot_to_json` 重新注册）；
 - 首次切换要求先「保存当前场景」（避免丢失未保存编辑），`-2` 时 UI 会提示。
 
-## 3. Player 导出 dry-run FFI（2）
+## 3. Player 导出 FFI（dry-run + 真实构建，3）
 
 | FFI | 签名 | 语义 |
 |---|---|---|
@@ -87,7 +87,54 @@ size/checksum/asset_id）→ `PlayerBuildInput`（脚本目录 + 运行时目录
 - 启动场景/字体在 AssetDatabase 中不存在时会生成"合成资产条目"进入计划（`synthetic_count`），
   便于在真实场景资产接入前验证整条链；C# 状态栏/Console 会展示警告码
   （`runtime_payload_empty` / `scripts_empty` / `linux_rpath_required` 等）。
-- **不做真实构建**：不复制 exe/assets/scripts/runtime；运行时 host 与真实构建在后续任务实现。
+- dry-run **不复制二进制**；真实构建见 §3.1（`player_export_build`）。
+
+### 3.1 真实构建 `player_export_build`（task-25，新增）
+
+| FFI | 签名 | 语义 |
+|---|---|---|
+| `player_export_build` | `fn(request_json) -> i32` | Cooker + `PlayerBuilder::build` 复制当前平台产物并跑 `--validate`；0 成功（validate 通过），-1 失败（摘要含原因，半成品已清理） |
+
+请求 JSON 与 dry-run 相同，额外字段：
+
+```json
+{ "executable_path": "<hezhou-player 可执行文件；空=自动查找编辑器同目录>" }
+```
+
+构建链（真实复制）：
+
+1. 以 `project_root` 独立打开 `AssetDatabase`（支持 fixture/非当前工程）并扫描；
+2. 启动场景：`start_scene` 显式优先，否则取第一个 `AssetKind::Scene` 资产（记录 locator `assets/<start_scene>`）；
+3. 字体：`required_font` 指定的资产不存在时自动关闭必检并告警（避免无字体工程无法构建）；
+4. `Cooker::plan` + `Cooker::cook_to_dir(<output>/cooked)` 生成 cook manifest/`imported/`/`assets/`；
+5. `CookedAssets::load` → `PlayerBuildInput::with_cooked`，脚本目录 `ScriptAssembly::from_dir`、运行时目录 `RuntimePayload::from_dir`（缺失则警告）；
+6. `PlayerBuilder::build(TargetPlatform::host(), BuildSources::new(exe, assets_root), <output>/<platform>)`：
+   staging → 预检 → 复制 → 校验 → 原子提交；
+7. 用**产物内**可执行文件执行 `--validate --player-root <pkg> --manifest <manifest>`，
+   失败则返回 -1 并清理 `target/` 与 `cooked/`；成功摘要包含 validate 输出。
+
+输出布局：
+
+```text
+<output_dir>/                     # 默认 <工程>/exports/player
+├── cooked/                       # Cooker 输出（cook_manifest.json + imported/ + assets/）
+└── windows/ 或 linux/            # 仅当前平台（TargetPlatform::host()）
+    ├── <executable>.exe / 无后缀
+    ├── manifest.json
+    ├── assets/（cook 产物 + cook_manifest.json）
+    ├── scripts/（预编译 C# DLL）
+    └── runtime/（存在时复制）
+```
+
+限制：
+
+- **只构建当前平台**：另一平台需在对应平台运行构建（`BuildError::CrossPlatformBuildUnsupported`），
+  摘要中会注明；
+- Player 可执行文件默认查找编辑器可执行文件同目录的 `hezhou-player[.exe]`（开发环境
+  `cargo build -p hezhou-player` 产物）；安装版可按请求 `executable_path` 指定；
+- 真实 C# 程序集/运行时需由工程提供（`scripts/bin/Mono`、`runtime/mono`）；缺失时只产生 warning，
+  包仍生成但运行依赖系统 Mono（见 `runtime_payload_empty` / `scripts_empty`）；
+- 真实构建同步执行（fixture 约 1~2 秒），构建期间编辑器 UI 不刷新；大工程可后续搬到后台线程。
 
 ## 4. 编辑器 UI 用法
 
@@ -102,14 +149,16 @@ size/checksum/asset_id）→ `PlayerBuildInput`（脚本目录 + 运行时目录
 | 捕获选中为 Prefab | 当前选中实体 → `assets/prefabs/prefab_<id>_<hhmmss>.prefab.json` | 「Prefab 已保存: …」 |
 | 实例化 Prefab | FileBrowser 选择 `.prefab.json` → 实例化到根/位置 (0,0,0) 并选中 | 「Prefab 实例化: root=…」 |
 | 导出 Player（DryRun） | 生成双平台计划到 `logs/player_dry_run` | 「Player dry-run 完成」 |
+| 导出 Player（Build） | 真实构建当前平台到 `exports/player/<platform>/`（Cooker + build + validate） | 「Player 真实构建 完成」/「失败（详见 Console）」 |
 
 - 场景槽状态标签：`场景: <当前槽>  槽=N`；导出摘要显示在「Player 导出: …」标签。
 - 所有失败只写 Console 日志 + 状态栏提示，不崩溃。
 
 ## 5. 启动自检（真实运行证据）
 
-`TestRunner.TestPrefabScenePlayerFfi()` 在 C# Initialize 阶段运行：
-Prefab 捕获→实例化→删除新增实体、SceneManager 保存/切换/卸载、Player 双平台 dry-run 计划生成。
+`TestRunner.TestPrefabScenePlayerFfi()` / `TestPlayerBuildFfi()` 在 C# Initialize 阶段运行：
+Prefab 捕获→实例化→删除新增实体、SceneManager 保存/切换/卸载、Player 双平台 dry-run 计划生成，
+以及 logs/ 下最小 fixture 工程的 **真实构建 + `--validate`**。
 
 2026-11-01 本机冒烟（debug 编辑器）：
 
@@ -120,22 +169,35 @@ Prefab 捕获→实例化→删除新增实体、SceneManager 保存/切换/卸�
 [SceneManager] 切换场景: __ffi_selftest_scene__ -> __ffi_selftest_scene__（实体数 1）
 [Player] Player 导出 dry-run 完成:
   资产: 28（合成条目 2）  [windows] 文件 30 ...  [linux] 文件 30 ...
-[TestRunner] ===== 测试完成: PASS=68, FAIL=0 =====
+[Player] 真实构建完成: 8 个文件，2005340 B -> ...\logs\player_build_selftest\windows
+[Player] Player 真实构建成功:
+  validate: 通过（hezhoubuildselftest.exe --validate）
+  hezhou-player 0.1.0 启动检查通过：HezhouBuildSelfTest v0.1.0（Windows，质量 high）；资产索引 3 条
+[TestRunner] ===== 测试完成: PASS=71, FAIL=0 =====
 ```
+
+真实构建自检 fixture（`logs/player_build_fixture/`，自检后清理）：
+`assets/scenes/main.scene` + `assets/fonts/HarmonyOS_Sans_SC.ttf` + `assets/audio/test.wav` + `runtime/README.txt`，
+经 `player_export_build` 生成 `logs/player_build_selftest/windows/` 并由产物内 exe 执行 `--validate` 通过。
+（fixture 场景内容是占位 JSON，validate 会回退内置测试场景但不影响启动检查；真实工程应放有效 Project JSON。）
 
 ## 6. 剩余 TODO
 
-1. **Player 真实构建**：复制 exe/assets/scripts/runtime，生成可启动产物；`hezhou-player`
-   `build()` 已存在，但编辑器侧需要构建配置面板（目标平台/质量档/启动场景选择）与进度反馈。
-2. **Player runtime host 集成**：编辑器“运行 Player”/导出后冒烟（当前 dry-run 不启动 host）。
+1. **Player 真实构建的平台/CI 固化**：在 Windows/Linux CI 各自构建 `hezhou-player` 产物并跑
+   `player_export_build` + `--validate`；编辑器侧可加构建配置面板（目标平台/质量档/启动场景选择）。
+2. **Player runtime host 集成**：导出后“运行 Player”冒烟（当前 validate 只做启动检查，不进游戏循环）。
 3. **Prefab 嵌套/覆盖 UI**：`PrefabRegistry` 已由 core 提供，编辑器需要注册表加载嵌套 Prefab
    与 override（位置/名称/可见性）编辑面板。
 4. **场景槽下拉/快捷键**：当前为循环切换按钮，后续用 Dropdown（UI.ComplexWidgets）与
    Ctrl+Shift+S 等快捷键；场景槽持久化（当前仅运行时内存）。
 5. **Prefab 资产入库**：捕获的 Prefab JSON 目前写到 `assets/prefabs/`，尚未自动注册到
    AssetDatabase（可调用 `asset_scan` 后作为普通 JSON 资产）。
+6. **真实构建后台化**：大工程同步构建会阻塞 UI；可把 `player_export_build` 放到后台线程 + 进度轮询
+   （FFI 只发起/查询，参考 FFI_AUDIO_ASSET_0_2.md 的 build 接入点）。
 
 新增 FFI 时必须沿用 tail 追加顺序、同步 C# delegate/IntPtr、更新
 `check_ffi_contract.py` 的 `EXPECTED_FIELD_COUNT`，并跑
 `cargo test -p hezhou-core`、`check_ffi_contract.py`、`build_mono.ps1`、
 `ci_local.ps1 -SkipBuild` 与编辑器启动冒烟。
+
+

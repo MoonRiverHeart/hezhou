@@ -61,6 +61,7 @@ namespace Hezhou
             _prefabCaptureCallback = OnPrefabCaptureClick;
             _prefabInstantiateCallback = OnPrefabInstantiateClick;
             _playerExportCallback = OnPlayerExportClick;
+            _playerBuildCallback = OnPlayerBuildClick;
             _sceneFileDialogResultCallback = OnSceneFileDialogResult;
             _rightMaxClickCallback = OnRightMaxClick;
             _consoleDialogResultCallback = OnConsoleDialogResult;
@@ -913,31 +914,53 @@ _bindScriptClickCallback = OnBindScriptClick;
         /// <summary>导出 Player dry-run（双平台计划 + manifest，不复制二进制）。</summary>
         private static void OnPlayerExportClick(ulong widgetId)
         {
+            RunPlayerExport(false);
+        }
+
+        /// <summary>真实构建当前平台 Player 包（Cooker + PlayerBuilder::build + validate）。</summary>
+        private static void OnPlayerBuildClick(ulong widgetId)
+        {
+            RunPlayerExport(true);
+        }
+
+        private static void RunPlayerExport(bool realBuild)
+        {
             string root = System.IO.Directory.GetCurrentDirectory();
-            string output = System.IO.Path.Combine(root, "logs", "player_dry_run");
-            string product = Project.IsLoaded() ? Project.GetName() : "HezhouGame";
-            string json = "{"
-                + "\"project_root\":\"" + EscapeJsonPath(root) + "\","
-                + "\"output_dir\":\"" + EscapeJsonPath(output) + "\","
-                + "\"product_name\":\"" + EscapeJsonPath(product) + "\","
-                + "\"version\":\"0.1.0\","
-                + "\"start_scene\":\"scenes/main.scene.json\","
-                + "\"scripts_dir\":\"" + EscapeJsonPath(System.IO.Path.Combine(root, "scripts")) + "\","
-                + "\"runtime_dir\":\"" + EscapeJsonPath(System.IO.Path.Combine(root, "runtime", "mono")) + "\","
-                + "\"required_font\":\"fonts/HarmonyOS_Sans_SC.ttf\""
-                + "}";
-            int rc = UI.PlayerExportDryRun(json);
+            string outputDir = realBuild
+                ? System.IO.Path.Combine(root, "exports", "player")
+                : System.IO.Path.Combine(root, "logs", "player_dry_run");
+            string json = BuildPlayerExportRequestJson(outputDir);
+            int rc = realBuild ? UI.PlayerExportBuild(json) : UI.PlayerExportDryRun(json);
             _lastPlayerExportSummary = UI.PlayerExportSummary();
+            string action = realBuild ? "Player 真实构建" : "Player dry-run";
             if (rc == 0)
             {
-                Log.Info("Player", "Player 导出 dry-run 完成:\n" + _lastPlayerExportSummary);
-                if (_statusItem != null) _statusItem.Text = "Player dry-run 完成";
+                Log.Info("Player", action + " 完成:\n" + _lastPlayerExportSummary);
+                if (_statusItem != null) _statusItem.Text = action + " 完成";
             }
             else
             {
-                Log.Warn("Player", "Player 导出 dry-run 失败: " + _lastPlayerExportSummary);
-                if (_statusItem != null) _statusItem.Text = "Player dry-run 失败";
+                Log.Warn("Player", action + " 失败: " + _lastPlayerExportSummary);
+                if (_statusItem != null) _statusItem.Text = action + " 失败（详见 Console）";
             }
+        }
+
+        /// <summary>构造 Player 导出请求 JSON（dry-run 与真实构建共用）。</summary>
+        private static string BuildPlayerExportRequestJson(string outputDir)
+        {
+            string root = System.IO.Directory.GetCurrentDirectory();
+            string product = Project.IsLoaded() ? Project.GetName() : "HezhouGame";
+            return "{"
+                + "\"project_root\":\"" + EscapeJsonPath(root) + "\","
+                + "\"output_dir\":\"" + EscapeJsonPath(outputDir) + "\","
+                + "\"product_name\":\"" + EscapeJsonPath(product) + "\","
+                + "\"version\":\"0.1.0\","
+                + "\"start_scene\":\"\","
+                + "\"scripts_dir\":\"" + EscapeJsonPath(System.IO.Path.Combine(root, "scripts", "bin", "Mono")) + "\","
+                + "\"runtime_dir\":\"" + EscapeJsonPath(System.IO.Path.Combine(root, "runtime", "mono")) + "\","
+                + "\"required_font\":\"fonts/HarmonyOS_Sans_SC.ttf\","
+                + "\"executable_path\":\"\""
+                + "}";
         }
 
         private static string EscapeJsonPath(string value)

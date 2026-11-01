@@ -460,6 +460,7 @@ ui_tree_view_set_on_select_thunk_ptr: unsafe { std::mem::transmute(ui_ffi::ui_tr
         scene_manager_current_name: prefab_scene_player_ffi::scene_manager_current_name,
         scene_manager_names: prefab_scene_player_ffi::scene_manager_names,
         player_export_dry_run: prefab_scene_player_ffi::player_export_dry_run,
+        player_export_build: prefab_scene_player_ffi::player_export_build,
         player_export_summary: prefab_scene_player_ffi::player_export_summary,
         on_hot_reload_complete: ffi_impl::on_hot_reload_complete_placeholder,
         register_hot_reload_complete_callback: unsafe { std::mem::transmute(hot_reload::register_hot_reload_complete_callback as *const std::ffi::c_void) },
