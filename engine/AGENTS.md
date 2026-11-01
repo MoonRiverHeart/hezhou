@@ -19,7 +19,7 @@ engine/
 ├── ⚡ rhi-vulkan/     # Vulkan renderer impl (see rhi-vulkan/src/AGENTS.md)
 ├── 🎥 render/         # RenderEngine + Camera/Mesh/Texture (see render/src/AGENTS.md)
 ├── 📜 scripting/      # Mono JIT executor, FfiContext (see scripting/src/AGENTS.md)
-│   └── 🏗️ ffi_context/ # 283-field FfiContext struct (see scripting/src/ffi_context/AGENTS.md)
+│   └── 🏗️ ffi_context/ # 301-field FfiContext struct (see scripting/src/ffi_context/AGENTS.md)
 ├── 🤖 mcp/            # MCP server — LLM集成层 (see mcp/src/AGENTS.md)
 │   └── 🔮 bridge.rs   # EngineBridge trait + 8返回结构体 + [Both]/[RustOnly]/[FfiOnly]标注
 │   └── 🖥️ server.rs   # 18 #[tool]方法 + #[tool_router(server_handler)]自动生成ServerHandler
@@ -267,7 +267,7 @@ glslc shaders/rotation.frag -o shaders/rotation.frag.spv
 ### 14. 分层测试 / DFX / 编辑器 P0 (2026-10-18)
 **新增测试**:
 - UT: `core/tests/{scene_properties,scene_hierarchy_cycles,project_fuzz_smoke}.rs`、`ui/tests/widget_tree_hit_test.rs`
-- 接口: `core/tests/{ffi_contract,project_ffi_contract}.rs` + `scripts/check_ffi_contract.py`（283 个 FfiContext 字段三方一致）
+- 接口: `core/tests/{ffi_contract,project_ffi_contract}.rs` + `scripts/check_ffi_contract.py`（301 个 FfiContext 字段三方一致）
 - FUZZ: `engine/fuzz/` cargo-fuzz target + 3000 组畸形 JSON 确定性 smoke
 - E2E: `scripts/run_autotest.ps1`、`UITestRunner.Report.cs`、`TestTelemetry.cs`
   - random/sequential/stress/intent 模式

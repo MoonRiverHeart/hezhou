@@ -12,11 +12,22 @@
 ## 0. 当前执行进度（2026-11-01）
 
 - ✅ 决策冻结：3D 动作引擎能力、骨骼动画进 0.2、自研物理、Windows/Linux Player、AI 并行。
-- ✅ 能力模块第一轮完成：`audio`、`asset`、`physics`、`gameplay`、`animation`、`render-pipeline/rhi-vulkan`、`player`、`integration`。
-- ✅ 编辑器已接入渲染质量/PBR FFI（工具栏画质切换、状态栏摘要、启动自检 44 项通过）。
-- ✅ 本地 CI 通过：默认测试 + 可选 feature 测试 + FFI 契约 + C# 编译 + 图标一致性。
-- ⏳ 未完成：PBR 模式天空盒/outline/gizmo、蒙皮进 draw 循环、编辑器音频/资产/构建面板、Prefab/场景工作流、Player 真正启动游戏、能力演示工程、Player CI/发布附件、测试与文档收尾。
-- 当前提交：见仓库 `git log`；0.2 仍处于进行中，不满足发布 Definition of Done。
+- ✅ 能力模块完整第一轮：audio、asset、physics、gameplay、animation、render-pipeline/rhi-vulkan、player、integration。
+- ✅ 编辑器已接入：渲染质量/PBR 切换、音频播放、资产扫描/glTF 导入；启动自检 **PASS=57, FAIL=0**；FFI 契约 **301/301/301**。
+- ✅ 渲染：PBR + CSM 阴影 + Bloom/Tonemap、PBR 模式天空盒/outline/Gizmo、合成蒙皮 draw、质量档/resize；GPU 冒烟通过。
+- ✅ 能力演示工程：headless `capability_demo` 14 项能力全 pass，输出 report.json。
+- ✅ Player：真实构建、cook manifest 接入、包内资产索引、`--validate`/`--run`/`--host` 与 Host 契约。
+- ✅ Core：Prefab（一层嵌套/覆盖/循环检测）与 SceneManager。
+- ✅ 本地 CI `ci_local.ps1 -Offline` 通过（默认测试 + feature 测试 + FFI 契约 + C# 编译 + 图标一致性）。
+- ⏳ 未完成（0.2 验收尚未达成）：
+  1. Player 真正 game host（窗口/Vulkan/Mono/C# Initialize/帧循环/AssetId 加载）；
+  2. Editor 构建/导出面板与 Prefab 编辑 FFI/UI；
+  3. per-entity PBR 材质/纹理 + Inspector；
+  4. 真实角色蒙皮 mesh 数据源（当前为合成 mesh 验证 pipeline）；
+  5. C# 对 gameplay/animation/asset/audio 的完整 API 绑定；
+  6. Player 发布附件、真实 cooker 端到端、双平台 release 验证；
+  7. 文档/测试收尾与 0.2 Release。
+- 0.2 仍处于进行中，不满足发布 Definition of Done。
 
 ## 1. 执行摘要
 
