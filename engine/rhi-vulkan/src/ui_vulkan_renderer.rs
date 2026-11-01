@@ -1,4 +1,4 @@
-﻿use ash::vk::{self, Handle};
+use ash::vk::{self, Handle};
 use ash::khr::surface::Instance as SurfaceLoader;
 use ash::khr::swapchain::Device as SwapchainLoader;
 use glfw::{Glfw, PWindow, GlfwReceiver, WindowEvent, WindowMode, Action, Key};
@@ -14,6 +14,10 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use hezhou_core::asset_library::MeshType;
 use crate::primitive_meshes::{self, MeshRange};
+use crate::pbr_forward::{
+    camera_projection_matrix, camera_view_matrix, MeshDraw, PbrForwardPass, SkinnedPipelineState,
+    LEGACY_FAR, LEGACY_FOV_DEGREES, LEGACY_NEAR,
+};
 
 
 fn push_ui_triangle(v: &mut Vec<f32>, x1: f32, y1: f32, x2: f32, y2: f32, x3: f32, y3: f32, r: f32, g: f32, b: f32, a: f32) {
@@ -227,6 +231,20 @@ pub struct UIVulkanRenderer {
     sky_enabled: bool,
     sky_top: [f32; 3],
     sky_bottom: [f32; 3],
+    
+    // 0.2 渲染设置（PBR / Shadow Map / Tonemap / Bloom / 质量档）
+    // 默认值 = legacy Blinn-Phong 路径（不改变 0.1 视觉），编辑器通过
+    // set_render_quality_preset / set_render_settings 选择质量档
+    render_settings: hezhou_render_pipeline::RenderSettings,
+
+    // 0.2 PBR/Shadow/Post 实际绘制通道（仅 PBR 质量档创建；默认 None 走 legacy）
+    pbr_forward: Option<crate::pbr_forward::PbrForwardPass>,
+    pbr_skinned: Option<crate::pbr_forward::SkinnedPipelineState>,
+    // 延迟到 cleanup 销毁的旧 PBR 通道（运行期销毁 Vulkan 资源会触发驱动 HEAP_CORRUPTION）
+    retired_pbr: Vec<(
+        crate::pbr_forward::PbrForwardPass,
+        Option<crate::pbr_forward::SkinnedPipelineState>,
+    )>,
     
     // 截图源图像 — 记录当前帧实际渲染结果的image和extent
     // rasterization模式: offscreen_image(经FXAA后)
@@ -1781,6 +1799,11 @@ p_multisample_state: &vk::PipelineMultisampleStateCreateInfo {
                 sky_enabled: true,
                 sky_top: [0.16, 0.32, 0.62],
                 sky_bottom: [0.72, 0.82, 0.92],
+                // 默认 legacy 兼容（Blinn-Phong + FXAA），质量档由编辑器显式切换
+                render_settings: hezhou_render_pipeline::RenderSettings::default(),
+                pbr_forward: None,
+                pbr_skinned: None,
+                retired_pbr: Vec::new(),
                 // 截图源初始为offscreen_image（初始化时尚未渲染，后续draw_frame会更新）
                 screenshot_source_image: offscreen_image,
                 screenshot_source_extent: offscreen_extent,
@@ -1808,6 +1831,349 @@ p_multisample_state: &vk::PipelineMultisampleStateCreateInfo {
     pub fn set_gizmo_3d(&mut self, visible: bool, x: f32, y: f32, z: f32) {
         self.gizmo_visible = visible;
         self.gizmo_position = [x, y, z];
+    }
+
+    // === 0.2 渲染设置（PBR / Shadow Map / Tonemap / Bloom / 质量档） ===
+
+    /// 当前渲染设置
+    pub fn render_settings(&self) -> &hezhou_render_pipeline::RenderSettings {
+        &self.render_settings
+    }
+
+    /// 覆盖渲染设置（自动 validate 收敛非法值）
+    ///
+    /// 编辑器接入点：材质/光照面板可修改 `tonemap.exposure`、`bloom.intensity`、
+    /// `shadows.*` 后调用本方法；默认值保持 legacy 行为。
+    pub fn set_render_settings(&mut self, settings: hezhou_render_pipeline::RenderSettings) {
+        self.render_settings = settings.validate();
+    }
+
+    /// 切换质量档（低/中/高）
+    ///
+    /// 同时同步着色模型（PBR/Blinn-Phong）、阴影/Bloom/Tonemap 开关、阴影级联数与分辨率。
+    /// 编辑器接入点建议：C# 新增 `renderer_set_quality_preset(int)` FFI，
+    /// 参数取值见 `RenderQualityPreset::as_u32`（0=Low,1=Medium,2=High,3=Custom）。
+    pub fn set_render_quality_preset(
+        &mut self,
+        preset: hezhou_render_pipeline::RenderQualityPreset,
+    ) {
+        self.render_settings.set_quality_preset(preset);
+        self.render_settings = self.render_settings.validated();
+    }
+
+    /// 按整数切换质量档（FFI 便捷入口，非法值回退中配）
+    pub fn set_render_quality_preset_u32(&mut self, preset: u32) {
+        self.set_render_quality_preset(hezhou_render_pipeline::RenderQualityPreset::from_u32(preset));
+    }
+
+    /// 当前质量档摘要（状态栏/日志）
+    pub fn render_quality_summary(&self) -> String {
+        crate::render_quality::quality_summary(&self.render_settings)
+    }
+
+    /// 当前帧渲染计划（pass 顺序 + 阴影/Bloom 资源配置）
+    ///
+    /// 供渲染后端/调试面板查询；GPU 资源创建由调用方在 resize/质量档切换时执行。
+    pub fn render_plan(&self) -> crate::render_quality::RenderPlan {
+        crate::render_quality::build_render_plan(
+            hezhou_render_pipeline::ViewportExtent::new(
+                self.offscreen_extent.width,
+                self.offscreen_extent.height,
+            ),
+            &self.render_settings,
+        )
+    }
+
+    // === 0.2 PBR/Shadow/Post 实际绘制通道状态与接入 API ===
+
+    /// PBR 实际绘制通道是否已创建（仅 PBR 质量档且未启用 PipelineRegistry 时）
+    pub fn pbr_forward_active(&self) -> bool {
+        self.pbr_forward.is_some()
+    }
+
+    /// PBR draw path 摘要（状态栏/日志/测试证据）
+    pub fn pbr_draw_path_summary(&self) -> Option<String> {
+        let pass = self.pbr_forward.as_ref()?;
+        Some(format!(
+            "PBR active: {} (shadow={}, bloom={}, tonemap={}, hdr={}x{}, skinned_pipeline={})",
+            self.render_quality_summary(),
+            pass.shadow_active(),
+            pass.bloom_active(),
+            pass.settings().effective_tonemap(),
+            pass.extent.width,
+            pass.extent.height,
+            self.pbr_skinned.is_some()
+        ))
+    }
+
+    /// 上传蒙皮 joint palette（`JointPalette::to_le_bytes()` 输出）
+    ///
+    /// 编辑器/玩法接入点：每帧 `AnimationStateMachine::sample` → `JointPalette::from_pose`
+    /// → `to_le_bytes()` → 本方法上传（需要 PBR 质量档已创建蒙皮 pipeline）。
+    pub fn upload_skin_palette(&self, bytes: &[u8]) -> Result<usize, String> {
+        match &self.pbr_skinned {
+            Some(skinned) => unsafe { skinned.upload_joint_palette(bytes) },
+            None => Err("蒙皮 pipeline 未启用（需要 PBR 质量档）".to_string()),
+        }
+    }
+
+    /// PBR draw path 是否应激活：PBR 着色 + 未启用 PipelineRegistry（legacy 仲裁）
+    fn pbr_path_active(&self) -> bool {
+        self.pipeline_registry.is_none()
+            && self.render_settings.shading == hezhou_render_pipeline::ShadingModel::Pbr
+    }
+
+    /// 按当前设置创建/重建 PBR/Shadow/Post 通道与蒙皮 pipeline
+    fn ensure_pbr_forward(&mut self) -> Result<(), String> {
+        if !self.pbr_path_active() {
+            self.retire_pbr_forward();
+            return Ok(());
+        }
+        let needs_recreate = match &self.pbr_forward {
+            Some(pass) => {
+                pass.settings() != &self.render_settings
+                    || pass.extent.width != self.offscreen_extent.width
+                    || pass.extent.height != self.offscreen_extent.height
+            }
+            None => true,
+        };
+        if !needs_recreate {
+            return Ok(());
+        }
+        self.retire_pbr_forward();
+
+        let extent = hezhou_render_pipeline::ViewportExtent::new(
+            self.offscreen_extent.width,
+            self.offscreen_extent.height,
+        );
+        let pass = unsafe {
+            crate::pbr_forward::PbrForwardPass::create(
+                &self.instance,
+                &self.device,
+                self.physical_device,
+                self.command_pool,
+                self.queue,
+                extent,
+                self.depth_image_view,
+                self.offscreen_image_view,
+                self.offscreen_format,
+                &self.render_settings,
+            )?
+        };
+        let skinned = match unsafe {
+            crate::pbr_forward::SkinnedPipelineState::create(
+                &self.instance,
+                &self.device,
+                self.physical_device,
+                self.command_pool,
+                self.queue,
+                pass.hdr_render_pass(),
+                extent,
+            )
+        } {
+            Ok(skinned) => skinned,
+            Err(err) => {
+                // 创建失败的 pass 立即销毁（纹理上传 path 已 queue_wait_idle，GPU 空闲）
+                unsafe { pass.destroy() };
+                return Err(err);
+            }
+        };
+        let summary = self.render_quality_summary();
+        self.dfx.lock().get_logger().lock().log(
+            LogLevel::Info,
+            "Vulkan",
+            &format!(
+                "PBR draw path enabled: {summary}; shadow={} bloom={} (HDR→Tonemap→FXAA→UI), skinned pipeline ready",
+                pass.shadow_active(),
+                pass.bloom_active()
+            ),
+            file!(),
+            line!(),
+        );
+        self.pbr_forward = Some(pass);
+        self.pbr_skinned = Some(skinned);
+        Ok(())
+    }
+
+    /// 把当前 PBR 通道移入延迟销毁列表（cleanup 时统一销毁）
+    fn retire_pbr_forward(&mut self) {
+        if let Some(pass) = self.pbr_forward.take() {
+            let skinned = self.pbr_skinned.take();
+            self.retired_pbr.push((pass, skinned));
+        }
+    }
+
+    /// 录制 PBR 实际 draw path：Shadow → Game(PBR/HDR) → Bloom → Tonemap
+    ///
+    /// 之后由 draw_frame 既有代码继续 FXAA → UI，保证 FXAA/UI 链路不变。
+    fn record_pbr_scene(
+        &self,
+        pass: &crate::pbr_forward::PbrForwardPass,
+        cmd: vk::CommandBuffer,
+    ) -> Result<(), String> {
+        let settings = &self.render_settings;
+        let extent = self.offscreen_extent;
+        let aspect = if extent.height > 0 {
+            extent.width as f32 / extent.height as f32
+        } else {
+            1.0
+        };
+
+        // 1. 方向光（与 legacy 路径相同的 Scene 遍历语义）
+        let mut light = hezhou_render_pipeline::PbrLight::default();
+        if let Some(scene_ptr) = self.scene_ptr {
+            unsafe {
+                let scene = &*scene_ptr;
+                for entity in &scene.root_entities {
+                    if let Some(light_comp) = scene
+                        .world
+                        .get_component::<hezhou_core::DirectionalLightComponent>(*entity)
+                    {
+                        light.direction = [
+                            light_comp.direction.x,
+                            light_comp.direction.y,
+                            light_comp.direction.z,
+                        ];
+                        light.color =
+                            [light_comp.color.x, light_comp.color.y, light_comp.color.z];
+                        light.intensity = light_comp.intensity;
+                        break;
+                    }
+                }
+            }
+        }
+
+        // 2. 相机参数（与 legacy rotation.vert 固定参数一致，保证取景不变）
+        let camera = hezhou_render_pipeline::CameraParams {
+            position: [self.camera_x, self.camera_y, self.camera_z],
+            yaw: self.camera_yaw,
+            pitch: self.camera_pitch,
+            fov: LEGACY_FOV_DEGREES.to_radians(),
+            near: LEGACY_NEAR,
+            far: LEGACY_FAR,
+        };
+
+        // 3. 本帧 cascade 阴影数据
+        let shadow = if settings.effective_shadows() {
+            match settings.shadow_config() {
+                Some(config) => match hezhou_render_pipeline::ShadowFrameData::from_camera(
+                    &camera,
+                    aspect,
+                    light.direction,
+                    config,
+                ) {
+                    Ok(frame) => Some(frame),
+                    Err(err) => {
+                        self.dfx.lock().get_logger().lock().log(
+                            LogLevel::Warn,
+                            "Vulkan",
+                            &format!("PBR 阴影计算失败，本帧退回无阴影: {err}"),
+                            file!(),
+                            line!(),
+                        );
+                        None
+                    }
+                },
+                None => None,
+            }
+        } else {
+            None
+        };
+
+        let view = camera_view_matrix(camera.position, camera.yaw, camera.pitch);
+        let proj = camera_projection_matrix(
+            LEGACY_FOV_DEGREES,
+            aspect,
+            LEGACY_NEAR,
+            LEGACY_FAR,
+        );
+        unsafe {
+            pass.update_frame_ubo(&light, view, proj, camera.position, shadow.as_ref())?;
+        }
+
+        // 4. 构建 draw list（primitive + 自定义 mesh，数据源与 legacy 一致）
+        let mut draws: Vec<MeshDraw> = Vec::new();
+        if let Some(scene_ptr) = self.scene_ptr {
+            unsafe {
+                let scene = &*scene_ptr;
+                for entity in &scene.root_entities {
+                    let renderable_opt = scene
+                        .world
+                        .get_component::<hezhou_core::RenderableComponent>(*entity);
+                    let Some(renderable) = renderable_opt else {
+                        continue;
+                    };
+                    if !renderable.visible {
+                        continue;
+                    }
+                    let transform_opt =
+                        scene.world.get_component::<hezhou_core::LocalTransform>(*entity);
+                    let Some(transform) = transform_opt else {
+                        continue;
+                    };
+                    let model = Self::compute_model_matrix(&transform);
+                    if crate::mesh_loader::is_custom_mesh(&renderable.mesh_path) {
+                        if let Some(info) = self.custom_meshes.get(&renderable.mesh_path) {
+                            draws.push(MeshDraw::indexed(
+                                info.vertex_offset,
+                                info.vertex_count,
+                                info.index_offset,
+                                info.index_count,
+                                model,
+                            ));
+                        }
+                    } else {
+                        let mesh_type =
+                            primitive_meshes::mesh_type_from_path(&renderable.mesh_path);
+                        if let Some(range) = self.primitive_ranges.get(&mesh_type) {
+                            draws.push(MeshDraw::primitive(
+                                range.vertex_offset,
+                                range.vertex_count,
+                                model,
+                            ));
+                        }
+                    }
+                }
+            }
+        }
+
+        // 5. 录制 Shadow → Game(PBR) → Bloom → Tonemap
+        unsafe {
+            if let Some(shadow) = &shadow {
+                pass.record_shadow(
+                    cmd,
+                    shadow,
+                    self.game_mesh_buffer,
+                    self.game_index_buffer,
+                    &draws,
+                );
+            }
+            pass.record_scene(
+                cmd,
+                self.game_mesh_buffer,
+                self.game_index_buffer,
+                &draws,
+                &settings.default_material,
+            );
+            pass.record_post(cmd);
+        }
+
+        // 6. Trace 日志：实际 draw path 证据（draw 数/开关）
+        self.dfx.lock().get_logger().lock().log(
+            LogLevel::Trace,
+            "Vulkan",
+            &format!(
+                "PBR draw path: {} draws={} shadow={} bloom={} tonemap={}",
+                settings.quality_label(),
+                draws.len(),
+                pass.shadow_active(),
+                pass.bloom_active(),
+                settings.effective_tonemap()
+            ),
+            file!(),
+            line!(),
+        );
+        Ok(())
     }
 
     fn build_gizmo_vertices() -> Vec<f32> {
@@ -2061,6 +2427,7 @@ p_multisample_state: &vk::PipelineMultisampleStateCreateInfo {
             sky_enabled: self.sky_enabled,
             sky_top: self.sky_top,
             sky_bottom: self.sky_bottom,
+            render_settings: self.render_settings.clone(),
         };
         
 // 5. 在switch_pipeline前，从active_resources取出renderer自有资源
@@ -3143,6 +3510,14 @@ self.device.wait_for_fences(&[self.in_flight_fences[self.current_frame]], true, 
             // === Game Rendering: 双路径（pipeline / legacy）===
             // 实体角度更新和offscreen布局转换在条件分支外部（两条路径都需要）
             
+            // === 0.2: PBR/Shadow/Post 实际绘制通道（默认 legacy 设置不会激活） ===
+            // 质量档切换/设置变化时重建；未启用时保持 legacy 路径零回归
+            if self.pbr_path_active() {
+                self.ensure_pbr_forward()?;
+            } else {
+                self.retire_pbr_forward();
+            }
+
             if let Some(ref mut registry) = self.pipeline_registry {
                 // 仅在dynamic data变更时重建管线同步HashMap（dirty flag机制）
                 // 避免每帧无意义的HashMap克隆开销
@@ -3221,6 +3596,7 @@ self.device.wait_for_fences(&[self.in_flight_fences[self.current_frame]], true, 
                     sky_enabled: self.sky_enabled,
                     sky_top: self.sky_top,
                     sky_bottom: self.sky_bottom,  // 用frame_count而非current_frame（不循环）
+                    render_settings: self.render_settings.clone(),
                 };
                 
                 // 委托给PipelineRegistry执行完整渲染帧
@@ -3235,6 +3611,11 @@ self.device.wait_for_fences(&[self.in_flight_fences[self.current_frame]], true, 
                     self.screenshot_source_image = output.color_image;
                     self.screenshot_source_extent = output.extent;
                 }
+            } else if let Some(ref pass) = self.pbr_forward {
+                // === 0.2 PBR 实际绘制路径 ===
+                // Shadow（可选）→ Game(PBR/HDR) → Bloom（可选）→ Tonemap(LDR)
+                // 之后由下面的既有代码继续 FXAA → UI
+                self.record_pbr_scene(pass, self.command_buffers[image_index_usize])?;
             } else {
                 // Legacy路径：保持现有游戏渲染代码不变
             // Begin game render pass
@@ -5451,6 +5832,9 @@ pub fn process_events(&mut self) {
     unsafe fn apply_pending_offscreen_resize(&mut self) -> Result<(), String> {
         let new_extent = self.pending_offscreen_resize.take()
             .expect("apply_pending_offscreen_resize called without pending extent");
+
+        // 0.2: PBR 通道引用了旧 depth/ldr view，先退役（cleanup 统一销毁），下一帧重建
+        self.retire_pbr_forward();
         
         // NOTE: 不在resize中调用flush_deferred_destroy() — 运行时销毁旧Vulkan资源
         // 会触发HEAP_CORRUPTION（即使device_wait_idle后也崩溃）。
@@ -6013,6 +6397,15 @@ pub fn process_events(&mut self) {
             
             // Flush deferred destroy — 程序退出时销毁所有延迟列表中的旧Vulkan资源
             self.flush_deferred_destroy();
+
+            // 0.2 PBR/Shadow/Post 通道（创建/切换时保留到 cleanup，避免运行期销毁驱动崩溃）
+            self.retire_pbr_forward();
+            for (pass, skinned) in self.retired_pbr.drain(..) {
+                pass.destroy();
+                if let Some(skinned) = skinned {
+                    skinned.destroy();
+                }
+            }
             
             // Cleanup game preview resources
             self.device.destroy_framebuffer(self.offscreen_framebuffer, None);

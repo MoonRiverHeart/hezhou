@@ -1,4 +1,4 @@
-﻿# Local mirror of .github/workflows/ci.yml (no GUI/Vulkan required).
+# Local mirror of .github/workflows/ci.yml (no GUI/Vulkan required).
 # Usage: powershell -ExecutionPolicy Bypass -File engine/scripts/ci_local.ps1
 param(
     [switch]$SkipBuild,
@@ -16,7 +16,11 @@ function Step($name) {
 }
 
 Step "Rust unit/integration tests"
-cargo test -j 1 -p hezhou-core -p hezhou-ui -p hezhou-dfx
+cargo test -j 1 `
+    -p hezhou-core -p hezhou-ui -p hezhou-dfx `
+    -p hezhou-audio -p hezhou-asset -p hezhou-gameplay `
+    -p hezhou-animation -p hezhou-integration -p hezhou-player `
+    -p hezhou-physics -p hezhou-render-pipeline -p hezhou-rhi-vulkan
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 Step "FFI contract"

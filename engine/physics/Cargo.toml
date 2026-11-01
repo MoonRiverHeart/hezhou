@@ -7,16 +7,10 @@ edition = "2021"
 name = "hezhou_physics"
 path = "src/lib.rs"
 
+# 自研动作物理：不引入 rapier/PhysX 等第三方物理引擎（ADR-002）。
+# nalgebra 仅用于刚体旋转的表示（与 hezhou-core 的数学类型互补）。
 [dependencies]
 hezhou-core = { path = "../core" }
-rapier3d = { version = "0.22", optional = true }
-rapier2d = { version = "0.22", optional = true }
 nalgebra = "0.32"
-parking_lot = "0.12"
-
-[features]
-default = ["3d"]
-2d = ["rapier2d"]
-3d = ["rapier3d"]
 
 [dev-dependencies]

@@ -1,3 +1,9 @@
+//! C ABI 桥接层。
+//!
+//! 这些函数沿用引擎既有 FFI 约定：由 C# / 调用方保证指针有效，函数本身不做
+//! `unsafe` 标注（历史接口保持兼容）。
+#![allow(clippy::not_unsafe_ptr_arg_deref)]
+
 use crate::PhysicsWorld;
 use crate::{ColliderShape, RigidBodyType};
 use std::os::raw::c_void;

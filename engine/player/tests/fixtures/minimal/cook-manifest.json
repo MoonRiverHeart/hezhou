@@ -1,0 +1,14 @@
+{
+  "assets": [
+    {
+      "path": "scenes/empty.scene",
+      "kind": "scene",
+      "size_bytes": 3
+    },
+    {
+      "path": "fonts/HarmonyOS_Sans_SC.ttf",
+      "kind": "font",
+      "size_bytes": 12
+    }
+  ]
+}

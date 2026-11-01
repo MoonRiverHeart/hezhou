@@ -66,6 +66,31 @@ impl RigidBody {
         self.rotation = rotation;
     }
 
+    /// 以欧拉角（弧度，XYZ 顺序）设置旋转。编辑器/脚本侧比四元数更易用。
+    pub fn set_rotation_euler(&mut self, x: f32, y: f32, z: f32) {
+        self.rotation = nalgebra::UnitQuaternion::from_euler_angles(x, y, z);
+    }
+
+    /// 以“轴 + 角度（弧度）”设置旋转。
+    pub fn set_rotation_axis_angle(&mut self, axis: Vec3, angle_radians: f32) {
+        let axis = axis.normalized();
+        if axis.magnitude() <= f32::EPSILON {
+            self.rotation = nalgebra::UnitQuaternion::identity();
+            return;
+        }
+        let axis = nalgebra::Vector3::new(axis.x, axis.y, axis.z);
+        self.rotation = nalgebra::UnitQuaternion::from_axis_angle(
+            &nalgebra::Unit::new_normalize(axis),
+            angle_radians,
+        );
+    }
+
+    /// 刚体局部 +Y 轴在世界空间的方向（`Plane` 碰撞体用它作平面法线）。
+    pub fn rotation_up(&self) -> Vec3 {
+        let v = self.rotation * nalgebra::Vector3::new(0.0, 1.0, 0.0);
+        Vec3::new(v.x, v.y, v.z)
+    }
+
     pub fn velocity(&self) -> &Vec3 {
         &self.velocity
     }
@@ -84,6 +109,18 @@ impl RigidBody {
 
     pub fn body_type(&self) -> RigidBodyType {
         self.body_type
+    }
+
+    pub fn is_dynamic(&self) -> bool {
+        self.body_type == RigidBodyType::Dynamic
+    }
+
+    pub fn is_static(&self) -> bool {
+        self.body_type == RigidBodyType::Static
+    }
+
+    pub fn is_kinematic(&self) -> bool {
+        self.body_type == RigidBodyType::Kinematic
     }
 
     pub fn set_body_type(&mut self, body_type: RigidBodyType) {

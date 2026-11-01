@@ -1,0 +1,27 @@
+[package]
+name = "hezhou-audio"
+version.workspace = true
+edition.workspace = true
+
+# ADR-001（2026-11 定稿）：音频后端采用 cpal + 自研混音，OGG 采用 lewton。
+#
+# 依赖策略：
+# - 两个依赖均为 **可选**（optional），默认构建仍保持零外部依赖：
+#   `cargo test -p hezhou-audio` 可完全离线通过，不要求声卡；
+# - 启用 `cpal-backend` 后 `default_backend()` 返回 cpal 后端，无设备/打开失败时
+#   引擎自动回退 `NullBackend`（不 panic、播放逻辑照常）；
+# - 启用 `ogg` 后 `DecoderRegistry::with_builtin()` 自动注册 lewton 解码器，
+#   WAV/OGG 均可从文件或内存加载。
+#
+# 注意：启用 feature 会更新 workspace 的 `engine/Cargo.lock`（由集成负责人统一提交）。
+
+[dependencies]
+cpal = { version = "0.15", optional = true }
+lewton = { version = "0.10", optional = true }
+
+[features]
+default = []
+# 真实音频输出后端（cpal + 自研混音）。
+cpal-backend = ["dep:cpal"]
+# OGG/Vorbis 解码（lewton）。
+ogg = ["dep:lewton"]

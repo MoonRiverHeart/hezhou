@@ -1,4 +1,5 @@
 [workspace]
+resolver = "2"
 members = [
     "scripting",
     "harmony",
@@ -14,6 +15,12 @@ members = [
     "ui",
     "mcp",
     "render-pipeline",
+    "player",
+    "integration",
+    "animation",
+    "gameplay",
+    "asset",
+    "audio",
 ]
 
 [workspace.package]

@@ -20,6 +20,8 @@ hezhou-platform = { path = "../platform" }
 hezhou-dfx = { path = "../dfx" }
 hezhou-scripting = { path = "../scripting", default-features = false }
 hezhou-render-pipeline = { path = "../render-pipeline" }
+# 0.2 骨骼蒙皮契约（SkinnedVertex / JointPalette 数据布局），仅用于 pipeline 接入描述
+hezhou-animation = { path = "../animation" }
 ash = "0.38"
 bytemuck = "1.14"
 glfw = { version = "0.62", default-features = false, features = ["src-build", "vulkan", "raw-window-handle-v0-6", "native-handles"] }

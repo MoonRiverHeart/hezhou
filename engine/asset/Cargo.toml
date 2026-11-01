@@ -1,0 +1,26 @@
+[package]
+name = "hezhou-asset"
+version.workspace = true
+edition.workspace = true
+description = "Hezhou 引擎级资产管线：AssetId/Meta/资产数据库/glTF 导入/cook"
+license = "MIT"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+uuid = { version = "1", features = ["v4", "v5", "serde"] }
+thiserror = "2"
+base64 = "0.22"
+# glTF/GLB 导入仅在 `gltf` feature 下编译；关闭后 crate 仍提供导入数据契约与接口桩。
+gltf = { version = "1.4", default-features = false, features = ["import", "names"], optional = true }
+# animation 桥接（可选）：把导入数据转成 hezhou-animation 的 glTF 契约。
+# 默认关闭，避免 asset 与 animation 的构建互相牵制；需要时启用 `animation-bridge` feature。
+hezhou-animation = { path = "../animation", optional = true }
+
+[dev-dependencies]
+tempfile = "3"
+
+[features]
+default = ["gltf"]
+gltf = ["dep:gltf"]
+animation-bridge = ["dep:hezhou-animation"]

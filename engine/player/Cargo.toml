@@ -1,0 +1,21 @@
+[package]
+name = "hezhou-player"
+version.workspace = true
+edition.workspace = true
+description = "Hezhou Player 导出构建器与最小运行时（Windows + Linux）"
+default-run = "hezhou-player"
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+# 复用 asset crate 的 CookManifest/AssetId/AssetKind 契约，不另写不兼容 schema。
+# 关闭默认 gltf feature：Player 只消费 cook 产物（JSON/原始资产），不需要 glTF 解析器。
+hezhou-asset = { path = "../asset", default-features = false }
+
+[[bin]]
+name = "hezhou-player"
+path = "src/main.rs"
+
+[[bin]]
+name = "hezhou-player-build"
+path = "src/bin/player_build.rs"

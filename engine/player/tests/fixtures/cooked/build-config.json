@@ -1,0 +1,16 @@
+{
+  "product_name": "Cooked Fixture",
+  "executable_name": "cooked-fixture",
+  "start_scene": "scenes/empty.scene",
+  "version": "0.1.0",
+  "target": "windows",
+  "quality": "low",
+  "window": {
+    "title": "Hezhou Cooked Fixture",
+    "width": 960,
+    "height": 540,
+    "mode": "windowed"
+  },
+  "log_dir": "logs",
+  "required_font": "fonts/HarmonyOS_Sans_SC.ttf"
+}

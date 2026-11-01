@@ -1,0 +1,7 @@
+# 允许测试 fixture 中的占位二进制与 JSON（父级 .gitignore 会忽略 *.dll / *.so / *.json / *.png）
+!tests/fixtures/**/*.dll
+!tests/fixtures/**/*.so
+!tests/fixtures/**/*.json
+!tests/fixtures/**/*.scene
+!tests/fixtures/**/*.ttf
+!tests/fixtures/**/*.png

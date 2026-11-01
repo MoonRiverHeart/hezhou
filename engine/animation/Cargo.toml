@@ -1,0 +1,11 @@
+[package]
+name = "hezhou-animation"
+version.workspace = true
+edition.workspace = true
+description = "Hezhou 引擎级骨骼/蒙皮动画能力（Skeleton/Skin/Clip/StateMachine/GPU palette）"
+
+# 0.2 刻意保持零第三方依赖：
+# - 避免与 core::math/render 的数学类型产生版本耦合
+# - 离线 CI 可独立测试（cargo test -p hezhou-animation）
+# 需要序列化时由 asset/gameplay 层负责转换，本 crate 只提供纯数据契约。
+[dependencies]

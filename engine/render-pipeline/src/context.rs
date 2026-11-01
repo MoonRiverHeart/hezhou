@@ -2,8 +2,15 @@
 //!
 //! RenderContext — 每帧渲染参数（场景指针、摄像机、视口、选中实体）
 //! RenderMode — 编辑/运行模式映射（对应 GameState）
+//!
+//! 0.2 起 `RenderContext` 携带 [`RenderSettings`]（PBR/阴影/后处理/质量档），
+//! 并可直接派生每帧阴影数据与 PBR UBO 数据；默认值保持 0.1 legacy 行为。
 
 use hezhou_core::ecs::Scene;
+
+use crate::pbr::{PbrFrameUbo, PbrLight};
+use crate::quality::RenderSettings;
+use crate::shadow::{ShadowConfig, ShadowError, ShadowFrameData, ShadowSettings};
 
 /// 渲染模式，映射 GameState
 ///
@@ -104,6 +111,11 @@ pub struct RenderContext {
     pub sky_enabled: bool,
     pub sky_top: [f32; 3],
     pub sky_bottom: [f32; 3],
+    /// 0.2 渲染设置（PBR/阴影/后处理/质量档）
+    ///
+    /// 默认值 = 0.1 legacy 行为（Blinn-Phong + FXAA），保证未接入时视觉不回归。
+    /// 编辑器接入点见 `RenderSettings` / `UIVulkanRenderer::set_render_quality_preset`。
+    pub render_settings: RenderSettings,
 }
 
 impl Default for RenderContext {
@@ -120,6 +132,65 @@ impl Default for RenderContext {
             sky_enabled: true,
             sky_top: [0.16, 0.32, 0.62],
             sky_bottom: [0.55, 0.68, 0.82],
+            render_settings: RenderSettings::default(),
         }
+    }
+}
+
+impl RenderContext {
+    /// 视口宽高比（宽/高）；宽高为 0 时返回 1.0
+    pub fn aspect(&self) -> f32 {
+        let w = self.viewport_extent.width as f32;
+        let h = self.viewport_extent.height as f32;
+        if w > 0.0 && h > 0.0 {
+            w / h
+        } else {
+            1.0
+        }
+    }
+
+    /// 阴影调参（来自渲染设置）
+    pub fn shadow_settings(&self) -> ShadowSettings {
+        self.render_settings.shadows
+    }
+
+    /// 阴影配置（未启用时返回 None）
+    pub fn shadow_config(&self) -> Option<ShadowConfig> {
+        self.render_settings.shadow_config()
+    }
+
+    /// 计算当前帧阴影数据
+    ///
+    /// - 阴影未启用 → `Ok(None)`
+    /// - 相机/光源非法 → `Err(ShadowError)`
+    ///
+    /// 光线方向取自场景中的 `DirectionalLightComponent`（需要传入以保证本 crate
+    /// 不直接依赖场景遍历；调用方可从 `RasterPipeline` 的 light 收集逻辑复用）。
+    pub fn shadow_frame(
+        &self,
+        light_direction: [f32; 3],
+    ) -> Result<Option<ShadowFrameData>, ShadowError> {
+        let Some(config) = self.shadow_config() else {
+            return Ok(None);
+        };
+        ShadowFrameData::from_camera(&self.camera, self.aspect(), light_direction, config)
+            .map(Some)
+    }
+
+    /// 构造 PBR 每帧 UBO（view/proj 由渲染后端传入）
+    ///
+    /// 若传入阴影帧数据则同时写入级联矩阵；否则阴影关闭。
+    pub fn pbr_frame_ubo(
+        &self,
+        light: &PbrLight,
+        view: [[f32; 4]; 4],
+        proj: [[f32; 4]; 4],
+        shadow: Option<&ShadowFrameData>,
+    ) -> PbrFrameUbo {
+        let mut ubo = PbrFrameUbo::from_light(light, view, proj, self.camera.position);
+        if let (Some(frame), Some(config)) = (shadow, self.shadow_config()) {
+            frame.write_into_ubo(&config, &mut ubo);
+        }
+        ubo
     }
 }

@@ -1,0 +1,24 @@
+[package]
+name = "hezhou-integration"
+version.workspace = true
+edition.workspace = true
+description = "Hezhou animation ↔ gameplay 集成适配层：ActionState 映射 / 逐招式 clip / 状态机事件透传"
+
+[lib]
+name = "hezhou_integration"
+path = "src/lib.rs"
+
+[dependencies]
+# 集成层是唯一同时依赖两个能力 crate 的地方：
+# - animation / gameplay 本身保持互不依赖，只通过 trait / 适配层组合。
+hezhou-animation = { path = "../animation" }
+hezhou-gameplay = { path = "../gameplay" }
+
+[features]
+# animation task-11 已合入 Land/Dodge/Block，默认开启一一映射；
+# 关闭默认 feature（--no-default-features）时走 0.2 早期 6 状态兼容映射，
+# 便于在旧 animation 版本/回归场景下复现历史行为。
+default = ["extended-states"]
+# 把 gameplay 的 Land / Dodge / Block 一一映射到 animation 的同名状态。
+# 依赖 hezhou-animation 已合入 task-11 的扩展状态（Land/Dodge/Block）。
+extended-states = []

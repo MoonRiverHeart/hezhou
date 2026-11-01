@@ -1,0 +1,20 @@
+[package]
+name = "hezhou-gameplay"
+version.workspace = true
+edition.workspace = true
+description = "Hezhou 3D 动作游戏通用能力组件：角色移动、第三人称相机、锁定、连招、命中、伤害、闪避、格挡"
+
+[lib]
+name = "hezhou_gameplay"
+path = "src/lib.rs"
+
+[dependencies]
+# 适配层依赖（可选）：默认不引入，保持 gameplay 零依赖、可独立测试。
+hezhou-core = { path = "../core", optional = true }
+hezhou-physics = { path = "../physics", optional = true }
+
+[features]
+default = []
+# 启用 physics 适配层：把 CharacterCollisionQuery / CameraCollisionQuery /
+# VisibilityQuery / HitDetectionQuery 接到 hezhou-physics 上。
+physics = ["dep:hezhou-core", "dep:hezhou-physics"]
