@@ -181,6 +181,59 @@ jobs:
           name: hezhou-editor-linux-deb
           path: dist/*.deb
 
+  player-build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ env.RUST_VERSION }}
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: engine
+
+      - name: Player tests
+        working-directory: engine
+        shell: pwsh
+        run: cargo test -p hezhou-player
+
+      - name: Build player runtime
+        working-directory: engine
+        shell: pwsh
+        run: cargo build -p hezhou-player --release
+
+      - name: Build and validate player fixture
+        shell: pwsh
+        run: |
+          $target = if ($env:RUNNER_OS -eq "Windows") { "windows" } else { "linux" }
+          $suffix = if ($env:RUNNER_OS -eq "Windows") { ".exe" } else { "" }
+          $config = "engine/player/tests/fixtures/minimal/build-config.json"
+          python -c "import json; p='$config'; d=json.load(open(p)); d['target']='$target'; open(p,'w').write(json.dumps(d,indent=2))"
+          $exe = "engine/target/release/hezhou-player$suffix"
+          $builder = "engine/target/release/hezhou-player-build$suffix"
+          & $builder --config $config `
+            --cook engine/player/tests/fixtures/minimal/cook-manifest.json `
+            --assets-dir engine/player/tests/fixtures/minimal/assets `
+            --scripts-dir engine/player/tests/fixtures/minimal/scripts `
+            --runtime-dir engine/player/tests/fixtures/minimal/runtime `
+            --exe $exe --build-out dist/player-fixture
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $pkg = "dist/player-fixture/$target"
+          & "$pkg/minimal-fixture$suffix" --validate --player-root $pkg --log-dir "$env:RUNNER_TEMP/hezhou-player-logs"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hezhou-player-fixture-${{ matrix.os }}
+          path: dist/player-fixture/**
+
   publish-release:
     if: startsWith(github.ref, 'refs/tags/v')
     needs: [package-windows, package-linux]
