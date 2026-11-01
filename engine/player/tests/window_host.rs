@@ -266,7 +266,7 @@ fn actual_window_host_calls_csharp_scene_context() {
 
     let log = std::fs::read_to_string(log_dir.join("player.log")).expect("读取 player.log");
     assert!(
-        log.contains("mono-host：Scene context 已提供（初始 3 实体，ABI v1"),
+        log.contains("mono-host：Scene context 已提供（初始 3 实体，ABI v2"),
         "日志：{log}"
     );
     assert!(
@@ -274,7 +274,7 @@ fn actual_window_host_calls_csharp_scene_context() {
         "日志：{log}"
     );
     assert!(
-        log.contains("C# Shutdown 后 Scene 实体 4"),
+        log.contains("C# Shutdown 后 Scene 实体 3"),
         "日志：{log}"
     );
     assert!(log.contains("窗口 host 结束：5 帧"), "日志：{log}");
@@ -290,11 +290,18 @@ fn actual_window_host_calls_csharp_scene_context() {
         "C# 日志：{csharp_log}"
     );
     assert!(
+        csharp_log.contains("rotationSet=0") && csharp_log.contains("scale=(1.500,1.500,1.500)"),
+        "C# 日志：{csharp_log}"
+    );
+    assert!(
         csharp_log.contains("SceneContext: frame=1 entities=4 cube="),
         "C# 日志：{csharp_log}"
     );
     assert!(
-        csharp_log.contains("SceneContext: Shutdown entities=4"),
+        csharp_log.contains("SceneContext: Shutdown entities=3")
+            && csharp_log.contains("existsBefore=1")
+            && csharp_log.contains("destroyResult=0")
+            && csharp_log.contains("existsAfter=0"),
         "C# 日志：{csharp_log}"
     );
 }

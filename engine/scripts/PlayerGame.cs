@@ -28,10 +28,12 @@ namespace Hezhou
     /// <summary>Player C# 游戏入口（Rust Player host 静态调用）。</summary>
     public static class PlayerGame
     {
-        private const uint PlayerContextVersion = 1;
+        private const uint PlayerContextVersion = 2;
         private const float CubeX = 2.5f;
         private const float CubeY = 0.5f;
         private const float CubeZ = -1.5f;
+        private const float CubeRotationY = 90.0f;
+        private const float CubeScale = 1.5f;
 
         private static bool _initialized;
         private static ContextApi _sceneContext;
@@ -40,6 +42,12 @@ namespace Hezhou
         private static float _lastX;
         private static float _lastY;
         private static float _lastZ;
+        private static float _lastRotationX;
+        private static float _lastRotationY;
+        private static float _lastRotationZ;
+        private static float _lastScaleX = 1.0f;
+        private static float _lastScaleY = 1.0f;
+        private static float _lastScaleZ = 1.0f;
         private static long _frameCount;
         private static double _elapsedSeconds;
         private static long _lastLogFrame = -1;
@@ -89,6 +97,12 @@ namespace Hezhou
             _lastX = 0.0f;
             _lastY = 0.0f;
             _lastZ = 0.0f;
+            _lastRotationX = 0.0f;
+            _lastRotationY = 0.0f;
+            _lastRotationZ = 0.0f;
+            _lastScaleX = 1.0f;
+            _lastScaleY = 1.0f;
+            _lastScaleZ = 1.0f;
 
             if (context == IntPtr.Zero)
             {
@@ -121,13 +135,44 @@ namespace Hezhou
                 _lastY = y;
                 _lastZ = z;
 
+                // v2：Transform rotation（欧拉角，度）/scale；v1 兼容时跳过。
+                int rotationSet = -1;
+                int rotationGet = -1;
+                int scaleSet = -1;
+                int scaleGet = -1;
+                float rx = 0.0f, ry = 0.0f, rz = 0.0f;
+                float sx = 1.0f, sy = 1.0f, sz = 1.0f;
+                if (api.HasTransform)
+                {
+                    rotationSet = api.SetRotation(
+                        _createdEntityId, 0.0f, CubeRotationY, 0.0f);
+                    scaleSet = api.SetScale(
+                        _createdEntityId, CubeScale, CubeScale, CubeScale);
+                    rotationGet = api.GetRotation(
+                        _createdEntityId, out rx, out ry, out rz);
+                    scaleGet = api.GetScale(
+                        _createdEntityId, out sx, out sy, out sz);
+                    _lastRotationX = rx;
+                    _lastRotationY = ry;
+                    _lastRotationZ = rz;
+                    _lastScaleX = sx;
+                    _lastScaleY = sy;
+                    _lastScaleZ = sz;
+                }
+
                 SafeLog("SceneContext: Initialize 创建 cube="
                     + _createdEntityId.ToString(CultureInfo.InvariantCulture)
                     + " setResult=" + setResult.ToString(CultureInfo.InvariantCulture)
                     + " getResult=" + getResult.ToString(CultureInfo.InvariantCulture)
                     + " entities " + before.ToString(CultureInfo.InvariantCulture)
                     + "->" + after.ToString(CultureInfo.InvariantCulture)
-                    + " position=(" + Fmt(x) + "," + Fmt(y) + "," + Fmt(z) + ")");
+                    + " position=(" + Fmt(x) + "," + Fmt(y) + "," + Fmt(z) + ")"
+                    + " rotationSet=" + rotationSet.ToString(CultureInfo.InvariantCulture)
+                    + " rotationGet=" + rotationGet.ToString(CultureInfo.InvariantCulture)
+                    + " rotation=(" + Fmt(rx) + "," + Fmt(ry) + "," + Fmt(rz) + ")"
+                    + " scaleSet=" + scaleSet.ToString(CultureInfo.InvariantCulture)
+                    + " scaleGet=" + scaleGet.ToString(CultureInfo.InvariantCulture)
+                    + " scale=(" + Fmt(sx) + "," + Fmt(sy) + "," + Fmt(sz) + ")");
             }
             catch (Exception exception)
             {
@@ -159,6 +204,21 @@ namespace Hezhou
                     _lastEntityCount = _sceneContext.EntityCount();
                     int getResult = _sceneContext.GetPosition(
                         _createdEntityId, out _lastX, out _lastY, out _lastZ);
+                    int rotationResult = -1;
+                    int scaleResult = -1;
+                    if (_sceneContext.HasTransform)
+                    {
+                        rotationResult = _sceneContext.GetRotation(
+                            _createdEntityId,
+                            out _lastRotationX,
+                            out _lastRotationY,
+                            out _lastRotationZ);
+                        scaleResult = _sceneContext.GetScale(
+                            _createdEntityId,
+                            out _lastScaleX,
+                            out _lastScaleY,
+                            out _lastScaleZ);
+                    }
                     // 首帧 + 每 60 帧输出一次，避免刷屏；Player 5 帧冒烟也能看到一次。
                     if (_frameCount == 1 || _frameCount % 60 == 0)
                     {
@@ -166,8 +226,17 @@ namespace Hezhou
                             + _frameCount.ToString(CultureInfo.InvariantCulture)
                             + " entities=" + _lastEntityCount.ToString(CultureInfo.InvariantCulture)
                             + " cube=" + _createdEntityId.ToString(CultureInfo.InvariantCulture)
+                            + " exists=" + (_sceneContext.HasTransform
+                                ? ExistsText(_sceneContext, _createdEntityId)
+                                : "n/a")
                             + " getResult=" + getResult.ToString(CultureInfo.InvariantCulture)
-                            + " position=(" + Fmt(_lastX) + "," + Fmt(_lastY) + "," + Fmt(_lastZ) + ")");
+                            + " position=(" + Fmt(_lastX) + "," + Fmt(_lastY) + "," + Fmt(_lastZ) + ")"
+                            + " rotationResult=" + rotationResult.ToString(CultureInfo.InvariantCulture)
+                            + " rotation=(" + Fmt(_lastRotationX) + "," + Fmt(_lastRotationY)
+                            + "," + Fmt(_lastRotationZ) + ")"
+                            + " scaleResult=" + scaleResult.ToString(CultureInfo.InvariantCulture)
+                            + " scale=(" + Fmt(_lastScaleX) + "," + Fmt(_lastScaleY)
+                            + "," + Fmt(_lastScaleZ) + ")");
                     }
                 }
                 catch (Exception exception)
@@ -210,9 +279,28 @@ namespace Hezhou
                     _lastX = x;
                     _lastY = y;
                     _lastZ = z;
+
+                    bool existsBefore = false;
+                    bool existsAfter = false;
+                    int destroyResult = -1;
+                    if (_sceneContext.HasTransform)
+                    {
+                        existsBefore = _sceneContext.EntityExists(_createdEntityId) != 0;
+                        if (existsBefore)
+                        {
+                            destroyResult = _sceneContext.DestroyEntity(_createdEntityId);
+                        }
+                        existsAfter = _sceneContext.EntityExists(_createdEntityId) != 0;
+                        count = _sceneContext.EntityCount();
+                        _lastEntityCount = count;
+                    }
+
                     SafeLog("SceneContext: Shutdown entities="
                         + count.ToString(CultureInfo.InvariantCulture)
                         + " cube=" + _createdEntityId.ToString(CultureInfo.InvariantCulture)
+                        + " existsBefore=" + BoolText(existsBefore)
+                        + " destroyResult=" + destroyResult.ToString(CultureInfo.InvariantCulture)
+                        + " existsAfter=" + BoolText(existsAfter)
                         + " getResult=" + getResult.ToString(CultureInfo.InvariantCulture)
                         + " position=(" + Fmt(x) + "," + Fmt(y) + "," + Fmt(z) + ")");
                 }
@@ -237,6 +325,16 @@ namespace Hezhou
             return value.ToString("F3", CultureInfo.InvariantCulture);
         }
 
+        private static string BoolText(bool value)
+        {
+            return value ? "1" : "0";
+        }
+
+        private static string ExistsText(ContextApi api, ulong entityId)
+        {
+            return BoolText(api.EntityExists(entityId) != 0);
+        }
+
         /// <summary>日志安全包装：任何输出异常都不允许中断 Player。</summary>
         private static void SafeLog(string message)
         {
@@ -258,7 +356,7 @@ namespace Hezhou
 
         // ==== PlayerCSharpContext ABI（必须与 Rust repr(C) 布局一致）====
 
-        /// <summary>Rust `PlayerCSharpContext` 的 C# 镜像（9 个 8 字节槽）。</summary>
+        /// <summary>Rust `PlayerCSharpContext` 的 C# 镜像（v2：13 个 8 字节槽）。</summary>
         [StructLayout(LayoutKind.Sequential)]
         private struct PlayerCSharpContextNative
         {
@@ -271,6 +369,13 @@ namespace Hezhou
             public IntPtr SceneSetEntityPosition;
             public IntPtr SceneGetEntityPosition;
             public IntPtr Log;
+            // v2 tail（task-33）。
+            public IntPtr SceneSetEntityRotation;
+            public IntPtr SceneGetEntityRotation;
+            public IntPtr SceneSetEntityScale;
+            public IntPtr SceneGetEntityScale;
+            public IntPtr SceneEntityExists;
+            public IntPtr SceneDestroyEntity;
         }
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
@@ -290,15 +395,44 @@ namespace Hezhou
         private delegate int SceneGetEntityPositionDelegate(
             IntPtr scene, ulong entityId, out float x, out float y, out float z);
 
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        private delegate int SceneSetEntityRotationDelegate(
+            IntPtr scene, ulong entityId, float x, float y, float z);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        private delegate int SceneGetEntityRotationDelegate(
+            IntPtr scene, ulong entityId, out float x, out float y, out float z);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        private delegate int SceneSetEntityScaleDelegate(
+            IntPtr scene, ulong entityId, float x, float y, float z);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        private delegate int SceneGetEntityScaleDelegate(
+            IntPtr scene, ulong entityId, out float x, out float y, out float z);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        private delegate int SceneEntityExistsDelegate(IntPtr scene, ulong entityId);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        private delegate int SceneDestroyEntityDelegate(IntPtr scene, ulong entityId);
+
         /// <summary>已解析的 PlayerContext（函数指针 + scene）；GC 期间保持委托存活。</summary>
         private sealed class ContextApi
         {
             public IntPtr Scene;
+            public bool HasTransform;
             public SceneEntityCountDelegate EntityCountFn;
             public SceneCreateCubeDelegate CreateCubeFn;
             public SceneCreateEntityDelegate CreateEntityFn;
             public SceneSetEntityPositionDelegate SetPositionFn;
             public SceneGetEntityPositionDelegate GetPositionFn;
+            public SceneSetEntityRotationDelegate SetRotationFn;
+            public SceneGetEntityRotationDelegate GetRotationFn;
+            public SceneSetEntityScaleDelegate SetScaleFn;
+            public SceneGetEntityScaleDelegate GetScaleFn;
+            public SceneEntityExistsDelegate EntityExistsFn;
+            public SceneDestroyEntityDelegate DestroyEntityFn;
 
             public uint EntityCount()
             {
@@ -325,6 +459,36 @@ namespace Hezhou
                 return GetPositionFn(Scene, entityId, out x, out y, out z);
             }
 
+            public int SetRotation(ulong entityId, float x, float y, float z)
+            {
+                return SetRotationFn(Scene, entityId, x, y, z);
+            }
+
+            public int GetRotation(ulong entityId, out float x, out float y, out float z)
+            {
+                return GetRotationFn(Scene, entityId, out x, out y, out z);
+            }
+
+            public int SetScale(ulong entityId, float x, float y, float z)
+            {
+                return SetScaleFn(Scene, entityId, x, y, z);
+            }
+
+            public int GetScale(ulong entityId, out float x, out float y, out float z)
+            {
+                return GetScaleFn(Scene, entityId, out x, out y, out z);
+            }
+
+            public int EntityExists(ulong entityId)
+            {
+                return EntityExistsFn(Scene, entityId);
+            }
+
+            public int DestroyEntity(ulong entityId)
+            {
+                return DestroyEntityFn(Scene, entityId);
+            }
+
             public static ContextApi TryParse(IntPtr context, out string error)
             {
                 error = null;
@@ -340,12 +504,14 @@ namespace Hezhou
                     return null;
                 }
 
-                if (native.Version != PlayerContextVersion)
+                // v2 兼容策略：接受 v1（只用 position）与 v2（完整 Transform/生命周期）。
+                if (native.Version < 1 || native.Version > PlayerContextVersion)
                 {
-                    error = "ABI 版本不匹配：native=" + native.Version
-                        + " expected=" + PlayerContextVersion;
+                    error = "ABI 版本不支持：native=" + native.Version
+                        + " supported=1.." + PlayerContextVersion;
                     return null;
                 }
+                bool hasTransform = native.Version >= 2;
                 if (native.Scene == IntPtr.Zero)
                 {
                     error = "scene 指针为 0";
@@ -357,15 +523,27 @@ namespace Hezhou
                     || native.SceneSetEntityPosition == IntPtr.Zero
                     || native.SceneGetEntityPosition == IntPtr.Zero)
                 {
-                    error = "函数指针缺失";
+                    error = "基础函数指针缺失";
+                    return null;
+                }
+                if (hasTransform
+                    && (native.SceneSetEntityRotation == IntPtr.Zero
+                        || native.SceneGetEntityRotation == IntPtr.Zero
+                        || native.SceneSetEntityScale == IntPtr.Zero
+                        || native.SceneGetEntityScale == IntPtr.Zero
+                        || native.SceneEntityExists == IntPtr.Zero
+                        || native.SceneDestroyEntity == IntPtr.Zero))
+                {
+                    error = "v2 函数指针缺失";
                     return null;
                 }
 
                 try
                 {
-                    return new ContextApi
+                    ContextApi api = new ContextApi
                     {
                         Scene = native.Scene,
+                        HasTransform = hasTransform,
                         EntityCountFn = Marshal.GetDelegateForFunctionPointer<SceneEntityCountDelegate>(
                             native.SceneEntityCount),
                         CreateCubeFn = Marshal.GetDelegateForFunctionPointer<SceneCreateCubeDelegate>(
@@ -377,6 +555,22 @@ namespace Hezhou
                         GetPositionFn = Marshal.GetDelegateForFunctionPointer<SceneGetEntityPositionDelegate>(
                             native.SceneGetEntityPosition),
                     };
+                    if (hasTransform)
+                    {
+                        api.SetRotationFn = Marshal.GetDelegateForFunctionPointer<SceneSetEntityRotationDelegate>(
+                            native.SceneSetEntityRotation);
+                        api.GetRotationFn = Marshal.GetDelegateForFunctionPointer<SceneGetEntityRotationDelegate>(
+                            native.SceneGetEntityRotation);
+                        api.SetScaleFn = Marshal.GetDelegateForFunctionPointer<SceneSetEntityScaleDelegate>(
+                            native.SceneSetEntityScale);
+                        api.GetScaleFn = Marshal.GetDelegateForFunctionPointer<SceneGetEntityScaleDelegate>(
+                            native.SceneGetEntityScale);
+                        api.EntityExistsFn = Marshal.GetDelegateForFunctionPointer<SceneEntityExistsDelegate>(
+                            native.SceneEntityExists);
+                        api.DestroyEntityFn = Marshal.GetDelegateForFunctionPointer<SceneDestroyEntityDelegate>(
+                            native.SceneDestroyEntity);
+                    }
+                    return api;
                 }
                 catch (Exception exception)
                 {

@@ -58,10 +58,13 @@ pub use config::{
 };
 pub use cook_bridge::{find_entry_by_project_path, CookedAssets};
 pub use csharp_context::{
-    player_context_log, scene_create_cube, scene_create_entity, scene_entity_count,
-    scene_get_entity_position, scene_set_entity_position, PlayerCSharpContext,
-    SceneCreateCubeFn, SceneCreateEntityFn, SceneEntityCountFn, SceneGetEntityPositionFn,
-    SceneSetEntityPositionFn, PLAYER_CSHARP_CONTEXT_VERSION,
+    player_context_log, scene_create_cube, scene_create_entity, scene_destroy_entity,
+    scene_entity_count, scene_entity_exists, scene_get_entity_position, scene_get_entity_rotation,
+    scene_get_entity_scale, scene_set_entity_position, scene_set_entity_rotation,
+    scene_set_entity_scale, PlayerCSharpContext, SceneCreateCubeFn, SceneCreateEntityFn,
+    SceneDestroyEntityFn, SceneEntityCountFn, SceneEntityExistsFn, SceneGetEntityPositionFn,
+    SceneGetEntityRotationFn, SceneGetEntityScaleFn, SceneSetEntityPositionFn,
+    SceneSetEntityRotationFn, SceneSetEntityScaleFn, PLAYER_CSHARP_CONTEXT_VERSION,
 };
 pub use host::{
     resolve_host, DefaultPlayerHost, HostError, HostLog, HostOutcome, PlayerHost,

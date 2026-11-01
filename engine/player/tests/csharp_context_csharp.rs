@@ -35,7 +35,7 @@ fn csharp_creates_and_positions_entity_through_context() {
     script
         .initialize(context.as_ptr() as usize)
         .expect("Initialize(context)");
-    // C# Initialize 创建一个 cube + 设置 position。
+    // C# Initialize 创建一个 cube + 设置 position/rotation/scale。
     assert_eq!(scene.entity_count(), 3);
     let created = scene
         .get_all_entities()
@@ -44,11 +44,26 @@ fn csharp_creates_and_positions_entity_through_context() {
         .expect("C# 应创建新实体");
     let position = scene.get_entity_position(created).expect("新实体有位置");
     assert_eq!((position.x, position.y, position.z), (2.5, 0.5, -1.5));
+    let rotation = scene.get_entity_rotation(created).expect("新实体有旋转");
+    let euler = rotation.to_euler_degrees();
+    assert!((euler[1] - 90.0).abs() < 0.2, "rotation={euler:?}");
+    let scale = scene.get_entity_scale(created).expect("新实体有缩放");
+    assert_eq!((scale.x, scale.y, scale.z), (1.5, 1.5, 1.5));
+    // context ABI v2 exists 函数。
+    assert_eq!(
+        unsafe { hezhou_player::scene_entity_exists(context.scene, created.id) },
+        1
+    );
 
     script.update(0.016).expect("Update");
     script.update(0.032).expect("Update");
     script.shutdown();
-    assert_eq!(scene.entity_count(), 3, "C# Shutdown 不删除实体");
+    // C# Shutdown 销毁自己创建的 cube：实体数回到 2，exists=false。
+    assert_eq!(scene.entity_count(), 2, "C# Shutdown 应销毁创建的 cube");
+    assert_eq!(
+        unsafe { hezhou_player::scene_entity_exists(context.scene, created.id) },
+        0
+    );
     std::env::remove_var("HEZHOU_PLAYER_MONO_LOG");
 
     let log = std::fs::read_to_string(&log_path).expect("读取 C# 日志");
@@ -62,11 +77,22 @@ fn csharp_creates_and_positions_entity_through_context() {
         "C# 日志：{log}"
     );
     assert!(
+        log.contains("rotationSet=0") && log.contains("rotationGet=0"),
+        "C# 日志：{log}"
+    );
+    assert!(
+        log.contains("scaleSet=0") && log.contains("scaleGet=0") && log.contains("scale=(1.500,1.500,1.500)"),
+        "C# 日志：{log}"
+    );
+    assert!(
         log.contains("SceneContext: frame=1 entities=3 cube="),
         "C# 日志：{log}"
     );
     assert!(
-        log.contains("SceneContext: Shutdown entities=3"),
+        log.contains("SceneContext: Shutdown entities=2")
+            && log.contains("existsBefore=1")
+            && log.contains("destroyResult=0")
+            && log.contains("existsAfter=0"),
         "C# 日志：{log}"
     );
     // Rust 侧统计：Initialize/Update×2/Shutdown 各调用成功。
