@@ -169,16 +169,32 @@ pub fn skinned_fixture_dir() -> PathBuf {
 /// 用于 mono-host 真实调用测试；mcs 不存在或编译失败时返回 `None`（测试跳过）。
 #[cfg(feature = "mono-host")]
 pub fn compile_player_game_fixture(temp: &TempDir) -> Option<PathBuf> {
-    use std::process::Command;
-
     let source = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("tests")
         .join("fixtures")
         .join("mono")
         .join("PlayerGame.cs");
+    compile_csharp_source(temp, &source, "PlayerGame.dll")
+}
+
+/// 编译 task-30/32 的真实 `engine/scripts/PlayerGame.cs`（Player C# 入口）。
+#[cfg(feature = "mono-host")]
+pub fn compile_engine_player_game(temp: &TempDir) -> Option<PathBuf> {
+    let source = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("..")
+        .join("scripts")
+        .join("PlayerGame.cs");
+    compile_csharp_source(temp, &source, "PlayerGame.dll")
+}
+
+/// 用本机 mcs 编译任意 C# 源为临时 DLL；mcs 不存在/编译失败返回 `None`。
+#[cfg(feature = "mono-host")]
+pub fn compile_csharp_source(temp: &TempDir, source: &Path, dll_name: &str) -> Option<PathBuf> {
+    use std::process::Command;
+
     let output_dir = temp.join("mono");
     std::fs::create_dir_all(&output_dir).ok()?;
-    let dll = output_dir.join("PlayerGame.dll");
+    let dll = output_dir.join(dll_name);
 
     #[cfg(windows)]
     let mut command = {
@@ -192,14 +208,15 @@ pub fn compile_player_game_fixture(temp: &TempDir) -> Option<PathBuf> {
     let status = command
         .arg("-target:library")
         .arg(format!("-out:{}", dll.display()))
-        .arg(&source)
+        .arg(source)
         .status()
         .ok()?;
     if status.success() && dll.is_file() {
         Some(dll)
     } else {
         eprintln!(
-            "跳过 mono-host 真实调用测试：mcs 编译 fixture 失败（status={status:?}）"
+            "跳过 mono-host 真实调用测试：mcs 编译 {} 失败（status={status:?}）",
+            source.display()
         );
         None
     }

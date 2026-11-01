@@ -31,7 +31,11 @@ Hezhou 0.2 **Player 导出构建器 + 最小运行时**（Windows / Linux）。
    （无动画时静态绑定姿态）；无蒙皮/失败回退已加载场景（内置 cube）并 WARN；
 9. **可选 C# 游戏逻辑入口**（`feature = "mono-host"`）：加载包内 `scripts/*.dll`，
    调用 `Hezhou.PlayerGame.Initialize(0)` / 每帧 `Update(dt)` / 结束 `Shutdown()`；
-   Mono/加载/调用失败 → WARN 回退纯 Rust 渲染，不 panic；默认 feature 关闭。
+   Mono/加载/调用失败 → WARN 回退纯 Rust 渲染，不 panic；默认 feature 关闭；
+10. **Player C# Scene Context ABI**：`#[repr(C)] PlayerCSharpContext`（版本 + scene 指针
+    + entity_count/create_cube/create_entity/set_position/get_position/log 函数指针，
+    catch_unwind 安全），window host 传给 C#；C# 通过 context 真实创建/查询 Scene 实体，
+    `context=0` 安全空转。
 
 不绑定具体游戏内容；真实 cooker 产物可原样替换测试 fixture。
 
@@ -47,6 +51,7 @@ engine/player/
 │   ├── imported_assets.rs# cook imported/*.json → ImportedScene / AssetId 查询（严格校验）
 │   ├── skinned_asset.rs# ImportedPrimitive → SkinnedVertex / skeleton+clip 选择 / joint palette
 │   ├── mono_host.rs    # feature mono-host：加载 scripts/*.dll → PlayerGame Initialize/Update/Shutdown
+│   ├── csharp_context.rs# repr(C) PlayerCSharpContext：scene + count/create/position 函数指针
 │   ├── scene_loader.rs# 起始场景：Project JSON → Scene（失败回退内置 cube+light）
 │   ├── host.rs       # PlayerHost trait / HostOutcome / DefaultPlayerHost
 │   ├── window_host.rs# （feature window-host）WindowPlayerHost：窗口+Vulkan 固定帧渲染
@@ -60,7 +65,7 @@ engine/player/
 └── tests/
     ├── fixtures/minimal/  # 最小 fixture（legacy assets[]，空场景 + 占位 DLL/runtime）
     ├── fixtures/cooked/   # hezhou-asset 真实 cook 输出布局 fixture
-    └── *.rs               # 默认 97 个测试；window-host 共 100；mono-host 共 106（+3 ignored 真窗口 smoke）
+    └── *.rs               # 默认 100；window-host 共 103；mono-host 共 111（+4 ignored 真窗口 smoke）
 ```
 
 > 硬性边界：本 crate 只改 `engine/player/**`。installer、CI、examples、editor
@@ -639,23 +644,32 @@ PBR draw path 激活：true；质量摘要：quality=low shading=PBR ...；已�
 ### 6.7 可选 C# 游戏逻辑入口（`feature = "mono-host"`）
 
 默认构建**不链接 Mono**。开启 `mono-host`（隐含 `window-host`）后，window host 会加载
-包内 `scripts/` 的第一个 `.dll` 并调用 C# 入口（task-30 `Hezhou.PlayerGame`）：
+包内 `scripts/` 的第一个 `.dll` 并调用 C# 入口（task-30 `Hezhou.PlayerGame`），
+同时传入 task-32 的 `PlayerCSharpContext`（Scene 操作 ABI）：
 
 ```rust
-let first = find_player_game_script(&manifest, root)?; // manifest.scripts 第一个 .dll
-let mut script = PlayerGameScript::load(&first.1)?;    // Mono ScriptManager 加载 assembly
-script.initialize(0)?;                                  // Hezhou.PlayerGame.Initialize(IntPtr)
-script.update(dt)?;                                     // Hezhou.PlayerGame.Update(float)
-script.shutdown();                                      // Hezhou.PlayerGame.Shutdown() + Mono shutdown
+let first = find_player_game_script(&manifest, root)?;      // manifest.scripts 第一个 .dll
+let mut script = PlayerGameScript::load(&first.1)?;         // Mono ScriptManager 加载 assembly
+let csharp_context = PlayerCSharpContext::new(scene_ptr);   // repr(C) context，覆盖整个帧循环
+script.initialize(csharp_context.as_ptr() as usize)?;       // C# 解析 context
+script.update(dt)?;                                          // 每帧；C# 通过 context 读写 Scene
+script.shutdown();                                           // C# Shutdown + Mono shutdown
 ```
 
+- **PlayerCSharpContext ABI（v1）**：`#[repr(C)]` = `version(u32) + reserved(u32) +
+  scene(IntPtr) + 6 个函数指针`：`scene_entity_count` / `scene_create_cube` /
+  `scene_create_entity` / `scene_set_entity_position` / `scene_get_entity_position` /
+  `log`。Rust 函数全部 `extern "C"` + `catch_unwind`；空 scene、实体不存在、输出指针
+  为空 → 返回 0/-1、不 panic。C# 用 `StructLayout(Sequential)` + `Cdecl` delegates +
+  `Marshal.GetDelegateForFunctionPointer` 解析；`context == 0` 时 C# 安全空转。
+  完整 ABI 表/C# 用法/扩展点见 [`engine/scripts/PLAYER_GAME_0_2.md`](../../scripts/PLAYER_GAME_0_2.md)。
 - **加载**：`manifest.scripts` 中第一个 `.dll`，路径 `<root>/scripts/<name>`；
   无 `.dll`/文件缺失/路径非法/assembly 加载失败/Initialize 失败 → WARN 并继续
   纯 Rust 渲染（窗口不阻塞、不 panic；所有 Mono 调用 `catch_unwind`）。
 - **每帧**：渲染帧循环中调用 `Update(dt)`（`dt` 为上一帧到当前帧的秒数）；
   调用失败 → WARN、停止 C# 调用并继续纯 Rust 渲染。
 - **结束**：`Shutdown()` + `ScriptManager::shutdown()`，日志输出
-  `mono-host：Shutdown 完成（Initialize 1 次，Update N 次，Shutdown 1 次，错误 0 次，DLL …）`。
+  `mono-host：Shutdown 完成（Initialize 1 次，Update N 次，Shutdown 1 次，错误 0 次，DLL …）；C# Shutdown 后 Scene 实体 N`。
 - **依赖/构建**：feature 依赖 `hezhou-scripting`（Mono JIT，`wrapped_mono`）；
   运行机器需要 Mono（`C:\Program Files\Mono` 或 exe 旁 `lib/`、`etc/`），
   或随包 `runtime/` 提供 Mono 运行时（构建时 `--runtime-dir` 复制；Mono 库搜索路径
@@ -664,35 +678,43 @@ script.shutdown();                                      // Hezhou.PlayerGame.Shu
   scripting crate，直接使用其底层 `ScriptManager::execute_with_ptr`（Initialize/
   Shutdown 的 `IntPtr`）与 `ScriptManager::execute`（Update 的 `float`），
   namespace=`Hezhou`、class=`PlayerGame`；等价于 `MonoUIExecutor` 的加载/调用路径。
-- **本机实测（debug mono-host + task-30 真实 `EditorScript.dll`，5 帧）**：
+- **本机实测（debug mono-host + 真实 `scripts/PlayerGame.cs` 编译 DLL，cooked fixture
+  场景 3 实体，5 帧）**：
 
   ```text
-  mono-host：加载 C# 入口 `EditorScript.dll`（.../scripts/EditorScript.dll）
-  mono-host：Hezhou.PlayerGame.Initialize(0) 成功（assembly EditorScript）
-  [PlayerGame] PlayerGame: Initialize 完成（context=0x0）      # C# stdio
-  [PlayerGame] PlayerGame: Shutdown（frames=5 elapsed=0.242s） # C# stdio
-  mono-host：Shutdown 完成（Initialize 1 次，Update 5 次，Shutdown 1 次，错误 0 次，DLL ...）
+  mono-host：Scene context 已提供（初始 3 实体，ABI v1，scene=0x...）
+  [PlayerGame] SceneContext: Initialize 创建 cube=1 setResult=0 getResult=0 entities 3->4 position=(2.500,0.500,-1.500)
+  [PlayerGame] SceneContext: frame=1 entities=4 cube=1 getResult=0 position=(2.500,0.500,-1.500)
+  [PlayerGame] SceneContext: Shutdown entities=4 cube=1 getResult=0 position=(2.500,0.500,-1.500)
+  mono-host：Shutdown 完成（Initialize 1 次，Update 5 次，Shutdown 1 次，错误 0 次，DLL ...）；C# Shutdown 后 Scene 实体 4
   窗口 host 结束：5 帧 ...
   ```
 
+  即 C# 已通过 context 真实创建 Scene 实体并设置/读取 position；task-30 的
+  context=0 路径仍安全空转（旧包/旧 DLL 不受影响）。
 - **测试**：`mono_host`（路径定位/缺失 DLL/非法路径，不初始化 Mono）、
   `mono_host_safety`（无效 DLL 加载失败可读、不 panic）、`mono_host_call`（mcs 编译
   C# fixture → Initialize(0)/Update(dt)/Shutdown 真实调用，无 mcs 时跳过）、
-  `window_host` ignored `actual_window_host_calls_csharp_player_game`（真窗口 5 帧 +
-  C# 调用日志断言）。CI 建议：单独 job 安装 Mono 后跑
+  `csharp_context`（lib 单元：ABI 布局/空指针/创建+位置函数）、
+  `csharp_context_csharp`（真实 `PlayerGame.cs`：context 创建 cube + position，
+  Rust 断言 Scene 实体数 2→3、position=(2.5,0.5,-1.5)、C# 日志）、
+  `csharp_context_null`（context=0 安全空转）、`window_host` ignored
+  `actual_window_host_calls_csharp_scene_context`（真窗口 5 帧 + Scene 实体 3→4 +
+  C# 日志断言）。CI 建议：单独 job 安装 Mono 后跑
   `cargo test -p hezhou-player --features mono-host`（无显示环境时跳过 ignored）。
-- **限制（本轮）**：只加载第一个 DLL；`Initialize(0)` context 固定 0（不传 FFI
-  context，C# 侧忽略/预留）；无热重载/脚本热更新；旧包无 `PlayerGame` 时安全回退；
-  C# 侧 gameplay/animation/FFI API 接入留待后续。
+- **限制（本轮）**：只加载第一个 DLL；context 仅暴露场景实体 count/创建/位置
+  5 个操作 + log（无旋转/缩放/删除/材质/组件/动画/物理/音频）；`scene` 指针仅覆盖
+  Player 帧循环，C# 不得在 `Shutdown()` 后使用；无热重载/脚本热更新；旧包无
+  `PlayerGame` 时安全回退；gameplay/animation/audio/FFI API 留待后续（按 §3 扩展点追加）。
 
 ## 7. 测试
 
 ```bash
 cd engine
-cargo test -p hezhou-player                        # 默认 97 个测试
+cargo test -p hezhou-player                        # 默认 100 个测试
 cargo build -p hezhou-player                       # 构建两个二进制 + 库
-cargo test -p hezhou-player --features window-host # 100 个（含 window-host 单元/契约测试）
-cargo test -p hezhou-player --features mono-host   # 106 个（含 C# 入口；需 Mono/mcs，缺失时跳过真实调用）
+cargo test -p hezhou-player --features window-host # 103 个（含 window-host 单元/契约测试）
+cargo test -p hezhou-player --features mono-host   # 111 个（含 C# 入口/context；需 Mono/mcs，缺失时跳过真实调用）
 # 真实窗口 smoke：需显示环境 + Vulkan GPU，CI 跳过；本机已实测通过（30 帧，exit 0）
 cargo test -p hezhou-player --features window-host --test window_host -- --ignored --nocapture
 # mono-host 真窗口 + C# 调用（需显示环境 + Vulkan GPU + Mono）
@@ -720,8 +742,11 @@ kind/index/数量严格校验、坏 JSON/越界/数量不匹配错误、未引�
 + 真实蒙皮上传/palette + `Running`/退出码 0；真实窗口测试 `#[ignore]`，本机已手工验证
 cooked 与 skinned 两个 fixture）、**mono-host feature**（manifest scripts 首个 DLL 定位/
 非法路径/缺失 DLL 错误安全、无效 DLL 加载失败不 panic、mcs 编译 C# fixture 后真实
-Initialize(0)/Update(dt)/Shutdown 调用、真窗口 5 帧 C# 日志断言；Mono 缺失时安全跳过/
-回退）、日志时间戳。
+Initialize/Update(dt)/Shutdown 调用、真窗口 5 帧 C# 日志断言；Mono 缺失时安全跳过/
+回退）、**Player C# Scene Context**（repr(C) 布局/空指针安全、count/create/position
+函数真实修改 Scene、真实 PlayerGame.cs context 创建 cube + 设置/读取 position
+（Scene 2→3，position=(2.5,0.5,-1.5)）、context=0 空转、真窗口 Scene 实体 3→4 +
+C# 日志断言）、日志时间戳。
 
 最小 fixture（`tests/fixtures/minimal/`）依赖零外部资产：空场景 3 字节、字体占位
 12 字节、假 C# 程序集 21 字节、占位 runtime 库 19 字节，用于无真实 cook 数据时
@@ -741,8 +766,11 @@ Initialize(0)/Update(dt)/Shutdown 调用、真窗口 5 帧 C# 日志断言；Mon
 C# fixture（`tests/fixtures/mono/PlayerGame.cs`）与 task-30 入口签名一致
 （`namespace Hezhou` / `static class PlayerGame` / `Initialize(IntPtr)` / `Update(float)` /
 `Shutdown()`），测试时用本机 `mcs` 编译为临时 DLL；通过
-`HEZHOU_PLAYER_MONO_LOG` 记录调用序列供 Rust 断言。真实集成还验证了 task-30 编译产物
-`scripts/bin/Mono/EditorScript.dll`（含 `Hezhou.PlayerGame`，见 §6.7 实测）。
+`HEZHOU_PLAYER_MONO_LOG` 记录调用序列供 Rust 断言。task-32 的
+`csharp_context_csharp` / `csharp_context_null` 直接编译真实
+`engine/scripts/PlayerGame.cs`（不重复 fixture），验证 context ABI 与 Scene 变更；
+真实集成还验证了 task-30 编译产物 `scripts/bin/Mono/EditorScript.dll`
+（含 `Hezhou.PlayerGame`，见 §6.7 实测）。
 
 ## 8. 与其它模块 / CI / installer 的集成点
 
@@ -827,8 +855,10 @@ C# fixture（`tests/fixtures/mono/PlayerGame.cs`）与 task-30 入口签名一�
   `mono-host` feature（隐含 window-host）依赖 `hezhou-scripting`（Mono JIT）；
   仍不依赖 render（构建器可独立编译）。
 - C# 入口（§6.7）：window host 加载 `manifest.scripts[]` 第一个 DLL，调用
-  `Hezhou.PlayerGame.Initialize(0)` / 每帧 `Update(dt)` / 结束 `Shutdown()`；
-  本轮 context 固定 0，FFI context/gameplay/animation/physics/audio API 后续接入。
+  `Hezhou.PlayerGame.Initialize(context_ptr)` / 每帧 `Update(dt)` / 结束 `Shutdown()`；
+  task-32 起传入 `PlayerCSharpContext`（scene + count/create/position 函数指针），
+  C# 可真实创建/查询 Scene 实体；gameplay/animation/physics/audio API 后续按
+  `scripts/PLAYER_GAME_0_2.md` 扩展点追加。
 - 部署要求：mono-host 的 Player 包运行机器需安装 Mono，或随包 `runtime/` 提供
   Mono 运行时（`--runtime-dir` 复制；`lib/`、`etc/`、`libmono` 等）；CI/安装包
   需把 Mono 运行时纳入 Player 附件。
@@ -893,6 +923,12 @@ C# fixture（`tests/fixtures/mono/PlayerGame.cs`）与 task-30 入口签名一�
 - [x] 可选 C# 入口（`mono-host`）：加载 scripts 首个 DLL，调用
   `Hezhou.PlayerGame.Initialize(0)`/`Update(dt)`/`Shutdown()`，失败安全回退，
   真实 task-30 `EditorScript.dll` 窗口实测通过；
+- [x] Player C# Scene Context（`PlayerCSharpContext` v1）：repr(C) ABI
+  （count/create_cube/create_entity/set/get position/log）、window host 传入真实
+  context、C# PlayerGame 创建 cube 并设置/读取 position、context=0 安全空转、
+  真实窗口 Scene 实体 3→4 实测；
+- [ ] context 扩展：transform 旋转/缩放、删除实体、材质/组件、gameplay/animation/
+  physics/audio API（按 ABI 尾部追加 + version 递增，见 `scripts/PLAYER_GAME_0_2.md`）；
 - [ ] 多蒙皮 mesh/primitive、多 clip/状态机/混合、材质/纹理绑定（当前只第一个 mesh/clip，
   upload material/texture_path 传 None）；
 - [ ] C# 侧 FFI context 接入（Initialize 当前传 0）、gameplay/animation/physics/audio

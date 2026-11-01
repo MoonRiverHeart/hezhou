@@ -208,7 +208,7 @@ fn actual_window_host_calls_csharp_player_game() {
         "日志：{log}"
     );
     assert!(
-        log.contains("mono-host：Hezhou.PlayerGame.Initialize(0) 成功"),
+        log.contains("mono-host：Hezhou.PlayerGame.Initialize(context=0x"),
         "日志：{log}"
     );
     assert!(
@@ -218,11 +218,83 @@ fn actual_window_host_calls_csharp_player_game() {
     assert!(log.contains("窗口 host 结束：5 帧"), "日志：{log}");
 
     let csharp_log = std::fs::read_to_string(&mono_log).expect("读取 C# 调用日志");
-    assert!(csharp_log.contains("Initialize context=0"), "C# 日志：{csharp_log}");
+    // task-32 起 Player 传入非 0 PlayerCSharpContext；fixture 忽略 context 但记录其数值。
+    assert!(
+        csharp_log.contains("Initialize context="),
+        "C# 日志：{csharp_log}"
+    );
     assert!(csharp_log.contains("Update #1"), "C# 日志：{csharp_log}");
     assert!(csharp_log.contains("Update #5"), "C# 日志：{csharp_log}");
     assert!(
         csharp_log.contains("Shutdown updates=5"),
+        "C# 日志：{csharp_log}"
+    );
+}
+
+/// 真实窗口 + 真实 C# PlayerGame 的 PlayerCSharpContext（feature = mono-host）：
+/// 编译 `engine/scripts/PlayerGame.cs` → Player 包 → 窗口 host 让 C# 创建/查询 Scene 实体。
+#[cfg(feature = "mono-host")]
+#[ignore = "需要显示环境 + Vulkan GPU + Mono；CI 默认跳过，本机手工验证"]
+#[test]
+fn actual_window_host_calls_csharp_scene_context() {
+    use common::compile_engine_player_game;
+
+    let temp = TempDir::new("window-host-csharp-context");
+    let fixture = cooked_fixture_dir();
+    let Some(dll) = compile_engine_player_game(&temp) else {
+        return;
+    };
+    let scripts = vec![ScriptAssembly::with_source("PlayerGame.dll", &dll)];
+    let (package, stem) = build_fixture_package_with_scripts(&temp, &fixture, Some(scripts));
+    let log_dir = temp.join("logs");
+    let mono_log = temp.join("mono-context.log");
+
+    let result = run_window_host_with_env(
+        &package,
+        &stem,
+        "5",
+        &log_dir,
+        &[("HEZHOU_PLAYER_MONO_LOG", mono_log.to_str().unwrap())],
+    );
+    assert!(
+        result.status.success(),
+        "C# context 窗口 host 失败\nstdout: {}\nstderr: {}",
+        String::from_utf8_lossy(&result.stdout),
+        String::from_utf8_lossy(&result.stderr)
+    );
+    assert_eq!(result.status.code(), Some(0));
+
+    let log = std::fs::read_to_string(log_dir.join("player.log")).expect("读取 player.log");
+    assert!(
+        log.contains("mono-host：Scene context 已提供（初始 3 实体，ABI v1"),
+        "日志：{log}"
+    );
+    assert!(
+        log.contains("C# Initialize 后 Scene 实体 4"),
+        "日志：{log}"
+    );
+    assert!(
+        log.contains("C# Shutdown 后 Scene 实体 4"),
+        "日志：{log}"
+    );
+    assert!(log.contains("窗口 host 结束：5 帧"), "日志：{log}");
+
+    let csharp_log = std::fs::read_to_string(&mono_log).expect("读取 C# 调用日志");
+    assert!(
+        csharp_log.contains("SceneContext: Initialize 创建 cube="),
+        "C# 日志：{csharp_log}"
+    );
+    assert!(csharp_log.contains("entities 3->4"), "C# 日志：{csharp_log}");
+    assert!(
+        csharp_log.contains("position=(2.500,0.500,-1.500)"),
+        "C# 日志：{csharp_log}"
+    );
+    assert!(
+        csharp_log.contains("SceneContext: frame=1 entities=4 cube="),
+        "C# 日志：{csharp_log}"
+    );
+    assert!(
+        csharp_log.contains("SceneContext: Shutdown entities=4"),
         "C# 日志：{csharp_log}"
     );
 }

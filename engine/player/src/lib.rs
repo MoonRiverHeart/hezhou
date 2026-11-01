@@ -21,6 +21,7 @@ pub mod asset_index;
 pub mod builder;
 pub mod config;
 pub mod cook_bridge;
+pub mod csharp_context;
 pub mod host;
 pub mod imported_assets;
 pub mod logging;
@@ -56,6 +57,12 @@ pub use config::{
     WindowConfig, WindowMode, DEFAULT_FONT_ASSET,
 };
 pub use cook_bridge::{find_entry_by_project_path, CookedAssets};
+pub use csharp_context::{
+    player_context_log, scene_create_cube, scene_create_entity, scene_entity_count,
+    scene_get_entity_position, scene_set_entity_position, PlayerCSharpContext,
+    SceneCreateCubeFn, SceneCreateEntityFn, SceneEntityCountFn, SceneGetEntityPositionFn,
+    SceneSetEntityPositionFn, PLAYER_CSHARP_CONTEXT_VERSION,
+};
 pub use host::{
     resolve_host, DefaultPlayerHost, HostError, HostLog, HostOutcome, PlayerHost,
     PlayerHostContext, DEFAULT_HOST_NAME, HOST_PENDING_EXIT_CODE,

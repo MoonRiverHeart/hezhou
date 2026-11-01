@@ -252,6 +252,11 @@ impl PlayerHost for WindowPlayerHost {
         // ---- 可选 C# PlayerGame 入口（feature = mono-host）----
         #[cfg(feature = "mono-host")]
         let mut mono_state: Option<MonoHostState> = None;
+        // PlayerCSharpContext 必须覆盖整个帧循环（C# 只在 Initialize/Update/Shutdown 内调用）。
+        #[cfg(feature = "mono-host")]
+        let csharp_context = crate::csharp_context::PlayerCSharpContext::new(
+            context.start_scene as *mut Scene,
+        );
         #[cfg(feature = "mono-host")]
         match find_player_game_script(context.manifest, context.root) {
             Ok(Some((name, path))) => {
@@ -272,14 +277,30 @@ impl PlayerHost for WindowPlayerHost {
                             path.display()
                         ),
                     );
+                    context.log.host_log(
+                        LogLevel::Info,
+                        &format!(
+                            "mono-host：Scene context 已提供（初始 {} 实体，ABI v{}，scene={:?}）",
+                            context.start_scene.get_all_entities().len(),
+                            csharp_context.version,
+                            csharp_context.scene
+                        ),
+                    );
+                    let context_ptr = if csharp_context.is_supported() {
+                        csharp_context.as_ptr() as usize
+                    } else {
+                        0
+                    };
                     match PlayerGameScript::load(&path) {
-                        Ok(mut script) => match script.initialize(0) {
+                        Ok(mut script) => match script.initialize(context_ptr) {
                             Ok(()) => {
                                 context.log.host_log(
                                     LogLevel::Info,
                                     &format!(
-                                        "mono-host：Hezhou.PlayerGame.Initialize(0) 成功（assembly {}）",
-                                        script.assembly()
+                                        "mono-host：Hezhou.PlayerGame.Initialize(context={:#x}) 成功（assembly {}）；C# Initialize 后 Scene 实体 {}",
+                                        context_ptr,
+                                        script.assembly(),
+                                        context.start_scene.get_all_entities().len()
                                     ),
                                 );
                                 mono_state = Some(MonoHostState {
@@ -441,12 +462,13 @@ impl PlayerHost for WindowPlayerHost {
             context.log.host_log(
                 LogLevel::Info,
                 &format!(
-                    "mono-host：Shutdown 完成（Initialize {} 次，Update {} 次，Shutdown {} 次，错误 {} 次，DLL {}）",
+                    "mono-host：Shutdown 完成（Initialize {} 次，Update {} 次，Shutdown {} 次，错误 {} 次，DLL {}）；C# Shutdown 后 Scene 实体 {}",
                     stats.initialize_calls,
                     stats.update_calls,
                     stats.shutdown_calls,
                     stats.errors,
-                    dll
+                    dll,
+                    context.start_scene.get_all_entities().len()
                 ),
             );
         } else {
