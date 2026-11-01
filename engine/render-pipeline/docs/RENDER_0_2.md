@@ -16,6 +16,9 @@
 | 质量档 低/中/高 | ✅ | 阴影开关、cascade 数、阴影分辨率、Bloom 开关、FXAA 开关 |
 | Blinn-Phong 回退 | ✅ 保留 | `RenderSettings::default()` 即 0.1 legacy 行为，现有 raster/FXAA/UI 路径不变 |
 | 编辑器实际启用 | ✅ 已接入（task-9） | `UIVulkanRenderer` 在 PBR 质量档走新 draw path；默认设置仍走 legacy，零回归 |
+| PBR 模式完整视觉 | ✅ 已补齐（task-18） | 天空盒（全屏渐变）、选中 outline、3D Gizmo 三轴、合成蒙皮 mesh 均进入实际 draw |
+| 蒙皮实际 draw | ✅ 合成 mesh 验证（task-18） | 64B stride + location 3/4 + joint palette 真实 draw；`upload_skin_palette` 供 asset/Player 接入 |
+| PBR 模式 resize | ✅ GPU 冒烟（task-18） | 320×180 → 640×360 重建并重新录制通过 |
 
 ## 2. 模块结构
 
@@ -38,8 +41,8 @@
 | `src/render_quality.rs` | 质量档 → `ShadowPassDesc`（image/view/sampler/render pass 创建参数）、`BloomPlan`、pass 顺序、显存估算 |
 | `src/shadow_map.rs` | `ShadowMapResources`：真实创建深度图/视图/采样器/render pass/framebuffer；`#[ignore]` GPU 冒烟测试 |
 | `src/skinning_plan.rs` | 蒙皮 pipeline 接入计划：`SkinnedVertexInput`（stride 64 + 5 attribute）、joint palette descriptor binding、palette 字节数、已编译 SPIR-V 校验 |
-| `src/pbr_forward.rs` | **实际绘制路径**：`PbrForwardPass`（HDR 目标 + PBR/Shadow/Bloom/Tonemap pipeline + 录制 Shadow→Game→Bloom→Tonemap）、`SkinnedPipelineState`（蒙皮 pipeline + palette 上传）、`camera_view_matrix/projection`、GPU 冒烟测试 |
-| `tests/pbr_forward_gpu.rs` | `#[ignore]` GPU 冒烟：High/Low 两档真实创建资源并录制提交 draw 命令 |
+| `src/pbr_forward.rs` | **实际绘制路径**：`PbrForwardPass`（HDR 目标 + PBR/Shadow/Bloom/Tonemap + 天空盒 + 选中 outline + 3D Gizmo pipeline + 录制函数）、`SkinnedPipelineState`（蒙皮 pipeline + 内置合成 skinned mesh + palette 动画/上传）、`camera_view_matrix/projection`、GPU 冒烟测试 |
+| `tests/pbr_forward_gpu.rs` | `#[ignore]` GPU 冒烟：High/Low 完整视觉 + 合成蒙皮 draw + resize 真实提交 |
 | `src/ui_vulkan_renderer.rs` | 新增 `render_settings` 字段与 `set_render_quality_preset` / `set_render_settings` / `render_plan` 接口 |
 
 ### shaders（新增，均带中文注释与契约常量）
@@ -123,7 +126,12 @@ draw_frame:
   ensure_pbr_forward()               // 设置/尺寸变化时创建或重建
   if pbr_forward:                    // 新路径
       Shadow pass (每 cascade)       // shadow_depth.vert/frag, D32 array
-      Game pass (HDR)                // pbr.vert/frag, R16G16B16A16_SFLOAT + 复用 D32 depth
+      HDR pass:
+        天空盒（sky.vert/frag）      // 全屏渐变，clear color 用天空底色
+        Game(PBR)                    // pbr.vert/frag, R16G16B16A16_SFLOAT + 复用 D32 depth
+        选中 outline（rotation.vert/frag，144B push，放大 1.05 + alpha blend）
+        3D Gizmo 三轴（同一 outline pipeline + gizmo 顶点缓冲）
+        合成蒙皮 mesh（skinning.vert/rotation.frag，stride64 + palette）
       Bloom prefilter (可选)         // bloom_prefilter.frag, 半分辨率
       Tonemap                        // post_tonemap.frag → renderer 的 LDR offscreen image
   else:                              // Legacy 路径（默认）
@@ -138,13 +146,15 @@ draw_frame:
 |---|---|
 | PBR descriptor | set0 = PbrFrameUbo(480B) + 阴影 `sampler2DArrayShadow`；set1 = albedo/normal/MR/AO（默认中性 1x1 贴图） |
 | 阴影 | 质量档分辨率/cascade 数；`ShadowMapResources` 创建 D32 array + 逐层 framebuffer；`LESS_OR_EQUAL` + `CLAMP_TO_BORDER` |
+| 天空盒 | `PbrForwardPass` 创建 HDR pass 兼容的 sky pipeline（32B push：top/bottom） |
+| outline/Gizmo | HDR pass 兼容 pipeline，复用 legacy 144B push + renderer 的 light/texture descriptor sets（layout 兼容）；Gizmo 顶点缓冲按需创建 |
+| 合成蒙皮 | `SkinnedPipelineState` 内置 8 顶点/36 索引合成 cube + 2 关节动画 palette，每帧 `record_synthetic` 真实 draw |
 | 阴影关闭 | 绑定 1x1 占位 D32 array（shader 在 `cascade_count=0` 时直接返回受光） |
 | Bloom 关闭 | Tonemap 的 bloom binding 指向 HDR 自身且 `bloom_intensity=0`，无需占位纹理 |
-| SRGB 目标 | `bdrf_format` 为 SRGB 时把 tonemap gamma 置 1.0，由硬件编码，避免双重 gamma |
+| SRGB 目标 | LDR 格式为 SRGB 时把 tonemap gamma 置 1.0，由硬件编码，避免双重 gamma |
 | 质量档切换 | 下一帧检测 `settings != pass.settings()` → 旧 pass 进 `retired_pbr`（cleanup 统一销毁），临时重建 |
-| resize | `apply_pending_offscreen_resize` 先退役旧 PBR 通道，下一帧用新 depth/ldr view 重建 |
+| resize | `apply_pending_offscreen_resize` 先退役旧 PBR 通道，下一帧用新 depth/ldr view 重建（GPU 冒烟覆盖 320→640） |
 | Legacy 零回归 | 默认设置 `pbr_forward=None`，draw_frame 仍执行原有 legacy 分支（天空盒/outline/gizmo/Blinn-Phong 全保留） |
-| 蒙皮 | `SkinnedPipelineState` 创建（stride 64、location 3/4、set0 binding1 palette）+ `upload_skin_palette` API；Scene 侧暂无蒙皮 mesh 源，未进 draw 循环 |
 
 Draw path 证据 API（编辑器/测试可直接查询）：
 
@@ -190,9 +200,11 @@ let frame = settings.shadow_config();
 
 ## 7. 蒙皮（Skinning）pipeline 接入契约（与 animation-owner 协作）
 
-`animation-owner` 已交付 `engine/animation`。**本任务已完成**：GPU pipeline 创建
-（`hezhou_rhi_vulkan::SkinnedPipelineState`）、palette 资源与 `upload_skin_palette` API；
-仍缺少 Scene 侧"蒙皮 mesh 顶点/索引数据源"，因此还未进入 draw 循环（见 §8/§12）。
+`animation-owner` 已交付 `engine/animation`。**task-18 已完成**：GPU pipeline 创建
+（`hezhou_rhi_vulkan::SkinnedPipelineState`）、palette 资源与 `upload_skin_palette` API，
+并且 **PBR draw path 已用合成 skinned mesh 真实绘制**（8 顶点 cube，上下两段分属 2 个关节，
+每帧动画 palette）；High/Low/resize 三组 GPU 冒烟覆盖。真实角色 mesh 仍需 asset/core 提供
+顶点/索引 + 每帧 palette（接口已就绪）。
 
 | 项目 | 契约 |
 |---|---|
@@ -218,8 +230,8 @@ let vertex_input = skinning_plan::SkinnedVertexInput::new();
 renderer.upload_skin_palette(&palette.to_le_bytes())?;
 ```
 
-**当前状态**：pipeline/palette 已真实创建并可上传（GPU 冒烟测试覆盖），但 Scene 侧暂无
-"蒙皮 mesh 顶点/索引数据源"，故未进入 draw 循环；接入点见 §9 与 §12。
+**当前状态**：pipeline/palette/合成 skinned mesh 已进入 PBR HDR pass 的真实 draw，
+`upload_skin_palette` 供 asset/Player 上传真实角色 palette；接入点见 §9 与 §12。
 
 ## 8. 已知限制（0.2）
 
@@ -230,15 +242,17 @@ renderer.upload_skin_palette(&palette.to_le_bytes())?;
 5. **法线贴图使用导数 TBN**：无顶点切线数据；对强各向异性表面质量有限。
 6. **HDR 目标格式固定 `R16G16B16A16_SFLOAT`**：未做设备格式能力回退。
 7. **PBR 模式下的简化**（legacy 模式不受影响）:
-   - 不绘制天空盒、选中 outline、3D gizmo
    - 材质固定 `RenderSettings.default_material` + 中性默认贴图；per-entity 材质/纹理未接入
    - `PipelineRegistry` 启用时 PBR 通道不激活（走 registry 管线）
 8. **GPU 测试 ignored**：`create_shadow_map_on_gpu` / `pbr_forward_gpu_*` 需真实 Vulkan 设备。
 9. **阴影分辨率需 2 的幂**：`normalize_shadow_resolution` 向下取整收敛。
 10. **SPIR-V 手动编译**：修改 shader 后必须重跑 glslc，否则运行时使用旧 `.spv`。
-11. **蒙皮未进 draw 循环**：pipeline/palette 已就绪，缺少 Scene/asset 侧蒙皮 mesh 数据源。
-12. **质量档/reisze 时旧 PBR 通道延迟到 cleanup 销毁**：避免运行期销毁 Vulkan 资源触发
+11. **蒙皮真实角色数据未接入**：draw path 用合成 skinned mesh 验证（pipeline 正确性），
+    真实角色需 asset/Player 提供 64B skinned 顶点/索引 + 每帧 palette（`upload_skin_palette` 已就绪）。
+12. **质量档/resize 时旧 PBR 通道延迟到 cleanup 销毁**：避免运行期销毁 Vulkan 资源触发
     驱动 HEAP_CORRUPTION；频繁切换质量档会暂时多占显存（换档不频繁，可接受）。
+13. **PBR 模式 gizmo/outline 复用 legacy 着色器**：视觉效果与 legacy 一致，但需要 renderer
+    每帧更新 legacy light UBO（已实现）。
 
 ## 9. 编辑器接入点（给 Lead 的集成清单）
 
@@ -270,13 +284,12 @@ let uploaded = renderer.upload_skin_palette(&palette.to_le_bytes())?;
 | C# 查询 PBR 状态 | `FfiContext` 新增 `renderer_get_pbr_summary()` / `renderer_pbr_active()` | 返回字符串/布尔，供状态栏/自检 |
 | 编辑器 UI（画质下拉） | `EditorScript.*.cs`（质量档 3 选项 + “Legacy” 回退） | 调用上述 FFI；状态栏显示 `pbr_draw_path_summary` |
 | PBR 材质字段编辑 | `core` 材质组件 + `FfiContext` + Inspector | 当前 PBR 模式固定默认材质，需要 core/asset 扩展 |
-| 蒙皮 draw 接入 | `core`/`asset` 提供 skinned mesh 顶点/索引 + palette，`rhi-vulkan` 复用 `SkinnedPipelineState` | palette 上传 API 已就绪 |
+| 蒙皮 draw 接入 | `core`/`asset` 提供 skinned mesh 顶点/索引 + palette，`rhi-vulkan` 复用 `SkinnedPipelineState` | draw path 已用合成 mesh 验证；真实数据接口 `upload_skin_palette` 已就绪 |
 | 阴影/Bloom 调参 | “高级”面板覆盖 `set_render_settings` | `RenderSettings::validate` 会收敛非法值 |
 | SPV 打包 | 安装包脚本已包含 `engine/shaders`？ | 需确认打包/CI 是否随包分发新增 `.spv` |
 
 ### 每帧数据流（已实现）
 
-```
 ```
 Scene(DirectionalLightComponent) ──┐
 CameraParams + ViewportExtent ─────┤
@@ -334,6 +347,15 @@ task-9（实际接入）：
 | `cargo build -j 1 -p hezhou-examples --features mono` | 通过（exit 0，41.37s） |
 | Legacy 零回归 | 默认 `RenderSettings` 为 legacy，draw_frame 仍走原 rotation/Blinn-Phong 分支；PBR 资源完全未创建 |
 
+task-18（完整视觉 + 蒙皮 draw + resize）：
+
+| 项目 | 结果 |
+|---|---|
+| `cargo test -p hezhou-render-pipeline -p hezhou-rhi-vulkan` | render-pipeline 62+10+9 passed；rhi-vulkan **44 passed**，1 ignored（shadow GPU）、3 ignored（PBR GPU） |
+| `cargo test -p hezhou-rhi-vulkan --test pbr_forward_gpu -- --ignored` | **3 passed**（真实 Vulkan 设备）：High = Shadow→Game(PBR/HDR)+天空盒+选中 outline+3D Gizmo+合成蒙皮→Bloom→Tonemap；Low = 同一套视觉元素无阴影/无 Bloom；Resize = 320×180→640×360 重建并重新录制 |
+| `cargo build -j 1 -p hezhou-examples --features mono` | 通过（exit 0） |
+| Legacy 零回归 | legacy 分支未改动；PBR 新增 pipeline/资源仅在 PBR 质量档创建 |
+
 ## 11. 性能风险
 
 | 风险 | 影响 | 缓解 |
@@ -345,17 +367,18 @@ task-9（实际接入）：
 | Bloom 半分辨率目标 | 额外 ~4 MB（1080p） | 仅 High/Custom 开启；单级降采样 |
 | Tonemap/Bloom 全屏 pass | 2~3 个全屏 pass 带宽 | 无 Bloom 时少 1 个 pass；Low 档只有 Tonemap |
 | 质量档切换时旧通道延迟销毁 | 切换期间暂时多占显存 | 换档不频繁；cleanup 统一回收（规避运行期销毁驱动崩溃） |
-| PBR 模式无天空盒/outline/gizmo | 编辑器交互提示减少 | 默认 legacy；作为已知限制记录 |
+| 天空盒/outline/Gizmo/合成蒙皮额外 draw | 每帧多 5~10 个 draw call | 数量固定且很小，相对场景实体可忽略 |
+| 合成蒙皮 mesh palette 每帧上传 | 128B HOST_COHERENT 写入 | 可忽略；真实角色 palette ≤16KB/角色 |
 
 ## 12. 第二轮 TODO
 
-1. PBR 模式补齐天空盒、选中 outline、3D gizmo（需要为 HDR render pass 创建兼容 pipeline）。
-2. 逐级 cascade 视锥剔除、按实体 AABB 构建光源可见集。
-3. 设备格式能力查询 + HDR 格式回退（`R11G11B10F` 等）。
-4. Bloom 上采样链（当前单级 prefilter + 合成，未实现多级模糊上采样）。
-5. 透明/alpha test 阴影支持。
-6. 阴影 golden image 回归（需要自托管 GPU runner）。
-7. 蒙皮进入 draw 循环：Scene/asset 提供 skinned mesh 顶点/索引与每帧 palette，
-   复用已创建的 `SkinnedPipelineState`（非蒙皮实体继续走现有路径）。
-8. per-entity PBR 材质/纹理：core 材质组件 + FfiContext + Inspector 接入。
+1. 逐级 cascade 视锥剔除、按实体 AABB 构建光源可见集。
+2. 设备格式能力查询 + HDR 格式回退（`R11G11B10F` 等）。
+3. Bloom 上采样链（当前单级 prefilter + 合成，未实现多级模糊上采样）。
+4. 透明/alpha test 阴影支持。
+5. 阴影 golden image 回归（需要自托管 GPU runner）。
+6. 真实角色蒙皮接入：asset/Player 提供 64B skinned mesh + 每帧 palette（复用
+   `SkinnedPipelineState` / `upload_skin_palette`，合成 mesh 可退化为自检/关闭）。
+7. per-entity PBR 材质/纹理：core 材质组件 + FfiContext + Inspector 接入。
+8. PBR 模式也支持 `PipelineRegistry` 仲裁（当前 registry 启用时走 registry 管线）。
 

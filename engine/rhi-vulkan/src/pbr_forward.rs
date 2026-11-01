@@ -24,10 +24,11 @@
 
 use ash::vk;
 use bytemuck::cast_slice;
+use hezhou_animation::gpu::{SkinnedVertex, SKINNED_VERTEX_STRIDE};
 use hezhou_render_pipeline::post::{BloomPrefilterPushConstant, PostTonemapPushConstant};
 use hezhou_render_pipeline::pbr::{PbrFrameUbo, PbrLight, PbrMaterial, PbrPushConstant};
 use hezhou_render_pipeline::shadow::{camera_basis, ShadowFrameData, ShadowPushConstant};
-use hezhou_render_pipeline::{RenderSettings, ViewportExtent};
+use hezhou_render_pipeline::{PushConstantData, RenderSettings, ViewportExtent};
 
 use crate::render_quality::{shadow_pass_desc, HDR_COLOR_FORMAT};
 use crate::shadow_map::ShadowMapResources;
@@ -54,6 +55,99 @@ pub const LEGACY_FOV_DEGREES: f32 = 60.0;
 pub const LEGACY_NEAR: f32 = 0.1;
 /// legacy 远平面
 pub const LEGACY_FAR: f32 = 100.0;
+/// legacy 静态着色 push constant 字节数（`rotation.vert/frag` 布局，144B）
+pub const LEGACY_PUSH_CONSTANT_BYTES: u32 = std::mem::size_of::<PushConstantData>() as u32;
+/// 天空盒 push constant 字节数（top/bottom 两个 vec4，32B）
+pub const SKY_PUSH_CONSTANT_BYTES: u32 = 32;
+/// Gizmo 单轴顶点数（build_gizmo_vertices: 2 平面 × 4 三角形 × 3 顶点 = 24）
+pub const GIZMO_VERTICES_PER_AXIS: u32 = 24;
+/// Gizmo 轴数（X/Y/Z）
+pub const GIZMO_AXIS_COUNT: u32 = 3;
+/// Gizmo 顶点缓冲字节数（3 轴 × 24 顶点 × 32B）
+pub const GIZMO_VERTEX_BUFFER_BYTES: u64 =
+    (GIZMO_AXIS_COUNT * GIZMO_VERTICES_PER_AXIS * 32) as u64;
+/// Gizmo 三轴颜色（X 红 / Y 绿 / Z 蓝，与 legacy gizmo 一致）
+pub const GIZMO_AXIS_COLORS: [[f32; 3]; 3] = [
+    [0.95, 0.25, 0.25],
+    [0.3, 0.95, 0.4],
+    [0.3, 0.55, 1.0],
+];
+
+/// 天空盒 push constant（与 `shaders/sky.vert/frag` 一致）
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default, bytemuck::Pod, bytemuck::Zeroable)]
+pub struct SkyPushConstant {
+    /// 顶部颜色（w=保留）
+    pub top: [f32; 4],
+    /// 底部颜色（w=保留）
+    pub bottom: [f32; 4],
+}
+
+impl SkyPushConstant {
+    /// 从场景天空颜色构造
+    pub fn new(top: [f32; 3], bottom: [f32; 3]) -> Self {
+        Self {
+            top: [top[0], top[1], top[2], 1.0],
+            bottom: [bottom[0], bottom[1], bottom[2], 1.0],
+        }
+    }
+}
+
+/// outline / gizmo 共用的 legacy 相机 push 数据（`rotation.vert/frag` 144B 布局）
+#[derive(Clone, Copy, Debug)]
+pub struct LegacyPushBase {
+    /// 视口尺寸（像素）
+    pub viewport: [f32; 2],
+    /// 相机世界坐标
+    pub camera_pos: [f32; 3],
+    /// 相机 yaw
+    pub camera_yaw: f32,
+    /// 相机 pitch
+    pub camera_pitch: f32,
+}
+
+impl LegacyPushBase {
+    /// 构造 outline 的 push constant（选中高亮色 `[1.0,0.5,0.0]`，is_selected=1）
+    pub fn outline_push(&self, model: [[f32; 4]; 4]) -> PushConstantData {
+        self.build(model, [1.0, 0.5, 0.0], 1.0, 0.0)
+    }
+
+    /// 构造 gizmo 轴线的 push constant（选中色作为轴线颜色，无纹理/无高光）
+    pub fn gizmo_push(&self, model: [[f32; 4]; 4], color: [f32; 3]) -> PushConstantData {
+        self.build(model, color, 1.0, 0.0)
+    }
+
+    /// 构造普通 mesh 的 push constant（is_selected=0，非 outline；蒙皮合成 mesh 用）
+    pub fn mesh_push(&self, model: [[f32; 4]; 4], has_texture: f32) -> PushConstantData {
+        self.build(model, [0.0, 0.0, 0.0], 0.0, has_texture)
+    }
+
+    fn build(
+        &self,
+        model: [[f32; 4]; 4],
+        outline_color: [f32; 3],
+        is_selected: f32,
+        has_texture: f32,
+    ) -> PushConstantData {
+        PushConstantData {
+            model,
+            outline_color,
+            is_selected,
+            viewport_size: self.viewport,
+            _pad: [0.0, 0.0],
+            camera_pos: self.camera_pos,
+            camera_yaw: self.camera_yaw,
+            camera_pitch: self.camera_pitch,
+            _pad2: 0.0,
+            has_texture,
+            specular_strength: 0.3,
+            ambient_strength: 0.15,
+            shininess: 32.0,
+            _end_pad: [0.0, 0.0],
+        }
+    }
+}
+
 
 /// 单个 mesh 的绘制描述（与 mesh 数据来源解耦）
 #[derive(Clone, Copy, Debug, Default)]
@@ -178,6 +272,21 @@ pub struct PbrForwardPass {
     material_sampler: vk::Sampler,
     material_textures: Vec<GpuTarget>,
     hdr_sampler: vk::Sampler,
+
+    // legacy 视觉补齐：天空盒 / 选中 outline / 3D gizmo
+    sky_pipeline: vk::Pipeline,
+    sky_layout: vk::PipelineLayout,
+    outline_pipeline: vk::Pipeline,
+    /// outline/gizmo 用的 legacy 兼容 pipeline layout（set0=light UBO，set1=材质贴图，144B push）
+    legacy_draw_layout: vk::PipelineLayout,
+    legacy_set0_layout: vk::DescriptorSetLayout,
+    legacy_set1_layout: vk::DescriptorSetLayout,
+    legacy_pool: vk::DescriptorPool,
+    /// 内置 fallback sets（renderer 可传入自己的兼容 sets 覆盖）
+    legacy_light_set: vk::DescriptorSet,
+    legacy_texture_set: vk::DescriptorSet,
+    legacy_light_ubo: vk::Buffer,
+    legacy_light_ubo_memory: vk::DeviceMemory,
 }
 
 impl PbrForwardPass {
@@ -273,6 +382,7 @@ impl PbrForwardPass {
                     depth_write: true,
                     depth_compare: vk::CompareOp::LESS_OR_EQUAL,
                     color_attachment: false,
+                    alpha_blend: false,
                 },
             )?;
             shadow = Some(ShadowTarget {
@@ -436,6 +546,144 @@ impl PbrForwardPass {
                 depth_write: true,
                 depth_compare: vk::CompareOp::LESS,
                 color_attachment: true,
+                alpha_blend: false,
+            },
+        )?;
+
+        // === 9.1 天空盒 pipeline（复用 sky.vert/frag，HDR 目标，全屏三角形） ===
+        let sky_layout = create_pipeline_layout(
+            &device,
+            SKY_PUSH_CONSTANT_BYTES,
+            vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT,
+            &[],
+        )?;
+        let sky_pipeline = create_pipeline(
+            &device,
+            hdr_render_pass,
+            sky_layout,
+            PipelineShaders {
+                vert: include_bytes!("../../shaders/sky.vert.spv"),
+                frag: include_bytes!("../../shaders/sky.frag.spv"),
+            },
+            &PipelineOptions {
+                vertex_stride: 0,
+                vertex_attributes: &[],
+                depth_test: false,
+                depth_write: false,
+                depth_compare: vk::CompareOp::ALWAYS,
+                color_attachment: true,
+                alpha_blend: false,
+            },
+        )?;
+
+        // === 9.2 选中 outline / Gizmo pipeline ===
+        // legacy 兼容 layout：set0 = light UBO(binding0, FRAGMENT)，
+        // set1 = 材质贴图(binding0, FRAGMENT)，push constant = 144B。
+        // renderer 自己的 light/texture descriptor sets 与本 layout 兼容，可直接复用；
+        // 独立使用（GPU 测试）时使用模块内置的 fallback sets。
+        let legacy_set0_layout = create_descriptor_set_layout(
+            &device,
+            &[binding(
+                0,
+                vk::DescriptorType::UNIFORM_BUFFER,
+                vk::ShaderStageFlags::FRAGMENT,
+            )],
+        )?;
+        let legacy_set1_layout = create_descriptor_set_layout(
+            &device,
+            &[binding(
+                0,
+                vk::DescriptorType::COMBINED_IMAGE_SAMPLER,
+                vk::ShaderStageFlags::FRAGMENT,
+            )],
+        )?;
+        let legacy_pool = create_descriptor_pool(
+            &device,
+            2,
+            &[
+                (vk::DescriptorType::UNIFORM_BUFFER, 1),
+                (vk::DescriptorType::COMBINED_IMAGE_SAMPLER, 1),
+            ],
+        )?;
+        let legacy_light_set =
+            allocate_descriptor_set(&device, legacy_pool, legacy_set0_layout)?;
+        let legacy_texture_set =
+            allocate_descriptor_set(&device, legacy_pool, legacy_set1_layout)?;
+        let (legacy_light_ubo, legacy_light_ubo_memory) = create_host_buffer(
+            &device,
+            &memory_properties,
+            32,
+            vk::BufferUsageFlags::UNIFORM_BUFFER,
+        )?;
+        // 默认光数据（std430：direction(12)+pad(4)+color(12)+intensity(4) = 32B）
+        let default_legacy_light: [f32; 8] = [-0.5, -1.0, -0.5, 0.0, 1.0, 1.0, 1.0, 1.0];
+        let legacy_light_ptr = device
+            .map_memory(legacy_light_ubo_memory, 0, 32, vk::MemoryMapFlags::empty())
+            .map_err(|e| format!("PbrForwardPass: map 内置 light UBO 失败: {e}"))?;
+        std::ptr::copy_nonoverlapping(
+            default_legacy_light.as_ptr() as *const u8,
+            legacy_light_ptr as *mut u8,
+            32,
+        );
+        device.unmap_memory(legacy_light_ubo_memory);
+        let legacy_light_info = vk::DescriptorBufferInfo {
+            buffer: legacy_light_ubo,
+            offset: 0,
+            range: 32,
+        };
+        let legacy_white_info = vk::DescriptorImageInfo {
+            sampler: material_sampler,
+            image_view: material_textures[0].view,
+            image_layout: vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
+        };
+        device.update_descriptor_sets(
+            &[
+                vk::WriteDescriptorSet {
+                    dst_set: legacy_light_set,
+                    dst_binding: 0,
+                    descriptor_count: 1,
+                    descriptor_type: vk::DescriptorType::UNIFORM_BUFFER,
+                    p_buffer_info: &legacy_light_info,
+                    ..Default::default()
+                },
+                vk::WriteDescriptorSet {
+                    dst_set: legacy_texture_set,
+                    dst_binding: 0,
+                    descriptor_count: 1,
+                    descriptor_type: vk::DescriptorType::COMBINED_IMAGE_SAMPLER,
+                    p_image_info: &legacy_white_info,
+                    ..Default::default()
+                },
+            ],
+            &[],
+        );
+        let legacy_draw_layout = create_pipeline_layout(
+            &device,
+            LEGACY_PUSH_CONSTANT_BYTES,
+            vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT,
+            &[legacy_set0_layout, legacy_set1_layout],
+        )?;
+
+        let outline_pipeline = create_pipeline(
+            &device,
+            hdr_render_pass,
+            legacy_draw_layout,
+            PipelineShaders {
+                vert: include_bytes!("../../shaders/rotation.vert.spv"),
+                frag: include_bytes!("../../shaders/rotation.frag.spv"),
+            },
+            &PipelineOptions {
+                vertex_stride: 32,
+                vertex_attributes: &[
+                    (0, vk::Format::R32G32B32_SFLOAT, 0),
+                    (1, vk::Format::R32G32B32_SFLOAT, 12),
+                    (2, vk::Format::R32G32_SFLOAT, 24),
+                ],
+                depth_test: true,
+                depth_write: false,
+                depth_compare: vk::CompareOp::LESS_OR_EQUAL,
+                color_attachment: true,
+                alpha_blend: true,
             },
         )?;
 
@@ -512,6 +760,7 @@ impl PbrForwardPass {
                     depth_write: false,
                     depth_compare: vk::CompareOp::ALWAYS,
                     color_attachment: true,
+                    alpha_blend: false,
                 },
             )?;
             bloom = Some(BloomTarget {
@@ -598,6 +847,7 @@ impl PbrForwardPass {
                 depth_write: false,
                 depth_compare: vk::CompareOp::ALWAYS,
                 color_attachment: true,
+                alpha_blend: false,
             },
         )?;
 
@@ -637,6 +887,17 @@ impl PbrForwardPass {
             material_sampler,
             material_textures,
             hdr_sampler,
+            sky_pipeline,
+            sky_layout,
+            outline_pipeline,
+            legacy_draw_layout,
+            legacy_set0_layout,
+            legacy_set1_layout,
+            legacy_pool,
+            legacy_light_set,
+            legacy_texture_set,
+            legacy_light_ubo,
+            legacy_light_ubo_memory,
         })
     }
 
@@ -663,6 +924,21 @@ impl PbrForwardPass {
     /// LDR 输出格式是否 SRGB（若是，tonemap 的 gamma 由硬件完成）
     pub fn ldr_is_srgb(&self) -> bool {
         format_is_srgb(self.ldr_format)
+    }
+
+    /// 天空盒 pipeline 是否已创建
+    pub fn sky_pipeline_ready(&self) -> bool {
+        self.sky_pipeline != vk::Pipeline::null()
+    }
+
+    /// 选中 outline / Gizmo pipeline 是否已创建
+    pub fn outline_pipeline_ready(&self) -> bool {
+        self.outline_pipeline != vk::Pipeline::null()
+    }
+
+    /// renderer 的 legacy pipeline layout（outline/gizmo descriptor sets 绑定用）
+    pub fn legacy_draw_layout(&self) -> vk::PipelineLayout {
+        self.legacy_draw_layout
     }
 
     /// 上传 PbrFrameUbo（含阴影级联数据）
@@ -758,7 +1034,7 @@ impl PbrForwardPass {
         }
     }
 
-    /// 录制 PBR 主 pass（HDR 目标）
+    /// 录制 PBR 主 pass（HDR 目标）— 兼容入口：begin + 实体 + end
     ///
     /// # Safety
     /// 同 [`PbrForwardPass::record_shadow`]
@@ -770,6 +1046,18 @@ impl PbrForwardPass {
         draws: &[MeshDraw],
         material: &PbrMaterial,
     ) {
+        self.begin_scene(cmd, [0.05, 0.05, 0.1, 1.0]);
+        self.record_scene_draws(cmd, vertex_buffer, index_buffer, draws, material);
+        self.end_scene(cmd);
+    }
+
+    /// 开始 PBR HDR render pass
+    ///
+    /// `clear_color` 用于无天空盒时区分质量档底色（有天空盒时会被全屏天空覆盖）。
+    ///
+    /// # Safety
+    /// 同 [`PbrForwardPass::record_shadow`]
+    pub unsafe fn begin_scene(&self, cmd: vk::CommandBuffer, clear_color: [f32; 4]) {
         let extent = vk::Extent2D {
             width: self.extent.width,
             height: self.extent.height,
@@ -777,7 +1065,7 @@ impl PbrForwardPass {
         let clear_values = [
             vk::ClearValue {
                 color: vk::ClearColorValue {
-                    float32: [0.02, 0.02, 0.05, 1.0],
+                    float32: clear_color,
                 },
             },
             vk::ClearValue {
@@ -795,6 +1083,38 @@ impl PbrForwardPass {
             &clear_values,
         );
         self.set_viewport(cmd, extent);
+    }
+
+    /// 绘制天空盒（全屏三角形；应在实体之前、`begin_scene` 之后调用）
+    ///
+    /// # Safety
+    /// 必须已调用 [`PbrForwardPass::begin_scene`]
+    pub unsafe fn record_sky(&self, cmd: vk::CommandBuffer, top: [f32; 3], bottom: [f32; 3]) {
+        self.device
+            .cmd_bind_pipeline(cmd, vk::PipelineBindPoint::GRAPHICS, self.sky_pipeline);
+        let push = SkyPushConstant::new(top, bottom);
+        self.device.cmd_push_constants(
+            cmd,
+            self.sky_layout,
+            vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT,
+            0,
+            cast_slice(&[push]),
+        );
+        self.device.cmd_draw(cmd, 3, 1, 0, 0);
+    }
+
+    /// 绘制 PBR 实体（bind pipeline/sets/vertex + per-draw push constant）
+    ///
+    /// # Safety
+    /// 必须处于 HDR render pass 内
+    pub unsafe fn record_scene_draws(
+        &self,
+        cmd: vk::CommandBuffer,
+        vertex_buffer: vk::Buffer,
+        index_buffer: vk::Buffer,
+        draws: &[MeshDraw],
+        material: &PbrMaterial,
+    ) {
         self.device
             .cmd_bind_pipeline(cmd, vk::PipelineBindPoint::GRAPHICS, self.pbr_pipeline);
         self.device.cmd_bind_descriptor_sets(
@@ -818,6 +1138,116 @@ impl PbrForwardPass {
             );
             self.draw_mesh(cmd, index_buffer, draw);
         }
+    }
+
+    /// 绘制选中 outline（复用 legacy `rotation.vert/frag` pipeline + 144B push constant）
+    ///
+    /// `light_set` / `texture_set` 为 renderer 的 legacy descriptor sets
+    /// （与 `legacy_draw_layout` 兼容）。
+    ///
+    /// # Safety
+    /// 必须处于 HDR render pass 内；descriptor sets 必须与 `legacy_draw_layout` 兼容
+    pub unsafe fn record_outline(
+        &self,
+        cmd: vk::CommandBuffer,
+        light_set: Option<vk::DescriptorSet>,
+        texture_set: Option<vk::DescriptorSet>,
+        vertex_buffer: vk::Buffer,
+        index_buffer: vk::Buffer,
+        outlines: &[MeshDraw],
+        base: &LegacyPushBase,
+    ) {
+        if outlines.is_empty() {
+            return;
+        }
+        self.device.cmd_bind_pipeline(
+            cmd,
+            vk::PipelineBindPoint::GRAPHICS,
+            self.outline_pipeline,
+        );
+        self.device.cmd_bind_descriptor_sets(
+            cmd,
+            vk::PipelineBindPoint::GRAPHICS,
+            self.legacy_draw_layout,
+            0,
+            &[
+                light_set.unwrap_or(self.legacy_light_set),
+                texture_set.unwrap_or(self.legacy_texture_set),
+            ],
+            &[],
+        );
+        self.device
+            .cmd_bind_vertex_buffers(cmd, 0, &[vertex_buffer], &[0]);
+        for draw in outlines {
+            let push = base.outline_push(draw.model);
+            self.device.cmd_push_constants(
+                cmd,
+                self.legacy_draw_layout,
+                vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT,
+                0,
+                cast_slice(&[push]),
+            );
+            self.draw_mesh(cmd, index_buffer, draw);
+        }
+    }
+
+    /// 绘制 3D Gizmo 三轴（复用 outline pipeline + renderer 的 gizmo 顶点缓冲）
+    ///
+    /// # Safety
+    /// 必须处于 HDR render pass 内；`gizmo_vertex_buffer` 需包含
+    /// [`GIZMO_AXIS_COUNT`] × [`GIZMO_VERTICES_PER_AXIS`] 个 32B 顶点
+    pub unsafe fn record_gizmo(
+        &self,
+        cmd: vk::CommandBuffer,
+        light_set: Option<vk::DescriptorSet>,
+        texture_set: Option<vk::DescriptorSet>,
+        gizmo_vertex_buffer: vk::Buffer,
+        position: [f32; 3],
+        base: &LegacyPushBase,
+    ) {
+        self.device.cmd_bind_pipeline(
+            cmd,
+            vk::PipelineBindPoint::GRAPHICS,
+            self.outline_pipeline,
+        );
+        self.device.cmd_bind_descriptor_sets(
+            cmd,
+            vk::PipelineBindPoint::GRAPHICS,
+            self.legacy_draw_layout,
+            0,
+            &[
+                light_set.unwrap_or(self.legacy_light_set),
+                texture_set.unwrap_or(self.legacy_texture_set),
+            ],
+            &[],
+        );
+        self.device
+            .cmd_bind_vertex_buffers(cmd, 0, &[gizmo_vertex_buffer], &[0]);
+        let model = translation_matrix(position);
+        for axis in 0..GIZMO_AXIS_COUNT {
+            let push = base.gizmo_push(model, GIZMO_AXIS_COLORS[axis as usize]);
+            self.device.cmd_push_constants(
+                cmd,
+                self.legacy_draw_layout,
+                vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT,
+                0,
+                cast_slice(&[push]),
+            );
+            self.device.cmd_draw(
+                cmd,
+                GIZMO_VERTICES_PER_AXIS,
+                1,
+                axis * GIZMO_VERTICES_PER_AXIS,
+                0,
+            );
+        }
+    }
+
+    /// 结束 PBR HDR render pass
+    ///
+    /// # Safety
+    /// 必须与 [`PbrForwardPass::begin_scene`] 配对
+    pub unsafe fn end_scene(&self, cmd: vk::CommandBuffer) {
         self.device.cmd_end_render_pass(cmd);
     }
 
@@ -930,12 +1360,26 @@ impl PbrForwardPass {
         let pipelines = [
             self.pbr_pipeline,
             self.tonemap_pipeline,
+            self.sky_pipeline,
+            self.outline_pipeline,
         ];
         for pipeline in pipelines {
             if pipeline != vk::Pipeline::null() {
                 device.destroy_pipeline(pipeline, None);
             }
         }
+        if self.sky_layout != vk::PipelineLayout::null() {
+            device.destroy_pipeline_layout(self.sky_layout, None);
+        }
+        // outline/gizmo 的 legacy 兼容 layout + fallback sets
+        if self.legacy_draw_layout != vk::PipelineLayout::null() {
+            device.destroy_pipeline_layout(self.legacy_draw_layout, None);
+        }
+        device.destroy_descriptor_pool(self.legacy_pool, None);
+        device.destroy_descriptor_set_layout(self.legacy_set0_layout, None);
+        device.destroy_descriptor_set_layout(self.legacy_set1_layout, None);
+        device.destroy_buffer(self.legacy_light_ubo, None);
+        device.free_memory(self.legacy_light_ubo_memory, None);
         if let Some(mut shadow) = self.shadow.take() {
             device.destroy_pipeline(shadow.pipeline, None);
             device.destroy_pipeline_layout(shadow.layout, None);
@@ -1072,6 +1516,13 @@ pub struct SkinnedPipelineState {
     light_ubo_memory: vk::DeviceMemory,
     white_texture: GpuTarget,
     sampler: vk::Sampler,
+    // 合成 skinned mesh（8 顶点 × 64B + 36 索引），用于验证 pipeline 实际进 draw
+    skinned_vertex_buffer: vk::Buffer,
+    skinned_vertex_memory: vk::DeviceMemory,
+    skinned_index_buffer: vk::Buffer,
+    skinned_index_memory: vk::DeviceMemory,
+    skinned_vertex_count: u32,
+    skinned_index_count: u32,
 }
 
 impl SkinnedPipelineState {
@@ -1229,8 +1680,76 @@ impl SkinnedPipelineState {
                 depth_write: true,
                 depth_compare: vk::CompareOp::LESS,
                 color_attachment: true,
+                alpha_blend: false,
             },
         )?;
+
+        // 合成 skinned mesh：8 顶点（64B stride）+ 36 索引，用于真实 draw 验证
+        let (synthetic_vertices, synthetic_indices) = synthetic_skinned_cube();
+        // SkinnedVertex 不实现 bytemuck::Pod（animation crate 零依赖），手动序列化
+        let mut vertex_bytes: Vec<u8> =
+            Vec::with_capacity(synthetic_vertices.len() * SKINNED_VERTEX_STRIDE);
+        for vertex in &synthetic_vertices {
+            for value in vertex
+                .position
+                .iter()
+                .chain(vertex.normal.iter())
+                .chain(vertex.uv.iter())
+            {
+                vertex_bytes.extend_from_slice(&value.to_le_bytes());
+            }
+            for value in &vertex.joint_indices {
+                vertex_bytes.extend_from_slice(&value.to_le_bytes());
+            }
+            for value in &vertex.joint_weights {
+                vertex_bytes.extend_from_slice(&value.to_le_bytes());
+            }
+        }
+        debug_assert_eq!(
+            vertex_bytes.len(),
+            synthetic_vertices.len() * SKINNED_VERTEX_STRIDE
+        );
+        let (skinned_vertex_buffer, skinned_vertex_memory) = create_host_buffer(
+            &device,
+            &memory_properties,
+            vertex_bytes.len() as u64,
+            vk::BufferUsageFlags::VERTEX_BUFFER,
+        )?;
+        let vertex_ptr = device
+            .map_memory(
+                skinned_vertex_memory,
+                0,
+                vertex_bytes.len() as u64,
+                vk::MemoryMapFlags::empty(),
+            )
+            .map_err(|e| format!("SkinnedPipelineState: map skinned vertex buffer 失败: {e}"))?;
+        std::ptr::copy_nonoverlapping(
+            vertex_bytes.as_ptr(),
+            vertex_ptr as *mut u8,
+            vertex_bytes.len(),
+        );
+        device.unmap_memory(skinned_vertex_memory);
+        let index_bytes = cast_slice(&synthetic_indices);
+        let (skinned_index_buffer, skinned_index_memory) = create_host_buffer(
+            &device,
+            &memory_properties,
+            index_bytes.len() as u64,
+            vk::BufferUsageFlags::INDEX_BUFFER,
+        )?;
+        let index_ptr = device
+            .map_memory(
+                skinned_index_memory,
+                0,
+                index_bytes.len() as u64,
+                vk::MemoryMapFlags::empty(),
+            )
+            .map_err(|e| format!("SkinnedPipelineState: map skinned index buffer 失败: {e}"))?;
+        std::ptr::copy_nonoverlapping(
+            index_bytes.as_ptr(),
+            index_ptr as *mut u8,
+            index_bytes.len(),
+        );
+        device.unmap_memory(skinned_index_memory);
 
         Ok(Self {
             device,
@@ -1247,12 +1766,80 @@ impl SkinnedPipelineState {
             light_ubo_memory,
             white_texture,
             sampler,
+            skinned_vertex_buffer,
+            skinned_vertex_memory,
+            skinned_index_buffer,
+            skinned_index_memory,
+            skinned_vertex_count: synthetic_vertices.len() as u32,
+            skinned_index_count: synthetic_indices.len() as u32,
         })
     }
 
     /// 蒙皮 pipeline handle（供下一轮 draw 循环/测试使用）
     pub fn pipeline(&self) -> vk::Pipeline {
         self.pipeline
+    }
+
+    /// 合成 skinned mesh 顶点数（= 8）
+    pub fn skinned_vertex_count(&self) -> u32 {
+        self.skinned_vertex_count
+    }
+
+    /// 合成 skinned mesh 索引数（= 36）
+    pub fn skinned_index_count(&self) -> u32 {
+        self.skinned_index_count
+    }
+
+    /// 上传动画化 palette（2 关节，绕 Y 轴摆动；用于合成 skinned draw）
+    ///
+    /// # Safety
+    /// palette buffer 为 HOST_VISIBLE|HOST_COHERENT
+    pub unsafe fn update_palette_animated(&self, time: f32) -> Result<usize, String> {
+        let bytes = synthetic_skin_palette(time);
+        self.upload_joint_palette(&bytes)
+    }
+
+    /// 绘制合成 skinned mesh（验证 stride64 + location3/4 + palette 的真实 draw）
+    ///
+    /// `model` 为网格摆放矩阵；`base` 提供 legacy 相机 push 数据。
+    ///
+    /// # Safety
+    /// 必须处于 HDR render pass 内；调用前已通过 `update_palette_animated` 或
+    /// `upload_joint_palette` 上传 palette
+    pub unsafe fn record_synthetic(
+        &self,
+        cmd: vk::CommandBuffer,
+        model: [[f32; 4]; 4],
+        base: &LegacyPushBase,
+    ) {
+        self.device
+            .cmd_bind_pipeline(cmd, vk::PipelineBindPoint::GRAPHICS, self.pipeline);
+        self.device.cmd_bind_descriptor_sets(
+            cmd,
+            vk::PipelineBindPoint::GRAPHICS,
+            self.layout,
+            0,
+            &[self.set0, self.set1],
+            &[],
+        );
+        self.device
+            .cmd_bind_vertex_buffers(cmd, 0, &[self.skinned_vertex_buffer], &[0]);
+        self.device.cmd_bind_index_buffer(
+            cmd,
+            self.skinned_index_buffer,
+            0,
+            vk::IndexType::UINT32,
+        );
+        let push = base.mesh_push(model, 0.0);
+        self.device.cmd_push_constants(
+            cmd,
+            self.layout,
+            vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT,
+            0,
+            cast_slice(&[push]),
+        );
+        self.device
+            .cmd_draw_indexed(cmd, self.skinned_index_count, 1, 0, 0, 0);
     }
 
     /// 上传 joint palette（`JointPalette::to_le_bytes()` 输出）
@@ -1298,8 +1885,122 @@ impl SkinnedPipelineState {
         device.free_memory(self.light_ubo_memory, None);
         destroy_gpu_target(&device, self.white_texture);
         device.destroy_sampler(self.sampler, None);
+        device.destroy_buffer(self.skinned_vertex_buffer, None);
+        device.free_memory(self.skinned_vertex_memory, None);
+        device.destroy_buffer(self.skinned_index_buffer, None);
+        device.free_memory(self.skinned_index_memory, None);
         let _ = (self.set0, self.set1);
     }
+}
+
+// === 合成蒙皮网格（GPU 冒烟 / 编辑器自检用，验证 stride64 + location 3/4 + palette） ===
+
+/// 构造一个上下两段分别受 2 个关节影响的立方体（8 顶点 × 64B + 36 索引）
+///
+/// 顶点布局与 `hezhou_animation::SkinnedVertex` 契约一致（stride 64）。
+pub fn synthetic_skinned_cube() -> (Vec<SkinnedVertex>, Vec<u32>) {
+    let mut vertices = Vec::with_capacity(8);
+    const HALF: f32 = 0.5;
+    for (index, corner) in [
+        [-HALF, -HALF, -HALF],
+        [HALF, -HALF, -HALF],
+        [HALF, -HALF, HALF],
+        [-HALF, -HALF, HALF],
+        [-HALF, HALF, -HALF],
+        [HALF, HALF, -HALF],
+        [HALF, HALF, HALF],
+        [-HALF, HALF, HALF],
+    ]
+    .iter()
+    .enumerate()
+    {
+        let position = *corner;
+        let length = (position[0] * position[0]
+            + position[1] * position[1]
+            + position[2] * position[2])
+            .sqrt()
+            .max(1e-6);
+        let normal = [
+            position[0] / length,
+            position[1] / length,
+            position[2] / length,
+        ];
+        // 下半部分受 joint0 控制，上半部分受 joint1 控制
+        let joint = if index < 4 { 0u32 } else { 1u32 };
+        vertices.push(SkinnedVertex {
+            position,
+            normal,
+            uv: [0.0, 0.0],
+            joint_indices: [joint, 0, 0, 0],
+            joint_weights: [1.0, 0.0, 0.0, 0.0],
+        });
+    }
+    let indices = vec![
+        0, 1, 2, 0, 2, 3, // bottom
+        4, 6, 5, 4, 7, 6, // top
+        0, 4, 5, 0, 5, 1, // front
+        1, 5, 6, 1, 6, 2, // right
+        2, 6, 7, 2, 7, 3, // back
+        3, 7, 4, 3, 4, 0, // left
+    ];
+    (vertices, indices)
+}
+
+/// 生成两关节动画 palette 字节（128B = 2 × mat4，column-major）
+///
+/// joint0 = 单位矩阵（下身固定），joint1 = 绕 Y 轴按 `time` 摆动（上身摆动）。
+pub fn synthetic_skin_palette(time: f32) -> Vec<u8> {
+    let angle = (time * 0.8).sin() * 0.5;
+    let c = angle.cos();
+    let s = angle.sin();
+    // column-major 3x3 Y 旋转填进 mat4
+    let joint1: [[f32; 4]; 4] = [
+        [c, 0.0, -s, 0.0],
+        [0.0, 1.0, 0.0, 0.0],
+        [s, 0.0, c, 0.0],
+        [0.0, 0.0, 0.0, 1.0],
+    ];
+    let identity: [[f32; 4]; 4] = [
+        [1.0, 0.0, 0.0, 0.0],
+        [0.0, 1.0, 0.0, 0.0],
+        [0.0, 0.0, 1.0, 0.0],
+        [0.0, 0.0, 0.0, 1.0],
+    ];
+    let mut bytes = Vec::with_capacity(2 * 64);
+    for matrix in [identity, joint1] {
+        for column in matrix {
+            for value in column {
+                bytes.extend_from_slice(&value.to_le_bytes());
+            }
+        }
+    }
+    bytes
+}
+
+/// 合成蒙皮网格的摆放矩阵（相机前方 2.5 单位、缩放 0.5、随 `time` 旋转）
+pub fn synthetic_skinned_model_matrix(
+    camera_pos: [f32; 3],
+    yaw: f32,
+    pitch: f32,
+    time: f32,
+) -> [[f32; 4]; 4] {
+    let (_, _, forward) = camera_basis(yaw, pitch);
+    // 放在相机前方，略低于视线中心
+    let position = [
+        camera_pos[0] + forward[0] * 2.5,
+        camera_pos[1] + forward[1] * 2.5 - 0.25,
+        camera_pos[2] + forward[2] * 2.5,
+    ];
+    let scale = 0.5f32;
+    let angle = time * 0.6;
+    let c = angle.cos();
+    let s = angle.sin();
+    [
+        [c * scale, 0.0, -s * scale, 0.0],
+        [0.0, scale, 0.0, 0.0],
+        [s * scale, 0.0, c * scale, 0.0],
+        [position[0], position[1], position[2], 1.0],
+    ]
 }
 
 // === 相机矩阵（与 shaders/rotation.vert 完全一致，保证 PBR 取景与 legacy 相同） ===
@@ -1344,6 +2045,57 @@ pub fn camera_projection_matrix(
 
 fn dot3(a: [f32; 3], b: [f32; 3]) -> f32 {
     a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
+}
+
+/// 平移矩阵（column-major，与 GLSL `translate()` 一致）
+pub fn translation_matrix(position: [f32; 3]) -> [[f32; 4]; 4] {
+    [
+        [1.0, 0.0, 0.0, 0.0],
+        [0.0, 1.0, 0.0, 0.0],
+        [0.0, 0.0, 1.0, 0.0],
+        [position[0], position[1], position[2], 1.0],
+    ]
+}
+
+/// 3D Gizmo 顶点数据（3 轴 × 24 顶点 × 8 floats，与 renderer `build_gizmo_vertices` 一致）
+///
+/// 每轴两条交叉薄四边形（双面），顶点格式 `x,y,z, nx,ny,nz, u,v`（stride 32B）。
+pub fn gizmo_vertex_data() -> Vec<f32> {
+    let axes = [
+        ([1.0f32, 0.0, 0.0], [0.0f32, 1.0, 0.0], [0.0f32, 0.0, 1.0]),
+        ([0.0f32, 1.0, 0.0], [1.0f32, 0.0, 0.0], [0.0f32, 0.0, 1.0]),
+        ([0.0f32, 0.0, 1.0], [1.0f32, 0.0, 0.0], [0.0f32, 1.0, 0.0]),
+    ];
+    let len = 2.0f32;
+    let w = 0.05f32;
+    let mut out = Vec::with_capacity(
+        GIZMO_AXIS_COUNT as usize * GIZMO_VERTICES_PER_AXIS as usize * 8,
+    );
+    for (d, u, v) in axes {
+        for plane in [u, v] {
+            let a = [-plane[0] * w, -plane[1] * w, -plane[2] * w];
+            let b = [plane[0] * w, plane[1] * w, plane[2] * w];
+            let c = [d[0] * len + a[0], d[1] * len + a[1], d[2] * len + a[2]];
+            let e = [d[0] * len + b[0], d[1] * len + b[1], d[2] * len + b[2]];
+            let mut push = |p: [f32; 3]| {
+                out.extend_from_slice(&[p[0], p[1], p[2], d[0], d[1], d[2], 0.0, 0.0]);
+            };
+            // 双面：正反各两个三角形
+            push(a);
+            push(b);
+            push(c);
+            push(c);
+            push(b);
+            push(e);
+            push(a);
+            push(c);
+            push(b);
+            push(c);
+            push(e);
+            push(b);
+        }
+    }
+    out
 }
 
 // === Vulkan 资源创建辅助函数 ===
@@ -1914,6 +2666,8 @@ struct PipelineOptions<'a> {
     depth_write: bool,
     depth_compare: vk::CompareOp,
     color_attachment: bool,
+    /// 是否启用 SRC_ALPHA/ONE_MINUS_SRC_ALPHA 混合（outline 用）
+    alpha_blend: bool,
 }
 
 unsafe fn create_pipeline(
@@ -1967,13 +2721,21 @@ unsafe fn create_pipeline(
     };
     let dynamic_states = [vk::DynamicState::VIEWPORT, vk::DynamicState::SCISSOR];
     let color_blend_attachment = vk::PipelineColorBlendAttachmentState {
-        blend_enable: vk::FALSE,
+        blend_enable: if options.alpha_blend { vk::TRUE } else { vk::FALSE },
         color_write_mask: vk::ColorComponentFlags::R
             | vk::ColorComponentFlags::G
             | vk::ColorComponentFlags::B
             | vk::ColorComponentFlags::A,
-        src_color_blend_factor: vk::BlendFactor::ONE,
-        dst_color_blend_factor: vk::BlendFactor::ZERO,
+        src_color_blend_factor: if options.alpha_blend {
+            vk::BlendFactor::SRC_ALPHA
+        } else {
+            vk::BlendFactor::ONE
+        },
+        dst_color_blend_factor: if options.alpha_blend {
+            vk::BlendFactor::ONE_MINUS_SRC_ALPHA
+        } else {
+            vk::BlendFactor::ZERO
+        },
         color_blend_op: vk::BlendOp::ADD,
         src_alpha_blend_factor: vk::BlendFactor::ONE,
         dst_alpha_blend_factor: vk::BlendFactor::ZERO,
@@ -2374,5 +3136,104 @@ mod tests {
         assert!(proj[1][1] < 0.0, "Vulkan 约定需要 Y 翻转");
         // 深度范围 [0,1]
         assert!(proj[3][2].abs() > 0.0);
+    }
+
+    #[test]
+    fn sky_and_legacy_push_layouts_match_shaders() {
+        assert_eq!(SKY_PUSH_CONSTANT_BYTES, 32);
+        assert_eq!(std::mem::size_of::<SkyPushConstant>(), 32);
+        assert_eq!(LEGACY_PUSH_CONSTANT_BYTES, 144);
+        let sky = SkyPushConstant::new([0.1, 0.2, 0.3], [0.4, 0.5, 0.6]);
+        assert_eq!(sky.top, [0.1, 0.2, 0.3, 1.0]);
+        assert_eq!(sky.bottom, [0.4, 0.5, 0.6, 1.0]);
+
+        let base = LegacyPushBase {
+            viewport: [1280.0, 720.0],
+            camera_pos: [1.0, 2.0, 3.0],
+            camera_yaw: 0.2,
+            camera_pitch: -0.3,
+        };
+        let push = base.outline_push(
+            [[1.0; 4]; 4],
+        );
+        assert_eq!(push.outline_color, [1.0, 0.5, 0.0]);
+        assert_eq!(push.is_selected, 1.0);
+        assert_eq!(push.viewport_size, [1280.0, 720.0]);
+        assert_eq!(push.camera_pos, [1.0, 2.0, 3.0]);
+        assert_eq!(push.has_texture, 0.0);
+        let bytes: [u8; 144] = bytemuck::cast(push);
+        assert_eq!(bytes.len(), 144);
+    }
+
+    #[test]
+    fn gizmo_vertex_data_matches_axis_layout() {
+        let vertices = gizmo_vertex_data();
+        assert_eq!(
+            vertices.len(),
+            GIZMO_AXIS_COUNT as usize * GIZMO_VERTICES_PER_AXIS as usize * 8
+        );
+        assert_eq!(
+            vertices.len() as u64 * 4,
+            GIZMO_VERTEX_BUFFER_BYTES,
+            "gizmo 顶点数据字节数应与常量一致"
+        );
+        // 前 24 个顶点是 X 轴（法线 = (1,0,0)，位于第 3..5 个 float）
+        for vertex in 0..24 {
+            let offset = vertex * 8;
+            assert_eq!(vertices[offset + 3], 1.0);
+            assert_eq!(vertices[offset + 4], 0.0);
+            assert_eq!(vertices[offset + 5], 0.0);
+        }
+        assert_eq!(GIZMO_AXIS_COLORS[0], [0.95, 0.25, 0.25]);
+    }
+
+    #[test]
+    fn synthetic_skinned_cube_matches_animation_contract() {
+        let (vertices, indices) = synthetic_skinned_cube();
+        assert_eq!(vertices.len(), 8);
+        assert_eq!(indices.len(), 36);
+        assert_eq!(SKINNED_VERTEX_STRIDE, 64);
+        // 下半 4 顶点 → joint0，上半 4 顶点 → joint1
+        for (index, vertex) in vertices.iter().enumerate() {
+            let expected_joint = if index < 4 { 0 } else { 1 };
+            assert_eq!(vertex.joint_indices, [expected_joint, 0, 0, 0]);
+            assert_eq!(vertex.joint_weights, [1.0, 0.0, 0.0, 0.0]);
+            assert!(vertex.position.iter().all(|v| v.abs() <= 0.5));
+        }
+        // 索引都在顶点范围内
+        assert!(indices.iter().all(|index| (*index as usize) < vertices.len()));
+    }
+
+    #[test]
+    fn synthetic_palette_is_two_matrices_and_finite() {
+        let bytes = synthetic_skin_palette(0.0);
+        assert_eq!(bytes.len(), 2 * 64);
+        assert_eq!(bytes.len(), joint_palette_bytes(2));
+        // time=0 时角度=0 → 两个矩阵都是近似单位阵
+        let values: Vec<f32> = bytes
+            .chunks_exact(4)
+            .map(|chunk| f32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]))
+            .collect();
+        assert_eq!(values.len(), 32);
+        assert!(values.iter().all(|value| value.is_finite()));
+        assert!((values[0] - 1.0).abs() < 1e-6);
+        // 非零时间后矩阵仍有限
+        let animated = synthetic_skin_palette(3.0);
+        assert_eq!(animated.len(), 128);
+    }
+
+    #[test]
+    fn synthetic_model_matrix_places_mesh_in_front_of_camera() {
+        let matrix = synthetic_skinned_model_matrix([0.0, 0.0, 5.0], 0.0, 0.0, 0.0);
+        // yaw=0,pitch=0 → forward=(0,0,-1)，网格应在 z = 5 - 2.5 = 2.5
+        assert!((matrix[3][2] - 2.5).abs() < 1e-5);
+        assert!((matrix[3][1] + 0.25).abs() < 1e-5);
+        assert!(matrix.iter().flatten().all(|value| value.is_finite()));
+    }
+
+    #[test]
+    fn translation_matrix_matches_glsl_translate() {
+        let matrix = translation_matrix([1.0, 2.0, 3.0]);
+        assert_eq!(matrix[3], [1.0, 2.0, 3.0, 1.0]);
     }
 }

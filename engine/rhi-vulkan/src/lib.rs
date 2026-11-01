@@ -43,12 +43,14 @@ pub use render_quality::{
 };
 pub use shadow_map::{ShadowMapResources, ShadowMapError};
 pub use pbr_forward::{
-    PbrForwardPass, SkinnedPipelineState, MeshDraw,
+    PbrForwardPass, SkinnedPipelineState, MeshDraw, LegacyPushBase, SkyPushConstant,
     camera_view_matrix, camera_projection_matrix, format_is_srgb,
     create_render_target, destroy_render_target, create_host_visible_buffer, GpuTarget,
     MAX_SKIN_JOINTS, JOINT_PALETTE_BUFFER_BYTES,
     PBR_PUSH_CONSTANT_BYTES, PBR_FRAME_UBO_BYTES, SHADOW_PUSH_CONSTANT_BYTES,
     TONEMAP_PUSH_CONSTANT_BYTES, BLOOM_PUSH_CONSTANT_BYTES,
+    LEGACY_PUSH_CONSTANT_BYTES, SKY_PUSH_CONSTANT_BYTES,
+    GIZMO_AXIS_COUNT, GIZMO_VERTICES_PER_AXIS, GIZMO_VERTEX_BUFFER_BYTES,
     LEGACY_FOV_DEGREES, LEGACY_NEAR, LEGACY_FAR,
 };
 pub use skinning_plan::{

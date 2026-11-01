@@ -1895,13 +1895,15 @@ p_multisample_state: &vk::PipelineMultisampleStateCreateInfo {
     pub fn pbr_draw_path_summary(&self) -> Option<String> {
         let pass = self.pbr_forward.as_ref()?;
         Some(format!(
-            "PBR active: {} (shadow={}, bloom={}, tonemap={}, hdr={}x{}, skinned_pipeline={})",
+            "PBR active: {} (shadow={}, bloom={}, tonemap={}, hdr={}x{}, sky_pipeline={}, outline_gizmo={}, skinned_pipeline={})",
             self.render_quality_summary(),
             pass.shadow_active(),
             pass.bloom_active(),
             pass.settings().effective_tonemap(),
             pass.extent.width,
             pass.extent.height,
+            pass.sky_pipeline_ready(),
+            pass.outline_pipeline_ready(),
             self.pbr_skinned.is_some()
         ))
     }
@@ -1992,6 +1994,8 @@ p_multisample_state: &vk::PipelineMultisampleStateCreateInfo {
         );
         self.pbr_forward = Some(pass);
         self.pbr_skinned = Some(skinned);
+        // 3D Gizmo 顶点缓冲（PBR 路径需要；legacy registry 路径此前按需创建）
+        self.ensure_pbr_gizmo_buffer()?;
         Ok(())
     }
 
@@ -2001,6 +2005,44 @@ p_multisample_state: &vk::PipelineMultisampleStateCreateInfo {
             let skinned = self.pbr_skinned.take();
             self.retired_pbr.push((pass, skinned));
         }
+    }
+
+    /// 确保 PBR 模式的 3D Gizmo 顶点缓冲已创建（3 轴 × 24 顶点 × 32B）
+    fn ensure_pbr_gizmo_buffer(&mut self) -> Result<(), String> {
+        if self.gizmo_vertex_buffer.is_some() {
+            return Ok(());
+        }
+        let vertices = crate::pbr_forward::gizmo_vertex_data();
+        let mut bytes = Vec::with_capacity(vertices.len() * 4);
+        for value in &vertices {
+            bytes.extend_from_slice(&value.to_le_bytes());
+        }
+        let (buffer, memory) = unsafe {
+            Self::create_buffer_with_usage(
+                &self.instance,
+                &self.device,
+                self.physical_device,
+                bytes.len() as vk::DeviceSize,
+                vk::BufferUsageFlags::VERTEX_BUFFER,
+                vk::MemoryPropertyFlags::HOST_VISIBLE | vk::MemoryPropertyFlags::HOST_COHERENT,
+            )?
+        };
+        unsafe {
+            let ptr = self
+                .device
+                .map_memory(
+                    memory,
+                    0,
+                    bytes.len() as u64,
+                    vk::MemoryMapFlags::empty(),
+                )
+                .map_err(|e| format!("PBR: map gizmo vertex buffer 失败: {e}"))?;
+            std::ptr::copy_nonoverlapping(bytes.as_ptr(), ptr as *mut u8, bytes.len());
+            self.device.unmap_memory(memory);
+        }
+        self.gizmo_vertex_buffer = Some(buffer);
+        self.gizmo_vertex_memory = Some(memory);
+        Ok(())
     }
 
     /// 录制 PBR 实际 draw path：Shadow → Game(PBR/HDR) → Bloom → Tonemap
@@ -2092,7 +2134,9 @@ p_multisample_state: &vk::PipelineMultisampleStateCreateInfo {
         }
 
         // 4. 构建 draw list（primitive + 自定义 mesh，数据源与 legacy 一致）
+        //    同时收集选中实体的 outline（放大 1.05，与 legacy 一致）
         let mut draws: Vec<MeshDraw> = Vec::new();
+        let mut outlines: Vec<MeshDraw> = Vec::new();
         if let Some(scene_ptr) = self.scene_ptr {
             unsafe {
                 let scene = &*scene_ptr;
@@ -2112,6 +2156,11 @@ p_multisample_state: &vk::PipelineMultisampleStateCreateInfo {
                         continue;
                     };
                     let model = Self::compute_model_matrix(&transform);
+                    let outline_model = if scene.selected_entities.contains(entity) {
+                        Some(Self::compute_scaled_model_matrix(&transform, 1.05))
+                    } else {
+                        None
+                    };
                     if crate::mesh_loader::is_custom_mesh(&renderable.mesh_path) {
                         if let Some(info) = self.custom_meshes.get(&renderable.mesh_path) {
                             draws.push(MeshDraw::indexed(
@@ -2121,6 +2170,15 @@ p_multisample_state: &vk::PipelineMultisampleStateCreateInfo {
                                 info.index_count,
                                 model,
                             ));
+                            if let Some(outline) = outline_model {
+                                outlines.push(MeshDraw::indexed(
+                                    info.vertex_offset,
+                                    info.vertex_count,
+                                    info.index_offset,
+                                    info.index_count,
+                                    outline,
+                                ));
+                            }
                         }
                     } else {
                         let mesh_type =
@@ -2131,13 +2189,51 @@ p_multisample_state: &vk::PipelineMultisampleStateCreateInfo {
                                 range.vertex_count,
                                 model,
                             ));
+                            if let Some(outline) = outline_model {
+                                outlines.push(MeshDraw::primitive(
+                                    range.vertex_offset,
+                                    range.vertex_count,
+                                    outline,
+                                ));
+                            }
                         }
                     }
                 }
             }
         }
 
-        // 5. 录制 Shadow → Game(PBR) → Bloom → Tonemap
+        // 5. 更新 legacy light UBO（outline/gizmo 复用 legacy descriptor set）
+        let legacy_light_data: [f32; 8] = [
+            light.direction[0],
+            light.direction[1],
+            light.direction[2],
+            0.0,
+            light.color[0],
+            light.color[1],
+            light.color[2],
+            light.intensity,
+        ];
+        unsafe {
+            let data_ptr = self
+                .device
+                .map_memory(self.light_ubo_memory, 0, 32, vk::MemoryMapFlags::empty())
+                .map_err(|e| format!("PBR: map legacy light UBO 失败: {e}"))?;
+            std::ptr::copy_nonoverlapping(
+                legacy_light_data.as_ptr() as *const u8,
+                data_ptr as *mut u8,
+                32,
+            );
+            self.device.unmap_memory(self.light_ubo_memory);
+        }
+
+        let base = crate::pbr_forward::LegacyPushBase {
+            viewport: [extent.width as f32, extent.height as f32],
+            camera_pos: camera.position,
+            camera_yaw: camera.yaw,
+            camera_pitch: camera.pitch,
+        };
+
+        // 6. 录制 Shadow → Game(PBR) →（天空盒/实体/outline/gizmo/合成蒙皮）→ Bloom → Tonemap
         unsafe {
             if let Some(shadow) = &shadow {
                 pass.record_shadow(
@@ -2148,24 +2244,79 @@ p_multisample_state: &vk::PipelineMultisampleStateCreateInfo {
                     &draws,
                 );
             }
-            pass.record_scene(
+            // 有天空盒时全屏天空覆盖，clear color 用天空底色保证过渡一致
+            let clear_color = if self.sky_enabled {
+                [
+                    self.sky_bottom[0],
+                    self.sky_bottom[1],
+                    self.sky_bottom[2],
+                    1.0,
+                ]
+            } else {
+                [0.05, 0.05, 0.1, 1.0]
+            };
+            pass.begin_scene(cmd, clear_color);
+            if self.sky_enabled {
+                pass.record_sky(cmd, self.sky_top, self.sky_bottom);
+            }
+            pass.record_scene_draws(
                 cmd,
                 self.game_mesh_buffer,
                 self.game_index_buffer,
                 &draws,
                 &settings.default_material,
             );
+            if !outlines.is_empty() {
+                pass.record_outline(
+                    cmd,
+                    Some(self.light_descriptor_set),
+                    Some(self.default_texture_descriptor_set),
+                    self.game_mesh_buffer,
+                    self.game_index_buffer,
+                    &outlines,
+                    &base,
+                );
+            }
+            if self.gizmo_visible {
+                if let Some(gizmo_buffer) = self.gizmo_vertex_buffer {
+                    pass.record_gizmo(
+                        cmd,
+                        Some(self.light_descriptor_set),
+                        Some(self.default_texture_descriptor_set),
+                        gizmo_buffer,
+                        self.gizmo_position,
+                        &base,
+                    );
+                }
+            }
+            // 合成蒙皮 mesh：验证 stride64 + location3/4 + joint palette 的真实 draw
+            if let Some(skinned) = &self.pbr_skinned {
+                let time = self.glfw.get_time() as f32;
+                skinned.update_palette_animated(time)?;
+                let skinned_model = crate::pbr_forward::synthetic_skinned_model_matrix(
+                    camera.position,
+                    camera.yaw,
+                    camera.pitch,
+                    time,
+                );
+                skinned.record_synthetic(cmd, skinned_model, &base);
+            }
+            pass.end_scene(cmd);
             pass.record_post(cmd);
         }
 
-        // 6. Trace 日志：实际 draw path 证据（draw 数/开关）
+        // 7. Trace 日志：实际 draw path 证据（draw 数/开关）
         self.dfx.lock().get_logger().lock().log(
             LogLevel::Trace,
             "Vulkan",
             &format!(
-                "PBR draw path: {} draws={} shadow={} bloom={} tonemap={}",
+                "PBR draw path: {} draws={} outlines={} sky={} gizmo={} skinned={} shadow={} bloom={} tonemap={}",
                 settings.quality_label(),
                 draws.len(),
+                outlines.len(),
+                self.sky_enabled,
+                self.gizmo_visible,
+                self.pbr_skinned.is_some(),
                 pass.shadow_active(),
                 pass.bloom_active(),
                 settings.effective_tonemap()
@@ -6454,6 +6605,14 @@ pub fn process_events(&mut self) {
             
             self.device.destroy_buffer(self.game_index_buffer, None);
             self.device.free_memory(self.game_index_buffer_memory, None);
+
+            // 3D Gizmo 顶点缓冲（PBR/registry 路径创建）
+            if let Some(gizmo_buffer) = self.gizmo_vertex_buffer.take() {
+                self.device.destroy_buffer(gizmo_buffer, None);
+            }
+            if let Some(gizmo_memory) = self.gizmo_vertex_memory.take() {
+                self.device.free_memory(gizmo_memory, None);
+            }
             
             self.device.destroy_pipeline(self.fxaa_pipeline, None);
             self.device.destroy_pipeline_layout(self.fxaa_pipeline_layout, None);

@@ -1,12 +1,13 @@
-//! PBR/Shadow/Post + 蒙皮 pipeline 的 GPU 冒烟测试（标记 ignored）
+//! PBR/Shadow/Post + 天空盒/outline/Gizmo + 蒙皮 draw 的 GPU 冒烟测试（标记 ignored）
 //!
-//! 这些测试需要真实 Vulkan 设备（本机 NV/AMD/Intel 均可），不进入常规 CI：
-//! `cargo test -p hezhou-rhi-vulkan -- --ignored pbr_forward_gpu`
+//! 需要真实 Vulkan 设备（本机独显/集显均可），不进入常规 CI：
+//! `cargo test -p hezhou-rhi-vulkan --test pbr_forward_gpu -- --ignored`
 //!
-//! 测试内容:
-//! 1. High 质量档：创建 PBR/Shadow/Bloom/Tonemap 全部资源 + 蒙皮 pipeline，
-//!    上传 joint palette，并真实录制 Shadow→Game(PBR)→Bloom→Tonemap 命令后提交
-//! 2. Low 质量档：无阴影/无 Bloom 的 PBR 路径录制
+//! 覆盖:
+//! 1. High 档：完整绘制 Shadow → Game(PBR/HDR) → 天空盒 → 实体 → 选中 outline →
+//!    3D Gizmo → 合成 skinned mesh → Bloom → Tonemap，真实提交
+//! 2. Low 档：无阴影/无 Bloom 的同一套视觉元素
+//! 3. Resize：在两种视口尺寸下分别创建/录制 PBR 通道（模拟窗口 resize 后重建）
 //!
 //! 若环境无 Vulkan loader/设备，测试打印跳过原因并视为通过（与其他 GPU 测试一致）。
 
@@ -16,13 +17,18 @@ use hezhou_render_pipeline::{
     CameraParams, RenderQualityPreset, RenderSettings, ShadowFrameData, ViewportExtent,
 };
 use hezhou_rhi_vulkan::{
-    create_host_visible_buffer, create_render_target, destroy_render_target, GpuTarget, MeshDraw,
-    PbrForwardPass, SkinnedPipelineState, LEGACY_FAR, LEGACY_FOV_DEGREES, LEGACY_NEAR,
+    create_host_visible_buffer, create_render_target, destroy_render_target, GpuTarget,
+    LegacyPushBase, MeshDraw, PbrForwardPass, SkinnedPipelineState, LEGACY_FAR,
+    LEGACY_FOV_DEGREES, LEGACY_NEAR,
 };
 
-const TEST_EXTENT: ViewportExtent = ViewportExtent {
+const DEFAULT_EXTENT: ViewportExtent = ViewportExtent {
     width: 320,
     height: 180,
+};
+const RESIZED_EXTENT: ViewportExtent = ViewportExtent {
+    width: 640,
+    height: 360,
 };
 
 struct HeadlessVulkan {
@@ -135,7 +141,7 @@ impl HeadlessVulkan {
         })
     }
 
-    unsafe fn destroy(mut self) {
+    unsafe fn destroy(self) {
         self.device.destroy_command_pool(self.command_pool, None);
         self.device.destroy_device(None);
         self.instance.destroy_instance(None);
@@ -144,12 +150,15 @@ impl HeadlessVulkan {
 }
 
 /// 创建 LDR 输出目标 + D32 深度目标
-unsafe fn create_targets(headless: &HeadlessVulkan) -> Result<(GpuTarget, GpuTarget), String> {
+unsafe fn create_targets(
+    headless: &HeadlessVulkan,
+    extent: ViewportExtent,
+) -> Result<(GpuTarget, GpuTarget), String> {
     let ldr = create_render_target(
         &headless.instance,
         &headless.device,
         headless.physical_device,
-        TEST_EXTENT,
+        extent,
         vk::Format::B8G8R8A8_UNORM,
         vk::ImageUsageFlags::COLOR_ATTACHMENT | vk::ImageUsageFlags::SAMPLED,
         vk::ImageAspectFlags::COLOR,
@@ -158,7 +167,7 @@ unsafe fn create_targets(headless: &HeadlessVulkan) -> Result<(GpuTarget, GpuTar
         &headless.instance,
         &headless.device,
         headless.physical_device,
-        TEST_EXTENT,
+        extent,
         vk::Format::D32_SFLOAT,
         vk::ImageUsageFlags::DEPTH_STENCIL_ATTACHMENT,
         vk::ImageAspectFlags::DEPTH,
@@ -166,7 +175,7 @@ unsafe fn create_targets(headless: &HeadlessVulkan) -> Result<(GpuTarget, GpuTar
     Ok((ldr, depth))
 }
 
-/// 创建 3 顶点（stride 32）的顶点缓冲，用于真实 draw
+/// 创建 3 顶点（stride 32）的顶点缓冲，用于实体/outline draw
 unsafe fn create_test_vertex_buffer(
     headless: &HeadlessVulkan,
 ) -> Result<(vk::Buffer, vk::DeviceMemory), String> {
@@ -175,44 +184,70 @@ unsafe fn create_test_vertex_buffer(
         0.0, 0.5, 0.0, 0.0, 0.0, 1.0, 0.5, 0.5, -0.5, -0.5, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.5,
         -0.5, 0.0, 0.0, 0.0, 1.0, 1.0, 0.0,
     ];
-    let size = std::mem::size_of_val(&vertex_bytes) as u64;
+    upload_bytes(
+        headless,
+        &vertex_bytes,
+        vk::BufferUsageFlags::VERTEX_BUFFER,
+    )
+}
+
+/// 创建 3D Gizmo 顶点缓冲（与 renderer `gizmo_vertex_data` 一致）
+unsafe fn create_gizmo_buffer(
+    headless: &HeadlessVulkan,
+) -> Result<(vk::Buffer, vk::DeviceMemory), String> {
+    let vertices = hezhou_rhi_vulkan::pbr_forward::gizmo_vertex_data();
+    upload_bytes(headless, &vertices, vk::BufferUsageFlags::VERTEX_BUFFER)
+}
+
+unsafe fn upload_bytes<T>(
+    headless: &HeadlessVulkan,
+    values: &[T],
+    usage: vk::BufferUsageFlags,
+) -> Result<(vk::Buffer, vk::DeviceMemory), String> {
+    let bytes: &[u8] = std::slice::from_raw_parts(
+        values.as_ptr() as *const u8,
+        std::mem::size_of_val(values),
+    );
     let (buffer, memory) = create_host_visible_buffer(
         &headless.instance,
         &headless.device,
         headless.physical_device,
-        size,
-        vk::BufferUsageFlags::VERTEX_BUFFER,
+        bytes.len() as u64,
+        usage,
     )?;
     let ptr = headless
         .device
-        .map_memory(memory, 0, size, vk::MemoryMapFlags::empty())
+        .map_memory(memory, 0, bytes.len() as u64, vk::MemoryMapFlags::empty())
         .map_err(|e| format!("map 顶点缓冲失败: {e}"))?;
-    std::ptr::copy_nonoverlapping(
-        vertex_bytes.as_ptr() as *const u8,
-        ptr as *mut u8,
-        size as usize,
-    );
+    std::ptr::copy_nonoverlapping(bytes.as_ptr(), ptr as *mut u8, bytes.len());
     headless.device.unmap_memory(memory);
     Ok((buffer, memory))
 }
 
-/// 录制一帧：Shadow → Game(PBR) → Bloom → Tonemap
-unsafe fn record_frame(
-    headless: &HeadlessVulkan,
-    pass: &PbrForwardPass,
-    settings: &RenderSettings,
-    vertex_buffer: vk::Buffer,
-    ldr_target: &GpuTarget,
-) -> Result<(), String> {
-    let camera = CameraParams {
+fn camera() -> CameraParams {
+    CameraParams {
         position: [0.0, 2.0, 5.0],
         yaw: 0.2,
         pitch: -0.3,
         fov: LEGACY_FOV_DEGREES.to_radians(),
         near: LEGACY_NEAR,
         far: LEGACY_FAR,
-    };
-    let aspect = TEST_EXTENT.width as f32 / TEST_EXTENT.height as f32;
+    }
+}
+
+/// 录制一帧：Shadow（可选）→ HDR pass（天空/实体/outline/Gizmo/合成蒙皮）→ Bloom/Tonemap
+unsafe fn record_frame(
+    headless: &HeadlessVulkan,
+    pass: &PbrForwardPass,
+    skinned: &SkinnedPipelineState,
+    settings: &RenderSettings,
+    extent: ViewportExtent,
+    vertex_buffer: vk::Buffer,
+    gizmo_buffer: vk::Buffer,
+    ldr_target: &GpuTarget,
+) -> Result<(), String> {
+    let camera = camera();
+    let aspect = extent.width as f32 / extent.height as f32;
     let light_direction = [-0.4f32, -1.0, -0.3];
 
     let shadow = match settings.shadow_config() {
@@ -222,7 +257,6 @@ unsafe fn record_frame(
         ),
         None => None,
     };
-
     let view = hezhou_rhi_vulkan::camera_view_matrix(camera.position, camera.yaw, camera.pitch);
     let proj = hezhou_rhi_vulkan::camera_projection_matrix(
         LEGACY_FOV_DEGREES,
@@ -236,12 +270,27 @@ unsafe fn record_frame(
     };
     pass.update_frame_ubo(&light, view, proj, camera.position, shadow.as_ref())?;
 
-    let draws = [MeshDraw::primitive(0, 3, [
+    let model = [
         [1.0, 0.0, 0.0, 0.0],
         [0.0, 1.0, 0.0, 0.0],
         [0.0, 0.0, 1.0, 0.0],
         [0.0, 0.0, 0.0, 1.0],
-    ])];
+    ];
+    let draws = [MeshDraw::primitive(0, 3, model)];
+    // outline：放大 1.05 的同一 mesh
+    let outline_model = [
+        [1.05, 0.0, 0.0, 0.0],
+        [0.0, 1.05, 0.0, 0.0],
+        [0.0, 0.0, 1.05, 0.0],
+        [0.0, 0.0, 0.0, 1.0],
+    ];
+    let outlines = [MeshDraw::primitive(0, 3, outline_model)];
+    let base = LegacyPushBase {
+        viewport: [extent.width as f32, extent.height as f32],
+        camera_pos: camera.position,
+        camera_yaw: camera.yaw,
+        camera_pitch: camera.pitch,
+    };
 
     let cmd = headless
         .device
@@ -284,16 +333,32 @@ unsafe fn record_frame(
         }],
     );
 
+    // 1. 阴影
     if let Some(shadow_frame) = &shadow {
         pass.record_shadow(cmd, shadow_frame, vertex_buffer, vertex_buffer, &draws);
     }
-    pass.record_scene(
+    // 2. HDR 主 pass：天空盒 → 实体 → outline → Gizmo → 合成蒙皮
+    pass.begin_scene(cmd, [0.05, 0.05, 0.1, 1.0]);
+    pass.record_sky(cmd, [0.16, 0.32, 0.62], [0.72, 0.82, 0.92]);
+    pass.record_scene_draws(
         cmd,
         vertex_buffer,
         vertex_buffer,
         &draws,
         &settings.default_material,
     );
+    pass.record_outline(cmd, None, None, vertex_buffer, vertex_buffer, &outlines, &base);
+    pass.record_gizmo(cmd, None, None, gizmo_buffer, [0.0, 0.0, 0.0], &base);
+    skinned.update_palette_animated(0.5)?;
+    let skinned_model = hezhou_rhi_vulkan::pbr_forward::synthetic_skinned_model_matrix(
+        camera.position,
+        camera.yaw,
+        camera.pitch,
+        0.5,
+    );
+    skinned.record_synthetic(cmd, skinned_model, &base);
+    pass.end_scene(cmd);
+    // 3. Bloom（可选）→ Tonemap
     pass.record_post(cmd);
 
     headless
@@ -316,63 +381,122 @@ unsafe fn record_frame(
         .device
         .queue_wait_idle(headless.queue)
         .map_err(|e| format!("queue wait idle 失败: {e}"))?;
-    headless.device.free_command_buffers(headless.command_pool, &[cmd]);
+    headless
+        .device
+        .free_command_buffers(headless.command_pool, &[cmd]);
     Ok(())
 }
 
+struct FrameResources {
+    ldr: GpuTarget,
+    depth: GpuTarget,
+    vertex_buffer: vk::Buffer,
+    vertex_memory: vk::DeviceMemory,
+    gizmo_buffer: vk::Buffer,
+    gizmo_memory: vk::DeviceMemory,
+}
+
+unsafe fn create_frame_resources(
+    headless: &HeadlessVulkan,
+    extent: ViewportExtent,
+) -> Result<FrameResources, String> {
+    let (ldr, depth) = create_targets(headless, extent)?;
+    let (vertex_buffer, vertex_memory) = create_test_vertex_buffer(headless)?;
+    let (gizmo_buffer, gizmo_memory) = create_gizmo_buffer(headless)?;
+    Ok(FrameResources {
+        ldr,
+        depth,
+        vertex_buffer,
+        vertex_memory,
+        gizmo_buffer,
+        gizmo_memory,
+    })
+}
+
+unsafe fn destroy_frame_resources(headless: &HeadlessVulkan, resources: FrameResources) {
+    headless.device.destroy_buffer(resources.vertex_buffer, None);
+    headless.device.free_memory(resources.vertex_memory, None);
+    headless.device.destroy_buffer(resources.gizmo_buffer, None);
+    headless.device.free_memory(resources.gizmo_memory, None);
+    destroy_render_target(&headless.device, resources.ldr);
+    destroy_render_target(&headless.device, resources.depth);
+}
+
+/// 创建 PBR 通道 + 蒙皮 pipeline（供 High/Low/resize 三组测试复用）
+unsafe fn create_pipeline_pair(
+    headless: &HeadlessVulkan,
+    extent: ViewportExtent,
+    settings: &RenderSettings,
+    depth_view: vk::ImageView,
+    ldr_view: vk::ImageView,
+) -> Result<(PbrForwardPass, SkinnedPipelineState), String> {
+    let pass = PbrForwardPass::create(
+        &headless.instance,
+        &headless.device,
+        headless.physical_device,
+        headless.command_pool,
+        headless.queue,
+        extent,
+        depth_view,
+        ldr_view,
+        vk::Format::B8G8R8A8_UNORM,
+        settings,
+    )?;
+    let skinned = SkinnedPipelineState::create(
+        &headless.instance,
+        &headless.device,
+        headless.physical_device,
+        headless.command_pool,
+        headless.queue,
+        pass.hdr_render_pass(),
+        extent,
+    )?;
+    Ok((pass, skinned))
+}
+
 #[test]
-#[ignore = "需要 Vulkan 设备（GPU 测试）；运行: cargo test -p hezhou-rhi-vulkan -- --ignored pbr_forward_gpu"]
+#[ignore = "需要 Vulkan 设备（GPU 测试）；运行: cargo test -p hezhou-rhi-vulkan --test pbr_forward_gpu -- --ignored"]
 fn pbr_forward_gpu_high_quality_draw_path() {
     unsafe {
         let Some(headless) = HeadlessVulkan::create() else {
             return;
         };
         let result = (|| -> Result<(), String> {
-            let (ldr, depth) = create_targets(&headless)?;
+            let resources = create_frame_resources(&headless, DEFAULT_EXTENT)?;
             let settings = RenderSettings::for_preset(RenderQualityPreset::High);
-            let pass = PbrForwardPass::create(
-                &headless.instance,
-                &headless.device,
-                headless.physical_device,
-                headless.command_pool,
-                headless.queue,
-                TEST_EXTENT,
-                depth.view,
-                ldr.view,
-                vk::Format::B8G8R8A8_UNORM,
+            let (pass, skinned) = create_pipeline_pair(
+                &headless,
+                DEFAULT_EXTENT,
                 &settings,
+                resources.depth.view,
+                resources.ldr.view,
             )?;
             assert!(pass.shadow_active(), "High 档应启用阴影 pass");
             assert!(pass.bloom_active(), "High 档应启用 Bloom pass");
+            assert!(pass.sky_pipeline_ready(), "天空盒 pipeline 应创建");
+            assert!(pass.outline_pipeline_ready(), "outline/Gizmo pipeline 应创建");
             assert_eq!(pass.settings().quality.shadow_cascade_count, 3);
+            assert_eq!(skinned.skinned_vertex_count(), 8);
+            assert_eq!(skinned.skinned_index_count(), 36);
 
-            let skinned = SkinnedPipelineState::create(
-                &headless.instance,
-                &headless.device,
-                headless.physical_device,
-                headless.command_pool,
-                headless.queue,
-                pass.hdr_render_pass(),
-                TEST_EXTENT,
+            record_frame(
+                &headless,
+                &pass,
+                &skinned,
+                &settings,
+                DEFAULT_EXTENT,
+                resources.vertex_buffer,
+                resources.gizmo_buffer,
+                &resources.ldr,
             )?;
-            assert_ne!(skinned.pipeline(), vk::Pipeline::null());
 
-            // 蒙皮 palette 上传（2 关节 = 128B）
-            let palette = hezhou_animation::JointPalette::identity(2);
-            let uploaded = skinned.upload_joint_palette(&palette.to_le_bytes())?;
-            assert_eq!(uploaded, 128);
-
-            let (vertex_buffer, vertex_memory) = create_test_vertex_buffer(&headless)?;
-            record_frame(&headless, &pass, &settings, vertex_buffer, &ldr)?;
-
-            // 清理（调用方保证 GPU 空闲：record_frame 内已 queue_wait_idle）
-            pass.destroy();
+            // 清理顺序：先蒙皮（引用 hdr render pass）后 PBR 通道
             skinned.destroy();
-            headless.device.destroy_buffer(vertex_buffer, None);
-            headless.device.free_memory(vertex_memory, None);
-            destroy_render_target(&headless.device, ldr);
-            destroy_render_target(&headless.device, depth);
-            eprintln!("GPU PBR 冒烟通过: High 档 Shadow→Game(PBR)→Bloom→Tonemap + skinned pipeline 已执行");
+            pass.destroy();
+            destroy_frame_resources(&headless, resources);
+            eprintln!(
+                "GPU PBR 冒烟通过: High 档 Shadow→Game(PBR/HDR)+天空盒+outline+Gizmo+合成蒙皮→Bloom→Tonemap"
+            );
             Ok(())
         })();
         headless.destroy();
@@ -383,44 +507,96 @@ fn pbr_forward_gpu_high_quality_draw_path() {
 }
 
 #[test]
-#[ignore = "需要 Vulkan 设备（GPU 测试）；运行: cargo test -p hezhou-rhi-vulkan -- --ignored pbr_forward_gpu"]
+#[ignore = "需要 Vulkan 设备（GPU 测试）；运行: cargo test -p hezhou-rhi-vulkan --test pbr_forward_gpu -- --ignored"]
 fn pbr_forward_gpu_low_quality_draw_path() {
     unsafe {
         let Some(headless) = HeadlessVulkan::create() else {
             return;
         };
         let result = (|| -> Result<(), String> {
-            let (ldr, depth) = create_targets(&headless)?;
+            let resources = create_frame_resources(&headless, DEFAULT_EXTENT)?;
             let settings = RenderSettings::for_preset(RenderQualityPreset::Low);
-            let pass = PbrForwardPass::create(
-                &headless.instance,
-                &headless.device,
-                headless.physical_device,
-                headless.command_pool,
-                headless.queue,
-                TEST_EXTENT,
-                depth.view,
-                ldr.view,
-                vk::Format::B8G8R8A8_UNORM,
+            let (pass, skinned) = create_pipeline_pair(
+                &headless,
+                DEFAULT_EXTENT,
                 &settings,
+                resources.depth.view,
+                resources.ldr.view,
             )?;
             assert!(!pass.shadow_active(), "Low 档不应启用阴影");
             assert!(!pass.bloom_active(), "Low 档不应启用 Bloom");
+            assert!(pass.sky_pipeline_ready());
+            assert!(pass.outline_pipeline_ready());
 
-            let (vertex_buffer, vertex_memory) = create_test_vertex_buffer(&headless)?;
-            record_frame(&headless, &pass, &settings, vertex_buffer, &ldr)?;
+            record_frame(
+                &headless,
+                &pass,
+                &skinned,
+                &settings,
+                DEFAULT_EXTENT,
+                resources.vertex_buffer,
+                resources.gizmo_buffer,
+                &resources.ldr,
+            )?;
 
+            skinned.destroy();
             pass.destroy();
-            headless.device.destroy_buffer(vertex_buffer, None);
-            headless.device.free_memory(vertex_memory, None);
-            destroy_render_target(&headless.device, ldr);
-            destroy_render_target(&headless.device, depth);
-            eprintln!("GPU PBR 冒烟通过: Low 档 PBR→Tonemap 路径已执行（无阴影/无 Bloom）");
+            destroy_frame_resources(&headless, resources);
+            eprintln!(
+                "GPU PBR 冒烟通过: Low 档 PBR+天空盒+outline+Gizmo+合成蒙皮→Tonemap（无阴影/无 Bloom）"
+            );
             Ok(())
         })();
         headless.destroy();
         if let Err(err) = result {
             panic!("GPU PBR Low 档冒烟失败: {err}");
+        }
+    }
+}
+
+#[test]
+#[ignore = "需要 Vulkan 设备（GPU 测试）；运行: cargo test -p hezhou-rhi-vulkan --test pbr_forward_gpu -- --ignored"]
+fn pbr_forward_gpu_resize_recreate() {
+    unsafe {
+        let Some(headless) = HeadlessVulkan::create() else {
+            return;
+        };
+        let result = (|| -> Result<(), String> {
+            let settings = RenderSettings::for_preset(RenderQualityPreset::High);
+            for extent in [DEFAULT_EXTENT, RESIZED_EXTENT] {
+                let resources = create_frame_resources(&headless, extent)?;
+                let (pass, skinned) = create_pipeline_pair(
+                    &headless,
+                    extent,
+                    &settings,
+                    resources.depth.view,
+                    resources.ldr.view,
+                )?;
+                assert_eq!(pass.extent.width, extent.width);
+                assert_eq!(pass.extent.height, extent.height);
+                record_frame(
+                    &headless,
+                    &pass,
+                    &skinned,
+                    &settings,
+                    extent,
+                    resources.vertex_buffer,
+                    resources.gizmo_buffer,
+                    &resources.ldr,
+                )?;
+                skinned.destroy();
+                pass.destroy();
+                destroy_frame_resources(&headless, resources);
+                eprintln!(
+                    "GPU PBR resize 冒烟通过: {}x{} 创建/录制/销毁",
+                    extent.width, extent.height
+                );
+            }
+            Ok(())
+        })();
+        headless.destroy();
+        if let Err(err) = result {
+            panic!("GPU PBR resize 冒烟失败: {err}");
         }
     }
 }
