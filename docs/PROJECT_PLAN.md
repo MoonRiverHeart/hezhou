@@ -24,13 +24,13 @@
 - ✅ 编辑器：Player 真实构建（Cooker + PlayerBuilder + 产物内 validate）已通过 fixture；PBR 材质进入 core/Project/Inspector，启动自检 **PASS=77**。
 - ✅ Player：加载 cook imported 资产 bundle（mesh/material/skeleton/animation，严格校验）；真实窗口加载 3 实体场景 30 帧 exit 0。
 - ✅ 真实蒙皮：渲染器支持 SkinnedMeshUpload/每实体 palette；Player 从 imported 资产转换 SkinnedVertex、播放首个 clip，窗口 30 帧 exit 0。
+- ✅ Player C# 入口：PlayerGame.cs + mono-host；真实窗口加载 DLL 调用 Initialize/Update/Shutdown，5 帧 exit 0；mono-host 106 tests。
 - ✅ 本地 CI `ci_local.ps1 -Offline` 通过（默认测试 + feature 测试 + FFI 契约 + C# 编译 + 图标一致性）。
 - ✅ 验证证据：capability_demo 14/14 项通过；Player 72 tests；Core 43 tests；编辑器启动自检 PASS=57、FAIL=0；FFI 301/301/301。
 - ⏳ 未完成（0.2 验收尚未达成）：
-  1. Player C# `Initialize()` / 脚本运行时（当前 Player 已渲染真实蒙皮资产，但不执行游戏 C# 脚本）；
-  2. C# 对 gameplay/animation/asset/audio 的完整 API 绑定；
-  3. Player 发布附件、真实 cooker 端到端、双平台 release 验证；
-  4. 文档/测试收尾与 0.2 Release。
+  1. C# 对 gameplay/animation/asset/audio 的完整 API 绑定（PlayerGame 当前 context=0，只验证入口）；
+  2. Player 发布附件、真实 cooker 端到端、双平台 release 验证；
+  3. 0.2 最终测试/文档收尾与 Release。
 - 0.2 仍处于进行中，不满足发布 Definition of Done。
 
 ## 1. 执行摘要
