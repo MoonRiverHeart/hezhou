@@ -34,6 +34,8 @@ use hezhou_rhi_vulkan::UIVulkanRenderer;
 
 use crate::host::{HostError, HostOutcome, PlayerHost, PlayerHostContext};
 use crate::logging::LogLevel;
+#[cfg(feature = "mono-host")]
+use crate::mono_host::{find_player_game_script, PlayerGameScript};
 use crate::skinned_asset::{select_first_skinned_asset, SelectedSkinnedAsset};
 use crate::skinned_asset::PLAYER_SKINNED_ENTITY_ID;
 
@@ -247,6 +249,73 @@ impl PlayerHost for WindowPlayerHost {
         }
         let mut palette_updates: u64 = 0;
 
+        // ---- 可选 C# PlayerGame 入口（feature = mono-host）----
+        #[cfg(feature = "mono-host")]
+        let mut mono_state: Option<MonoHostState> = None;
+        #[cfg(feature = "mono-host")]
+        match find_player_game_script(context.manifest, context.root) {
+            Ok(Some((name, path))) => {
+                if !path.is_file() {
+                    context.log.host_log(
+                        LogLevel::Warn,
+                        &format!(
+                            "mono-host：脚本 DLL 不存在 {}；继续纯 Rust 渲染",
+                            path.display()
+                        ),
+                    );
+                } else {
+                    context.log.host_log(
+                        LogLevel::Info,
+                        &format!(
+                            "mono-host：加载 C# 入口 `{}`（{}）",
+                            name,
+                            path.display()
+                        ),
+                    );
+                    match PlayerGameScript::load(&path) {
+                        Ok(mut script) => match script.initialize(0) {
+                            Ok(()) => {
+                                context.log.host_log(
+                                    LogLevel::Info,
+                                    &format!(
+                                        "mono-host：Hezhou.PlayerGame.Initialize(0) 成功（assembly {}）",
+                                        script.assembly()
+                                    ),
+                                );
+                                mono_state = Some(MonoHostState {
+                                    script,
+                                    last_update: Instant::now(),
+                                });
+                            }
+                            Err(error) => {
+                                script.record_error();
+                                context.log.host_log(
+                                    LogLevel::Warn,
+                                    &format!(
+                                        "mono-host：Initialize 失败：{error}；继续纯 Rust 渲染（旧包/无 PlayerGame 入口）"
+                                    ),
+                                );
+                            }
+                        },
+                        Err(error) => context.log.host_log(
+                            LogLevel::Warn,
+                            &format!(
+                                "mono-host：加载 C# DLL 失败：{error}；继续纯 Rust 渲染"
+                            ),
+                        ),
+                    }
+                }
+            }
+            Ok(None) => context.log.host_log(
+                LogLevel::Warn,
+                "mono-host：manifest.scripts 没有 .dll，跳过 C# 入口（纯 Rust 渲染）",
+            ),
+            Err(error) => context.log.host_log(
+                LogLevel::Warn,
+                &format!("mono-host：解析脚本路径失败：{error}；继续纯 Rust 渲染"),
+            ),
+        }
+
         let started = Instant::now();
         let mut frames: u32 = 0;
         let mut closed_by_user = false;
@@ -326,6 +395,29 @@ impl PlayerHost for WindowPlayerHost {
                 }
             }
 
+            // 可选：每帧驱动 C# PlayerGame.Update(dt)。
+            #[cfg(feature = "mono-host")]
+            {
+                let mut mono_error: Option<String> = None;
+                if let Some(state) = &mut mono_state {
+                    let dt = state.last_update.elapsed().as_secs_f32();
+                    state.last_update = Instant::now();
+                    if let Err(error) = state.script.update(dt) {
+                        state.script.record_error();
+                        mono_error = Some(format!("Update 失败：{error}"));
+                    }
+                }
+                if let Some(message) = mono_error {
+                    context.log.host_log(
+                        LogLevel::Warn,
+                        &format!(
+                            "第 {frames} 帧 mono-host {message}；停止 C# 调用，继续纯 Rust 渲染"
+                        ),
+                    );
+                    mono_state = None;
+                }
+            }
+
             if frames % 30 == 0 || frames == self.frame_limit {
                 context.log.host_log(
                     LogLevel::Info,
@@ -338,6 +430,30 @@ impl PlayerHost for WindowPlayerHost {
                 );
             }
             std::thread::sleep(FRAME_SLEEP);
+        }
+
+        // 可选：Shutdown C# PlayerGame 并写统计。
+        #[cfg(feature = "mono-host")]
+        if let Some(mut state) = mono_state.take() {
+            let dll = state.script.dll_path().display().to_string();
+            state.script.shutdown();
+            let stats = state.script.stats().clone();
+            context.log.host_log(
+                LogLevel::Info,
+                &format!(
+                    "mono-host：Shutdown 完成（Initialize {} 次，Update {} 次，Shutdown {} 次，错误 {} 次，DLL {}）",
+                    stats.initialize_calls,
+                    stats.update_calls,
+                    stats.shutdown_calls,
+                    stats.errors,
+                    dll
+                ),
+            );
+        } else {
+            context.log.host_log(
+                LogLevel::Info,
+                "mono-host：本次未加载 C# PlayerGame 入口，纯 Rust 渲染",
+            );
         }
 
         // 不调用 renderer.cleanup()：见模块文档"已知限制（上游 rhi-vulkan）"。
@@ -382,6 +498,15 @@ struct PlayerSkinnedState {
     asset: SelectedSkinnedAsset,
     /// 是否有动画 clip（无动画时每帧上传静态绑定姿态 palette）。
     animated: bool,
+}
+
+/// 当前 mono-host 状态（feature = mono-host）。
+#[cfg(feature = "mono-host")]
+struct MonoHostState {
+    /// 已加载并 Initialize 成功的 C# PlayerGame。
+    script: PlayerGameScript,
+    /// 上一帧 Update 时间（计算 dt）。
+    last_update: Instant,
 }
 
 /// 从环境变量解析帧数；非法/缺省时用 [`DEFAULT_FRAME_LIMIT`]。

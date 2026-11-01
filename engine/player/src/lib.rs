@@ -25,6 +25,8 @@ pub mod host;
 pub mod imported_assets;
 pub mod logging;
 pub mod manifest;
+#[cfg(feature = "mono-host")]
+pub mod mono_host;
 pub mod paths;
 pub mod platform;
 pub mod runtime;
@@ -35,6 +37,12 @@ pub mod version;
 /// 可选的真实窗口渲染 host（`--features window-host`）。
 #[cfg(feature = "window-host")]
 pub mod window_host;
+
+#[cfg(feature = "mono-host")]
+pub use mono_host::{
+    find_player_game_script, MonoHostError, PlayerGameScript, PLAYER_GAME_CLASS,
+    PLAYER_GAME_NAMESPACE,
+};
 
 pub use asset_index::{AssetIndexEntry, AssetIndexError, PlayerAssetIndex};
 pub use builder::{

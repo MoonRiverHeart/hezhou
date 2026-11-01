@@ -164,6 +164,47 @@ pub fn skinned_fixture_dir() -> PathBuf {
         .join("skinned")
 }
 
+/// 编译 `tests/fixtures/mono/PlayerGame.cs` 为临时 DLL（需要本机 mcs/Mono）。
+///
+/// 用于 mono-host 真实调用测试；mcs 不存在或编译失败时返回 `None`（测试跳过）。
+#[cfg(feature = "mono-host")]
+pub fn compile_player_game_fixture(temp: &TempDir) -> Option<PathBuf> {
+    use std::process::Command;
+
+    let source = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("tests")
+        .join("fixtures")
+        .join("mono")
+        .join("PlayerGame.cs");
+    let output_dir = temp.join("mono");
+    std::fs::create_dir_all(&output_dir).ok()?;
+    let dll = output_dir.join("PlayerGame.dll");
+
+    #[cfg(windows)]
+    let mut command = {
+        let mut command = Command::new("cmd");
+        command.args(["/C", "mcs.bat"]);
+        command
+    };
+    #[cfg(not(windows))]
+    let mut command = Command::new("mcs");
+
+    let status = command
+        .arg("-target:library")
+        .arg(format!("-out:{}", dll.display()))
+        .arg(&source)
+        .status()
+        .ok()?;
+    if status.success() && dll.is_file() {
+        Some(dll)
+    } else {
+        eprintln!(
+            "跳过 mono-host 真实调用测试：mcs 编译 fixture 失败（status={status:?}）"
+        );
+        None
+    }
+}
+
 /// 递归复制目录（fixture 损坏/缺失场景测试用）。
 pub fn copy_dir_all(source: &Path, destination: &Path) {
     std::fs::create_dir_all(destination).expect("创建复制目标目录");

@@ -33,13 +33,25 @@ fn host() -> TargetPlatform {
 
 /// 用指定 cook fixture 构建 Player 包，返回 `(包目录, 可执行文件 stem)`。
 fn build_fixture_package(temp: &TempDir, fixture: &Path) -> (PathBuf, String) {
+    build_fixture_package_with_scripts(temp, fixture, None)
+}
+
+/// 构建 Player 包；`scripts` 为 `Some` 时覆盖 fixture 自带 scripts（mono-host 测试用）。
+fn build_fixture_package_with_scripts(
+    temp: &TempDir,
+    fixture: &Path,
+    scripts: Option<Vec<ScriptAssembly>>,
+) -> (PathBuf, String) {
     let config_text = std::fs::read_to_string(fixture.join("build-config.json")).unwrap();
     let config: PlayerBuildConfig = serde_json::from_str(&config_text).unwrap();
     let executable_stem = config.executable_stem().to_string();
     let input = PlayerBuildInput {
         config,
         cook: CookManifest::default(),
-        scripts: ScriptAssembly::from_dir(&fixture.join("scripts")).unwrap(),
+        scripts: match scripts {
+            Some(scripts) => scripts,
+            None => ScriptAssembly::from_dir(&fixture.join("scripts")).unwrap(),
+        },
         runtime: RuntimePayload::from_dir(&fixture.join("runtime")).unwrap(),
         cooked: Some(CookedAssets::load(&fixture.join("cook_manifest.json")).unwrap()),
     };
@@ -55,6 +67,16 @@ fn build_fixture_package(temp: &TempDir, fixture: &Path) -> (PathBuf, String) {
 }
 
 fn run_window_host(package: &Path, stem: &str, frame_limit: &str, log_dir: &Path) -> std::process::Output {
+    run_window_host_with_env(package, stem, frame_limit, log_dir, &[])
+}
+
+fn run_window_host_with_env(
+    package: &Path,
+    stem: &str,
+    frame_limit: &str,
+    log_dir: &Path,
+    extra_env: &[(&str, &str)],
+) -> std::process::Output {
     let executable = package.join(host().executable_file_name(stem));
     let args: Vec<OsString> = vec![
         "--run".into(),
@@ -67,11 +89,12 @@ fn run_window_host(package: &Path, stem: &str, frame_limit: &str, log_dir: &Path
         "--log-dir".into(),
         log_dir.as_os_str().to_owned(),
     ];
-    Command::new(&executable)
-        .args(args)
-        .env(FRAME_LIMIT_ENV, frame_limit)
-        .output()
-        .expect("运行窗口 host")
+    let mut command = Command::new(&executable);
+    command.args(args).env(FRAME_LIMIT_ENV, frame_limit);
+    for (key, value) in extra_env {
+        command.env(key, value);
+    }
+    command.output().expect("运行窗口 host")
 }
 
 #[test]
@@ -143,6 +166,64 @@ fn actual_window_host_renders_fixed_frames() {
     assert!(
         log.contains("包内没有带 joints/weights 的蒙皮 mesh"),
         "日志：{log}"
+    );
+}
+
+/// 真实窗口 + 真实 Mono 调用 C# PlayerGame（feature = mono-host）：
+/// mcs 编译测试 fixture → 打成 Player 包 → 窗口 host 调用 Initialize/Update/Shutdown。
+#[cfg(feature = "mono-host")]
+#[ignore = "需要显示环境 + Vulkan GPU + Mono；CI 默认跳过，本机手工验证"]
+#[test]
+fn actual_window_host_calls_csharp_player_game() {
+    use common::compile_player_game_fixture;
+
+    let temp = TempDir::new("window-host-mono-smoke");
+    let fixture = cooked_fixture_dir();
+    let Some(dll) = compile_player_game_fixture(&temp) else {
+        return;
+    };
+    let scripts = vec![ScriptAssembly::with_source("PlayerGame.dll", &dll)];
+    let (package, stem) = build_fixture_package_with_scripts(&temp, &fixture, Some(scripts));
+    let log_dir = temp.join("logs");
+    let mono_log = temp.join("mono-output.log");
+
+    let result = run_window_host_with_env(
+        &package,
+        &stem,
+        "5",
+        &log_dir,
+        &[("HEZHOU_PLAYER_MONO_LOG", mono_log.to_str().unwrap())],
+    );
+    assert!(
+        result.status.success(),
+        "mono 窗口 host 失败\nstdout: {}\nstderr: {}",
+        String::from_utf8_lossy(&result.stdout),
+        String::from_utf8_lossy(&result.stderr)
+    );
+    assert_eq!(result.status.code(), Some(0));
+
+    let log = std::fs::read_to_string(log_dir.join("player.log")).expect("读取 player.log");
+    assert!(
+        log.contains("mono-host：加载 C# 入口 `PlayerGame.dll`"),
+        "日志：{log}"
+    );
+    assert!(
+        log.contains("mono-host：Hezhou.PlayerGame.Initialize(0) 成功"),
+        "日志：{log}"
+    );
+    assert!(
+        log.contains("mono-host：Shutdown 完成（Initialize 1 次，Update 5 次，Shutdown 1 次，错误 0 次"),
+        "日志：{log}"
+    );
+    assert!(log.contains("窗口 host 结束：5 帧"), "日志：{log}");
+
+    let csharp_log = std::fs::read_to_string(&mono_log).expect("读取 C# 调用日志");
+    assert!(csharp_log.contains("Initialize context=0"), "C# 日志：{csharp_log}");
+    assert!(csharp_log.contains("Update #1"), "C# 日志：{csharp_log}");
+    assert!(csharp_log.contains("Update #5"), "C# 日志：{csharp_log}");
+    assert!(
+        csharp_log.contains("Shutdown updates=5"),
+        "C# 日志：{csharp_log}"
     );
 }
 

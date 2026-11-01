@@ -27,9 +27,16 @@ hezhou-animation = { path = "../animation" }
 hezhou-rhi-vulkan = { path = "../rhi-vulkan", optional = true }
 hezhou-platform = { path = "../platform", optional = true }
 
+# 可选：C# 游戏逻辑入口（feature = mono-host，依赖 Mono JIT）。
+# 使用 hezhou-scripting 的 Mono ScriptManager 加载包内 scripts/*.dll 并调用
+# Hezhou.PlayerGame.Initialize/Update/Shutdown；默认构建不链接 Mono。
+hezhou-scripting = { path = "../scripting", default-features = false, features = ["mono"], optional = true }
+
 [features]
 default = []
 window-host = ["dep:hezhou-rhi-vulkan", "dep:hezhou-platform"]
+# mono-host 依赖窗口 host（C# Update 在渲染帧循环中驱动）。
+mono-host = ["window-host", "dep:hezhou-scripting"]
 
 [[bin]]
 name = "hezhou-player"
