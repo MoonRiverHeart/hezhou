@@ -18,6 +18,10 @@ use crate::pbr_forward::{
     camera_projection_matrix, camera_view_matrix, MeshDraw, PbrDrawItem, PbrForwardPass,
     PbrTextureBinding, SkinnedPipelineState, LEGACY_FAR, LEGACY_FOV_DEGREES, LEGACY_NEAR,
 };
+use crate::skinned_mesh::{
+    identity_palette_bytes, validate_palette_bytes, SkinnedMeshRegistry, SkinnedMeshUpload,
+    MAX_PALETTE_BYTES, MAX_PALETTE_JOINTS,
+};
 
 
 fn push_ui_triangle(v: &mut Vec<f32>, x1: f32, y1: f32, x2: f32, y2: f32, x3: f32, y3: f32, r: f32, g: f32, b: f32, a: f32) {
@@ -76,8 +80,7 @@ struct TextureCacheEntry {
 
 /// 自定义OBJ模型的GPU buffer信息
 #[derive(Clone)]
-struct CustomMeshInfo {
-    vertex_offset: u32,  // 在game_mesh_buffer中的偏移（vertex单位）
+struct CustomMeshInfo {    vertex_offset: u32,  // 在game_mesh_buffer中的偏移（vertex单位）
     vertex_count: u32,
     index_offset: u32,   // 在game_index_buffer中的偏移（index单位）
     index_count: u32,
@@ -86,6 +89,26 @@ struct CustomMeshInfo {
     specular_strength: f32,    // 高光强度
     ambient_strength: f32,     // 环境光强度
     shininess: f32,            // 高光指数
+}
+
+/// 真实上传蒙皮网格的 GPU 资源（每实体）
+struct SkinnedMeshGpu {
+    /// 顶点 buffer（host visible，64B stride）
+    vertex_buffer: vk::Buffer,
+    /// 顶点 buffer memory
+    vertex_memory: vk::DeviceMemory,
+    /// 索引 buffer（u32）
+    index_buffer: vk::Buffer,
+    /// 索引 buffer memory
+    index_memory: vk::DeviceMemory,
+    /// palette buffer（固定 16KB，HOST_VISIBLE|HOST_COHERENT）
+    palette_buffer: vk::Buffer,
+    /// palette buffer memory
+    palette_memory: vk::DeviceMemory,
+    /// 索引数量
+    index_count: u32,
+    /// 顶点数量
+    vertex_count: u32,
 }
 
 pub struct UIVulkanRenderer {
@@ -247,6 +270,16 @@ pub struct UIVulkanRenderer {
         crate::pbr_forward::PbrForwardPass,
         Option<crate::pbr_forward::SkinnedPipelineState>,
     )>,
+
+    // === 0.2 真实蒙皮网格上传（task-28） ===
+    // CPU 侧 EntityId → SkinnedMeshUpload 注册表
+    skinned_meshes: SkinnedMeshRegistry,
+    // EntityId → GPU buffer（顶点/索引/palette）
+    skinned_gpu: HashMap<hezhou_core::ecs::EntityId, SkinnedMeshGpu>,
+    // EntityId → 最近一次上传的 palette 字节（调试/重传保留用）
+    skinned_palette_bytes: HashMap<hezhou_core::ecs::EntityId, Vec<u8>>,
+    // 延迟到 cleanup 销毁的蒙皮 buffer（避免运行期销毁 Vulkan 资源）
+    retired_skinned_buffers: Vec<(vk::Buffer, vk::DeviceMemory)>,
     
     // 截图源图像 — 记录当前帧实际渲染结果的image和extent
     // rasterization模式: offscreen_image(经FXAA后)
@@ -1807,6 +1840,10 @@ p_multisample_state: &vk::PipelineMultisampleStateCreateInfo {
                 pbr_forward: None,
                 pbr_skinned: None,
                 retired_pbr: Vec::new(),
+                skinned_meshes: SkinnedMeshRegistry::new(),
+                skinned_gpu: HashMap::new(),
+                skinned_palette_bytes: HashMap::new(),
+                retired_skinned_buffers: Vec::new(),
                 // 截图源初始为offscreen_image（初始化时尚未渲染，后续draw_frame会更新）
                 screenshot_source_image: offscreen_image,
                 screenshot_source_extent: offscreen_extent,
@@ -1898,7 +1935,7 @@ p_multisample_state: &vk::PipelineMultisampleStateCreateInfo {
     pub fn pbr_draw_path_summary(&self) -> Option<String> {
         let pass = self.pbr_forward.as_ref()?;
         Some(format!(
-            "PBR active: {} (shadow={}, bloom={}, tonemap={}, hdr={}x{}, sky_pipeline={}, outline_gizmo={}, skinned_pipeline={}, material_overrides={})",
+            "PBR active: {} (shadow={}, bloom={}, tonemap={}, hdr={}x{}, sky_pipeline={}, outline_gizmo={}, skinned_pipeline={}, material_overrides={}, real_skinned_meshes={})",
             self.render_quality_summary(),
             pass.shadow_active(),
             pass.bloom_active(),
@@ -1908,19 +1945,225 @@ p_multisample_state: &vk::PipelineMultisampleStateCreateInfo {
             pass.sky_pipeline_ready(),
             pass.outline_pipeline_ready(),
             self.pbr_skinned.is_some(),
-            self.pbr_material_overrides.len()
+            self.pbr_material_overrides.len(),
+            self.skinned_meshes.len()
         ))
     }
 
-    /// 上传蒙皮 joint palette（`JointPalette::to_le_bytes()` 输出）
+    /// 上传动画化 palette（合成 skinned mesh 自检专用）
     ///
-    /// 编辑器/玩法接入点：每帧 `AnimationStateMachine::sample` → `JointPalette::from_pose`
-    /// → `to_le_bytes()` → 本方法上传（需要 PBR 质量档已创建蒙皮 pipeline）。
-    pub fn upload_skin_palette(&self, bytes: &[u8]) -> Result<usize, String> {
+    /// 真实蒙皮实体请用 [`UIVulkanRenderer::upload_skin_palette`]（按 entity 上传）。
+    pub fn upload_synthetic_skin_palette(&self, bytes: &[u8]) -> Result<usize, String> {
         match &self.pbr_skinned {
             Some(skinned) => unsafe { skinned.upload_joint_palette(bytes) },
             None => Err("蒙皮 pipeline 未启用（需要 PBR 质量档）".to_string()),
         }
+    }
+
+    // === 真实蒙皮网格上传与绘制（task-28，Lead 定稿契约） ===
+
+    /// 创建 host-visible buffer 并上传字节
+    fn create_and_upload_buffer(
+        &self,
+        bytes: &[u8],
+        usage: vk::BufferUsageFlags,
+    ) -> Result<(vk::Buffer, vk::DeviceMemory), String> {
+        if bytes.is_empty() {
+            return Err("上传 buffer 字节为空".to_string());
+        }
+        let (buffer, memory) = Self::create_buffer_with_usage(
+            &self.instance,
+            &self.device,
+            self.physical_device,
+            bytes.len() as vk::DeviceSize,
+            usage,
+            vk::MemoryPropertyFlags::HOST_VISIBLE | vk::MemoryPropertyFlags::HOST_COHERENT,
+        )?;
+        unsafe {
+            let ptr = self
+                .device
+                .map_memory(memory, 0, bytes.len() as u64, vk::MemoryMapFlags::empty())
+                .map_err(|e| format!("map 上传 buffer 失败: {e}"))?;
+            std::ptr::copy_nonoverlapping(bytes.as_ptr(), ptr as *mut u8, bytes.len());
+            self.device.unmap_memory(memory);
+        }
+        Ok((buffer, memory))
+    }
+
+    /// 写入 palette buffer（最多 16KB，host visible）
+    unsafe fn write_palette_buffer(
+        device: &ash::Device,
+        memory: vk::DeviceMemory,
+        bytes: &[u8],
+    ) -> Result<(), String> {
+        if bytes.len() > MAX_PALETTE_BYTES {
+            return Err(format!(
+                "palette 过大: {} > {} 字节",
+                bytes.len(),
+                MAX_PALETTE_BYTES
+            ));
+        }
+        let ptr = device
+            .map_memory(
+                memory,
+                0,
+                MAX_PALETTE_BYTES as u64,
+                vk::MemoryMapFlags::empty(),
+            )
+            .map_err(|e| format!("map palette buffer 失败: {e}"))?;
+        std::ptr::copy_nonoverlapping(bytes.as_ptr(), ptr as *mut u8, bytes.len());
+        device.unmap_memory(memory);
+        Ok(())
+    }
+
+    /// 上传真实蒙皮网格（顶点 64B stride + u32 索引 + 每实体 palette buffer）
+    ///
+    /// `SkinnedMeshUpload` 不含 palette；先上传网格，再按帧调用
+    /// [`UIVulkanRenderer::upload_skin_palette`] 更新该实体 palette。
+    pub fn upload_skinned_mesh(&mut self, upload: SkinnedMeshUpload) -> Result<(), String> {
+        upload.validate().map_err(|e| e.to_string())?;
+        let entity_id = upload.entity_id;
+        let vertex_bytes = upload.vertex_bytes();
+        let index_bytes = upload.index_bytes().to_vec();
+        let (vertex_buffer, vertex_memory) = self.create_and_upload_buffer(
+            &vertex_bytes,
+            vk::BufferUsageFlags::VERTEX_BUFFER,
+        )?;
+        let (index_buffer, index_memory) = self.create_and_upload_buffer(
+            &index_bytes,
+            vk::BufferUsageFlags::INDEX_BUFFER,
+        )?;
+
+        // palette buffer：同一实体复用已有 buffer（保证 palette descriptor 稳定）；
+        // 新实体创建固定 16KB buffer 并填满单位矩阵
+        let existing_gpu = self.skinned_gpu.remove(&entity_id);
+        let (palette_buffer, palette_memory, reused_palette) = match &existing_gpu {
+            Some(existing) => (existing.palette_buffer, existing.palette_memory, true),
+            None => {
+                let identity = identity_palette_bytes();
+                let mut identity_palette = Vec::with_capacity(MAX_PALETTE_BYTES);
+                for _ in 0..MAX_PALETTE_JOINTS {
+                    identity_palette.extend_from_slice(&identity);
+                }
+                let (buffer, memory) = self.create_and_upload_buffer(
+                    &identity_palette,
+                    vk::BufferUsageFlags::STORAGE_BUFFER,
+                )?;
+                (buffer, memory, false)
+            }
+        };
+        // 新实体默认单位 palette（若调用方已先上传 palette 则保留）
+        if !reused_palette && !self.skinned_palette_bytes.contains_key(&entity_id) {
+            let identity = identity_palette_bytes();
+            unsafe {
+                Self::write_palette_buffer(&self.device, palette_memory, &identity)?;
+            }
+            self.skinned_palette_bytes.insert(entity_id, identity);
+        }
+        // 替换旧网格的 vertex/index buffer（延迟销毁；palette 复用不销毁）
+        if let Some(old) = existing_gpu {
+            self.retired_skinned_buffers
+                .push((old.vertex_buffer, old.vertex_memory));
+            self.retired_skinned_buffers
+                .push((old.index_buffer, old.index_memory));
+        }
+
+        let index_count = upload.indices.len() as u32;
+        let vertex_count = upload.vertices.len() as u32;
+        self.skinned_meshes
+            .insert(upload)
+            .map_err(|e| e.to_string())?;
+        self.skinned_gpu.insert(
+            entity_id,
+            SkinnedMeshGpu {
+                vertex_buffer,
+                vertex_memory,
+                index_buffer,
+                index_memory,
+                palette_buffer,
+                palette_memory,
+                index_count,
+                vertex_count,
+            },
+        );
+        // 网格替换/新增后 palette descriptor 需要指向当前 buffer
+        if let Some(skinned) = &self.pbr_skinned {
+            skinned.forget_entity_palette(entity_id);
+        }
+        self.dfx.lock().get_logger().lock().log(
+            LogLevel::Info,
+            "Vulkan",
+            &format!(
+                "上传蒙皮网格: entity={entity_id} vertices={vertex_count} indices={index_count} palette={}B",
+                self.skinned_palette_bytes
+                    .get(&entity_id)
+                    .map(|bytes| bytes.len())
+                    .unwrap_or(0)
+            ),
+            file!(),
+            line!(),
+        );
+        Ok(())
+    }
+
+    /// 移除实体蒙皮网格（之后不再绘制、不再接受 palette；GPU buffer 延迟到 cleanup 销毁）
+    pub fn remove_skinned_mesh(&mut self, entity_id: u64) -> bool {
+        let removed = self.skinned_meshes.remove(entity_id).is_some();
+        self.skinned_palette_bytes.remove(&entity_id);
+        if let Some(skinned) = &self.pbr_skinned {
+            skinned.forget_entity_palette(entity_id);
+        }
+        if let Some(gpu) = self.skinned_gpu.remove(&entity_id) {
+            self.retired_skinned_buffers
+                .push((gpu.vertex_buffer, gpu.vertex_memory));
+            self.retired_skinned_buffers
+                .push((gpu.index_buffer, gpu.index_memory));
+            self.retired_skinned_buffers
+                .push((gpu.palette_buffer, gpu.palette_memory));
+        }
+        removed
+    }
+
+    /// 当前已上传的真实蒙皮网格数量
+    pub fn skinned_mesh_count(&self) -> usize {
+        self.skinned_meshes.len()
+    }
+
+    /// 已上传蒙皮网格的实体列表（稳定排序）
+    pub fn skinned_mesh_entity_ids(&self) -> Vec<hezhou_core::ecs::EntityId> {
+        self.skinned_meshes.entity_ids()
+    }
+
+    /// 查询实体蒙皮网格上传数据
+    pub fn skinned_mesh_upload(&self, entity_id: u64) -> Option<&SkinnedMeshUpload> {
+        self.skinned_meshes.get(entity_id)
+    }
+
+    /// 按实体上传 joint palette（每关节 64B，mat4 列主序，最多 256 个）
+    ///
+    /// 实体必须已通过 [`UIVulkanRenderer::upload_skinned_mesh`] 上传网格；
+    /// remove 之后调用返回错误。
+    pub fn upload_skin_palette(&mut self, entity_id: u64, bytes: &[u8]) -> Result<(), String> {
+        if bytes.is_empty() {
+            return Err("joint palette 不能为空".to_string());
+        }
+        validate_palette_bytes(bytes).map_err(|e| e.to_string())?;
+        let Some(gpu) = self.skinned_gpu.get(&entity_id) else {
+            return Err(format!("实体 {entity_id} 未上传蒙皮网格"));
+        };
+        let memory = gpu.palette_memory;
+        unsafe {
+            Self::write_palette_buffer(&self.device, memory, bytes)?;
+        }
+        self.skinned_palette_bytes.insert(entity_id, bytes.to_vec());
+        Ok(())
+    }
+
+    /// 查询实体最近上传的 palette 字节（调试/测试）
+    pub fn skinned_palette_bytes(&self, entity_id: u64) -> Option<&[u8]> {
+        self.skinned_palette_bytes
+            .get(&entity_id)
+            .map(|bytes| bytes.as_slice())
     }
 
     // === 每实体 PBR 材质覆盖（task-22） ===
@@ -2235,6 +2478,10 @@ p_multisample_state: &vk::PipelineMultisampleStateCreateInfo {
             unsafe {
                 let scene = &*scene_ptr;
                 for entity in &scene.root_entities {
+                    // 真实蒙皮网格实体由 skinned draw 负责（避免重复绘制）
+                    if self.skinned_meshes.contains(entity.id) {
+                        continue;
+                    }
                     let renderable_opt = scene
                         .world
                         .get_component::<hezhou_core::RenderableComponent>(*entity);
@@ -2389,6 +2636,46 @@ p_multisample_state: &vk::PipelineMultisampleStateCreateInfo {
                 self.game_index_buffer,
                 &pbr_items,
             );
+            // 真实上传的蒙皮网格（按实体 transform + 每实体 palette）
+            let skinned_entities = self.skinned_meshes.entity_ids();
+            if !skinned_entities.is_empty() {
+                if let Some(skinned) = &self.pbr_skinned {
+                    let identity_model = [
+                        [1.0, 0.0, 0.0, 0.0],
+                        [0.0, 1.0, 0.0, 0.0],
+                        [0.0, 0.0, 1.0, 0.0],
+                        [0.0, 0.0, 0.0, 1.0],
+                    ];
+                    for entity_id in &skinned_entities {
+                        let Some(gpu) = self.skinned_gpu.get(entity_id) else {
+                            continue;
+                        };
+                        // 实体 transform 来自 Scene；无 transform 时用单位矩阵
+                        let model = if let Some(scene_ptr) = self.scene_ptr {
+                            let scene = &*scene_ptr;
+                            scene
+                                .world
+                                .get_component::<hezhou_core::LocalTransform>(
+                                    hezhou_core::Entity::new(*entity_id),
+                                )
+                                .map(|transform| Self::compute_model_matrix(&transform))
+                                .unwrap_or(identity_model)
+                        } else {
+                            identity_model
+                        };
+                        skinned.record_mesh(
+                            cmd,
+                            *entity_id,
+                            gpu.vertex_buffer,
+                            gpu.index_buffer,
+                            gpu.index_count,
+                            gpu.palette_buffer,
+                            model,
+                            &base,
+                        );
+                    }
+                }
+            }
             if !outlines.is_empty() {
                 pass.record_outline(
                     cmd,
@@ -2412,17 +2699,19 @@ p_multisample_state: &vk::PipelineMultisampleStateCreateInfo {
                     );
                 }
             }
-            // 合成蒙皮 mesh：验证 stride64 + location3/4 + joint palette 的真实 draw
-            if let Some(skinned) = &self.pbr_skinned {
-                let time = self.glfw.get_time() as f32;
-                skinned.update_palette_animated(time)?;
-                let skinned_model = crate::pbr_forward::synthetic_skinned_model_matrix(
-                    camera.position,
-                    camera.yaw,
-                    camera.pitch,
-                    time,
-                );
-                skinned.record_synthetic(cmd, skinned_model, &base);
+            // 合成蒙皮 mesh：仅在没有任何真实上传网格时作为 fallback 自检绘制
+            if self.skinned_meshes.is_empty() {
+                if let Some(skinned) = &self.pbr_skinned {
+                    let time = self.glfw.get_time() as f32;
+                    skinned.update_palette_animated(time)?;
+                    let skinned_model = crate::pbr_forward::synthetic_skinned_model_matrix(
+                        camera.position,
+                        camera.yaw,
+                        camera.pitch,
+                        time,
+                    );
+                    skinned.record_synthetic(cmd, skinned_model, &base);
+                }
             }
             pass.end_scene(cmd);
             pass.record_post(cmd);
@@ -2433,15 +2722,16 @@ p_multisample_state: &vk::PipelineMultisampleStateCreateInfo {
             LogLevel::Trace,
             "Vulkan",
             &format!(
-                "PBR draw path: {} draws={} outlines={} materials={} textured={} sky={} gizmo={} skinned={} shadow={} bloom={} tonemap={}",
+                "PBR draw path: {} draws={} outlines={} materials={} textured={} real_skinned={} synthetic_skinned={} sky={} gizmo={} shadow={} bloom={} tonemap={}",
                 settings.quality_label(),
                 draws.len(),
                 outlines.len(),
                 self.pbr_material_overrides.len(),
                 pbr_items.iter().filter(|item| item.texture.is_some()).count(),
+                self.skinned_meshes.len(),
+                self.skinned_meshes.is_empty() && self.pbr_skinned.is_some(),
                 self.sky_enabled,
                 self.gizmo_visible,
-                self.pbr_skinned.is_some(),
                 pass.shadow_active(),
                 pass.bloom_active(),
                 settings.effective_tonemap()
@@ -6683,6 +6973,24 @@ pub fn process_events(&mut self) {
                 if let Some(skinned) = skinned {
                     skinned.destroy();
                 }
+            }
+
+            // 0.2 真实蒙皮网格 GPU buffer（active + retired，cleanup 时统一销毁）
+            for gpu in self.skinned_gpu.values() {
+                self.retired_skinned_buffers
+                    .push((gpu.vertex_buffer, gpu.vertex_memory));
+                self.retired_skinned_buffers
+                    .push((gpu.index_buffer, gpu.index_memory));
+                self.retired_skinned_buffers
+                    .push((gpu.palette_buffer, gpu.palette_memory));
+            }
+            self.skinned_gpu.clear();
+            self.skinned_palette_bytes.clear();
+            self.skinned_meshes.clear();
+            let skinned_buffers = std::mem::take(&mut self.retired_skinned_buffers);
+            for (buffer, memory) in skinned_buffers {
+                self.device.destroy_buffer(buffer, None);
+                self.device.free_memory(memory, None);
             }
             
             // Cleanup game preview resources

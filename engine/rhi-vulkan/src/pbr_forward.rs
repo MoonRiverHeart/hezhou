@@ -253,6 +253,8 @@ impl PbrDrawItem {
 
 /// 每实体纹理 descriptor set 上限（超出回退默认贴图，避免 pool 爆炸）
 pub const MAX_ENTITY_TEXTURE_SETS: usize = 256;
+/// 同时可绘制的真实蒙皮实体上限（每实体一个 palette descriptor set）
+pub const MAX_SKINNED_ENTITIES: usize = 256;
 
 /// 自有的离屏目标（image + memory + view）
 pub struct GpuTarget {
@@ -1713,6 +1715,9 @@ pub struct SkinnedPipelineState {
     skinned_index_memory: vk::DeviceMemory,
     skinned_vertex_count: u32,
     skinned_index_count: u32,
+    // 每实体 palette descriptor 池/缓存（set0 = light UBO + palette SSBO）
+    entity_pool: vk::DescriptorPool,
+    entity_palette_sets: Mutex<HashMap<u64, vk::DescriptorSet>>,
 }
 
 impl SkinnedPipelineState {
@@ -1765,6 +1770,16 @@ impl SkinnedPipelineState {
         )?;
         let set0 = allocate_descriptor_set(&device, pool, set0_layout)?;
         let set1 = allocate_descriptor_set(&device, pool, set1_layout)?;
+
+        // 每实体 palette 的 descriptor 池（set0 = light UBO + palette SSBO）
+        let entity_pool = create_descriptor_pool(
+            &device,
+            MAX_SKINNED_ENTITIES as u32,
+            &[
+                (vk::DescriptorType::UNIFORM_BUFFER, MAX_SKINNED_ENTITIES as u32),
+                (vk::DescriptorType::STORAGE_BUFFER, MAX_SKINNED_ENTITIES as u32),
+            ],
+        )?;
 
         // light UBO（32 bytes，与 rotation.frag 的 LightData 一致）
         let (light_ubo, light_ubo_memory) = create_host_buffer(
@@ -1876,29 +1891,7 @@ impl SkinnedPipelineState {
 
         // 合成 skinned mesh：8 顶点（64B stride）+ 36 索引，用于真实 draw 验证
         let (synthetic_vertices, synthetic_indices) = synthetic_skinned_cube();
-        // SkinnedVertex 不实现 bytemuck::Pod（animation crate 零依赖），手动序列化
-        let mut vertex_bytes: Vec<u8> =
-            Vec::with_capacity(synthetic_vertices.len() * SKINNED_VERTEX_STRIDE);
-        for vertex in &synthetic_vertices {
-            for value in vertex
-                .position
-                .iter()
-                .chain(vertex.normal.iter())
-                .chain(vertex.uv.iter())
-            {
-                vertex_bytes.extend_from_slice(&value.to_le_bytes());
-            }
-            for value in &vertex.joint_indices {
-                vertex_bytes.extend_from_slice(&value.to_le_bytes());
-            }
-            for value in &vertex.joint_weights {
-                vertex_bytes.extend_from_slice(&value.to_le_bytes());
-            }
-        }
-        debug_assert_eq!(
-            vertex_bytes.len(),
-            synthetic_vertices.len() * SKINNED_VERTEX_STRIDE
-        );
+        let vertex_bytes = crate::skinned_mesh::skinned_vertex_bytes(&synthetic_vertices);
         let (skinned_vertex_buffer, skinned_vertex_memory) = create_host_buffer(
             &device,
             &memory_properties,
@@ -1962,6 +1955,8 @@ impl SkinnedPipelineState {
             skinned_index_memory,
             skinned_vertex_count: synthetic_vertices.len() as u32,
             skinned_index_count: synthetic_indices.len() as u32,
+            entity_pool,
+            entity_palette_sets: Mutex::new(HashMap::new()),
         })
     }
 
@@ -2032,7 +2027,7 @@ impl SkinnedPipelineState {
             .cmd_draw_indexed(cmd, self.skinned_index_count, 1, 0, 0, 0);
     }
 
-    /// 上传 joint palette（`JointPalette::to_le_bytes()` 输出）
+    /// 上传 joint palette（`JointPalette::to_le_bytes()` 输出）— 合成 mesh 专用
     ///
     /// # Safety
     /// palette buffer 为 HOST_VISIBLE|HOST_COHERENT
@@ -2058,6 +2053,119 @@ impl SkinnedPipelineState {
         Ok(bytes.len())
     }
 
+    /// 获取/创建真实蒙皮实体的 palette descriptor set
+    ///
+    /// cache_key 通常为 EntityId；renderer 在替换网格时复用同一 palette buffer，
+    /// 调用 `forget_entity_palette` 可让被移除/重传的实体重建 descriptor。
+    unsafe fn entity_palette_set(
+        &self,
+        cache_key: u64,
+        palette_buffer: vk::Buffer,
+    ) -> Option<vk::DescriptorSet> {
+        if let Some(set) = self.entity_palette_sets.lock().get(&cache_key) {
+            return Some(*set);
+        }
+        let mut cache = self.entity_palette_sets.lock();
+        if let Some(set) = cache.get(&cache_key) {
+            return Some(*set);
+        }
+        if cache.len() >= MAX_SKINNED_ENTITIES {
+            return None;
+        }
+        let set = allocate_descriptor_set(&self.device, self.entity_pool, self.set0_layout).ok()?;
+        let light_info = vk::DescriptorBufferInfo {
+            buffer: self.light_ubo,
+            offset: 0,
+            range: 32,
+        };
+        let palette_info = vk::DescriptorBufferInfo {
+            buffer: palette_buffer,
+            offset: 0,
+            range: crate::skinned_mesh::MAX_PALETTE_BYTES as u64,
+        };
+        self.device.update_descriptor_sets(
+            &[
+                vk::WriteDescriptorSet {
+                    dst_set: set,
+                    dst_binding: 0,
+                    descriptor_count: 1,
+                    descriptor_type: vk::DescriptorType::UNIFORM_BUFFER,
+                    p_buffer_info: &light_info,
+                    ..Default::default()
+                },
+                vk::WriteDescriptorSet {
+                    dst_set: set,
+                    dst_binding: 1,
+                    descriptor_count: 1,
+                    descriptor_type: vk::DescriptorType::STORAGE_BUFFER,
+                    p_buffer_info: &palette_info,
+                    ..Default::default()
+                },
+            ],
+            &[],
+        );
+        cache.insert(cache_key, set);
+        Some(set)
+    }
+
+    /// 忘记实体的 palette descriptor（remove/重新上传网格时调用）
+    pub fn forget_entity_palette(&self, cache_key: u64) {
+        self.entity_palette_sets.lock().remove(&cache_key);
+    }
+
+    /// 已缓存的每实体 palette descriptor 数量（调试/测试）
+    pub fn entity_palette_set_count(&self) -> usize {
+        self.entity_palette_sets.lock().len()
+    }
+
+    /// 绘制真实上传的蒙皮网格（vertex stride 64 + 每实体 palette）
+    ///
+    /// # Safety
+    /// 必须处于 HDR render pass 内；buffer 生命周期需覆盖本次提交
+    #[allow(clippy::too_many_arguments)]
+    pub unsafe fn record_mesh(
+        &self,
+        cmd: vk::CommandBuffer,
+        cache_key: u64,
+        vertex_buffer: vk::Buffer,
+        index_buffer: vk::Buffer,
+        index_count: u32,
+        palette_buffer: vk::Buffer,
+        model: [[f32; 4]; 4],
+        base: &LegacyPushBase,
+    ) {
+        let Some(entity_set) = self.entity_palette_set(cache_key, palette_buffer) else {
+            return;
+        };
+        self.device
+            .cmd_bind_pipeline(cmd, vk::PipelineBindPoint::GRAPHICS, self.pipeline);
+        self.device.cmd_bind_descriptor_sets(
+            cmd,
+            vk::PipelineBindPoint::GRAPHICS,
+            self.layout,
+            0,
+            &[entity_set, self.set1],
+            &[],
+        );
+        self.device
+            .cmd_bind_vertex_buffers(cmd, 0, &[vertex_buffer], &[0]);
+        self.device.cmd_bind_index_buffer(
+            cmd,
+            index_buffer,
+            0,
+            vk::IndexType::UINT32,
+        );
+        let push = base.mesh_push(model, 0.0);
+        self.device.cmd_push_constants(
+            cmd,
+            self.layout,
+            vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT,
+            0,
+            cast_slice(&[push]),
+        );
+        self.device.cmd_draw_indexed(cmd, index_count, 1, 0, 0, 0);
+    }
+
     /// 销毁蒙皮资源（调用方必须保证 GPU 已空闲）
     ///
     /// # Safety
@@ -2079,6 +2187,8 @@ impl SkinnedPipelineState {
         device.free_memory(self.skinned_vertex_memory, None);
         device.destroy_buffer(self.skinned_index_buffer, None);
         device.free_memory(self.skinned_index_memory, None);
+        device.destroy_descriptor_pool(self.entity_pool, None);
+        self.entity_palette_sets.lock().clear();
         let _ = (self.set0, self.set1);
     }
 }

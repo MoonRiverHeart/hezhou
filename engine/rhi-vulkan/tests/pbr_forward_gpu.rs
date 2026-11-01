@@ -21,6 +21,9 @@ use hezhou_rhi_vulkan::{
     LegacyPushBase, MeshDraw, PbrDrawItem, PbrForwardPass, SkinnedPipelineState, LEGACY_FAR,
     LEGACY_FOV_DEGREES, LEGACY_NEAR,
 };
+use hezhou_rhi_vulkan::skinned_mesh::{
+    identity_palette_bytes, skinned_vertex_bytes, MAX_PALETTE_BYTES, MAX_PALETTE_JOINTS,
+};
 
 const DEFAULT_EXTENT: ViewportExtent = ViewportExtent {
     width: 320,
@@ -575,6 +578,298 @@ fn pbr_forward_gpu_low_quality_draw_path() {
             panic!("GPU PBR Low 档冒烟失败: {err}");
         }
     }
+}
+
+#[test]
+#[ignore = "需要 Vulkan 设备（GPU 测试）；运行: cargo test -p hezhou-rhi-vulkan --test pbr_forward_gpu -- --ignored"]
+fn pbr_forward_gpu_two_real_skinned_meshes() {
+    unsafe {
+        let Some(headless) = HeadlessVulkan::create() else {
+            return;
+        };
+        let result = (|| -> Result<(), String> {
+            let resources = create_frame_resources(&headless, DEFAULT_EXTENT)?;
+            let settings = RenderSettings::for_preset(RenderQualityPreset::High);
+            let (pass, skinned) = create_pipeline_pair(
+                &headless,
+                DEFAULT_EXTENT,
+                &settings,
+                resources.depth.view,
+                resources.ldr.view,
+            )?;
+            assert!(pass.sky_pipeline_ready());
+
+            // === 2 个真实蒙皮网格（不同顶点/索引/palette） ===
+            let (cube_vertices, cube_indices) =
+                hezhou_rhi_vulkan::pbr_forward::synthetic_skinned_cube();
+            // 网格 A：8 顶点 / 36 索引，2 关节 palette
+            let mesh_a = (cube_vertices.clone(), cube_indices.clone());
+            // 网格 B：两个 cube 合并（16 顶点 / 72 索引），3 关节 palette
+            let mut vertices_b = cube_vertices.clone();
+            for vertex in &mut vertices_b {
+                vertex.position[1] += 1.5;
+            }
+            let mut mesh_b_vertices = cube_vertices.clone();
+            mesh_b_vertices.extend(vertices_b);
+            let mut mesh_b_indices = cube_indices.clone();
+            mesh_b_indices.extend(cube_indices.iter().map(|index| index + 8));
+            let mesh_b = (mesh_b_vertices, mesh_b_indices);
+            assert_ne!(mesh_a.0.len(), mesh_b.0.len(), "两个网格顶点数不同");
+            assert_ne!(mesh_a.1.len(), mesh_b.1.len(), "两个网格索引数不同");
+
+            let (vb_a, vb_a_mem, ib_a, ib_a_mem) = create_skinned_mesh_buffers(
+                &headless,
+                &mesh_a.0,
+                &mesh_a.1,
+            )?;
+            let (vb_b, vb_b_mem, ib_b, ib_b_mem) = create_skinned_mesh_buffers(
+                &headless,
+                &mesh_b.0,
+                &mesh_b.1,
+            )?;
+            let (palette_a, palette_a_mem) =
+                create_palette_buffer(&headless, &two_joint_palette())?;
+            let (palette_b, palette_b_mem) =
+                create_palette_buffer(&headless, &three_joint_palette())?;
+
+            let base = LegacyPushBase {
+                viewport: [DEFAULT_EXTENT.width as f32, DEFAULT_EXTENT.height as f32],
+                camera_pos: camera().position,
+                camera_yaw: camera().yaw,
+                camera_pitch: camera().pitch,
+            };
+            let cmd = headless
+                .device
+                .allocate_command_buffers(&vk::CommandBufferAllocateInfo {
+                    command_pool: headless.command_pool,
+                    level: vk::CommandBufferLevel::PRIMARY,
+                    command_buffer_count: 1,
+                    ..Default::default()
+                })
+                .map_err(|e| format!("分配 command buffer 失败: {e}"))?[0];
+            headless
+                .device
+                .begin_command_buffer(cmd, &vk::CommandBufferBeginInfo::default())
+                .map_err(|e| format!("begin command buffer 失败: {e}"))?;
+            headless.device.cmd_pipeline_barrier(
+                cmd,
+                vk::PipelineStageFlags::TOP_OF_PIPE,
+                vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT,
+                vk::DependencyFlags::empty(),
+                &[],
+                &[],
+                &[vk::ImageMemoryBarrier {
+                    old_layout: vk::ImageLayout::UNDEFINED,
+                    new_layout: vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL,
+                    src_queue_family_index: vk::QUEUE_FAMILY_IGNORED,
+                    dst_queue_family_index: vk::QUEUE_FAMILY_IGNORED,
+                    image: resources.ldr.image,
+                    subresource_range: vk::ImageSubresourceRange {
+                        aspect_mask: vk::ImageAspectFlags::COLOR,
+                        base_mip_level: 0,
+                        level_count: 1,
+                        base_array_layer: 0,
+                        layer_count: 1,
+                    },
+                    src_access_mask: vk::AccessFlags::empty(),
+                    dst_access_mask: vk::AccessFlags::COLOR_ATTACHMENT_WRITE,
+                    ..Default::default()
+                }],
+            );
+
+            // 背景实体（可选）+ 两个真实蒙皮网格
+            pass.begin_scene(cmd, [0.05, 0.05, 0.1, 1.0]);
+            pass.record_sky(cmd, [0.16, 0.32, 0.62], [0.72, 0.82, 0.92]);
+            let mesh = MeshDraw::primitive(0, 3, [
+                [1.0, 0.0, 0.0, 0.0],
+                [0.0, 1.0, 0.0, 0.0],
+                [0.0, 0.0, 1.0, 0.0],
+                [0.0, 0.0, 0.0, 1.0],
+            ]);
+            pass.record_scene_draws_with_materials(
+                cmd,
+                resources.vertex_buffer,
+                resources.vertex_buffer,
+                &[PbrDrawItem::new(mesh, settings.default_material.sanitized())],
+            );
+            let model_a = [
+                [0.5, 0.0, 0.0, 0.0],
+                [0.0, 0.5, 0.0, 0.0],
+                [0.0, 0.0, 0.5, 0.0],
+                [-1.2, 0.0, 0.0, 1.0],
+            ];
+            let model_b = [
+                [0.4, 0.0, 0.0, 0.0],
+                [0.0, 0.4, 0.0, 0.0],
+                [0.0, 0.0, 0.4, 0.0],
+                [1.2, 0.0, 0.0, 1.0],
+            ];
+            skinned.record_mesh(
+                cmd, 101, vb_a, ib_a, mesh_a.1.len() as u32, palette_a, model_a, &base,
+            );
+            skinned.record_mesh(
+                cmd, 102, vb_b, ib_b, mesh_b.1.len() as u32, palette_b, model_b, &base,
+            );
+            pass.end_scene(cmd);
+            pass.record_post(cmd);
+
+            headless
+                .device
+                .end_command_buffer(cmd)
+                .map_err(|e| format!("end command buffer 失败: {e}"))?;
+            headless
+                .device
+                .queue_submit(
+                    headless.queue,
+                    &[vk::SubmitInfo {
+                        command_buffer_count: 1,
+                        p_command_buffers: &cmd,
+                        ..Default::default()
+                    }],
+                    vk::Fence::null(),
+                )
+                .map_err(|e| format!("queue submit 失败: {e}"))?;
+            headless
+                .device
+                .queue_wait_idle(headless.queue)
+                .map_err(|e| format!("queue wait idle 失败: {e}"))?;
+            headless
+                .device
+                .free_command_buffers(headless.command_pool, &[cmd]);
+            assert_eq!(
+                skinned.entity_palette_set_count(),
+                2,
+                "两个真实蒙皮网格应各有 palette descriptor"
+            );
+
+            // 清理
+            skinned.destroy();
+            pass.destroy();
+            for (buffer, memory) in [
+                (vb_a, vb_a_mem),
+                (ib_a, ib_a_mem),
+                (vb_b, vb_b_mem),
+                (ib_b, ib_b_mem),
+                (palette_a, palette_a_mem),
+                (palette_b, palette_b_mem),
+            ] {
+                headless.device.destroy_buffer(buffer, None);
+                headless.device.free_memory(memory, None);
+            }
+            destroy_frame_resources(&headless, resources);
+            eprintln!(
+                "GPU 真实蒙皮网格冒烟通过: 2 个网格（8v/36i+2 关节、16v/72i+3 关节）真实绘制"
+            );
+            Ok(())
+        })();
+        headless.destroy();
+        if let Err(err) = result {
+            panic!("GPU 真实蒙皮网格冒烟失败: {err}");
+        }
+    }
+}
+
+/// 创建真实蒙皮网格的 vertex/index buffer（host visible）
+unsafe fn create_skinned_mesh_buffers(
+    headless: &HeadlessVulkan,
+    vertices: &[hezhou_animation::SkinnedVertex],
+    indices: &[u32],
+) -> Result<
+    (vk::Buffer, vk::DeviceMemory, vk::Buffer, vk::DeviceMemory),
+    String,
+> {
+    let vertex_bytes = skinned_vertex_bytes(vertices);
+    let (vertex_buffer, vertex_memory) = upload_raw(
+        headless,
+        &vertex_bytes,
+        vk::BufferUsageFlags::VERTEX_BUFFER,
+    )?;
+    let index_bytes: Vec<u8> = indices
+        .iter()
+        .flat_map(|index| index.to_le_bytes())
+        .collect();
+    let (index_buffer, index_memory) = upload_raw(
+        headless,
+        &index_bytes,
+        vk::BufferUsageFlags::INDEX_BUFFER,
+    )?;
+    Ok((vertex_buffer, vertex_memory, index_buffer, index_memory))
+}
+
+/// 创建 16KB palette buffer，并写入给定矩阵（其余填单位矩阵）
+unsafe fn create_palette_buffer(
+    headless: &HeadlessVulkan,
+    matrices: &[[[f32; 4]; 4]],
+) -> Result<(vk::Buffer, vk::DeviceMemory), String> {
+    let identity = identity_palette_bytes();
+    let mut bytes = Vec::with_capacity(MAX_PALETTE_BYTES);
+    for _ in 0..MAX_PALETTE_JOINTS {
+        bytes.extend_from_slice(&identity);
+    }
+    // 逐个矩阵写入（palette 顺序即 joint 顺序）
+    for (matrix_index, matrix) in matrices.iter().take(MAX_PALETTE_JOINTS).enumerate() {
+        let mut offset = matrix_index * 64;
+        for column in matrix {
+            for value in column {
+                bytes[offset..offset + 4].copy_from_slice(&value.to_le_bytes());
+                offset += 4;
+            }
+        }
+    }
+    upload_raw(headless, &bytes, vk::BufferUsageFlags::STORAGE_BUFFER)
+}
+
+unsafe fn upload_raw(
+    headless: &HeadlessVulkan,
+    bytes: &[u8],
+    usage: vk::BufferUsageFlags,
+) -> Result<(vk::Buffer, vk::DeviceMemory), String> {
+    let (buffer, memory) = create_host_visible_buffer(
+        &headless.instance,
+        &headless.device,
+        headless.physical_device,
+        bytes.len() as u64,
+        usage,
+    )?;
+    let ptr = headless
+        .device
+        .map_memory(memory, 0, bytes.len() as u64, vk::MemoryMapFlags::empty())
+        .map_err(|e| format!("map 上传 buffer 失败: {e}"))?;
+    std::ptr::copy_nonoverlapping(bytes.as_ptr(), ptr as *mut u8, bytes.len());
+    headless.device.unmap_memory(memory);
+    Ok((buffer, memory))
+}
+
+/// 2 关节 palette：单位阵 + 绕 Y 轴旋转 0.3（列主序 mat4）
+fn two_joint_palette() -> Vec<[[f32; 4]; 4]> {
+    let c = 0.3f32.cos();
+    let s = 0.3f32.sin();
+    vec![
+        [
+            [1.0, 0.0, 0.0, 0.0],
+            [0.0, 1.0, 0.0, 0.0],
+            [0.0, 0.0, 1.0, 0.0],
+            [0.0, 0.0, 0.0, 1.0],
+        ],
+        [
+            [c, 0.0, -s, 0.0],
+            [0.0, 1.0, 0.0, 0.0],
+            [s, 0.0, c, 0.0],
+            [0.0, 0.0, 0.0, 1.0],
+        ],
+    ]
+}
+
+/// 3 关节 palette：单位阵 + 两个不同旋转/平移
+fn three_joint_palette() -> Vec<[[f32; 4]; 4]> {
+    let mut palette = two_joint_palette();
+    palette.push([
+        [1.0, 0.0, 0.0, 0.0],
+        [0.0, 1.0, 0.0, 0.0],
+        [0.0, 0.0, 1.0, 0.0],
+        [0.0, 0.5, 0.0, 1.0],
+    ]);
+    palette
 }
 
 #[test]

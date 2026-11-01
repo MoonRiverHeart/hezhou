@@ -17,7 +17,7 @@
 | Blinn-Phong 回退 | ✅ 保留 | `RenderSettings::default()` 即 0.1 legacy 行为，现有 raster/FXAA/UI 路径不变 |
 | 编辑器实际启用 | ✅ 已接入（task-9） | `UIVulkanRenderer` 在 PBR 质量档走新 draw path；默认设置仍走 legacy，零回归 |
 | PBR 模式完整视觉 | ✅ 已补齐（task-18） | 天空盒（全屏渐变）、选中 outline、3D Gizmo 三轴、合成蒙皮 mesh 均进入实际 draw |
-| 蒙皮实际 draw | ✅ 合成 mesh 验证（task-18） | 64B stride + location 3/4 + joint palette 真实 draw；`upload_skin_palette` 供 asset/Player 接入 |
+| 蒙皮实际 draw | ✅ 真实网格上传（task-28） | `SkinnedMeshUpload` + 每实体 palette 真实绘制；2 网格 GPU 冒烟；合成 cube 仅作无上传 fallback |
 | 每实体 PBR 材质 | ✅ 渲染层完成（task-22） | `PbrMaterialOverride` + EntityId 映射；每实体 push constant + 纹理 descriptor；无覆盖回退默认材质；core/Inspector 字段待接入 |
 | PBR 模式 resize | ✅ GPU 冒烟（task-18） | 320×180 → 640×360 重建并重新录制通过 |
 
@@ -228,6 +228,58 @@ Project 保存/加载需要把以上字段写入 `ProjectEntity.material`（0.3 
 **TODO（0.2 不做）**：透明/alpha 混合材质、法线贴图多 UV、per-entity normal/MR/AO 独立贴图、
 材质资产（AssetId）与材质库、texture cache 淘汰策略。
 
+### 5.3 真实蒙皮网格上传与绘制（task-28，Lead 定稿契约）
+
+公开 API（`UIVulkanRenderer`，实现已就绪）：
+
+```rust
+pub struct SkinnedMeshUpload {
+    pub entity_id: u64,
+    pub vertices: Vec<hezhou_animation::SkinnedVertex>,
+    pub indices: Vec<u32>,
+    pub material: Option<hezhou_render_pipeline::pbr::PbrMaterial>,
+    pub texture_path: Option<String>,
+}
+
+impl UIVulkanRenderer {
+    pub fn upload_skinned_mesh(&mut self, upload: SkinnedMeshUpload) -> Result<(), String>;
+    pub fn remove_skinned_mesh(&mut self, entity_id: u64) -> bool;
+    pub fn skinned_mesh_count(&self) -> usize;
+    pub fn upload_skin_palette(&mut self, entity_id: u64, bytes: &[u8]) -> Result<(), String>;
+}
+```
+
+数据契约：
+- 顶点 = 64B stride（position/normal/uv/joint_indices[u32;4]/joint_weights[f32;4]），
+  序列化由 `hezhou_rhi_vulkan::skinned_vertex_bytes` 提供
+- 索引 u32，3 的倍数且 < 顶点数；上限 1,048,576 顶点 / 4,194,304 索引
+- palette 单独按实体上传：每关节 64B（mat4 列主序），最多 256 关节（16 KiB）
+- 实体模型矩阵取自 Scene `LocalTransform`（实体无 transform 时为单位矩阵）
+
+GPU/绘制行为：
+- 每实体 host-visible vertex/index buffer + 固定 16KB palette buffer；
+  替换网格时复用 palette buffer（保证 palette descriptor 稳定），旧 buffer 延迟到 cleanup 销毁
+- PBR HDR pass 中按实体 `Transform` 绘制真实网格；每实体独立 palette descriptor set
+  （`SkinnedPipelineState` 内缓存，上限 256）
+- **有真实上传网格时不画 synthetic**；`skinned_mesh_count() == 0` 时保留合成 cube 自检 fallback
+- `remove_skinned_mesh` 后不再绘制、`upload_skin_palette` 返回错误；GPU buffer cleanup 回收
+- Legacy 路径不绘制蒙皮网格（只影响 PBR 质量档）
+
+**Player/asset 接入点：ImportedPrimitive → SkinnedVertex 字段映射**
+
+| ImportedPrimitive 字段 | `SkinnedVertex` 字段 | 说明 |
+|---|---|---|
+| positions（f32×3） | `position` | glTF `POSITION` |
+| normals（f32×3） | `normal` | glTF `NORMAL` |
+| uvs（f32×2，uv0） | `uv` | glTF `TEXCOORD_0` |
+| joints（u16/u32×4） | `joint_indices: [u32;4]` | glTF `JOINTS_0`（palette 索引，非骨架全局索引） |
+| weights（f32×4） | `joint_weights` | glTF `WEIGHTS_0`（调用方归一化） |
+| indices（u32） | `indices: Vec<u32>` | 三角索引 |
+| 每帧 palette | `JointPalette::to_le_bytes()` | `AnimationStateMachine::sample` → `JointPalette::from_pose` → `upload_skin_palette` |
+
+**限制/TODO**：蒙皮着色复用 `rotation.frag`（Blinn-Phong 回退，`material`/`texture_path` 暂存未生效）；
+不支持 LOD/骨骼压缩/根运动；多材质子网格（一个实体多 draw）未支持；无蒙皮阴影。
+
 ## 6. 质量档
 
 | 档位 | 着色 | 阴影 | cascade | 阴影分辨率/级 | Bloom | Tonemap | FXAA |
@@ -260,11 +312,9 @@ let frame = settings.shadow_config();
 
 ## 7. 蒙皮（Skinning）pipeline 接入契约（与 animation-owner 协作）
 
-`animation-owner` 已交付 `engine/animation`。**task-18 已完成**：GPU pipeline 创建
-（`hezhou_rhi_vulkan::SkinnedPipelineState`）、palette 资源与 `upload_skin_palette` API，
-并且 **PBR draw path 已用合成 skinned mesh 真实绘制**（8 顶点 cube，上下两段分属 2 个关节，
-每帧动画 palette）；High/Low/resize 三组 GPU 冒烟覆盖。真实角色 mesh 仍需 asset/core 提供
-顶点/索引 + 每帧 palette（接口已就绪）。
+`animation-owner` 已交付 `engine/animation`。**task-18/task-28 已完成**：GPU pipeline 创建
+（`hezhou_rhi_vulkan::SkinnedPipelineState`）、每实体 palette、真实网格上传与绘制（见 §5.3）；
+`synthetic_skinned_cube` 仅在没有任何真实上传网格时作为 fallback 自检。
 
 | 项目 | 契约 |
 |---|---|
@@ -272,26 +322,28 @@ let frame = settings.shadow_config();
 | location 3 | `R32G32B32A32_UINT`（joint indices），offset 32 |
 | location 4 | `R32G32B32A32_SFLOAT`（joint weights），offset 48 |
 | joint palette | set = 0, binding = 1（binding 0 是 LightData），std430 `mat4 joints[]` |
-| palette 数据 | 每帧 `machine.sample` → `JointPalette::from_pose` → `to_le_bytes()` 上传 |
-| 容量 | ≤256 关节可用 UBO（16 KiB）；SSBO 无此限制 |
+| palette 数据 | 每帧 `machine.sample` → `JointPalette::from_pose` → `to_le_bytes()` → `upload_skin_palette(entity_id, bytes)` |
+| 容量 | ≤256 关节（16 KiB / 实体） |
 | push constant | 复用现有 144 bytes 布局（`skinning.vert` 与 `rotation.vert` 一致） |
 | shader | `shaders/skinning.vert` / `skinning.frag` 已编译为 `.spv` |
 
-Rust 侧已提供（`hezhou_rhi_vulkan::skinning_plan` 契约 + `SkinnedPipelineState` 实际 pipeline）：
+Rust 侧已提供（真实网格上传 + pipeline 由 renderer 自动创建）：
 
 ```rust
-use hezhou_rhi_vulkan::{SkinnedPipelineState, skinning_plan};
+use hezhou_rhi_vulkan::SkinnedMeshUpload;
 
-// 顶点输入计划（stride 64 + 5 个 attribute）
-let vertex_input = skinning_plan::SkinnedVertexInput::new();
-
-// GPU pipeline 由 UIVulkanRenderer::ensure_pbr_forward 自动创建；
-// 每帧上传 palette：
-renderer.upload_skin_palette(&palette.to_le_bytes())?;
+// 1) 上传真实蒙皮网格（顶点 64B stride + u32 索引）
+renderer.upload_skinned_mesh(
+    SkinnedMeshUpload::from_parts(entity_id, vertices, indices),
+)?;
+// 2) 每帧按实体上传 joint palette（每关节 64B，最多 256）
+renderer.upload_skin_palette(entity_id, &palette.to_le_bytes())?;
+// 3) 卸载
+renderer.remove_skinned_mesh(entity_id);
 ```
 
-**当前状态**：pipeline/palette/合成 skinned mesh 已进入 PBR HDR pass 的真实 draw，
-`upload_skin_palette` 供 asset/Player 上传真实角色 palette；接入点见 §9 与 §12。
+**当前状态**：真实网格上传/绘制/每实体 palette 已实现并有 2 网格 GPU 测试；
+合成 cube 保留为无上传时的 fallback；接入点见 §5.3 与 §12。
 
 ## 8. 已知限制（0.2）
 
@@ -309,8 +361,9 @@ renderer.upload_skin_palette(&palette.to_le_bytes())?;
 8. **GPU 测试 ignored**：`create_shadow_map_on_gpu` / `pbr_forward_gpu_*` 需真实 Vulkan 设备。
 9. **阴影分辨率需 2 的幂**：`normalize_shadow_resolution` 向下取整收敛。
 10. **SPIR-V 手动编译**：修改 shader 后必须重跑 glslc，否则运行时使用旧 `.spv`。
-11. **蒙皮真实角色数据未接入**：draw path 用合成 skinned mesh 验证（pipeline 正确性），
-    真实角色需 asset/Player 提供 64B skinned 顶点/索引 + 每帧 palette（`upload_skin_palette` 已就绪）。
+11. **真实蒙皮网格限制**：仅 PBR 模式绘制（legacy 不画）；蒙皮着色复用 `rotation.frag`
+    （Blinn-Phong 回退，`material`/`texture_path` 暂存未生效）；无 LOD/骨骼压缩/根运动；
+    蒙皮网格不参与阴影/outline；每实体 palette buffer 固定 16KB；remove 的 GPU buffer 在 cleanup 回收。
 12. **质量档/resize 时旧 PBR 通道延迟到 cleanup 销毁**：避免运行期销毁 Vulkan 资源触发
     驱动 HEAP_CORRUPTION；频繁切换质量档会暂时多占显存（换档不频繁，可接受）。
 13. **PBR 模式 gizmo/outline 复用 legacy 着色器**：视觉效果与 legacy 一致，但需要 renderer
@@ -336,8 +389,11 @@ if renderer.pbr_forward_active() {
 // 3. 每帧渲染计划（pass 顺序 + 阴影/Bloom 资源描述）
 let plan = renderer.render_plan();
 
-// 4. 蒙皮 palette 上传（需要 PBR 质量档）
-let uploaded = renderer.upload_skin_palette(&palette.to_le_bytes())?;
+// 4. 真实蒙皮网格上传 + 每实体 palette（需要 PBR 质量档）
+renderer.upload_skinned_mesh(SkinnedMeshUpload::from_parts(entity_id, vertices, indices))?;
+renderer.upload_skin_palette(entity_id, &palette.to_le_bytes())?;
+renderer.remove_skinned_mesh(entity_id);
+renderer.skinned_mesh_count();
 
 // 5. 每实体 PBR 材质（task-22）
 renderer.set_entity_pbr_material(entity_id, material);
@@ -354,7 +410,7 @@ renderer.remove_entity_pbr_material(entity_id); // 回退默认材质
 | 编辑器 UI（画质下拉） | `EditorScript.*.cs`（质量档 3 选项 + “Legacy” 回退） | 调用上述 FFI；状态栏显示 `pbr_draw_path_summary` |
 | PBR 材质字段编辑 | `core` 材质组件 + `FfiContext` + Inspector | **渲染层已支持每实体材质（task-22）**；需要 core 组件字段（见 §5.2 字段清单）+ FFI setter + Inspector 行 |
 | 材质持久化 | `core/src/project.rs` `ProjectEntity.material` | 保存/加载 base_color/metallic/roughness/normal_scale/ao/emissive/texture_path |
-| 蒙皮 draw 接入 | `core`/`asset` 提供 skinned mesh 顶点/索引 + palette，`rhi-vulkan` 复用 `SkinnedPipelineState` | draw path 已用合成 mesh 验证；真实数据接口 `upload_skin_palette` 已就绪 |
+| 蒙皮 draw 接入 | Player/asset 按 §5.3 映射 `ImportedPrimitive → SkinnedVertex`，调用 `upload_skinned_mesh` + 每帧 `upload_skin_palette` | 渲染层已支持真实网格（2 网格 GPU 冒烟通过）；合成 cube 为无上传 fallback |
 | 阴影/Bloom 调参 | “高级”面板覆盖 `set_render_settings` | `RenderSettings::validate` 会收敛非法值 |
 | SPV 打包 | 安装包脚本已包含 `engine/shaders`？ | 需确认打包/CI 是否随包分发新增 `.spv` |
 
@@ -437,6 +493,15 @@ task-22（每实体 PBR 材质）：
 | `cargo build -j 1 -p hezhou-examples --features mono` | 通过（exit 0） |
 | 默认/旧 PBR 零回归 | 无覆盖实体仍使用 `RenderSettings.default_material`；legacy 分支未改 |
 
+task-28（真实蒙皮网格上传与绘制）：
+
+| 项目 | 结果 |
+|---|---|
+| `cargo test -p hezhou-render-pipeline -p hezhou-rhi-vulkan` | render-pipeline 69+11+9 passed；rhi-vulkan **52 passed**，1 ignored（shadow GPU）、4 ignored（PBR GPU）——新增 `skinned_mesh` 布局/校验/注册表替换/移除/palette 校验等 CPU 测试 |
+| `cargo test -p hezhou-rhi-vulkan --test pbr_forward_gpu -- --ignored` | **4 passed**（真实 Vulkan 设备）：High/Low/Resize + 新增 **2 个真实蒙皮网格**（8v/36i+2 关节、16v/72i+3 关节，各自 palette buffer/descriptor）真实绘制并提交；`entity_palette_set_count()==2` 断言通过 |
+| `cargo build -j 1 -p hezhou-examples --features mono` | 通过（exit 0） |
+| Legacy/合成 fallback | legacy 分支未改；无真实上传网格时仍绘制 synthetic cube 自检 |
+
 ## 11. 性能风险
 
 | 风险 | 影响 | 缓解 |
@@ -451,6 +516,7 @@ task-22（每实体 PBR 材质）：
 | 天空盒/outline/Gizmo/合成蒙皮额外 draw | 每帧多 5~10 个 draw call | 数量固定且很小，相对场景实体可忽略 |
 | 合成蒙皮 mesh palette 每帧上传 | 128B HOST_COHERENT 写入 | 可忽略；真实角色 palette ≤16KB/角色 |
 | 每实体材质 descriptor 绑定切换 | 纹理不同的实体之间需重新 bind set1 | 相同材质/纹理连续绘制时 set1 不变不重绑；上限 256 个缓存 set |
+| 真实蒙皮网格每实体 16KB palette buffer | 256 实体约 4 MB | 上限 256；remove 后 cleanup 回收；后续可改为 palette UBO 池 |
 
 ## 12. 第二轮 TODO
 
@@ -459,8 +525,8 @@ task-22（每实体 PBR 材质）：
 3. Bloom 上采样链（当前单级 prefilter + 合成，未实现多级模糊上采样）。
 4. 透明/alpha test 阴影支持。
 5. 阴影 golden image 回归（需要自托管 GPU runner）。
-6. 真实角色蒙皮接入：asset/Player 提供 64B skinned mesh + 每帧 palette（复用
-   `SkinnedPipelineState` / `upload_skin_palette`，合成 mesh 可退化为自检/关闭）。
+6. 蒙皮进阶：PBR 材质/纹理真正用于蒙皮着色；多材质子网格；LOD/骨骼压缩；
+   蒙皮阴影/outline；asset/Player 侧 `ImportedPrimitive → SkinnedVertex` 接入。
 7. 每实体材质 editor 链路：core 材质组件字段 + FfiContext setter + Inspector + Project 持久化
    （渲染层 API/字段清单已就绪，见 §5.2）。
 8. PBR 模式也支持 `PipelineRegistry` 仲裁（当前 registry 启用时走 registry 管线）。

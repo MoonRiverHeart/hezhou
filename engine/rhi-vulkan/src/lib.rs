@@ -20,6 +20,8 @@ pub mod shadow_map;
 pub mod pbr_forward;
 // 0.2 骨骼蒙皮 pipeline 接入计划（契约由 hezhou-animation 提供，本轮不创建 pipeline）
 pub mod skinning_plan;
+// 0.2 真实蒙皮网格上传（SkinnedMeshUpload / EntityId 注册表）
+pub mod skinned_mesh;
 
 #[cfg(feature = "mono")]
 pub mod mono_rotation_renderer;
@@ -59,4 +61,9 @@ pub use skinning_plan::{
     joint_palette_layout_binding, joint_palette_bytes, format_from_contract,
     skinning_vert_spv, skinning_frag_spv,
     SKINNED_STRIDE_BYTES, JOINT_BYTES,
+};
+pub use skinned_mesh::{
+    SkinnedMeshUpload, SkinnedMeshRegistry, SkinnedMeshUploadError,
+    skinned_vertex_bytes, skinned_vertex_stride, identity_palette_bytes,
+    MAX_PALETTE_JOINTS, MAX_PALETTE_BYTES, MAX_SKINNED_VERTICES, MAX_SKINNED_INDICES,
 };

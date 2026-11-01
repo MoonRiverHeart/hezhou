@@ -198,8 +198,9 @@ has_texture_f, specular, ambient, shininess,  // offsets 120-132
 | `render_quality.rs` | `RenderSettings`（render-pipeline）→ Vulkan 资源描述：`ShadowPassDesc`（D32 深度图 array + 比较采样器 + 深度 render pass 参数）、`BloomPlan`（半分辨率 mip 链）、`pass_order`（Shadow→Game→Bloom→Tonemap→FXAA→UI）、显存估算。纯 CPU，可单测。 |
 | `shadow_map.rs` | `ShadowMapResources::create/destroy`：真实创建 depth image(array)/views/sampler/render pass/framebuffer。GPU 测试 `create_shadow_map_on_gpu` 标 `#[ignore]`。 |
 | `skinning_plan.rs` | 蒙皮 pipeline 接入计划（契约来自 `hezhou-animation`）：`SkinnedVertexInput`（stride 64 + location 3/4）、joint palette set0/binding1 descriptor binding、palette 字节数、`skinning.vert/frag.spv` 有效性。 |
-| `pbr_forward.rs` | **PBR/Shadow/Post 实际 draw path**：`PbrForwardPass`（HDR 目标 + PBR/Shadow/Bloom/Tonemap + 天空盒 + outline/Gizmo pipeline + `begin_scene/record_sky/record_scene_draws(_with_materials)/record_outline/record_gizmo/end_scene/record_post`）、`PbrDrawItem`+`PbrTextureBinding`（每实体材质 push constant + 每实体纹理 descriptor 缓存）、`SkinnedPipelineState`（蒙皮 pipeline + 合成 skinned mesh + palette 动画/上传）、`camera_view_matrix/projection_matrix`、SRGB gamma 处理。 |
-| `tests/pbr_forward_gpu.rs` | `#[ignore]` GPU 冒烟：High/Low 完整视觉（天空盒/outline/Gizmo/合成蒙皮）+ resize 重建，真实录制提交。 |
+| `skinned_mesh.rs` | **真实蒙皮网格上传**（task-28）：`SkinnedMeshUpload`（entity_id/vertices/indices/material/texture_path）、`SkinnedMeshRegistry`（EntityId 映射/替换/移除）、`skinned_vertex_bytes`、`validate_palette_bytes`、上限常量。 |
+| `pbr_forward.rs` | **PBR/Shadow/Post 实际 draw path**：`PbrForwardPass`（HDR 目标 + PBR/Shadow/Bloom/Tonemap + 天空盒 + outline/Gizmo pipeline + `begin_scene/record_sky/record_scene_draws(_with_materials)/record_outline/record_gizmo/end_scene/record_post`）、`PbrDrawItem`+`PbrTextureBinding`（每实体材质 push constant + 每实体纹理 descriptor 缓存）、`SkinnedPipelineState`（蒙皮 pipeline + 合成 skinned mesh + `record_mesh` 真实网格绘制 + 每实体 palette descriptor 缓存）、`camera_view_matrix/projection_matrix`、SRGB gamma 处理。 |
+| `tests/pbr_forward_gpu.rs` | `#[ignore]` GPU 冒烟：High/Low 完整视觉（天空盒/outline/Gizmo/合成蒙皮）+ **2 个真实蒙皮网格** + resize 重建，真实录制提交。 |
 | `ui_vulkan_renderer.rs` | 新增字段 `render_settings`（默认 legacy 兼容）+ `set_render_quality_preset` / `set_render_settings` / `render_plan` / `render_quality_summary`；两个 `RenderContext` 构造点透传设置。 |
 
 **约定**:
@@ -216,6 +217,13 @@ has_texture_f, specular, ambient, shininess,  // offsets 120-132
   core/Inspector 材质字段与 FFI setter 待后续任务接入。
 - 每实体材质入口：`UIVulkanRenderer::set_entity_pbr_material(_params)` /
   `set_entity_pbr_texture` / `remove_entity_pbr_material` / `resolve_entity_pbr_material`。
-- 蒙皮 `SkinnedPipelineState` 与 PBR 通道同时创建，含内置合成 skinned mesh + 动画 palette
-  （High/Low/resize GPU 冒烟覆盖）；真实角色走 `upload_skin_palette` + 64B skinned 顶点接口。
+- 真实蒙皮网格入口（task-28，Lead 定稿契约）：
+  `upload_skinned_mesh(SkinnedMeshUpload)` / `remove_skinned_mesh(entity_id)` /
+  `skinned_mesh_count()` / `upload_skin_palette(entity_id, bytes)`；
+  `SkinnedMeshUpload` 字段 = entity_id/vertices/indices/material/texture_path（不含 palette）。
+- 每实体 host-visible vertex/index buffer + 固定 16KB palette buffer；替换网格复用 palette buffer，
+  旧 buffer 延迟到 cleanup 销毁；PBR draw 用真实网格，**有真实上传时不画 synthetic**，
+  `skinned_mesh_count()==0` 时保留合成 cube fallback；remove 后不绘制/不接受 palette。
+- 蒙皮 `SkinnedPipelineState` 与 PBR 通道同时创建；`pbr_forward_gpu_two_real_skinned_meshes`
+  GPU 测试覆盖 2 个真实网格（不同顶点/索引/palette）。
 - 详细文档: `render-pipeline/docs/RENDER_0_2.md`。
