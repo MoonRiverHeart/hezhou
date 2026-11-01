@@ -9,6 +9,15 @@
 
 ---
 
+## 0. 当前执行进度（2026-11-01）
+
+- ✅ 决策冻结：3D 动作引擎能力、骨骼动画进 0.2、自研物理、Windows/Linux Player、AI 并行。
+- ✅ 能力模块第一轮完成：`audio`、`asset`、`physics`、`gameplay`、`animation`、`render-pipeline/rhi-vulkan`、`player`、`integration`。
+- ✅ 编辑器已接入渲染质量/PBR FFI（工具栏画质切换、状态栏摘要、启动自检 44 项通过）。
+- ✅ 本地 CI 通过：默认测试 + 可选 feature 测试 + FFI 契约 + C# 编译 + 图标一致性。
+- ⏳ 未完成：PBR 模式天空盒/outline/gizmo、蒙皮进 draw 循环、编辑器音频/资产/构建面板、Prefab/场景工作流、Player 真正启动游戏、能力演示工程、Player CI/发布附件、测试与文档收尾。
+- 当前提交：见仓库 `git log`；0.2 仍处于进行中，不满足发布 Definition of Done。
+
 ## 1. 执行摘要
 
 Hezhou 已经具备一个可运行的引擎/编辑器垂直切片：
