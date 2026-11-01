@@ -34,6 +34,17 @@ fn run_cli() -> i32 {
                 return 0;
             }
             "--validate" => options.validate_only = true,
+            "--run" => options.run = true,
+            "--host" => match args.next() {
+                Some(value) => {
+                    options.host = Some(value);
+                    options.run = true;
+                }
+                None => {
+                    eprintln!("错误：--host 需要一个名称参数（本轮支持 default）");
+                    return 2;
+                }
+            },
             "--manifest" => match args.next() {
                 Some(value) => options.manifest_path = Some(PathBuf::from(value)),
                 None => {
@@ -63,11 +74,15 @@ fn run_cli() -> i32 {
         }
     }
 
+    if options.validate_only && options.run {
+        eprintln!("提示：同时指定 --validate 与 --run/--host，按 --validate 执行（不调用 host）");
+    }
+
     let failure_root = failure_log_root(&options);
     match hezhou_player::runtime::run(options) {
         Ok(report) => {
             println!("{}", report.summary());
-            0
+            report.exit_code()
         }
         Err(error) => {
             eprintln!("Player 启动失败：{error}");
@@ -102,15 +117,22 @@ fn print_help() {
          \n\
          用法：hezhou-player [选项]\n\
          \n\
+         模式（默认只做启动检查并退出 0）：\n\
+           --validate            只做启动检查（含资产索引），不进游戏循环\n\
+           --run                 加载资产索引后调用 PlayerHost（本轮默认 host 会明确\n\
+                                 报告“等待 game host 接入”并退出 3）\n\
+           --host <name>         选择 PlayerHost（本轮支持 default/headless/null），\n\
+                                 隐含 --run\n\
+         \n\
          选项：\n\
            --player-root <dir>   指定 Player 包根目录（默认：可执行文件所在目录）\n\
            --manifest <file>     指定 manifest.json 路径（默认：<player-root>/manifest.json）\n\
            --log-dir <dir>       指定日志目录（默认：用户数据目录）\n\
-           --validate            只做启动检查，不进入游戏循环\n\
            --version, -V         打印版本\n\
            --help, -h            打印帮助\n\
          \n\
-         退出码：0 成功；2 启动检查失败（详见 startup-error.log）"
+         退出码：0 启动检查/host 运行成功；2 启动检查失败（详见 startup-error.log）；\n\
+                 3 host pending（本轮 game host 尚未接入，资产索引已加载）"
     );
 }
 

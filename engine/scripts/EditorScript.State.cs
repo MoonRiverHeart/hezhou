@@ -194,6 +194,20 @@ namespace Hezhou
         private static ListItem _renderItem;
         private static int _qualityPreset = 3; // 3=Legacy（默认，不启用 PBR）
 
+        // === 0.2 音频 / 资产数据库（toolbar 音频测试 + 工程资产面板 + 状态栏） ===
+        private static ulong _audioTestButtonId;
+        private static UI.WidgetCallbackDelegate _audioTestCallback;
+        private static ulong _assetScanButtonId;
+        private static UI.WidgetCallbackDelegate _assetScanCallback;
+        private static ulong _assetImportButtonId;
+        private static UI.WidgetCallbackDelegate _assetImportCallback;
+        private static ulong _assetDbSummaryLabelId;
+        private static ulong _assetImportDialogId;
+        private static ulong _assetImportFileBrowserId;
+        private static UI.DialogResultCallbackDelegate _assetImportDialogResultCallback;
+        private static ListItem _assetItem;
+        private static ListItem _audioItem;
+
         // === Dock / Layout State ===
         private static ulong _rightMaxButtonId;
         private static UI.WidgetCallbackDelegate _rightMaxClickCallback;

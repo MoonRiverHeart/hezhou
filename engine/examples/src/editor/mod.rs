@@ -9,6 +9,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 
 pub mod ffi_impl;
 pub mod scene_ffi_impl;
+pub mod audio_asset_ffi;
 pub mod hot_reload;
 pub mod dfx_init;
 #[cfg(feature = "mcp")]
@@ -189,6 +190,11 @@ pub fn run() {
     
     // 启用管线系统 — 使编辑器走pipeline路径而非legacy路径
     renderer.enable_pipeline_system();
+
+    // 0.2 音频引擎 + 工程资产数据库：启动时初始化；失败只记日志，不阻塞编辑器。
+    dfx_trace_begin!("AudioAsset", "init");
+    audio_asset_ffi::startup_init();
+    dfx_trace_end!("AudioAsset", "init");
 
     dfx_trace_begin!("Script", "compile");
     hot_reload::compile_editor_script();
@@ -425,6 +431,21 @@ ui_tree_view_set_on_select_thunk_ptr: unsafe { std::mem::transmute(ui_ffi::ui_tr
         renderer_set_quality_preset: ffi_impl::renderer_set_quality_preset,
         renderer_pbr_active: ffi_impl::renderer_pbr_active,
         renderer_get_pbr_summary: ffi_impl::renderer_get_pbr_summary,
+        audio_init: audio_asset_ffi::audio_init,
+        audio_shutdown: audio_asset_ffi::audio_shutdown,
+        audio_play_first_asset: audio_asset_ffi::audio_play_first_asset,
+        audio_pause: audio_asset_ffi::audio_pause,
+        audio_resume: audio_asset_ffi::audio_resume,
+        audio_stop: audio_asset_ffi::audio_stop,
+        audio_set_master_volume: audio_asset_ffi::audio_set_master_volume,
+        audio_set_listener: audio_asset_ffi::audio_set_listener,
+        audio_get_summary: audio_asset_ffi::audio_get_summary,
+        asset_open_project: audio_asset_ffi::asset_open_project,
+        asset_scan: audio_asset_ffi::asset_scan,
+        asset_import_gltf: audio_asset_ffi::asset_import_gltf,
+        asset_count: audio_asset_ffi::asset_count,
+        asset_get_summary: audio_asset_ffi::asset_get_summary,
+        asset_get_asset: audio_asset_ffi::asset_get_asset,
         on_hot_reload_complete: ffi_impl::on_hot_reload_complete_placeholder,
         register_hot_reload_complete_callback: unsafe { std::mem::transmute(hot_reload::register_hot_reload_complete_callback as *const std::ffi::c_void) },
         ui_debug_print_widget_tree: unsafe { std::mem::transmute(ui_ffi::ui_debug_print_widget_tree as *const std::ffi::c_void) },
@@ -559,6 +580,7 @@ ui_widget_get_layout: unsafe { std::mem::transmute(ui_ffi::ui_widget_get_layout 
 
     let mut frame_count = 0u64;
     let mut start_time = Instant::now();
+    let mut last_audio_tick = Instant::now();
     let mut screenshot_taken = false;
     let mut dialog_auto_clicked = false;
     
@@ -573,6 +595,10 @@ ui_widget_get_layout: unsafe { std::mem::transmute(ui_ffi::ui_widget_get_layout 
     
     loop {
         frame_count += 1;
+        // 音频状态机推进（NullBackend 下由这里驱动；真实设备后端内部自动跳过）。
+        let audio_dt = last_audio_tick.elapsed().as_secs_f32();
+        last_audio_tick = Instant::now();
+        audio_asset_ffi::tick(audio_dt);
         dfx_trace_begin!("Frame", "render");
         dfx.lock().get_perf_monitor().lock().begin_frame();
         
@@ -718,6 +744,8 @@ dfx_trace_begin!("ProcessEvents", "ui");
 
     dfx_info!("Demo", "Shutting down...");
     
+    audio_asset_ffi::shutdown_all();
+
     unsafe {
         if let Some(ref mut executor) = EXECUTOR {
             executor.shutdown();

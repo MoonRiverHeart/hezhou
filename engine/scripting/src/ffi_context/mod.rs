@@ -9,6 +9,7 @@ mod renderer;
 mod property;
 mod asset_project;
 mod pipeline;
+mod audio_asset;
 
 pub use types::*;
 pub use ui_system::*;
@@ -21,6 +22,7 @@ pub use renderer::*;
 pub use property::*;
 pub use asset_project::*;
 pub use pipeline::*;
+pub use audio_asset::*;
 
 use std::ffi::c_void;
 
@@ -315,6 +317,23 @@ pub project_add_entity: ProjectAddEntityFn,
         pub renderer_set_quality_preset: RendererSetQualityPresetFn,
         pub renderer_pbr_active: RendererPbrActiveFn,
         pub renderer_get_pbr_summary: RendererGetPbrSummaryFn,
+        // 0.2 音频 FFI（tail；必须与 C# FfiContext 字段顺序一致）
+        pub audio_init: AudioInitFn,
+        pub audio_shutdown: AudioShutdownFn,
+        pub audio_play_first_asset: AudioPlayFirstAssetFn,
+        pub audio_pause: AudioPauseFn,
+        pub audio_resume: AudioResumeFn,
+        pub audio_stop: AudioStopFn,
+        pub audio_set_master_volume: AudioSetMasterVolumeFn,
+        pub audio_set_listener: AudioSetListenerFn,
+        pub audio_get_summary: AudioGetSummaryFn,
+        // 0.2 资产数据库 FFI（tail；必须与 C# FfiContext 字段顺序一致）
+        pub asset_open_project: AssetOpenProjectFn,
+        pub asset_scan: AssetScanFn,
+        pub asset_import_gltf: AssetImportGltfFn,
+        pub asset_count: AssetCountFn,
+        pub asset_get_summary: AssetGetSummaryFn,
+        pub asset_get_asset: AssetGetAssetFn,
     }
 
 static mut FFI_CONTEXT: Option<Box<FfiContext>> = None;

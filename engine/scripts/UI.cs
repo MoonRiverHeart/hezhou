@@ -922,6 +922,40 @@ namespace Hezhou
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public delegate ulong RendererGetPbrSummaryDelegate(IntPtr buffer, ulong bufferSize);
 
+        // 0.2 音频 / 资产数据库 FFI（Rust: engine/examples/src/editor/audio_asset_ffi.rs）
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate int AudioInitDelegate();
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate int AudioShutdownDelegate();
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate int AudioPlayFirstAssetDelegate(int looping);
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate int AudioPauseDelegate();
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate int AudioResumeDelegate();
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate int AudioStopDelegate();
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate int AudioSetMasterVolumeDelegate(float volume);
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate int AudioSetListenerDelegate(float x, float y, float z);
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate ulong AudioGetSummaryDelegate(IntPtr buffer, ulong bufferSize);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate int AssetOpenProjectDelegate(IntPtr path);
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate int AssetScanDelegate();
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate int AssetImportGltfDelegate(IntPtr path);
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate int AssetCountDelegate();
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate ulong AssetGetSummaryDelegate(IntPtr buffer, ulong bufferSize);
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate int AssetGetAssetDelegate(
+            int index, IntPtr idBuffer, ulong idSize, IntPtr pathBuffer, ulong pathSize);
+
 [StructLayout(LayoutKind.Sequential)]
         public struct FfiContext
         {
@@ -1219,6 +1253,23 @@ namespace Hezhou
             public IntPtr renderer_set_quality_preset;
             public IntPtr renderer_pbr_active;
             public IntPtr renderer_get_pbr_summary;
+            // 0.2 音频 FFI（tail；必须与 Rust FfiContext 字段顺序一致）
+            public IntPtr audio_init;
+            public IntPtr audio_shutdown;
+            public IntPtr audio_play_first_asset;
+            public IntPtr audio_pause;
+            public IntPtr audio_resume;
+            public IntPtr audio_stop;
+            public IntPtr audio_set_master_volume;
+            public IntPtr audio_set_listener;
+            public IntPtr audio_get_summary;
+            // 0.2 资产数据库 FFI（tail；必须与 Rust FfiContext 字段顺序一致）
+            public IntPtr asset_open_project;
+            public IntPtr asset_scan;
+            public IntPtr asset_import_gltf;
+            public IntPtr asset_count;
+            public IntPtr asset_get_summary;
+            public IntPtr asset_get_asset;
         }
 
         public static void InitFromContext(IntPtr contextPtr)
@@ -1596,6 +1647,183 @@ public static void RegisterResizeCallback(ResizeCallbackDelegate callback)
             finally
             {
                 Marshal.FreeHGlobal(buffer);
+            }
+        }
+
+        // === 0.2 音频 FFI（Rust: audio_asset_ffi.rs） ===
+
+        /// <summary>初始化音频引擎（幂等；无声卡自动降级）。返回 0 成功。</summary>
+        public static int AudioInit()
+        {
+            if (_ffi.audio_init == IntPtr.Zero) return -1;
+            var func = Marshal.GetDelegateForFunctionPointer<AudioInitDelegate>(_ffi.audio_init);
+            return func();
+        }
+
+        /// <summary>关闭音频引擎。</summary>
+        public static int AudioShutdown()
+        {
+            if (_ffi.audio_shutdown == IntPtr.Zero) return -1;
+            var func = Marshal.GetDelegateForFunctionPointer<AudioShutdownDelegate>(_ffi.audio_shutdown);
+            return func();
+        }
+
+        /// <summary>播放工程内第一个音频资产（WAV/OGG；无资产时内置测试音）。</summary>
+        public static int AudioPlayFirstAsset(bool looping)
+        {
+            if (_ffi.audio_play_first_asset == IntPtr.Zero) return -1;
+            var func = Marshal.GetDelegateForFunctionPointer<AudioPlayFirstAssetDelegate>(_ffi.audio_play_first_asset);
+            return func(looping ? 1 : 0);
+        }
+
+        public static int AudioPause()
+        {
+            if (_ffi.audio_pause == IntPtr.Zero) return -1;
+            var func = Marshal.GetDelegateForFunctionPointer<AudioPauseDelegate>(_ffi.audio_pause);
+            return func();
+        }
+
+        public static int AudioResume()
+        {
+            if (_ffi.audio_resume == IntPtr.Zero) return -1;
+            var func = Marshal.GetDelegateForFunctionPointer<AudioResumeDelegate>(_ffi.audio_resume);
+            return func();
+        }
+
+        public static int AudioStop()
+        {
+            if (_ffi.audio_stop == IntPtr.Zero) return -1;
+            var func = Marshal.GetDelegateForFunctionPointer<AudioStopDelegate>(_ffi.audio_stop);
+            return func();
+        }
+
+        public static int AudioSetMasterVolume(float volume)
+        {
+            if (_ffi.audio_set_master_volume == IntPtr.Zero) return -1;
+            var func = Marshal.GetDelegateForFunctionPointer<AudioSetMasterVolumeDelegate>(_ffi.audio_set_master_volume);
+            return func(volume);
+        }
+
+        public static int AudioSetListener(float x, float y, float z)
+        {
+            if (_ffi.audio_set_listener == IntPtr.Zero) return -1;
+            var func = Marshal.GetDelegateForFunctionPointer<AudioSetListenerDelegate>(_ffi.audio_set_listener);
+            return func(x, y, z);
+        }
+
+        public static string AudioGetSummary()
+        {
+            if (_ffi.audio_get_summary == IntPtr.Zero) return "audio=off";
+            const int bufferSize = 512;
+            IntPtr buffer = Marshal.AllocHGlobal(bufferSize);
+            try
+            {
+                Marshal.WriteByte(buffer, 0, 0);
+                var func = Marshal.GetDelegateForFunctionPointer<AudioGetSummaryDelegate>(_ffi.audio_get_summary);
+                ulong written = func(buffer, (ulong)bufferSize);
+                if (written == 0UL) return "audio=off";
+                return Marshal.PtrToStringAnsi(buffer, (int)written) ?? "audio=off";
+            }
+            finally
+            {
+                Marshal.FreeHGlobal(buffer);
+            }
+        }
+
+        // === 0.2 资产数据库 FFI（AssetDatabase） ===
+
+        /// <summary>打开工程资产数据库并扫描（空路径=当前工作目录）。返回 0 成功。</summary>
+        public static int AssetOpenProject(string projectPath)
+        {
+            if (_ffi.asset_open_project == IntPtr.Zero) return -1;
+            IntPtr pathPtr = Marshal.StringToHGlobalAnsi(projectPath ?? "");
+            try
+            {
+                var func = Marshal.GetDelegateForFunctionPointer<AssetOpenProjectDelegate>(_ffi.asset_open_project);
+                return func(pathPtr);
+            }
+            finally
+            {
+                Marshal.FreeHGlobal(pathPtr);
+            }
+        }
+
+        /// <summary>重新扫描当前工程资产（0 成功，-1 未打开工程）。</summary>
+        public static int AssetScan()
+        {
+            if (_ffi.asset_scan == IntPtr.Zero) return -1;
+            var func = Marshal.GetDelegateForFunctionPointer<AssetScanDelegate>(_ffi.asset_scan);
+            return func();
+        }
+
+        /// <summary>导入 glTF/GLB（支持绝对路径或工程相对逻辑路径）。</summary>
+        public static int AssetImportGltf(string path)
+        {
+            if (_ffi.asset_import_gltf == IntPtr.Zero) return -1;
+            IntPtr pathPtr = Marshal.StringToHGlobalAnsi(path ?? "");
+            try
+            {
+                var func = Marshal.GetDelegateForFunctionPointer<AssetImportGltfDelegate>(_ffi.asset_import_gltf);
+                return func(pathPtr);
+            }
+            finally
+            {
+                Marshal.FreeHGlobal(pathPtr);
+            }
+        }
+
+        /// <summary>已注册资产总数（文件 + 子资产；未打开工程返回 0）。</summary>
+        public static int AssetCount()
+        {
+            if (_ffi.asset_count == IntPtr.Zero) return 0;
+            var func = Marshal.GetDelegateForFunctionPointer<AssetCountDelegate>(_ffi.asset_count);
+            return func();
+        }
+
+        /// <summary>资产数据库摘要（project/assets/sub_assets/gltf/warnings）。</summary>
+        public static string AssetGetSummary()
+        {
+            if (_ffi.asset_get_summary == IntPtr.Zero) return "assets=0 project=-";
+            const int bufferSize = 512;
+            IntPtr buffer = Marshal.AllocHGlobal(bufferSize);
+            try
+            {
+                Marshal.WriteByte(buffer, 0, 0);
+                var func = Marshal.GetDelegateForFunctionPointer<AssetGetSummaryDelegate>(_ffi.asset_get_summary);
+                ulong written = func(buffer, (ulong)bufferSize);
+                if (written == 0UL) return "assets=0 project=-";
+                return Marshal.PtrToStringAnsi(buffer, (int)written) ?? "assets=0 project=-";
+            }
+            finally
+            {
+                Marshal.FreeHGlobal(buffer);
+            }
+        }
+
+        /// <summary>查询第 index 个资产的 AssetId 与定位符；返回 false 表示越界/不可用。</summary>
+        public static bool AssetGetAsset(int index, out string assetId, out string locator)
+        {
+            assetId = "";
+            locator = "";
+            if (_ffi.asset_get_asset == IntPtr.Zero) return false;
+            const int bufferSize = 512;
+            IntPtr idBuffer = Marshal.AllocHGlobal(bufferSize);
+            IntPtr pathBuffer = Marshal.AllocHGlobal(bufferSize);
+            try
+            {
+                Marshal.WriteByte(idBuffer, 0, 0);
+                Marshal.WriteByte(pathBuffer, 0, 0);
+                var func = Marshal.GetDelegateForFunctionPointer<AssetGetAssetDelegate>(_ffi.asset_get_asset);
+                int rc = func(index, idBuffer, (ulong)bufferSize, pathBuffer, (ulong)bufferSize);
+                if (rc != 0) return false;
+                assetId = Marshal.PtrToStringAnsi(idBuffer) ?? "";
+                locator = Marshal.PtrToStringAnsi(pathBuffer) ?? "";
+                return assetId.Length > 0;
+            }
+            finally
+            {
+                Marshal.FreeHGlobal(idBuffer);
+                Marshal.FreeHGlobal(pathBuffer);
             }
         }
     }

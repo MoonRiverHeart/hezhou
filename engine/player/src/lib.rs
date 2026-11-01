@@ -17,9 +17,11 @@
 //! └── runtime/
 //! ```
 
+pub mod asset_index;
 pub mod builder;
 pub mod config;
 pub mod cook_bridge;
+pub mod host;
 pub mod logging;
 pub mod manifest;
 pub mod paths;
@@ -27,6 +29,7 @@ pub mod platform;
 pub mod runtime;
 pub mod version;
 
+pub use asset_index::{AssetIndexEntry, AssetIndexError, PlayerAssetIndex};
 pub use builder::{
     checksum_bytes, checksum_file, normalize_asset_relative, ArtifactCategory, BuildError,
     BuildSources, BuildWarning, BuiltFile, CookManifest, PlannedFile, PlayerBuildInput,
@@ -38,6 +41,10 @@ pub use config::{
     WindowConfig, WindowMode, DEFAULT_FONT_ASSET,
 };
 pub use cook_bridge::{find_entry_by_project_path, CookedAssets};
+pub use host::{
+    resolve_host, DefaultPlayerHost, HostError, HostLog, HostOutcome, PlayerHost,
+    PlayerHostContext, DEFAULT_HOST_NAME, HOST_PENDING_EXIT_CODE,
+};
 pub use logging::{FileLogger, LogLevel};
 pub use manifest::{
     ManifestAsset, ManifestError, PlayerManifest, RuntimePaths, ASSETS_DIR, LOGS_DIR,
@@ -48,7 +55,8 @@ pub use paths::{
 };
 pub use platform::TargetPlatform;
 pub use runtime::{
-    resolve_layout, resolve_player_root, RuntimeError, RuntimeLayout, RuntimeOptions, RuntimeReport,
+    resolve_layout, resolve_player_root, HostRunReport, RuntimeError, RuntimeLayout,
+    RuntimeOptions, RuntimeReport,
 };
 pub use version::{SemVer, VersionError};
 

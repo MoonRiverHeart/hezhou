@@ -443,6 +443,21 @@ fn main() {
         renderer_set_quality_preset: stub_renderer_set_quality_preset,
         renderer_pbr_active: stub_renderer_pbr_active,
         renderer_get_pbr_summary: stub_renderer_get_pbr_summary,
+        audio_init: stub_audio_init,
+        audio_shutdown: stub_audio_shutdown,
+        audio_play_first_asset: stub_audio_play_first_asset,
+        audio_pause: stub_audio_pause,
+        audio_resume: stub_audio_resume,
+        audio_stop: stub_audio_stop,
+        audio_set_master_volume: stub_audio_set_master_volume,
+        audio_set_listener: stub_audio_set_listener,
+        audio_get_summary: stub_audio_get_summary,
+        asset_open_project: stub_asset_open_project,
+        asset_scan: stub_asset_scan,
+        asset_import_gltf: stub_asset_import_gltf,
+        asset_count: stub_asset_count,
+        asset_get_summary: stub_asset_get_summary,
+        asset_get_asset: stub_asset_get_asset,
     };
     hezhou_scripting::ffi_context::set_ffi_context(ffi_ctx);
     let ffi_ptr = hezhou_scripting::ffi_context::get_ffi_context_ptr();
@@ -610,6 +625,30 @@ extern "C" fn stub_renderer_get_pbr_summary(
     _: *mut std::ffi::c_char,
     _: usize,
 ) -> usize {
+    0
+}
+
+extern "C" fn stub_audio_init() -> i32 { 0 }
+extern "C" fn stub_audio_shutdown() -> i32 { 0 }
+extern "C" fn stub_audio_play_first_asset(_: i32) -> i32 { 0 }
+extern "C" fn stub_audio_pause() -> i32 { 0 }
+extern "C" fn stub_audio_resume() -> i32 { 0 }
+extern "C" fn stub_audio_stop() -> i32 { 0 }
+extern "C" fn stub_audio_set_master_volume(_: f32) -> i32 { 0 }
+extern "C" fn stub_audio_set_listener(_: f32, _: f32, _: f32) -> i32 { 0 }
+extern "C" fn stub_audio_get_summary(_: *mut std::ffi::c_char, _: usize) -> usize { 0 }
+extern "C" fn stub_asset_open_project(_: *const std::ffi::c_char) -> i32 { 0 }
+extern "C" fn stub_asset_scan() -> i32 { 0 }
+extern "C" fn stub_asset_import_gltf(_: *const std::ffi::c_char) -> i32 { 0 }
+extern "C" fn stub_asset_count() -> i32 { 0 }
+extern "C" fn stub_asset_get_summary(_: *mut std::ffi::c_char, _: usize) -> usize { 0 }
+extern "C" fn stub_asset_get_asset(
+    _: i32,
+    _: *mut std::ffi::c_char,
+    _: usize,
+    _: *mut std::ffi::c_char,
+    _: usize,
+) -> i32 {
     0
 }
 

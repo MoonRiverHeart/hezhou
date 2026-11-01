@@ -50,6 +50,10 @@ namespace Hezhou
             _consoleClickCallback = OnConsoleClick;
             _themeClickCallback = OnThemeClick;
             _qualityClickCallback = OnQualityClick;
+            _audioTestCallback = OnAudioTestClick;
+            _assetScanCallback = OnAssetScanClick;
+            _assetImportCallback = OnAssetImportClick;
+            _assetImportDialogResultCallback = OnAssetImportDialogResult;
             _rightMaxClickCallback = OnRightMaxClick;
             _consoleDialogResultCallback = OnConsoleDialogResult;
             _consoleRefreshCallback = OnConsoleRefresh;
@@ -399,6 +403,21 @@ _bindScriptClickCallback = OnBindScriptClick;
                     {
                         UI.SetText(_qualityButtonId, "画质: " + UI.RendererQualityName(_qualityPreset));
                     }
+                    // 0.2 资产数据库 / 音频（task-16）：状态栏摘要 + 监听者跟随相机
+                    UI.AudioSetListener(_cameraX, _cameraY, _cameraZ);
+                    if (_assetItem != null)
+                    {
+                        _assetItem.Text = "资产: " + ShortenFfiSummary(UI.AssetGetSummary(), 18);
+                    }
+                    if (_audioItem != null)
+                    {
+                        _audioItem.Text = "音频: " + AudioShortLabel(UI.AudioGetSummary());
+                    }
+                    if (_assetDbSummaryLabelId != 0)
+                    {
+                        UI.SetText(_assetDbSummaryLabelId,
+                            "资产: " + ShortenFfiSummary(UI.AssetGetSummary(), 90));
+                    }
 
                     // === 脚本属性runtime值→UI同步 (每5帧) ===
                     SyncScriptPropertyValuesToUI();
@@ -504,6 +523,141 @@ _bindScriptClickCallback = OnBindScriptClick;
             if (string.IsNullOrEmpty(summary)) return "Legacy";
             const int max = 44;
             return summary.Length <= max ? summary : summary.Substring(0, max - 3) + "...";
+        }
+
+        // === 0.2 音频 / 资产数据库（FFI: UI.Audio* / UI.Asset*） ===
+
+        /// <summary>音频按钮：未播放时播放工程内第一个音频资产，播放中则停止。</summary>
+        private static void OnAudioTestClick(ulong widgetId)
+        {
+            string before = UI.AudioGetSummary();
+            bool playing = before.IndexOf("audio=on") >= 0 && before.IndexOf("voices=0") < 0;
+            int rc = playing ? UI.AudioStop() : UI.AudioPlayFirstAsset(false);
+            string after = UI.AudioGetSummary();
+            if (rc == 0)
+            {
+                Log.Info("Audio", (playing ? "停止成功" : "播放成功") + " | " + after);
+                if (_statusItem != null) _statusItem.Text = playing ? "音频: 已停止" : "音频: 正在播放测试音";
+            }
+            else
+            {
+                Log.Warn("Audio", "音频操作失败 rc=" + rc + "（无声卡时仍应可播放） | " + after);
+                if (_statusItem != null) _statusItem.Text = "音频操作失败: rc=" + rc;
+            }
+            RefreshAssetAudioStatus();
+        }
+
+        /// <summary>资产扫描按钮。</summary>
+        private static void OnAssetScanClick(ulong widgetId)
+        {
+            int rc = UI.AssetScan();
+            string summary = UI.AssetGetSummary();
+            if (rc == 0)
+            {
+                Log.Info("Asset", "资产扫描完成: " + summary);
+                if (_statusItem != null) _statusItem.Text = "资产扫描完成";
+            }
+            else
+            {
+                Log.Warn("Asset", "资产扫描失败 rc=" + rc + "（先打开工程）: " + summary);
+                if (_statusItem != null) _statusItem.Text = "资产扫描失败: rc=" + rc;
+            }
+            RefreshAssetAudioStatus();
+        }
+
+        /// <summary>导入 glTF/GLB 按钮：弹出文件浏览器。</summary>
+        private static void OnAssetImportClick(ulong widgetId)
+        {
+            ShowAssetImportDialog();
+        }
+
+        private static void ShowAssetImportDialog()
+        {
+            ulong rootId = UI.GetRootId();
+            float dialogWidth = 560f;
+            float dialogHeight = 420f;
+            _assetImportDialogId = UI.CreateDialog(rootId, "导入 glTF/GLB 资产", dialogWidth, dialogHeight);
+            UI.DialogSetOnResult(_assetImportDialogId, _assetImportDialogResultCallback);
+            ulong contentId = UI.CreateVStack(_assetImportDialogId, 10f);
+            UI.CreateLabel(contentId, dialogWidth - 40f, 30f, "选择 .gltf / .glb 文件（自动注册子资产并写 .meta）:");
+            _assetImportFileBrowserId = UI.CreateFileBrowser(
+                contentId, 10f, 10f, dialogWidth - 60f, dialogHeight - 120f, ".");
+            UI.FileBrowserSetFilter(_assetImportFileBrowserId, "*.*");
+            UI.DialogSetContent(_assetImportDialogId, contentId);
+            UI.DialogAddButton(_assetImportDialogId, "导入", 1);
+            UI.DialogAddButton(_assetImportDialogId, "取消", 0);
+            UI.DialogShow(_assetImportDialogId);
+        }
+
+        private static void OnAssetImportDialogResult(ulong dialogId, int result)
+        {
+            UI.DialogHide(_assetImportDialogId);
+            if (result != 1)
+            {
+                return;
+            }
+            string selectedPath = GetBrowserSelectedOrCurrent(_assetImportFileBrowserId);
+            if (string.IsNullOrEmpty(selectedPath))
+            {
+                if (_statusItem != null) _statusItem.Text = "请选择 .gltf/.glb 文件";
+                return;
+            }
+            string lower = selectedPath.ToLowerInvariant();
+            if (!lower.EndsWith(".gltf") && !lower.EndsWith(".glb"))
+            {
+                Log.Warn("Asset", "导入失败: 不是 .gltf/.glb 文件: " + selectedPath);
+                if (_statusItem != null) _statusItem.Text = "请选择 .gltf 或 .glb 文件";
+                return;
+            }
+
+            int rc = UI.AssetImportGltf(selectedPath);
+            if (rc == 0)
+            {
+                Log.Info("Asset", "glTF 导入成功: " + selectedPath + " | " + UI.AssetGetSummary());
+                if (_statusItem != null) _statusItem.Text = "glTF 导入成功";
+            }
+            else
+            {
+                Log.Warn("Asset", "glTF 导入失败 rc=" + rc + ": " + selectedPath);
+                if (_statusItem != null) _statusItem.Text = "glTF 导入失败: rc=" + rc;
+            }
+            RefreshAssetAudioStatus();
+        }
+
+        /// <summary>刷新状态栏资产/音频摘要（失败不影响编辑器）。</summary>
+        private static void RefreshAssetAudioStatus()
+        {
+            if (_assetItem != null) _assetItem.Text = "资产: " + ShortenFfiSummary(UI.AssetGetSummary(), 18);
+            if (_audioItem != null) _audioItem.Text = "音频: " + AudioShortLabel(UI.AudioGetSummary());
+            if (_assetDbSummaryLabelId != 0)
+            {
+                UI.SetText(_assetDbSummaryLabelId, "资产: " + ShortenFfiSummary(UI.AssetGetSummary(), 90));
+            }
+        }
+
+        /// <summary>FFI 摘要截断。</summary>
+        private static string ShortenFfiSummary(string summary, int max)
+        {
+            if (string.IsNullOrEmpty(summary)) return "-";
+            return summary.Length <= max ? summary : summary.Substring(0, max - 3) + "...";
+        }
+
+        /// <summary>音频摘要 → 状态栏短标签（ON/backend 或 OFF）。</summary>
+        private static string AudioShortLabel(string summary)
+        {
+            if (string.IsNullOrEmpty(summary) || summary.IndexOf("audio=on") < 0)
+            {
+                return "OFF";
+            }
+            int backend = summary.IndexOf("backend=");
+            if (backend < 0)
+            {
+                return "ON";
+            }
+            string rest = summary.Substring(backend + 8);
+            int space = rest.IndexOf(' ');
+            string name = space > 0 ? rest.Substring(0, space) : rest;
+            return "ON/" + name;
         }
 
         public static void ApplyTheme(ThemeMode mode, bool rebuild)

@@ -1,18 +1,24 @@
 //! `hezhou-player` 最小运行时启动流程。
 //!
-//! 本轮职责（不接渲染/脚本，只建立可验收的启动契约）：
+//! 本轮职责（不接渲染/脚本，但已加载资产索引并暴露 host 接口）：
 //! 1. 定位包根目录与 `manifest.json`；
 //! 2. 校验清单结构、格式版本、目标平台、引擎版本兼容性；
 //! 3. 校验资产/脚本/运行时/字体文件是否齐全（跨平台路径规则）；
-//! 4. 初始化文件日志（无终端），记录启动摘要；
-//! 5. `--validate` 模式只做启动检查，便于 CI 冒烟测试。
+//! 4. 加载 `assets/cook_manifest.json`，按 `AssetId` 建索引并校验 output 存在；
+//! 5. 初始化文件日志（无终端），记录启动摘要与资产索引；
+//! 6. `--validate` 只做启动检查；`--run`/`--host` 加载索引后调用 [`PlayerHost`]。
 //!
-//! 真正的窗口创建、Vulkan 初始化、Mono 加载在后续轮次接入
-//! `render` / `scripting` / `platform` crate（见 README 集成点）。
+//! 本轮默认 host 只输出"等待 game host 接入"并返回退出码 3（见 [`HOST_PENDING_EXIT_CODE`]）；
+//! 真正的窗口/Vulkan/Mono/C# `Initialize()` 由下一轮 game host 实现（见 `host.rs`）。
 
 use std::fmt;
 use std::path::{Path, PathBuf};
 
+use crate::asset_index::{AssetIndexError, PlayerAssetIndex};
+use crate::host::{
+    resolve_host, HostError, HostOutcome, PlayerHostContext, DEFAULT_HOST_NAME,
+    HOST_PENDING_EXIT_CODE,
+};
 use crate::logging::{format_timestamp_utc, FileLogger, STARTUP_ERROR_LOG};
 use crate::manifest::{ManifestError, PlayerManifest};
 use crate::paths::to_native_path;
@@ -30,6 +36,10 @@ pub struct RuntimeOptions {
     pub log_dir: Option<PathBuf>,
     /// 只做启动检查，不进入游戏循环。
     pub validate_only: bool,
+    /// 加载资产索引后调用 PlayerHost（`--run`）。
+    pub run: bool,
+    /// host 名称（`--host`）；默认 [`DEFAULT_HOST_NAME`]。
+    pub host: Option<String>,
 }
 
 /// 已解析的包内布局（本机路径）。
@@ -43,27 +53,63 @@ pub struct RuntimeLayout {
     pub font: Option<PathBuf>,
 }
 
+/// host 运行记录。
+#[derive(Clone, Debug)]
+pub struct HostRunReport {
+    /// host 名称。
+    pub host: String,
+    /// host 返回结果。
+    pub outcome: HostOutcome,
+}
+
 /// 启动成功后的报告。
 pub struct RuntimeReport {
     pub manifest: PlayerManifest,
     pub root: PathBuf,
     pub layout: RuntimeLayout,
     pub log_path: PathBuf,
+    /// 已加载并校验 output 的资产索引。
+    pub index: PlayerAssetIndex,
+    /// `--run`/`--host` 模式下的 host 结果（`--validate`/默认模式为 `None`）。
+    pub host: Option<HostRunReport>,
 }
 
 impl RuntimeReport {
     /// 单行启动摘要（带控制台时打印；无终端时只进日志）。
     pub fn summary(&self) -> String {
-        format!(
-            "hezhou-player {} 启动检查通过：{} v{}（{}，质量 {}）场景 {}，日志 {}",
+        let mut text = format!(
+            "hezhou-player {} 启动检查通过：{} v{}（{}，质量 {}）场景 {}；{}；日志 {}",
             RUNTIME_ENGINE_VERSION,
             self.manifest.product_name,
             self.manifest.version,
             self.manifest.target.display_name(),
             self.manifest.quality.as_str(),
             self.layout.start_scene.display(),
+            self.index.summary(),
             self.log_path.display(),
-        )
+        );
+        if let Some(host) = &self.host {
+            match &host.outcome {
+                HostOutcome::Pending { reason } => {
+                    text.push_str(&format!(
+                        "；host `{}` 等待接入（exit {HOST_PENDING_EXIT_CODE}）：{reason}",
+                        host.host
+                    ));
+                }
+                HostOutcome::Running { frames } => {
+                    text.push_str(&format!("；host `{}` 运行结束（{frames} 帧）", host.host));
+                }
+            }
+        }
+        text
+    }
+
+    /// 进程退出码：host 模式用 host 结果（0/3），其余成功为 0。
+    pub fn exit_code(&self) -> i32 {
+        self.host
+            .as_ref()
+            .map(|host| host.outcome.exit_code())
+            .unwrap_or(0)
     }
 }
 
@@ -71,6 +117,8 @@ impl RuntimeReport {
 #[derive(Debug)]
 pub enum RuntimeError {
     Manifest(ManifestError),
+    AssetIndex(AssetIndexError),
+    Host(HostError),
     Io {
         context: String,
         source: std::io::Error,
@@ -90,6 +138,8 @@ impl fmt::Display for RuntimeError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Manifest(source) => write!(f, "{source}"),
+            Self::AssetIndex(source) => write!(f, "{source}"),
+            Self::Host(source) => write!(f, "PlayerHost 失败：{source}"),
             Self::Io { context, source } => write!(f, "{context} 失败：{source}"),
             Self::InvalidRoot { path } => write!(
                 f,
@@ -106,6 +156,8 @@ impl std::error::Error for RuntimeError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
             Self::Manifest(source) => Some(source),
+            Self::AssetIndex(source) => Some(source),
+            Self::Host(source) => Some(source),
             Self::Io { source, .. } => Some(source),
             _ => None,
         }
@@ -288,15 +340,84 @@ pub fn run(options: RuntimeOptions) -> Result<RuntimeReport, RuntimeError> {
         )?;
     }
 
-    // 6) 完成（本轮不创建窗口/渲染/加载 Mono）。
-    if options.validate_only {
-        log_info(&mut logger, "validate-only 模式：启动检查完成")?;
+    // 6) 加载资产索引：包内 assets/cook_manifest.json（legacy 包为空索引）。
+    let index = PlayerAssetIndex::load(&root, &manifest).map_err(RuntimeError::AssetIndex)?;
+    log_info(&mut logger, &index.summary())?;
+    if index.is_empty() {
+        log_warn(
+            &mut logger,
+            "包内没有 assets/cook_manifest.json（或没有 asset_id）：资产索引为空（legacy/骨架包）",
+        )?;
+    }
+    if let Some(scene) = index.start_scene() {
+        log_info(
+            &mut logger,
+            &format!(
+                "资产索引启动场景：AssetId {}、kind {}、output {}",
+                scene.id,
+                scene.kind.as_str(),
+                scene.output
+            ),
+        )?;
+    }
+    if let Some(font) = index.font() {
+        log_info(
+            &mut logger,
+            &format!(
+                "资产索引字体：AssetId {}、kind {}、output {}",
+                font.id,
+                font.kind.as_str(),
+                font.output
+            ),
+        )?;
+    }
+
+    // 7) 模式：--validate / --run(host) / 默认骨架启动。
+    let host_report = if options.validate_only {
+        log_info(
+            &mut logger,
+            "validate-only 模式：启动检查完成（资产索引已加载）",
+        )?;
+        None
+    } else if options.run {
+        let host_name = options
+            .host
+            .clone()
+            .unwrap_or_else(|| DEFAULT_HOST_NAME.to_string());
+        let mut host = resolve_host(&host_name).map_err(RuntimeError::Host)?;
+        log_info(&mut logger, &format!("加载 PlayerHost `{}`", host.name()))?;
+        let outcome = {
+            let mut context = PlayerHostContext {
+                root: &root,
+                assets_dir: &layout.assets_dir,
+                manifest: &manifest,
+                index: &index,
+                log: &mut logger,
+            };
+            host.run(&mut context).map_err(RuntimeError::Host)?
+        };
+        log_info(
+            &mut logger,
+            &format!(
+                "PlayerHost `{}` 返回退出码 {}",
+                host.name(),
+                outcome.exit_code()
+            ),
+        )?;
+        if let HostOutcome::Pending { reason } = &outcome {
+            log_warn(&mut logger, &format!("等待 game host 接入：{reason}"))?;
+        }
+        Some(HostRunReport {
+            host: host.name().to_string(),
+            outcome,
+        })
     } else {
         log_info(
             &mut logger,
-            "运行时骨架启动成功：窗口/渲染/脚本加载待接入（见 engine/player/README.md 集成点）",
+            "运行时骨架启动成功：窗口/渲染/脚本加载待接入；用 --run 调用 PlayerHost，--validate 只做启动检查",
         )?;
-    }
+        None
+    };
 
     let log_path = logger.path().to_path_buf();
     Ok(RuntimeReport {
@@ -304,6 +425,8 @@ pub fn run(options: RuntimeOptions) -> Result<RuntimeReport, RuntimeError> {
         root,
         layout,
         log_path,
+        index,
+        host: host_report,
     })
 }
 

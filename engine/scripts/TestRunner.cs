@@ -40,6 +40,9 @@ namespace Hezhou
             try { TestRendererQualityFfi(); }
             catch (Exception ex) { Log.Error("TestRunner", "TestRendererQualityFfi异常: " + ex.Message); }
 
+            try { TestAudioAssetFfi(); }
+            catch (Exception ex) { Log.Error("TestRunner", "TestAudioAssetFfi异常: " + ex.Message); }
+
             Log.Info("TestRunner", "===== 测试完成: PASS=" + _passCount + ", FAIL=" + _failCount + " =====");
         }
 
@@ -328,6 +331,105 @@ namespace Hezhou
             AssertTrue("RendererFFI", summaryLow.ToLower().IndexOf("quality=low") >= 0,
                 "ApplyQualityPreset(Low) → quality=low (" + summaryLow + ")");
             EditorScript.ApplyQualityPreset(3);
+        }
+
+        /// <summary>
+        /// 0.2 音频 / 资产数据库 FFI 自检（task-16）：
+        /// 启动时资产自动扫描、AssetId 可查询；音频引擎就绪（无设备自动降级）、
+        /// 播放/暂停/恢复/停止/主音量/监听者全链路可调用且不崩溃。
+        /// </summary>
+        private static void TestAudioAssetFfi()
+        {
+            // === 资产数据库（启动时已自动扫描当前工程） ===
+            int scanRc = UI.AssetScan();
+            AssertTrue("AudioAsset", scanRc == 0, "AssetScan 成功 (rc=" + scanRc + ")");
+            string assetSummary = UI.AssetGetSummary();
+            AssertTrue("AudioAsset", assetSummary.IndexOf("assets=") >= 0,
+                "资产摘要包含 assets= (" + assetSummary + ")");
+            int count = UI.AssetCount();
+            AssertTrue("AudioAsset", count >= 0, "AssetCount 非负 (count=" + count + ")");
+            if (count > 0)
+            {
+                string assetId;
+                string locator;
+                bool ok = UI.AssetGetAsset(0, out assetId, out locator);
+                AssertTrue("AudioAsset", ok && assetId.Length > 0 && locator.Length > 0,
+                    "AssetGetAsset(0) 返回 AssetId+定位符 (id=" + assetId + ", locator=" + locator + ")");
+            }
+            else
+            {
+                AssertTrue("AudioAsset", true, "工程无资产，跳过 AssetId 查询");
+            }
+
+            // === glTF 导入（创建临时最小 glTF -> 导入 -> 清理） ===
+            string selftestDir = System.IO.Path.Combine(
+                System.IO.Directory.GetCurrentDirectory(), "assets");
+            string selftestPath = System.IO.Path.Combine(selftestDir, "__ffi_selftest__.gltf");
+            try
+            {
+                System.IO.Directory.CreateDirectory(selftestDir);
+                byte[] bin = new byte[42];
+                float[] positions = new float[] { 0f, 0f, 0f, 1f, 0f, 0f, 0f, 1f, 0f };
+                for (int i = 0; i < positions.Length; i++)
+                {
+                    byte[] bytes = BitConverter.GetBytes(positions[i]);
+                    Buffer.BlockCopy(bytes, 0, bin, i * 4, 4);
+                }
+                ushort[] indices = new ushort[] { 0, 1, 2 };
+                for (int i = 0; i < indices.Length; i++)
+                {
+                    byte[] bytes = BitConverter.GetBytes(indices[i]);
+                    Buffer.BlockCopy(bytes, 0, bin, 36 + i * 2, 2);
+                }
+                string base64 = Convert.ToBase64String(bin);
+                string json = "{"
+                    + "\"asset\":{\"version\":\"2.0\"},"
+                    + "\"scene\":0,"
+                    + "\"scenes\":[{\"nodes\":[0]}],"
+                    + "\"nodes\":[{\"name\":\"FFITest\",\"mesh\":0}],"
+                    + "\"meshes\":[{\"name\":\"FFITestMesh\",\"primitives\":[{\"attributes\":{\"POSITION\":0},\"indices\":1,\"material\":0}]}],"
+                    + "\"materials\":[{\"name\":\"FFITestMat\",\"pbrMetallicRoughness\":{\"baseColorFactor\":[1,0,0,1]}}],"
+                    + "\"accessors\":["
+                    + "{\"bufferView\":0,\"componentType\":5126,\"count\":3,\"type\":\"VEC3\",\"min\":[0,0,0],\"max\":[1,1,0]},"
+                    + "{\"bufferView\":1,\"componentType\":5123,\"count\":3,\"type\":\"SCALAR\"}],"
+                    + "\"bufferViews\":[{\"buffer\":0,\"byteOffset\":0,\"byteLength\":36},{\"buffer\":0,\"byteOffset\":36,\"byteLength\":6}],"
+                    + "\"buffers\":[{\"byteLength\":42,\"uri\":\"data:application/octet-stream;base64," + base64 + "\"}]"
+                    + "}";
+                System.IO.File.WriteAllText(selftestPath, json);
+                int importRc = UI.AssetImportGltf(selftestPath);
+                AssertTrue("AudioAsset", importRc == 0, "AssetImportGltf 临时 glTF 返回 0 (rc=" + importRc + ")");
+            }
+            catch (Exception ex)
+            {
+                AssertTrue("AudioAsset", false, "glTF 导入自检异常: " + ex.Message);
+            }
+            finally
+            {
+                try { if (System.IO.File.Exists(selftestPath)) System.IO.File.Delete(selftestPath); } catch (Exception) { }
+                try { if (System.IO.File.Exists(selftestPath + ".meta")) System.IO.File.Delete(selftestPath + ".meta"); } catch (Exception) { }
+                int cleanupRc = UI.AssetScan();
+                AssertTrue("AudioAsset", cleanupRc == 0, "导入自检后重新扫描返回 0 (rc=" + cleanupRc + ")");
+            }
+
+            // === 音频（启动时已初始化；无设备自动降级为无声） ===
+            string audioSummary = UI.AudioGetSummary();
+            AssertTrue("AudioAsset", audioSummary.IndexOf("audio=on") >= 0,
+                "音频引擎已就绪 (" + audioSummary + ")");
+            int rcInit = UI.AudioInit();
+            AssertTrue("AudioAsset", rcInit == 0, "AudioInit 幂等返回 0 (rc=" + rcInit + ")");
+
+            UI.AudioSetMasterVolume(0f); // 自检静音，避免启动时听到测试音
+            int rcPlay = UI.AudioPlayFirstAsset(false);
+            AssertTrue("AudioAsset", rcPlay == 0, "AudioPlayFirstAsset 返回 0 (rc=" + rcPlay + ")");
+            int rcPause = UI.AudioPause();
+            AssertTrue("AudioAsset", rcPause == 0, "AudioPause 返回 0 (rc=" + rcPause + ")");
+            int rcResume = UI.AudioResume();
+            AssertTrue("AudioAsset", rcResume == 0, "AudioResume 返回 0 (rc=" + rcResume + ")");
+            int rcStop = UI.AudioStop();
+            AssertTrue("AudioAsset", rcStop == 0, "AudioStop 返回 0 (rc=" + rcStop + ")");
+            UI.AudioSetMasterVolume(0.8f);
+            int rcListener = UI.AudioSetListener(0f, 1.5f, -3f);
+            AssertTrue("AudioAsset", rcListener == 0, "AudioSetListener 返回 0");
         }
 
         // 内存保存值结构（模拟SavedScriptPropertyValue，用于测试）

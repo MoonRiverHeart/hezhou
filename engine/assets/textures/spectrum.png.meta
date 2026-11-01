@@ -1,0 +1,16 @@
+{
+  "meta_version": 1,
+  "uuid": "1ed183c7-71c7-4fe5-8dc1-47f76ff059e3",
+  "kind": "texture",
+  "import_settings": {
+    "importer": "texture",
+    "settings": {
+      "srgb": true,
+      "generate_mipmaps": true,
+      "filter": "linear",
+      "wrap": "repeat"
+    }
+  },
+  "dependencies": [],
+  "sub_assets": {}
+}

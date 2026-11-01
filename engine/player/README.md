@@ -3,14 +3,18 @@
 Hezhou 0.2 **Player 导出构建器 + 最小运行时**（Windows / Linux）。
 
 本 crate 是 `engine/player`，对应 `docs/PROJECT_PLAN.md` §1.5 Player 导出与
-§9 AI 并行工作流中的 Player 工作流。已完成三轮：
+§9 AI 并行工作流中的 Player 工作流。已完成四轮：
 
 1. **格式契约 + dry-run**：产物目录、`manifest.json`、跨平台路径规则、双平台清单；
 2. **真实产物构建**：按计划复制 exe/assets/scripts/runtime/manifest，staging 原子提交、
    失败清理、大小/校验和/权限检查；最小 fixture 产出的包可通过 `hezhou-player --validate`；
 3. **asset cooker 集成**：直接读取 `hezhou-asset` 的 `cook_manifest.json`
    （`format_version=1`、`roots`、`entries`），按 `AssetId` 映射资产、复制
-   `imported/` + `assets/` 输出并写入 Player manifest（可追踪 id/kind/locator/output）。
+   `imported/` + `assets/` 输出并写入 Player manifest（可追踪 id/kind/locator/output）；
+4. **运行时资产索引 + host 接口**：运行时加载包内 `assets/cook_manifest.json` 建
+   `AssetId → output/kind/locator` 索引并校验 output/start_scene/font；
+   `--run`/`--host` 加载索引后调用 `PlayerHost` trait，默认 host 明确报告
+   "等待 game host 接入"（退出码 3），为下一轮窗口/Vulkan/Mono/C# 接入留好契约。
 
 不绑定具体游戏内容；真实 cooker 产物可原样替换测试 fixture。
 
@@ -20,19 +24,21 @@ engine/player/
 │   ├── lib.rs        # 公共 API 导出
 │   ├── config.rs     # PlayerBuildConfig（导出设置）与校验
 │   ├── manifest.rs   # manifest.json 契约与校验（含 cook 资产字段）
+│   ├── asset_index.rs# 运行时资产索引（cook_manifest.json → AssetId 查询/校验）
 │   ├── builder.rs    # 构建器：dry-run 计划 + 真实复制（预检/staging/校验/权限）
 │   ├── cook_bridge.rs# hezhou-asset CookManifest → Player assets[]/文件映射
+│   ├── host.rs       # PlayerHost trait / HostOutcome / DefaultPlayerHost
 │   ├── paths.rs      # 逻辑路径规则（分隔符/大小写/保留名/权限位）
 │   ├── platform.rs   # 目标平台差异（exe 命名/动态库查找/rpath/归档）
 │   ├── logging.rs    # UTC 文件日志
-│   ├── runtime.rs    # hezhou-player 启动流程
+│   ├── runtime.rs    # hezhou-player 启动流程（清单 → 布局 → 索引 → host）
 │   ├── main.rs       # hezhou-player 二进制入口（运行时）
 │   └── bin/player_build.rs  # hezhou-player-build CLI（dry-run + 真实构建）
 ├── template/         # 构建配置 / cook 清单示例 JSON
 └── tests/
     ├── fixtures/minimal/  # 最小 fixture（legacy assets[]，空场景 + 占位 DLL/runtime）
     ├── fixtures/cooked/   # hezhou-asset 真实 cook 输出布局 fixture
-    └── *.rs               # 62 个测试（单元 + 集成）
+    └── *.rs               # 72 个测试（单元 + 集成）
 ```
 
 > 硬性边界：本 crate 只改 `engine/player/**`。installer、CI、examples、editor
@@ -324,14 +330,20 @@ cargo run -p hezhou-player --bin hezhou-player-build -- \
 1. 定位包根目录（优先级：`--player-root` > `manifest.json` 所在目录 > 可执行文件目录）；
 2. 读取 `manifest.json`，校验结构版本 / 字段 / 目标平台 / 引擎版本（major.minor）；
 3. 解析并检查 `assets/`、`scripts/`、`runtime/`、启动场景、字体、每个脚本 DLL；
-4. 打开文件日志（`player.log`，UTC 时间戳、INFO/WARN/ERROR），记录启动摘要；
-5. `--validate` 模式到此结束（CI 冒烟）；否则进入"运行时骨架"日志并正常退出。
+4. 打开文件日志（`player.log`，UTC 时间戳、INFO/WARN/ERROR）；
+5. **加载资产索引**：读 `assets/cook_manifest.json`，建 `AssetId → output/kind/locator`
+   索引，校验所有 `output` 存在、start_scene/font 可在索引中解析（见 §6.1）；
+6. 按模式结束：
+   - 默认：记录"运行时骨架启动成功"并以 0 退出；
+   - `--validate`：启动检查完成（含资产索引）并以 0 退出；
+   - `--run` / `--host <name>`：加载索引后调用 `PlayerHost`（见 §6.2），本轮默认 host
+     返回 `Pending`，退出码 **3**（不是错误，表示 game host 尚未接入）。
 
 参数：
 
 ```text
 hezhou-player [--player-root <dir>] [--manifest <file>] [--log-dir <dir>]
-              [--validate] [--version|-V] [--help|-h]
+              [--validate] [--run] [--host <name>] [--version|-V] [--help|-h]
 ```
 
 - **Windows 无终端**：`#![cfg_attr(all(windows, not(debug_assertions)), windows_subsystem = "windows")]`，
@@ -340,16 +352,83 @@ hezhou-player [--player-root <dir>] [--manifest <file>] [--log-dir <dir>]
   - Windows `%LOCALAPPDATA%\Hezhou\<product-slug>\logs\player.log`
   - Linux `$XDG_DATA_HOME/hezhou/<product-slug>/logs/player.log`
     （无 XDG 时 `$HOME/.local/share/hezhou/<product-slug>/logs`）
-- 启动失败写 `startup-error.log`（包内 `logs/`，只读则回退系统临时目录）；
-  退出码 `0` 成功、`2` 启动检查失败、未知参数/用法错误 `2`。
-- 字体/脚本/场景缺失属于硬错误；`runtime/` 为空只告警（骨架阶段），
+- 启动失败写 `startup-error.log`（包内 `logs/`，只读则回退系统临时目录）。
+- 退出码：`0` 启动检查/host 运行成功；`2` 启动检查失败（清单/布局/资产索引，详见
+  `startup-error.log`）；`3` host pending（`--run` 时 game host 尚未接入）。
+- 字体/脚本/场景/资产索引 output 缺失属于硬错误；`runtime/` 为空只告警（骨架阶段），
   正式发布必须内置运行时（PROJECT_PLAN §1.5 验收：干净机器不依赖 Mono）。
+
+### 6.1 资产索引 `PlayerAssetIndex`
+
+```rust
+use hezhou_player::{PlayerAssetIndex, PlayerManifest, AssetKind, AssetId};
+
+let manifest = PlayerManifest::load(&root.join("manifest.json"))?;
+let index = PlayerAssetIndex::load(&root, &manifest)?;
+
+index.entry(asset_id);                        // 按 AssetId
+index.by_kind(AssetKind::Scene);              // 按 kind（按 output 排序）
+index.entry_by_locator("assets/models/hero.gltf#mesh:0"); // 按 locator
+index.entry_by_output("assets/<uuid>.png");   // 按包内 output（大小写不敏感）
+index.start_scene();                          // 启动场景条目
+index.font();                                 // 必检字体条目
+index.len();                                  // 条目数
+```
+
+加载与校验规则：
+
+- 复用 `hezhou_asset::cook::CookManifest`（不另写 schema）；`assets/cook_manifest.json`
+  不存在时回退按 Player manifest 的 `asset_id` 建索引；两者都没有 asset_id（legacy 包）
+  得到空索引并告警，不阻塞 `--validate`。
+- 校验 `format_version`、entries 非空、`output` 合法/无重复、**每个 output 文件存在**；
+  并核对 Player manifest `assets[]` 与 cook 索引一一对应（AssetId/output/kind），
+  防止清单过期或被篡改。
+- `start_scene`/`font` 用 Player manifest 中的 output 路径匹配索引条目；匹配不到返回
+  可读错误 `MissingStartScene`/`MissingFont`。
+- 坏 JSON / 读失败返回 `AssetIndexError::CookManifest`（含路径 + serde 错误），
+  运行时转为退出码 2 并写 `startup-error.log`。
+
+### 6.2 `PlayerHost` 接口（game host 接入契约）
+
+本轮只提供接口与默认实现，不创建窗口/不初始化 Vulkan/Mono：
+
+```rust
+pub trait PlayerHost {
+    fn name(&self) -> &'static str;
+    fn run(&mut self, context: &mut PlayerHostContext<'_>) -> Result<HostOutcome, HostError>;
+}
+
+pub struct PlayerHostContext<'a> {
+    pub root: &'a Path,                    // Player 包根
+    pub assets_dir: &'a Path,              // <root>/assets
+    pub manifest: &'a PlayerManifest,      // 已校验清单（窗口/quality/scripts 等）
+    pub index: &'a PlayerAssetIndex,       // 已加载资产索引（AssetId → output/kind/locator）
+    pub log: &'a mut dyn HostLog,          // 写 player.log（HostLog trait）
+}
+
+pub enum HostOutcome {
+    Running { frames: u64 },               // 已进入游戏循环并正常结束 → 退出码 0
+    Pending { reason: String },            // host 尚未接入 → 退出码 3
+}
+```
+
+- 选择：`resolve_host("default" | "headless" | "null")`；未来新增 host 在此注册，
+  CLI `--host <name>` 选择（本轮未知名称 → 可读错误 + 退出码 2）。
+- 默认实现 `DefaultPlayerHost`：加载索引后记录资产数/启动场景/字体/窗口/quality，
+  明确输出"等待 game host 接入"（`WARN`）与下一轮接入顺序，返回
+  `HostOutcome::Pending`（退出码 3）。
+- 下一轮 game host 接入顺序（实现 `PlayerHost` 即可，无需改运行时）：
+  `platform(window/input)` → `rhi`/`rhi-vulkan` → `render`/`render-pipeline`
+  → `scripting`（加载 `scripts/*.dll` 并调用 C# 静态 `Initialize()`）
+  → `gameplay`/`animation`/`physics`/`audio`（按 AssetId 从索引加载
+  `assets/cook_manifest.json` / `imported/*.json` / 纹理音频字节）→ 帧循环。
+- `--run` 在 CI 中应视为"host pending = 退出码 3"；`--validate` 仍是 0 退出码的冒烟检查。
 
 ## 7. 测试
 
 ```bash
 cd engine
-cargo test -p hezhou-player     # 62 个测试
+cargo test -p hezhou-player     # 72 个测试
 cargo build -p hezhou-player    # 构建两个二进制 + 库
 ```
 
@@ -358,7 +437,9 @@ cargo build -p hezhou-player    # 构建两个二进制 + 库
 校验和/失败清理/权限/跨平台拒绝）、fixture CLI 端到端（构建 → 复制出的 Player
 `--validate`）、**hezhou-asset cook 集成**（manifest 解析、AssetId/kind/locator/output
 映射、cook_manifest.json 入包、缺失输出、产物大小/哈希损坏、格式版本、启动场景/字体
-定位、CLI 真实构建 + validate）、运行时 CLI、日志时间戳。
+定位、CLI 真实构建 + validate）、**运行时资产索引**（按 AssetId/kind/locator/output
+查询、start_scene/font 解析、缺失 output、坏 JSON、manifest/索引不一致、legacy 空索引、
+`--run`/`--host` 退出码 3、未知 host、`--validate` 不回归）、日志时间戳。
 
 最小 fixture（`tests/fixtures/minimal/`）依赖零外部资产：空场景 3 字节、字体占位
 12 字节、假 C# 程序集 21 字节、占位 runtime 库 19 字节，用于无真实 cook 数据时
@@ -408,14 +489,14 @@ cargo build -p hezhou-player    # 构建两个二进制 + 库
 **契约差异与限制（相对 asset README §6）**
 
 - asset §6 建议启动时读 `cook_manifest.json` 建立 `id -> output` 索引；Player
-  **第一轮运行时尚未加载资产索引**（仅校验文件存在），但清单已随包提供
-  `assets/cook_manifest.json`，且 Player manifest 内嵌 `asset_id/output/dependencies`，
-  下一轮直接按 `AssetId` 加载 `imported/*.json` 即可，无需改构建契约。
-- `imported/*.json` 内容当前不解析/不校验（只复制 + 校验文件存在/大小/哈希）。
+  **运行时已实现**（`PlayerAssetIndex`，见 §6.1），并校验 output 存在、
+  start_scene/font 可解析、Player manifest 与索引一致。
+- `imported/*.json` 内容当前仍不解析/不校验（构建时只复制 + 校验文件存在/大小/哈希；
+  运行时由后续 game host 按 AssetId 加载并反序列化为 `ImportedScene` 等价结构）。
 - asset 依赖表/压缩标记等新增字段需先扩展 `ManifestAsset`（`assets[]` 严格反序列化）。
 - legacy `{ "assets": [...] }` 清单仍支持（`--assets-dir` 提供资产根目录），
   作为无 cooker 时的过渡；字段映射为：`path`（相对资产根）、`kind`、
-  `size_bytes`、`checksum`。
+  `size_bytes`、`checksum`；运行时 legacy 包得到空资产索引（告警但不阻塞 `--validate`）。
 - 真实 cooker 接入后只需把 CLI `--cook` 指向 `<cook_out>/cook_manifest.json`，
   无需改 Player 构建代码。
 
@@ -439,8 +520,9 @@ cargo build -p hezhou-player    # 构建两个二进制 + 库
 - `scripts[]` 是预编译 C# 程序集（`mcs -target:library`，禁止 .NET 8 编译产物）；
 - C# 无 `Main()`，入口为静态 `Initialize()`，由 Rust 运行时调用；
 - 本轮 Player crate 故意**不依赖** core/render/scripting（保持构建器可独立编译）；
-  下一轮在此 bin 内启用 `mono` feature 并链接引擎 crate，或由 examples 产出最终
-  Player 可执行文件后由构建器复制。
+  下一轮实现 `PlayerHost`（见 §6.2）时再启用 `mono` feature 并链接引擎 crate，
+  在 host 内加载 `manifest.scripts[]`、调用 C# 静态 `Initialize()`、按 AssetId
+  从资产索引加载 gameplay/animation/physics/audio 数据。
 
 ### CI（需要 Lead 新增两个 job：`player-build-windows` / `player-build-linux`）
 
@@ -457,8 +539,9 @@ cargo build -p hezhou-player    # 构建两个二进制 + 库
 5. 打包：Windows `zip` / Linux `tar.gz`，tar 需保留 staging 时写入的 `unix_mode`
    （exe 0755，数据 0644，可用 `tar --mode` 或 `chmod` 后打包）；
 6. 冒烟：运行 `<dist>/player/<target>/<exe> --validate --manifest ... --log-dir <tmp>`，
-   非 0 退出即失败；无真实 cooker 数据时先用 `tests/fixtures/cooked`（或
-   `tests/fixtures/minimal`）做前置检查；
+   非 0 退出即失败（会加载资产索引）；无真实 cooker 数据时先用 `tests/fixtures/cooked`
+   （或 `tests/fixtures/minimal`）做前置检查。`--run` 当前默认 host 返回 3
+   （host pending），CI 冒烟请用 `--validate`，等 game host 接入后再把 `--run` 纳入门禁；
 7. 可选 `cross-platform-assets`：同一 cook 清单在双平台各跑一次 dry-run 对比指纹；
 8. Release 上传 Player zip/tar.gz（与 Editor 安装包并列）。
 
@@ -481,8 +564,12 @@ cargo build -p hezhou-player    # 构建两个二进制 + 库
 - [x] 真实复制 exe/assets/scripts/runtime（预检 + staging 原子提交 + 失败清理 + 权限）；
 - [x] 真实 asset cooker 输出对接（`cook_manifest.json` + `imported/` + `assets/`、
   AssetId/kind/locator/output 映射、cook 产物大小/哈希校验）；
-- [ ] Player 运行时接入窗口/Vulkan/Mono（当前仅启动校验骨架）；
-- [ ] Player 运行时按 `AssetId` 加载 `assets/cook_manifest.json` / `imported/*.json`；
+- [x] 运行时加载 `assets/cook_manifest.json`，建 `AssetId → output/kind/locator` 索引，
+  校验 output/start_scene/font（`PlayerAssetIndex`）；
+- [x] `PlayerHost` trait + 默认 host + `--run`/`--host`（明确 host pending，退出码 3）；
+- [ ] 实现 game host：窗口/输入（platform）→ Vulkan（rhi-vulkan）→ render →
+  Mono 加载 + C# 静态 `Initialize()`（scripting）；
+- [ ] game host 按 AssetId 加载 `imported/*.json` / 纹理 / 音频字节并进入帧循环；
 - [ ] Linux rpath 链接参数固化到构建脚本/CI（需要在 Linux job 注入 `RUSTFLAGS`）；
 - [ ] 跨平台构建（在 Windows 上产出 Linux 包）——不计划支持，由 CI 双平台分别执行；
 - [ ] 资产 pack/压缩格式（当前按 loose files 计划）；

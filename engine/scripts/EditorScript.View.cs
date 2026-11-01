@@ -167,6 +167,13 @@ namespace Hezhou
             UI.ThemeSetBackground(_qualityButtonId, ThemeRole.ButtonSecondaryBg);
             UI.ThemeSetText(_qualityButtonId, ThemeRole.TextPrimary);
 
+            // 0.2 音频调试按钮：播放/停止工程内第一个音频资产（无资产时内置测试音）
+            _audioTestButtonId = UI.CreateButton(_toolbar.Id, 90f, 30f, "音频测试");
+            UI.SetWidgetLayout(_audioTestButtonId, _screenWidth - 800f, 5f, 90f, 30f);
+            UI.SetOnClick(_audioTestButtonId, _audioTestCallback);
+            UI.ThemeSetBackground(_audioTestButtonId, ThemeRole.ButtonSecondaryBg);
+            UI.ThemeSetText(_audioTestButtonId, ThemeRole.TextPrimary);
+
             // === SplitView-based Main Layout ===
             // Structure:
             //   OuterSplitView (Horizontal): LeftCenterZone | PropertiesPanel
@@ -289,7 +296,17 @@ namespace Hezhou
             
             ulong sceneTabContent = UI.CreateVStack(_assetTabWidget.Id, 5f);
             UI.CreateLabel(sceneTabContent, 200f, 25f, "场景列表 (待实现)");
-            
+
+            // 0.2 工程资产数据库面板：扫描/导入 glTF + 扫描结果摘要
+            ulong projectAssetTabContent = UI.CreateVStack(_assetTabWidget.Id, 6f);
+            UI.CreateLabel(projectAssetTabContent, 460f, 24f, "工程资产数据库（AssetDatabase）");
+            _assetScanButtonId = UI.CreateButton(projectAssetTabContent, 140f, 26f, "扫描工程资产");
+            UI.SetOnClick(_assetScanButtonId, _assetScanCallback);
+            _assetImportButtonId = UI.CreateButton(projectAssetTabContent, 140f, 26f, "导入 glTF/GLB");
+            UI.SetOnClick(_assetImportButtonId, _assetImportCallback);
+            _assetDbSummaryLabelId = UI.CreateLabel(projectAssetTabContent, 640f, 24f, "资产: 未初始化");
+            UI.CreateLabel(projectAssetTabContent, 640f, 22f, "扫描结果同时输出到 Console；AssetId 可用 UI.AssetGetAsset(index) 查询");
+
             _assetTabWidget.AddTab("模型", modelTabContent, false);
             _assetTabWidget.AddTab("材质", materialTabContent, false);
             if (!_textureDockedRight)
@@ -298,6 +315,7 @@ namespace Hezhou
             }
             _assetTabWidget.AddTab("脚本", scriptTabContent, false);
             _assetTabWidget.AddTab("场景", sceneTabContent, false);
+            _assetTabWidget.AddTab("工程", projectAssetTabContent, false);
             _assetTabWidget.SetReorderable(true);
 
             // === Properties Panel: 5-tab TabWidget ===
@@ -423,32 +441,41 @@ namespace Hezhou
             float itemHeight = STATUS_BAR_HEIGHT - 4f;
             
             _fpsItem = _statusItems.AddItem("FPS: 0", false);
-            UI.SetWidgetLayout(_fpsItem.Id, 0f, 2f, 120f, itemHeight);
+            UI.SetWidgetLayout(_fpsItem.Id, 0f, 2f, 110f, itemHeight);
             UI.SetListItemFontSize(_fpsItem.Id, fontSize);
-            
+
             _statusItem = _statusItems.AddItem("状态: 就绪", true);
-            UI.SetWidgetLayout(_statusItem.Id, 130f, 2f, 150f, itemHeight);
+            UI.SetWidgetLayout(_statusItem.Id, 120f, 2f, 130f, itemHeight);
             UI.SetListItemFontSize(_statusItem.Id, fontSize);
-            
+
             _projectItem = _statusItems.AddItem("项目: 未命名", true);
-            UI.SetWidgetLayout(_projectItem.Id, 290f, 2f, 150f, itemHeight);
+            UI.SetWidgetLayout(_projectItem.Id, 260f, 2f, 130f, itemHeight);
             UI.SetListItemFontSize(_projectItem.Id, fontSize);
 
             _selectionItem = _statusItems.AddItem("选择: 0", true);
-            UI.SetWidgetLayout(_selectionItem.Id, 450f, 2f, 120f, itemHeight);
+            UI.SetWidgetLayout(_selectionItem.Id, 400f, 2f, 110f, itemHeight);
             UI.SetListItemFontSize(_selectionItem.Id, fontSize);
 
             _themeItem = _statusItems.AddItem(Theme.IsDark ? "主题: 深色" : "主题: 浅色", true);
-            UI.SetWidgetLayout(_themeItem.Id, 580f, 2f, 140f, itemHeight);
+            UI.SetWidgetLayout(_themeItem.Id, 520f, 2f, 120f, itemHeight);
             UI.SetListItemFontSize(_themeItem.Id, fontSize);
 
             // 0.2 渲染质量/PBR 摘要（文本由 Update() 每帧刷新，见 EditorScript.cs）
             _renderItem = _statusItems.AddItem("渲染: Legacy", true);
-            UI.SetWidgetLayout(_renderItem.Id, 730f, 2f, 300f, itemHeight);
+            UI.SetWidgetLayout(_renderItem.Id, 650f, 2f, 270f, itemHeight);
             UI.SetListItemFontSize(_renderItem.Id, fontSize);
 
+            // 0.2 资产数据库 / 音频状态摘要（task-16）
+            _assetItem = _statusItems.AddItem("资产: -", true);
+            UI.SetWidgetLayout(_assetItem.Id, 930f, 2f, 110f, itemHeight);
+            UI.SetListItemFontSize(_assetItem.Id, fontSize);
+
+            _audioItem = _statusItems.AddItem("音频: -", true);
+            UI.SetWidgetLayout(_audioItem.Id, 1050f, 2f, 110f, itemHeight);
+            UI.SetListItemFontSize(_audioItem.Id, fontSize);
+
             _errorItem = _statusItems.AddItem("错误: 0", true);
-            UI.SetWidgetLayout(_errorItem.Id, 1040f, 2f, 120f, itemHeight);
+            UI.SetWidgetLayout(_errorItem.Id, 1170f, 2f, 100f, itemHeight);
             UI.SetListItemFontSize(_errorItem.Id, fontSize);
 
             // === Script Editor Panel (pre-created, initially hidden) ===
