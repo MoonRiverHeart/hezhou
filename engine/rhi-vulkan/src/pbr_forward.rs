@@ -29,6 +29,8 @@ use hezhou_render_pipeline::post::{BloomPrefilterPushConstant, PostTonemapPushCo
 use hezhou_render_pipeline::pbr::{PbrFrameUbo, PbrLight, PbrMaterial, PbrPushConstant};
 use hezhou_render_pipeline::shadow::{camera_basis, ShadowFrameData, ShadowPushConstant};
 use hezhou_render_pipeline::{PushConstantData, RenderSettings, ViewportExtent};
+use parking_lot::Mutex;
+use std::collections::HashMap;
 
 use crate::render_quality::{shadow_pass_desc, HDR_COLOR_FORMAT};
 use crate::shadow_map::ShadowMapResources;
@@ -199,6 +201,59 @@ impl MeshDraw {
     }
 }
 
+/// 每实体纹理绑定（PBR set1 的 albedo/normal/MR/AO 贴图槽）
+///
+/// `cache_key` 由调用方给出（通常为 image view 的 raw handle），用于在
+/// [`PbrForwardPass`] 内缓存 PBR 兼容的 descriptor set，避免每帧重复分配。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct PbrTextureBinding {
+    /// 缓存 key（同一纹理多次绘制复用 descriptor set）
+    pub cache_key: u64,
+    /// 贴图 image view
+    pub view: vk::ImageView,
+    /// 贴图 sampler
+    pub sampler: vk::Sampler,
+}
+
+/// PBR 每实体绘制项：mesh + 该实体材质 + 可选纹理
+#[derive(Clone, Copy, Debug)]
+pub struct PbrDrawItem {
+    /// mesh 绘制描述（模型矩阵/顶点范围）
+    pub mesh: MeshDraw,
+    /// 该实体材质（来自 `PbrMaterialOverride` 或默认材质）
+    pub material: PbrMaterial,
+    /// 可选的每实体纹理（None = 默认中性贴图）
+    pub texture: Option<PbrTextureBinding>,
+}
+
+impl PbrDrawItem {
+    /// 只用材质（默认中性贴图）
+    pub fn new(mesh: MeshDraw, material: PbrMaterial) -> Self {
+        Self {
+            mesh,
+            material,
+            texture: None,
+        }
+    }
+
+    /// 带每实体纹理
+    pub fn with_texture(mesh: MeshDraw, material: PbrMaterial, texture: PbrTextureBinding) -> Self {
+        Self {
+            mesh,
+            material,
+            texture: Some(texture),
+        }
+    }
+
+    /// 该绘制项对应的 push constant（用于 CPU 契约测试/调试）
+    pub fn push_constant(&self) -> PbrPushConstant {
+        PbrPushConstant::from_material(self.mesh.model, &self.material)
+    }
+}
+
+/// 每实体纹理 descriptor set 上限（超出回退默认贴图，避免 pool 爆炸）
+pub const MAX_ENTITY_TEXTURE_SETS: usize = 256;
+
 /// 自有的离屏目标（image + memory + view）
 pub struct GpuTarget {
     /// image handle
@@ -272,6 +327,9 @@ pub struct PbrForwardPass {
     material_sampler: vk::Sampler,
     material_textures: Vec<GpuTarget>,
     hdr_sampler: vk::Sampler,
+    // 每实体纹理 descriptor 缓存（PBR set1：4 个 sampler）
+    entity_texture_pool: vk::DescriptorPool,
+    entity_texture_cache: Mutex<HashMap<u64, vk::DescriptorSet>>,
 
     // legacy 视觉补齐：天空盒 / 选中 outline / 3D gizmo
     sky_pipeline: vk::Pipeline,
@@ -458,6 +516,15 @@ impl PbrForwardPass {
             &[(vk::DescriptorType::COMBINED_IMAGE_SAMPLER, 4)],
         )?;
         let pbr_set1 = allocate_descriptor_set(&device, pbr_set1_pool, pbr_set1_layout)?;
+        // 每实体纹理 descriptor 池（复用 pbr_set1_layout：4 个 combined sampler）
+        let entity_texture_pool = create_descriptor_pool(
+            &device,
+            MAX_ENTITY_TEXTURE_SETS as u32,
+            &[(
+                vk::DescriptorType::COMBINED_IMAGE_SAMPLER,
+                (MAX_ENTITY_TEXTURE_SETS * 4) as u32,
+            )],
+        )?;
 
         let (shadow_image_view, shadow_sampler) = match &shadow {
             Some(shadow) => (shadow.map.array_view, shadow.map.sampler),
@@ -887,6 +954,8 @@ impl PbrForwardPass {
             material_sampler,
             material_textures,
             hdr_sampler,
+            entity_texture_pool,
+            entity_texture_cache: Mutex::new(HashMap::new()),
             sky_pipeline,
             sky_layout,
             outline_pipeline,
@@ -1137,6 +1206,125 @@ impl PbrForwardPass {
                 cast_slice(&[push]),
             );
             self.draw_mesh(cmd, index_buffer, draw);
+        }
+    }
+
+    /// 获取/创建每实体纹理的 PBR set1 descriptor set（内部缓存）
+    ///
+    /// set1 4 个 binding 分别为 albedo(每实体) / normal / metallic-roughness / AO，
+    /// 后三者使用模块内置中性贴图。超过 [`MAX_ENTITY_TEXTURE_SETS`] 时返回 None，
+    /// 调用方回退默认贴图 set。
+    unsafe fn entity_texture_set(&self, binding: &PbrTextureBinding) -> Option<vk::DescriptorSet> {
+        if let Some(set) = self.entity_texture_cache.lock().get(&binding.cache_key) {
+            return Some(*set);
+        }
+        let mut cache = self.entity_texture_cache.lock();
+        // 双重检查（并发 &self 录制场景）
+        if let Some(set) = cache.get(&binding.cache_key) {
+            return Some(*set);
+        }
+        if cache.len() >= MAX_ENTITY_TEXTURE_SETS {
+            return None;
+        }
+        let set =
+            allocate_descriptor_set(&self.device, self.entity_texture_pool, self.pbr_set1_layout)
+                .ok()?;
+        let infos = [
+            vk::DescriptorImageInfo {
+                sampler: binding.sampler,
+                image_view: binding.view,
+                image_layout: vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
+            },
+            vk::DescriptorImageInfo {
+                sampler: self.material_sampler,
+                image_view: self.material_textures[1].view,
+                image_layout: vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
+            },
+            vk::DescriptorImageInfo {
+                sampler: self.material_sampler,
+                image_view: self.material_textures[2].view,
+                image_layout: vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
+            },
+            vk::DescriptorImageInfo {
+                sampler: self.material_sampler,
+                image_view: self.material_textures[3].view,
+                image_layout: vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
+            },
+        ];
+        let writes: Vec<vk::WriteDescriptorSet> = infos
+            .iter()
+            .enumerate()
+            .map(|(index, info)| vk::WriteDescriptorSet {
+                dst_set: set,
+                dst_binding: index as u32,
+                descriptor_count: 1,
+                descriptor_type: vk::DescriptorType::COMBINED_IMAGE_SAMPLER,
+                p_image_info: info,
+                ..Default::default()
+            })
+            .collect();
+        self.device.update_descriptor_sets(&writes, &[]);
+        cache.insert(binding.cache_key, set);
+        Some(set)
+    }
+
+    /// 已缓存的每实体纹理 descriptor set 数量（调试/测试）
+    pub fn entity_texture_set_count(&self) -> usize {
+        self.entity_texture_cache.lock().len()
+    }
+
+    /// 录制 PBR 实体（每实体材质 + 可选每实体纹理）
+    ///
+    /// 每个 `PbrDrawItem` 独立写 PushConstant（base_color + metallic/roughness/
+    /// normal_scale/ao）；带纹理的 item 绑定其专属 set1 descriptor，否则用默认中性贴图。
+    ///
+    /// # Safety
+    /// 必须处于 HDR render pass 内；vertex/index buffer 必须已包含对应 mesh 数据
+    pub unsafe fn record_scene_draws_with_materials(
+        &self,
+        cmd: vk::CommandBuffer,
+        vertex_buffer: vk::Buffer,
+        index_buffer: vk::Buffer,
+        items: &[PbrDrawItem],
+    ) {
+        self.device
+            .cmd_bind_pipeline(cmd, vk::PipelineBindPoint::GRAPHICS, self.pbr_pipeline);
+        self.device.cmd_bind_descriptor_sets(
+            cmd,
+            vk::PipelineBindPoint::GRAPHICS,
+            self.pbr_layout,
+            0,
+            &[self.pbr_set0, self.pbr_set1],
+            &[],
+        );
+        self.device
+            .cmd_bind_vertex_buffers(cmd, 0, &[vertex_buffer], &[0]);
+        let mut current_set1 = self.pbr_set1;
+        for item in items {
+            let push = item.push_constant();
+            self.device.cmd_push_constants(
+                cmd,
+                self.pbr_layout,
+                vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT,
+                0,
+                cast_slice(&[push]),
+            );
+            let set1 = match item.texture {
+                Some(texture) => self.entity_texture_set(&texture).unwrap_or(self.pbr_set1),
+                None => self.pbr_set1,
+            };
+            if set1 != current_set1 {
+                self.device.cmd_bind_descriptor_sets(
+                    cmd,
+                    vk::PipelineBindPoint::GRAPHICS,
+                    self.pbr_layout,
+                    0,
+                    &[self.pbr_set0, set1],
+                    &[],
+                );
+                current_set1 = set1;
+            }
+            self.draw_mesh(cmd, index_buffer, &item.mesh);
         }
     }
 
@@ -1397,6 +1585,8 @@ impl PbrForwardPass {
         device.destroy_pipeline_layout(self.tonemap_layout, None);
         device.destroy_descriptor_pool(self.pbr_set0_pool, None);
         device.destroy_descriptor_pool(self.pbr_set1_pool, None);
+        device.destroy_descriptor_pool(self.entity_texture_pool, None);
+        self.entity_texture_cache.lock().clear();
         device.destroy_descriptor_pool(self.tonemap_pool, None);
         device.destroy_descriptor_set_layout(self.pbr_set0_layout, None);
         device.destroy_descriptor_set_layout(self.pbr_set1_layout, None);
@@ -3235,5 +3425,63 @@ mod tests {
     fn translation_matrix_matches_glsl_translate() {
         let matrix = translation_matrix([1.0, 2.0, 3.0]);
         assert_eq!(matrix[3], [1.0, 2.0, 3.0, 1.0]);
+    }
+
+    // === 每实体材质 draw item（task-22） ===
+
+    #[test]
+    fn pbr_draw_item_material_push_constants_differ() {
+        let mesh = MeshDraw::primitive(0, 36, [[1.0; 4]; 4]);
+        let red_metal = PbrMaterial::metal([0.9, 0.1, 0.1], 0.15);
+        let blue_rough = PbrMaterial::dielectric([0.1, 0.2, 0.9], 0.85);
+        let item_a = PbrDrawItem::new(mesh, red_metal);
+        let item_b = PbrDrawItem::new(mesh, blue_rough);
+        assert!(item_a.texture.is_none());
+        let push_a = item_a.push_constant();
+        let push_b = item_b.push_constant();
+        assert_ne!(push_a.base_color, push_b.base_color);
+        assert_ne!(push_a.material_params, push_b.material_params);
+        assert_eq!(push_a.material_params[0], 1.0); // metallic
+        assert_eq!(push_b.material_params[0], 0.0);
+        assert!(push_a.material_params[1] < push_b.material_params[1]); // roughness
+    }
+
+    #[test]
+    fn pbr_draw_item_texture_binding_is_carried() {
+        let mesh = MeshDraw::primitive(0, 36, [[1.0; 4]; 4]);
+        let binding = PbrTextureBinding {
+            cache_key: 42,
+            view: vk::ImageView::null(),
+            sampler: vk::Sampler::null(),
+        };
+        let item = PbrDrawItem::with_texture(mesh, PbrMaterial::default(), binding);
+        assert_eq!(item.texture, Some(binding));
+        assert_eq!(MAX_ENTITY_TEXTURE_SETS, 256);
+        let plain = PbrDrawItem::new(mesh, PbrMaterial::default());
+        assert!(plain.texture.is_none());
+    }
+
+    #[test]
+    fn pbr_material_override_maps_to_item_material() {
+        // 模拟 renderer 的实体材质解析：覆盖命中 vs 默认回退
+        let default = PbrMaterial::default();
+        let mut overrides = hezhou_render_pipeline::PbrMaterialOverrides::new(default);
+        let red = PbrMaterial::metal([0.9, 0.1, 0.1], 0.2);
+        overrides.set(
+            hezhou_render_pipeline::PbrMaterialOverride::new(7, red).with_texture_path("tex/red.png"),
+        );
+        let mesh = MeshDraw::primitive(0, 3, [[1.0; 4]; 4]);
+        let item_7 = PbrDrawItem::new(
+            mesh,
+            overrides.resolve_with_default(7, &default).clone(),
+        );
+        let item_8 = PbrDrawItem::new(
+            mesh,
+            overrides.resolve_with_default(8, &default).clone(),
+        );
+        assert_eq!(item_7.material, red);
+        assert_eq!(item_8.material, default);
+        assert_eq!(overrides.resolve_texture_path(7), Some("tex/red.png"));
+        assert_eq!(overrides.resolve_texture_path(8), None);
     }
 }

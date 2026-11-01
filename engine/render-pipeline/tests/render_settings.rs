@@ -6,8 +6,9 @@
 //! - PBR 每帧 UBO（含阴影级联数据）
 
 use hezhou_render_pipeline::{
-    BloomSettings, CameraParams, PbrLight, RenderContext, RenderQualityPreset, RenderSettings,
-    ShadingModel, ShadowSettings, TonemapOperator, ViewportExtent,
+    BloomSettings, CameraParams, PbrLight, PbrMaterial, PbrMaterialOverride,
+    RenderContext, RenderQualityPreset, RenderSettings, ShadingModel, ShadowSettings,
+    TonemapOperator, ViewportExtent,
 };
 
 fn camera() -> CameraParams {
@@ -159,4 +160,23 @@ fn shadow_settings_invalid_values_do_not_break_frame() {
         .expect("非法调参不应导致错误（会被 validate 收敛）")
         .expect("中配应返回阴影数据");
     assert_eq!(frame.cascade_count, 2);
+}
+
+#[test]
+fn render_context_resolves_per_entity_material() {
+    let mut ctx = context_with(RenderQualityPreset::High);
+    let red_metal = PbrMaterial::metal([0.9, 0.1, 0.1], 0.2);
+    ctx.pbr_material_overrides.set(
+        PbrMaterialOverride::new(1, red_metal).with_texture_path("textures/red.png"),
+    );
+    // 覆盖命中
+    assert_eq!(ctx.resolve_pbr_material(1), &red_metal);
+    assert_eq!(ctx.resolve_pbr_texture_path(1), Some("textures/red.png"));
+    // 未覆盖实体回退 render_settings.default_material
+    let default_material = ctx.render_settings.default_material;
+    assert_eq!(ctx.resolve_pbr_material(2), &default_material);
+    assert!(ctx.resolve_pbr_texture_path(2).is_none());
+    // 覆盖可删除后回退
+    assert!(ctx.pbr_material_overrides.remove(1));
+    assert_eq!(ctx.resolve_pbr_material(1), &default_material);
 }

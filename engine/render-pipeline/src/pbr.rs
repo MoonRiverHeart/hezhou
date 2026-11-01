@@ -2,6 +2,7 @@
 //!
 //! 内容:
 //! - [`PbrMaterial`]: albedo / metallic / roughness / normal / AO / emissive 参数与范围校验
+//! - [`PbrMaterialOverride`] / [`PbrMaterialOverrides`]: 每实体材质覆盖（EntityId → 材质 + 可选纹理槽）
 //! - [`PbrLight`]: 方向光参数（方向 + 颜色 + 强度 + 环境项）
 //! - CPU 参考 BRDF（GGX + Smith + Schlick），用于单元测试、编辑器预览与离线校验
 //! - GPU 数据布局: [`PbrPushConstant`]（96 bytes）与 [`PbrFrameUbo`]（480 bytes）
@@ -10,13 +11,17 @@
 //! 着色模型由 [`ShadingModel`] 显式选择，默认 `BlinnPhong`（0.1 行为）。
 //! PBR 只是新增路径，`rotation.vert/frag` 与现有光栅管线不受影响。
 //!
-//! **GPU 布局约定**（必须与 `shaders/pbr.vert` / `shaders/pbr.frag` 严格一致，
-//! 由 `tests/shader_contract.rs` 校验）:
-//! - Push constant: `mat4 model; vec4 base_color; vec4 material_params;` = 96 bytes
-//! - Frame UBO(std140): direction/intensity、color/shadow_strength、ambient/cascade_count、
-//!   cascade_splits、shadow_params、view、proj、light_view_proj[4]、camera_pos = 480 bytes
+//! **每实体材质链路（0.2 task-22）**:
+//! 渲染层通过 [`PbrMaterialOverrides`] 维护 `EntityId → PbrMaterialOverride` 映射；
+//! PBR draw 时按实体查覆盖，命中则每 draw 写 PushConstant（base_color + metallic/
+//! roughness/normal_scale/ao）+ 可选每实体纹理 descriptor；未命中回退
+//! `PbrMaterialOverrides::default_material`（默认 `RenderSettings.default_material`）。
+//! 不支持透明/多 UV 法线贴图，见 [`PbrMaterialOverride`] 文档 TODO。
+
+use std::collections::HashMap;
 
 use bytemuck::{Pod, Zeroable};
+use hezhou_core::ecs::EntityId;
 
 /// 介电质基础反射率（非金属 F0）
 pub const DIELECTRIC_F0: f32 = 0.04;
@@ -166,6 +171,143 @@ fn clamp_or(value: f32, lo: f32, hi: f32, fallback: f32) -> f32 {
         value.clamp(lo, hi)
     } else {
         fallback
+    }
+}
+
+/// 每实体 PBR 材质覆盖
+///
+/// 渲染层（`UIVulkanRenderer`）通过 [`PbrMaterialOverrides`] 维护
+/// `EntityId → PbrMaterialOverride`；PBR draw 时按实体查询：
+/// - 命中 → 该实体使用覆盖材质（每实体 push constant + 可选纹理 descriptor）
+/// - 未命中 → 回退 [`PbrMaterialOverrides::default_material`]
+///
+/// **0.2 不支持（TODO）**:
+/// - 透明/alpha 混合材质（PBR pass 当前无 blend）
+/// - 多 UV 通道法线贴图（shader 只用 UV0）
+/// - 材质资源 AssetId/材质资产（当前 texture 槽为路径字符串）
+#[derive(Clone, Debug, PartialEq)]
+pub struct PbrMaterialOverride {
+    /// 目标实体 ID（`hezhou_core::ecs::EntityId` = u64）
+    pub entity_id: EntityId,
+    /// 材质参数
+    pub material: PbrMaterial,
+    /// 可选的每实体纹理路径（renderer 的 texture_cache key；None = 使用默认中性贴图）
+    pub texture_path: Option<String>,
+}
+
+impl PbrMaterialOverride {
+    /// 创建覆盖（无纹理槽）
+    pub fn new(entity_id: EntityId, material: PbrMaterial) -> Self {
+        Self {
+            entity_id,
+            material,
+            texture_path: None,
+        }
+    }
+
+    /// 设置每实体纹理路径
+    pub fn with_texture_path(mut self, path: impl Into<String>) -> Self {
+        self.texture_path = Some(path.into());
+        self
+    }
+
+    /// NaN/越界收敛后的副本
+    pub fn sanitized(&self) -> Self {
+        Self {
+            entity_id: self.entity_id,
+            material: self.material.sanitized(),
+            texture_path: self.texture_path.clone(),
+        }
+    }
+}
+
+/// 每实体 PBR 材质覆盖集合（EntityId 映射 + 默认材质回退）
+#[derive(Clone, Debug, Default)]
+pub struct PbrMaterialOverrides {
+    default_material: PbrMaterial,
+    entries: HashMap<EntityId, PbrMaterialOverride>,
+}
+
+impl PbrMaterialOverrides {
+    /// 以默认材质创建空覆盖集合
+    pub fn new(default_material: PbrMaterial) -> Self {
+        Self {
+            default_material: default_material.sanitized(),
+            entries: HashMap::new(),
+        }
+    }
+
+    /// 默认材质（无覆盖实体使用）
+    pub fn default_material(&self) -> &PbrMaterial {
+        &self.default_material
+    }
+
+    /// 修改默认材质
+    pub fn set_default_material(&mut self, material: PbrMaterial) {
+        self.default_material = material.sanitized();
+    }
+
+    /// 写入/替换实体覆盖，返回旧值
+    pub fn set(&mut self, material_override: PbrMaterialOverride) -> Option<PbrMaterialOverride> {
+        self.entries
+            .insert(material_override.entity_id, material_override.sanitized())
+    }
+
+    /// 取实体覆盖
+    pub fn get(&self, entity_id: EntityId) -> Option<&PbrMaterialOverride> {
+        self.entries.get(&entity_id)
+    }
+
+    /// 删除实体覆盖，返回是否删除成功
+    pub fn remove(&mut self, entity_id: EntityId) -> bool {
+        self.entries.remove(&entity_id).is_some()
+    }
+
+    /// 清空全部覆盖（保留默认材质）
+    pub fn clear(&mut self) {
+        self.entries.clear();
+    }
+
+    /// 覆盖数量
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// 是否没有任何覆盖
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    /// 已覆盖实体列表（便于调试/编辑器同步）
+    pub fn entity_ids(&self) -> impl Iterator<Item = EntityId> + '_ {
+        self.entries.keys().copied()
+    }
+
+    /// 查询实体材质：命中覆盖则返回覆盖材质，否则返回默认材质
+    pub fn resolve(&self, entity_id: EntityId) -> &PbrMaterial {
+        self.resolve_with_default(entity_id, &self.default_material)
+    }
+
+    /// 查询实体材质，显式指定未覆盖时的回退材质
+    ///
+    /// 渲染侧通常传入 `RenderSettings::default_material`，从而让"未覆盖实体"
+    /// 始终跟随当前质量档/默认材质配置。
+    pub fn resolve_with_default<'a>(
+        &'a self,
+        entity_id: EntityId,
+        fallback: &'a PbrMaterial,
+    ) -> &'a PbrMaterial {
+        match self.entries.get(&entity_id) {
+            Some(entry) => &entry.material,
+            None => fallback,
+        }
+    }
+
+    /// 查询实体纹理槽：命中且配置了纹理路径时返回路径
+    pub fn resolve_texture_path(&self, entity_id: EntityId) -> Option<&str> {
+        self.entries
+            .get(&entity_id)
+            .and_then(|entry| entry.texture_path.as_deref())
     }
 }
 
@@ -746,5 +888,117 @@ mod tests {
             ..PbrLight::default()
         };
         assert!(zero.light_dir().iter().all(|c| c.is_finite()));
+    }
+
+    // === 每实体材质覆盖（task-22） ===
+
+    #[test]
+    fn overrides_resolve_falls_back_to_default() {
+        let default = PbrMaterial::dielectric([0.5, 0.5, 0.5], 0.5);
+        let overrides = PbrMaterialOverrides::new(default);
+        // 无覆盖 → 默认材质
+        assert_eq!(overrides.resolve(1), &default);
+        assert_eq!(overrides.resolve(999), &default);
+        assert!(overrides.is_empty());
+        assert_eq!(overrides.len(), 0);
+        assert!(overrides.resolve_texture_path(1).is_none());
+    }
+
+    #[test]
+    fn overrides_set_get_remove() {
+        let mut overrides = PbrMaterialOverrides::default();
+        let red_metal = PbrMaterial::metal([0.9, 0.1, 0.1], 0.2);
+        let entry = PbrMaterialOverride::new(7, red_metal);
+        assert!(overrides.set(entry.clone()).is_none());
+        assert_eq!(overrides.len(), 1);
+        assert_eq!(overrides.get(7), Some(&entry));
+        assert_eq!(overrides.resolve(7), &red_metal);
+        // 替换返回旧值
+        let blue = PbrMaterial::dielectric([0.1, 0.1, 0.9], 0.9);
+        let old = overrides.set(PbrMaterialOverride::new(7, blue));
+        assert_eq!(old, Some(entry));
+        assert_eq!(overrides.resolve(7), &blue);
+        // 删除后回退默认
+        assert!(overrides.remove(7));
+        assert!(!overrides.remove(7));
+        assert_eq!(overrides.resolve(7), overrides.default_material());
+    }
+
+    #[test]
+    fn overrides_sanitize_material_and_texture() {
+        let mut overrides = PbrMaterialOverrides::default();
+        let invalid = PbrMaterial {
+            base_color: [5.0, -1.0, 0.5, 1.0],
+            metallic: f32::NAN,
+            roughness: 9.0,
+            normal_scale: -3.0,
+            ao: f32::NAN,
+            emissive: [2.0, -1.0, 0.2],
+            emissive_strength: 1000.0,
+        };
+        overrides.set(
+            PbrMaterialOverride::new(3, invalid).with_texture_path("textures/metal.png"),
+        );
+        let entry = overrides.get(3).unwrap();
+        assert!(entry.material.is_valid());
+        assert_eq!(entry.material.metallic, 0.0);
+        assert_eq!(entry.material.roughness, 1.0);
+        assert_eq!(entry.material.normal_scale, 0.0);
+        assert_eq!(entry.texture_path.as_deref(), Some("textures/metal.png"));
+        assert_eq!(overrides.resolve_texture_path(3), Some("textures/metal.png"));
+        assert_eq!(overrides.resolve_texture_path(4), None);
+    }
+
+    #[test]
+    fn overrides_default_material_change_affects_uncovered_only() {
+        let mut overrides = PbrMaterialOverrides::new(PbrMaterial::default());
+        overrides.set(PbrMaterialOverride::new(1, PbrMaterial::metal([1.0, 0.8, 0.2], 0.1)));
+        let old_default = overrides.resolve(2).clone();
+        overrides.set_default_material(PbrMaterial::dielectric([0.2, 0.8, 0.2], 0.8));
+        // 已有覆盖不受默认材质变化影响
+        assert_eq!(overrides.resolve(1), &PbrMaterial::metal([1.0, 0.8, 0.2], 0.1));
+        // 未覆盖实体跟随默认材质
+        assert_ne!(overrides.resolve(2), &old_default);
+        assert_eq!(overrides.resolve(2), overrides.default_material());
+    }
+
+    #[test]
+    fn overrides_entity_ids_and_clear() {
+        let mut overrides = PbrMaterialOverrides::default();
+        for entity in [10u64, 20, 30] {
+            overrides.set(PbrMaterialOverride::new(entity, PbrMaterial::default()));
+        }
+        let mut ids: Vec<u64> = overrides.entity_ids().collect();
+        ids.sort_unstable();
+        assert_eq!(ids, vec![10, 20, 30]);
+        assert_eq!(overrides.len(), 3);
+        overrides.clear();
+        assert!(overrides.is_empty());
+    }
+
+    #[test]
+    fn per_entity_material_affects_push_constant() {
+        // 两个实体不同材质 → 每 draw push constant 不同（base_color / material_params）
+        let red_metal = PbrMaterial::metal([0.9, 0.1, 0.1], 0.15);
+        let blue_rough = PbrMaterial::dielectric([0.1, 0.2, 0.9], 0.85);
+        let model = [[1.0; 4]; 4];
+        let pc_red = PbrPushConstant::from_material(model, &red_metal);
+        let pc_blue = PbrPushConstant::from_material(model, &blue_rough);
+        assert_ne!(pc_red.base_color, pc_blue.base_color);
+        assert_ne!(pc_red.material_params, pc_blue.material_params);
+        assert_eq!(pc_red.material_params[0], 1.0); // metallic
+        assert_eq!(pc_blue.material_params[0], 0.0);
+        assert!(pc_red.material_params[1] < pc_blue.material_params[1]);
+    }
+
+    #[test]
+    fn overrides_is_cloneable_and_send_sync() {
+        fn assert_send_sync<T: Send + Sync>() {}
+        assert_send_sync::<PbrMaterialOverrides>();
+        let mut overrides = PbrMaterialOverrides::default();
+        overrides.set(PbrMaterialOverride::new(5, PbrMaterial::default()));
+        let cloned = overrides.clone();
+        assert_eq!(cloned.len(), 1);
+        assert_eq!(cloned.resolve(5), overrides.resolve(5));
     }
 }

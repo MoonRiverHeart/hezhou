@@ -14,11 +14,11 @@
 use ash::vk;
 
 use hezhou_render_pipeline::{
-    CameraParams, RenderQualityPreset, RenderSettings, ShadowFrameData, ViewportExtent,
+    CameraParams, PbrMaterial, RenderQualityPreset, RenderSettings, ShadowFrameData, ViewportExtent,
 };
 use hezhou_rhi_vulkan::{
     create_host_visible_buffer, create_render_target, destroy_render_target, GpuTarget,
-    LegacyPushBase, MeshDraw, PbrForwardPass, SkinnedPipelineState, LEGACY_FAR,
+    LegacyPushBase, MeshDraw, PbrDrawItem, PbrForwardPass, SkinnedPipelineState, LEGACY_FAR,
     LEGACY_FOV_DEGREES, LEGACY_NEAR,
 };
 
@@ -276,7 +276,31 @@ unsafe fn record_frame(
         [0.0, 0.0, 1.0, 0.0],
         [0.0, 0.0, 0.0, 1.0],
     ];
-    let draws = [MeshDraw::primitive(0, 3, model)];
+    // === 每实体材质（task-22）：3 个实体分别使用不同材质 ===
+    // 1) 红色金属（高 metallic / 低 roughness）
+    // 2) 蓝色粗糙介电质
+    // 3) 无覆盖 → 回退 settings.default_material
+    let per_entity_materials: [PbrMaterial; 3] = [
+        PbrMaterial::metal([0.9, 0.1, 0.1], 0.15),
+        PbrMaterial::dielectric([0.1, 0.2, 0.9], 0.85),
+        settings.default_material.sanitized(),
+    ];
+    let mut draws: Vec<MeshDraw> = Vec::new();
+    let mut pbr_items: Vec<PbrDrawItem> = Vec::new();
+    for (index, material) in per_entity_materials.iter().enumerate() {
+        let mut mesh_model = model;
+        // 横向错开，避免三个三角形完全重叠
+        mesh_model[3][0] = (index as f32 - 1.0) * 1.2;
+        let mesh = MeshDraw::primitive(0, 3, mesh_model);
+        draws.push(mesh);
+        pbr_items.push(PbrDrawItem::new(mesh, *material));
+    }
+    assert_ne!(
+        pbr_items[0].push_constant().material_params,
+        pbr_items[1].push_constant().material_params,
+        "两个实体的材质 push constant 必须不同"
+    );
+
     // outline：放大 1.05 的同一 mesh
     let outline_model = [
         [1.05, 0.0, 0.0, 0.0],
@@ -337,15 +361,14 @@ unsafe fn record_frame(
     if let Some(shadow_frame) = &shadow {
         pass.record_shadow(cmd, shadow_frame, vertex_buffer, vertex_buffer, &draws);
     }
-    // 2. HDR 主 pass：天空盒 → 实体 → outline → Gizmo → 合成蒙皮
+    // 2. HDR 主 pass：天空盒 → 每实体材质实体 → outline → Gizmo → 合成蒙皮
     pass.begin_scene(cmd, [0.05, 0.05, 0.1, 1.0]);
     pass.record_sky(cmd, [0.16, 0.32, 0.62], [0.72, 0.82, 0.92]);
-    pass.record_scene_draws(
+    pass.record_scene_draws_with_materials(
         cmd,
         vertex_buffer,
         vertex_buffer,
-        &draws,
-        &settings.default_material,
+        &pbr_items,
     );
     pass.record_outline(cmd, None, None, vertex_buffer, vertex_buffer, &outlines, &base);
     pass.record_gizmo(cmd, None, None, gizmo_buffer, [0.0, 0.0, 0.0], &base);

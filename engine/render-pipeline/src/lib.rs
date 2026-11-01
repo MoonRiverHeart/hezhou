@@ -42,6 +42,7 @@ pub use raytrace_pipeline::{RayTracePipeline, RayTracePushConstant};
 // === 0.2 渲染能力（PBR / Shadow / Post / Quality） ===
 pub use pbr::{
     PbrMaterial, PbrLight, PbrPushConstant, PbrFrameUbo, ShadingModel,
+    PbrMaterialOverride, PbrMaterialOverrides,
     DIELECTRIC_F0, MIN_ROUGHNESS, PBR_PI,
 };
 pub use shadow::{

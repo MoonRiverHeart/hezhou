@@ -15,8 +15,8 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use hezhou_core::asset_library::MeshType;
 use crate::primitive_meshes::{self, MeshRange};
 use crate::pbr_forward::{
-    camera_projection_matrix, camera_view_matrix, MeshDraw, PbrForwardPass, SkinnedPipelineState,
-    LEGACY_FAR, LEGACY_FOV_DEGREES, LEGACY_NEAR,
+    camera_projection_matrix, camera_view_matrix, MeshDraw, PbrDrawItem, PbrForwardPass,
+    PbrTextureBinding, SkinnedPipelineState, LEGACY_FAR, LEGACY_FOV_DEGREES, LEGACY_NEAR,
 };
 
 
@@ -236,6 +236,8 @@ pub struct UIVulkanRenderer {
     // 默认值 = legacy Blinn-Phong 路径（不改变 0.1 视觉），编辑器通过
     // set_render_quality_preset / set_render_settings 选择质量档
     render_settings: hezhou_render_pipeline::RenderSettings,
+    // 每实体 PBR 材质覆盖（EntityId → 材质 + 可选纹理路径），无覆盖回退 render_settings.default_material
+    pbr_material_overrides: hezhou_render_pipeline::PbrMaterialOverrides,
 
     // 0.2 PBR/Shadow/Post 实际绘制通道（仅 PBR 质量档创建；默认 None 走 legacy）
     pbr_forward: Option<crate::pbr_forward::PbrForwardPass>,
@@ -1801,6 +1803,7 @@ p_multisample_state: &vk::PipelineMultisampleStateCreateInfo {
                 sky_bottom: [0.72, 0.82, 0.92],
                 // 默认 legacy 兼容（Blinn-Phong + FXAA），质量档由编辑器显式切换
                 render_settings: hezhou_render_pipeline::RenderSettings::default(),
+                pbr_material_overrides: hezhou_render_pipeline::PbrMaterialOverrides::default(),
                 pbr_forward: None,
                 pbr_skinned: None,
                 retired_pbr: Vec::new(),
@@ -1895,7 +1898,7 @@ p_multisample_state: &vk::PipelineMultisampleStateCreateInfo {
     pub fn pbr_draw_path_summary(&self) -> Option<String> {
         let pass = self.pbr_forward.as_ref()?;
         Some(format!(
-            "PBR active: {} (shadow={}, bloom={}, tonemap={}, hdr={}x{}, sky_pipeline={}, outline_gizmo={}, skinned_pipeline={})",
+            "PBR active: {} (shadow={}, bloom={}, tonemap={}, hdr={}x{}, sky_pipeline={}, outline_gizmo={}, skinned_pipeline={}, material_overrides={})",
             self.render_quality_summary(),
             pass.shadow_active(),
             pass.bloom_active(),
@@ -1904,7 +1907,8 @@ p_multisample_state: &vk::PipelineMultisampleStateCreateInfo {
             pass.extent.height,
             pass.sky_pipeline_ready(),
             pass.outline_pipeline_ready(),
-            self.pbr_skinned.is_some()
+            self.pbr_skinned.is_some(),
+            self.pbr_material_overrides.len()
         ))
     }
 
@@ -1917,6 +1921,94 @@ p_multisample_state: &vk::PipelineMultisampleStateCreateInfo {
             Some(skinned) => unsafe { skinned.upload_joint_palette(bytes) },
             None => Err("蒙皮 pipeline 未启用（需要 PBR 质量档）".to_string()),
         }
+    }
+
+    // === 每实体 PBR 材质覆盖（task-22） ===
+
+    /// 设置/替换实体 PBR 材质（保留已有纹理槽）
+    ///
+    /// 编辑器接入点：`entity_id` 用 `EntityId`（u64）；材质参数非法值会在
+    /// `PbrMaterialOverrides::set` 内收敛（NaN → 默认值，越界 clamp）。
+    pub fn set_entity_pbr_material(
+        &mut self,
+        entity_id: u64,
+        material: hezhou_render_pipeline::PbrMaterial,
+    ) {
+        let mut entry = match self.pbr_material_overrides.get(entity_id) {
+            Some(existing) => existing.clone(),
+            None => hezhou_render_pipeline::PbrMaterialOverride::new(
+                entity_id,
+                self.render_settings.default_material,
+            ),
+        };
+        entry.material = material;
+        self.pbr_material_overrides.set(entry);
+    }
+
+    /// FFI 友好入口：按扁平参数设置实体 PBR 材质
+    #[allow(clippy::too_many_arguments)]
+    pub fn set_entity_pbr_material_params(
+        &mut self,
+        entity_id: u64,
+        base_color: [f32; 4],
+        metallic: f32,
+        roughness: f32,
+        normal_scale: f32,
+        ao: f32,
+        emissive: [f32; 3],
+        emissive_strength: f32,
+    ) {
+        let material = hezhou_render_pipeline::PbrMaterial {
+            base_color,
+            metallic,
+            roughness,
+            normal_scale,
+            ao,
+            emissive,
+            emissive_strength,
+        };
+        self.set_entity_pbr_material(entity_id, material);
+    }
+
+    /// 设置/清除实体 PBR 纹理路径（None = 使用默认中性贴图）
+    pub fn set_entity_pbr_texture(&mut self, entity_id: u64, texture_path: Option<&str>) {
+        let mut entry = match self.pbr_material_overrides.get(entity_id) {
+            Some(existing) => existing.clone(),
+            None => hezhou_render_pipeline::PbrMaterialOverride::new(
+                entity_id,
+                self.render_settings.default_material,
+            ),
+        };
+        entry.texture_path = texture_path.map(|path| path.to_string());
+        self.pbr_material_overrides.set(entry);
+    }
+
+    /// 删除实体 PBR 材质覆盖（之后回退 `render_settings.default_material`）
+    pub fn remove_entity_pbr_material(&mut self, entity_id: u64) -> bool {
+        self.pbr_material_overrides.remove(entity_id)
+    }
+
+    /// 查询实体 PBR 覆盖（无覆盖返回 None）
+    pub fn entity_pbr_material(
+        &self,
+        entity_id: u64,
+    ) -> Option<&hezhou_render_pipeline::PbrMaterialOverride> {
+        self.pbr_material_overrides.get(entity_id)
+    }
+
+    /// 已覆盖材质的实体数量
+    pub fn pbr_material_override_count(&self) -> usize {
+        self.pbr_material_overrides.len()
+    }
+
+    /// 解析实体当前实际使用的 PBR 材质（覆盖优先，否则默认材质）
+    pub fn resolve_entity_pbr_material(
+        &self,
+        entity_id: u64,
+    ) -> hezhou_render_pipeline::PbrMaterial {
+        self.pbr_material_overrides
+            .resolve_with_default(entity_id, &self.render_settings.default_material)
+            .clone()
     }
 
     /// PBR draw path 是否应激活：PBR 着色 + 未启用 PipelineRegistry（legacy 仲裁）
@@ -2137,6 +2229,8 @@ p_multisample_state: &vk::PipelineMultisampleStateCreateInfo {
         //    同时收集选中实体的 outline（放大 1.05，与 legacy 一致）
         let mut draws: Vec<MeshDraw> = Vec::new();
         let mut outlines: Vec<MeshDraw> = Vec::new();
+        // 每实体材质/纹理的 PBR draw item（覆盖优先，缺省默认材质）
+        let mut pbr_items: Vec<PbrDrawItem> = Vec::new();
         if let Some(scene_ptr) = self.scene_ptr {
             unsafe {
                 let scene = &*scene_ptr;
@@ -2161,15 +2255,40 @@ p_multisample_state: &vk::PipelineMultisampleStateCreateInfo {
                     } else {
                         None
                     };
+                    // 每实体材质解析：PbrMaterialOverride 优先，否则 render_settings.default_material
+                    let entity_id = entity.id;
+                    let material = self
+                        .pbr_material_overrides
+                        .resolve_with_default(entity_id, &settings.default_material)
+                        .clone();
+                    // 纹理槽：覆盖配置优先，其次 renderable.texture_path（与 legacy 行为一致）
+                    let texture_path = self
+                        .pbr_material_overrides
+                        .resolve_texture_path(entity_id)
+                        .map(|path| path.to_string())
+                        .or_else(|| renderable.texture_path.clone());
+                    let texture = texture_path
+                        .as_deref()
+                        .and_then(|path| self.texture_cache.get(path))
+                        .map(|entry| PbrTextureBinding {
+                            cache_key: entry.view.as_raw() as u64,
+                            view: entry.view,
+                            sampler: entry.sampler,
+                        });
                     if crate::mesh_loader::is_custom_mesh(&renderable.mesh_path) {
                         if let Some(info) = self.custom_meshes.get(&renderable.mesh_path) {
-                            draws.push(MeshDraw::indexed(
+                            let mesh = MeshDraw::indexed(
                                 info.vertex_offset,
                                 info.vertex_count,
                                 info.index_offset,
                                 info.index_count,
                                 model,
-                            ));
+                            );
+                            draws.push(mesh);
+                            pbr_items.push(match texture {
+                                Some(texture) => PbrDrawItem::with_texture(mesh, material, texture),
+                                None => PbrDrawItem::new(mesh, material),
+                            });
                             if let Some(outline) = outline_model {
                                 outlines.push(MeshDraw::indexed(
                                     info.vertex_offset,
@@ -2184,11 +2303,16 @@ p_multisample_state: &vk::PipelineMultisampleStateCreateInfo {
                         let mesh_type =
                             primitive_meshes::mesh_type_from_path(&renderable.mesh_path);
                         if let Some(range) = self.primitive_ranges.get(&mesh_type) {
-                            draws.push(MeshDraw::primitive(
+                            let mesh = MeshDraw::primitive(
                                 range.vertex_offset,
                                 range.vertex_count,
                                 model,
-                            ));
+                            );
+                            draws.push(mesh);
+                            pbr_items.push(match texture {
+                                Some(texture) => PbrDrawItem::with_texture(mesh, material, texture),
+                                None => PbrDrawItem::new(mesh, material),
+                            });
                             if let Some(outline) = outline_model {
                                 outlines.push(MeshDraw::primitive(
                                     range.vertex_offset,
@@ -2259,12 +2383,11 @@ p_multisample_state: &vk::PipelineMultisampleStateCreateInfo {
             if self.sky_enabled {
                 pass.record_sky(cmd, self.sky_top, self.sky_bottom);
             }
-            pass.record_scene_draws(
+            pass.record_scene_draws_with_materials(
                 cmd,
                 self.game_mesh_buffer,
                 self.game_index_buffer,
-                &draws,
-                &settings.default_material,
+                &pbr_items,
             );
             if !outlines.is_empty() {
                 pass.record_outline(
@@ -2305,15 +2428,17 @@ p_multisample_state: &vk::PipelineMultisampleStateCreateInfo {
             pass.record_post(cmd);
         }
 
-        // 7. Trace 日志：实际 draw path 证据（draw 数/开关）
+        // 7. Trace 日志：实际 draw path 证据（draw 数/开关/每实体材质数）
         self.dfx.lock().get_logger().lock().log(
             LogLevel::Trace,
             "Vulkan",
             &format!(
-                "PBR draw path: {} draws={} outlines={} sky={} gizmo={} skinned={} shadow={} bloom={} tonemap={}",
+                "PBR draw path: {} draws={} outlines={} materials={} textured={} sky={} gizmo={} skinned={} shadow={} bloom={} tonemap={}",
                 settings.quality_label(),
                 draws.len(),
                 outlines.len(),
+                self.pbr_material_overrides.len(),
+                pbr_items.iter().filter(|item| item.texture.is_some()).count(),
                 self.sky_enabled,
                 self.gizmo_visible,
                 self.pbr_skinned.is_some(),
@@ -2579,6 +2704,7 @@ p_multisample_state: &vk::PipelineMultisampleStateCreateInfo {
             sky_top: self.sky_top,
             sky_bottom: self.sky_bottom,
             render_settings: self.render_settings.clone(),
+            pbr_material_overrides: self.pbr_material_overrides.clone(),
         };
         
 // 5. 在switch_pipeline前，从active_resources取出renderer自有资源
@@ -3748,6 +3874,7 @@ self.device.wait_for_fences(&[self.in_flight_fences[self.current_frame]], true, 
                     sky_top: self.sky_top,
                     sky_bottom: self.sky_bottom,  // 用frame_count而非current_frame（不循环）
                     render_settings: self.render_settings.clone(),
+                    pbr_material_overrides: self.pbr_material_overrides.clone(),
                 };
                 
                 // 委托给PipelineRegistry执行完整渲染帧

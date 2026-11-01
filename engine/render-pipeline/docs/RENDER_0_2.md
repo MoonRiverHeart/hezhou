@@ -18,6 +18,7 @@
 | 编辑器实际启用 | ✅ 已接入（task-9） | `UIVulkanRenderer` 在 PBR 质量档走新 draw path；默认设置仍走 legacy，零回归 |
 | PBR 模式完整视觉 | ✅ 已补齐（task-18） | 天空盒（全屏渐变）、选中 outline、3D Gizmo 三轴、合成蒙皮 mesh 均进入实际 draw |
 | 蒙皮实际 draw | ✅ 合成 mesh 验证（task-18） | 64B stride + location 3/4 + joint palette 真实 draw；`upload_skin_palette` 供 asset/Player 接入 |
+| 每实体 PBR 材质 | ✅ 渲染层完成（task-22） | `PbrMaterialOverride` + EntityId 映射；每实体 push constant + 纹理 descriptor；无覆盖回退默认材质；core/Inspector 字段待接入 |
 | PBR 模式 resize | ✅ GPU 冒烟（task-18） | 320×180 → 640×360 重建并重新录制通过 |
 
 ## 2. 模块结构
@@ -168,6 +169,65 @@ println!("{}", renderer.pbr_draw_path_summary().unwrap());
 GPU 冒烟测试（`rhi-vulkan/tests/pbr_forward_gpu.rs`，`#[ignore]`）真实创建资源并录制
 Shadow→Game(PBR)→Bloom→Tonemap 命令后提交，High/Low 两档均通过。
 
+### 5.2 每实体 PBR 材质链路（task-22，渲染层已生效）
+
+CPU 数据模型（`hezhou-render-pipeline`）：
+
+```rust
+use hezhou_render_pipeline::{PbrMaterial, PbrMaterialOverride, PbrMaterialOverrides};
+
+let mut overrides = PbrMaterialOverrides::new(PbrMaterial::default());
+overrides.set(
+    PbrMaterialOverride::new(entity_id, PbrMaterial::metal([0.9, 0.1, 0.1], 0.15))
+        .with_texture_path("textures/red.png"),
+);
+let material = overrides.resolve_with_default(entity_id, &settings.default_material); // 命中覆盖
+let fallback = overrides.resolve_with_default(other_entity, &settings.default_material); // 默认材质
+```
+
+GPU 绘制链路：
+- **每实体材质 → push constant**：每个 `PbrDrawItem` 写自己的
+  `PbrPushConstant { model, base_color, material_params(metallic/roughness/normal_scale/ao) }`
+- **每实体纹理 → descriptor**：带 `PbrTextureBinding` 的 item 绑定专属 PBR set1
+  （albedo=每实体贴图，normal/MR/AO=内置中性贴图）；descriptor set 在 `PbrForwardPass`
+  内按 `cache_key` 缓存，上限 `MAX_ENTITY_TEXTURE_SETS=256`，超出回退默认贴图
+- **默认回退**：未覆盖实体使用 `RenderSettings.default_material`（legacy/旧 PBR 行为不变）
+- 覆盖材质参数在 `PbrMaterialOverrides::set` 内做 NaN 收敛 + 越界 clamp
+
+编辑器/玩法接入 API（`UIVulkanRenderer`，Rust 侧已就绪）：
+
+```rust
+renderer.set_entity_pbr_material(entity_id, material);              // 完整材质
+renderer.set_entity_pbr_material_params(entity_id, base_color, metallic,
+    roughness, normal_scale, ao, emissive, emissive_strength);       // FFI 友好
+renderer.set_entity_pbr_texture(entity_id, Some("textures/a.png"));  // 纹理槽
+renderer.remove_entity_pbr_material(entity_id);                      // 回退默认材质
+renderer.entity_pbr_material(entity_id);                             // 查询覆盖
+renderer.resolve_entity_pbr_material(entity_id);                     // 查询实际生效材质
+renderer.pbr_material_override_count();
+```
+
+**core / Inspector / C# 所需字段清单**（由后续任务接入，渲染层只消费这些字段）：
+
+| 字段 | 类型 | 说明 |
+|---|---|---|
+| `entity_id` | `u64`（EntityId） | 覆盖 key |
+| `base_color` | `[f32;4]` RGBA | albedo（线性空间） |
+| `metallic` | `f32` 0..1 | 金属度 |
+| `roughness` | `f32` 0..1 | 粗糙度 |
+| `normal_scale` | `f32` 0..4 | 法线贴图强度（0=无扰动） |
+| `ao` | `f32` 0..1 | 环境光遮蔽 |
+| `emissive` | `[f32;3]` | 自发光颜色 |
+| `emissive_strength` | `f32` 0..100 | 自发光强度 |
+| `texture_path` | `Option<String>` | albedo 纹理路径（renderer `texture_cache` key） |
+
+建议 FFI 签名：`renderer_set_entity_pbr_material(u64, f32[4], f32, f32, f32, f32, f32[3], f32)`、
+`renderer_set_entity_pbr_texture(u64, const char*)`、`renderer_remove_entity_pbr_material(u64)`。
+Project 保存/加载需要把以上字段写入 `ProjectEntity.material`（0.3 材质资产化后改为 AssetId）。
+
+**TODO（0.2 不做）**：透明/alpha 混合材质、法线贴图多 UV、per-entity normal/MR/AO 独立贴图、
+材质资产（AssetId）与材质库、texture cache 淘汰策略。
+
 ## 6. 质量档
 
 | 档位 | 着色 | 阴影 | cascade | 阴影分辨率/级 | Bloom | Tonemap | FXAA |
@@ -242,7 +302,9 @@ renderer.upload_skin_palette(&palette.to_le_bytes())?;
 5. **法线贴图使用导数 TBN**：无顶点切线数据；对强各向异性表面质量有限。
 6. **HDR 目标格式固定 `R16G16B16A16_SFLOAT`**：未做设备格式能力回退。
 7. **PBR 模式下的简化**（legacy 模式不受影响）:
-   - 材质固定 `RenderSettings.default_material` + 中性默认贴图；per-entity 材质/纹理未接入
+   - 每实体材质已支持（task-22），但 core/editor 尚无材质组件/Inspector 字段；
+     未配置覆盖的实体使用 `RenderSettings.default_material` + 中性默认贴图
+   - 每实体只有 albedo 纹理槽；normal/MR/AO 使用内置中性贴图
    - `PipelineRegistry` 启用时 PBR 通道不激活（走 registry 管线）
 8. **GPU 测试 ignored**：`create_shadow_map_on_gpu` / `pbr_forward_gpu_*` 需真实 Vulkan 设备。
 9. **阴影分辨率需 2 的幂**：`normalize_shadow_resolution` 向下取整收敛。
@@ -253,6 +315,8 @@ renderer.upload_skin_palette(&palette.to_le_bytes())?;
     驱动 HEAP_CORRUPTION；频繁切换质量档会暂时多占显存（换档不频繁，可接受）。
 13. **PBR 模式 gizmo/outline 复用 legacy 着色器**：视觉效果与 legacy 一致，但需要 renderer
     每帧更新 legacy light UBO（已实现）。
+14. **每实体纹理 descriptor 缓存不淘汰**：按 image view 缓存，上限 256 个 set；
+    超出回退默认贴图，重启/切质量档时随 PBR 通道重建释放。
 
 ## 9. 编辑器接入点（给 Lead 的集成清单）
 
@@ -274,6 +338,11 @@ let plan = renderer.render_plan();
 
 // 4. 蒙皮 palette 上传（需要 PBR 质量档）
 let uploaded = renderer.upload_skin_palette(&palette.to_le_bytes())?;
+
+// 5. 每实体 PBR 材质（task-22）
+renderer.set_entity_pbr_material(entity_id, material);
+renderer.set_entity_pbr_texture(entity_id, Some("textures/a.png"));
+renderer.remove_entity_pbr_material(entity_id); // 回退默认材质
 ```
 
 ### 需要 Lead 决策/接入的部分（C# / FFI，本轮未越界）
@@ -283,7 +352,8 @@ let uploaded = renderer.upload_skin_palette(&palette.to_le_bytes())?;
 | C# 设置质量档 | `engine/scripts/` + `FfiContext` 新增 `renderer_set_quality_preset(int)` | 参数 `0=Low,1=Medium,2=High,3=Custom`；Rust 入口已就绪 |
 | C# 查询 PBR 状态 | `FfiContext` 新增 `renderer_get_pbr_summary()` / `renderer_pbr_active()` | 返回字符串/布尔，供状态栏/自检 |
 | 编辑器 UI（画质下拉） | `EditorScript.*.cs`（质量档 3 选项 + “Legacy” 回退） | 调用上述 FFI；状态栏显示 `pbr_draw_path_summary` |
-| PBR 材质字段编辑 | `core` 材质组件 + `FfiContext` + Inspector | 当前 PBR 模式固定默认材质，需要 core/asset 扩展 |
+| PBR 材质字段编辑 | `core` 材质组件 + `FfiContext` + Inspector | **渲染层已支持每实体材质（task-22）**；需要 core 组件字段（见 §5.2 字段清单）+ FFI setter + Inspector 行 |
+| 材质持久化 | `core/src/project.rs` `ProjectEntity.material` | 保存/加载 base_color/metallic/roughness/normal_scale/ao/emissive/texture_path |
 | 蒙皮 draw 接入 | `core`/`asset` 提供 skinned mesh 顶点/索引 + palette，`rhi-vulkan` 复用 `SkinnedPipelineState` | draw path 已用合成 mesh 验证；真实数据接口 `upload_skin_palette` 已就绪 |
 | 阴影/Bloom 调参 | “高级”面板覆盖 `set_render_settings` | `RenderSettings::validate` 会收敛非法值 |
 | SPV 打包 | 安装包脚本已包含 `engine/shaders`？ | 需确认打包/CI 是否随包分发新增 `.spv` |
@@ -292,11 +362,13 @@ let uploaded = renderer.upload_skin_palette(&palette.to_le_bytes())?;
 
 ```
 Scene(DirectionalLightComponent) ──┐
+PbrMaterialOverrides(EntityId→材质) ┤
 CameraParams + ViewportExtent ─────┤
-                                   ├─ RenderContext { render_settings, ... }
+                                   ├─ RenderContext { render_settings, pbr_material_overrides, ... }
 RenderSettings(quality) ───────────┘
         │
         ├─ shadow_frame(light_dir) → ShadowFrameData（cascade 矩阵）
+        ├─ resolve_with_default(entity) → 每实体 PbrDrawItem（材质/纹理）
         └─ pbr_frame_ubo(light, view, proj, shadow) → PbrFrameUbo（上传 UBO）
 ```
 
@@ -356,6 +428,15 @@ task-18（完整视觉 + 蒙皮 draw + resize）：
 | `cargo build -j 1 -p hezhou-examples --features mono` | 通过（exit 0） |
 | Legacy 零回归 | legacy 分支未改动；PBR 新增 pipeline/资源仅在 PBR 质量档创建 |
 
+task-22（每实体 PBR 材质）：
+
+| 项目 | 结果 |
+|---|---|
+| `cargo test -p hezhou-render-pipeline -p hezhou-rhi-vulkan` | render-pipeline **69+11+9 passed**（新增 PbrMaterialOverride/EntityId 映射、默认回退、sanitize、RenderContext resolve 测试）；rhi-vulkan **47 passed**，1 ignored（shadow GPU）、3 ignored（PBR GPU） |
+| `cargo test -p hezhou-rhi-vulkan --test pbr_forward_gpu -- --ignored` | **3 passed**（真实 Vulkan 设备）：High/Low 均绘制 **3 个实体（红金属 / 蓝粗糙介电质 / 默认回退）** 不同材质 + 天空盒/outline/Gizmo/合成蒙皮；Resize 重建通过 |
+| `cargo build -j 1 -p hezhou-examples --features mono` | 通过（exit 0） |
+| 默认/旧 PBR 零回归 | 无覆盖实体仍使用 `RenderSettings.default_material`；legacy 分支未改 |
+
 ## 11. 性能风险
 
 | 风险 | 影响 | 缓解 |
@@ -369,6 +450,7 @@ task-18（完整视觉 + 蒙皮 draw + resize）：
 | 质量档切换时旧通道延迟销毁 | 切换期间暂时多占显存 | 换档不频繁；cleanup 统一回收（规避运行期销毁驱动崩溃） |
 | 天空盒/outline/Gizmo/合成蒙皮额外 draw | 每帧多 5~10 个 draw call | 数量固定且很小，相对场景实体可忽略 |
 | 合成蒙皮 mesh palette 每帧上传 | 128B HOST_COHERENT 写入 | 可忽略；真实角色 palette ≤16KB/角色 |
+| 每实体材质 descriptor 绑定切换 | 纹理不同的实体之间需重新 bind set1 | 相同材质/纹理连续绘制时 set1 不变不重绑；上限 256 个缓存 set |
 
 ## 12. 第二轮 TODO
 
@@ -379,6 +461,9 @@ task-18（完整视觉 + 蒙皮 draw + resize）：
 5. 阴影 golden image 回归（需要自托管 GPU runner）。
 6. 真实角色蒙皮接入：asset/Player 提供 64B skinned mesh + 每帧 palette（复用
    `SkinnedPipelineState` / `upload_skin_palette`，合成 mesh 可退化为自检/关闭）。
-7. per-entity PBR 材质/纹理：core 材质组件 + FfiContext + Inspector 接入。
+7. 每实体材质 editor 链路：core 材质组件字段 + FfiContext setter + Inspector + Project 持久化
+   （渲染层 API/字段清单已就绪，见 §5.2）。
 8. PBR 模式也支持 `PipelineRegistry` 仲裁（当前 registry 启用时走 registry 管线）。
+9. 材质资产化：AssetId/材质库替代 `texture_path` 字符串；per-entity normal/MR/AO 独立贴图；
+   透明/alpha 混合材质。
 

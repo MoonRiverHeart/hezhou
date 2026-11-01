@@ -8,7 +8,7 @@
 
 use hezhou_core::ecs::Scene;
 
-use crate::pbr::{PbrFrameUbo, PbrLight};
+use crate::pbr::{PbrFrameUbo, PbrLight, PbrMaterial, PbrMaterialOverrides};
 use crate::quality::RenderSettings;
 use crate::shadow::{ShadowConfig, ShadowError, ShadowFrameData, ShadowSettings};
 
@@ -116,6 +116,11 @@ pub struct RenderContext {
     /// 默认值 = 0.1 legacy 行为（Blinn-Phong + FXAA），保证未接入时视觉不回归。
     /// 编辑器接入点见 `RenderSettings` / `UIVulkanRenderer::set_render_quality_preset`。
     pub render_settings: RenderSettings,
+    /// 每实体 PBR 材质覆盖（EntityId → 材质 + 可选纹理槽）
+    ///
+    /// PBR draw 时按实体查询；未命中回退 `render_settings.default_material`。
+    /// 编辑器/玩法接入点：`UIVulkanRenderer::set_entity_pbr_material*`。
+    pub pbr_material_overrides: PbrMaterialOverrides,
 }
 
 impl Default for RenderContext {
@@ -133,11 +138,25 @@ impl Default for RenderContext {
             sky_top: [0.16, 0.32, 0.62],
             sky_bottom: [0.55, 0.68, 0.82],
             render_settings: RenderSettings::default(),
+            pbr_material_overrides: PbrMaterialOverrides::default(),
         }
     }
 }
 
 impl RenderContext {
+    /// 查询实体 PBR 材质（命中覆盖优先，否则回退 `render_settings.default_material`）
+    pub fn resolve_pbr_material(&self, entity_id: hezhou_core::ecs::EntityId) -> &PbrMaterial {
+        self.pbr_material_overrides
+            .resolve_with_default(entity_id, &self.render_settings.default_material)
+    }
+
+    /// 查询实体 PBR 纹理槽（覆盖配置的纹理路径）
+    pub fn resolve_pbr_texture_path(
+        &self,
+        entity_id: hezhou_core::ecs::EntityId,
+    ) -> Option<&str> {
+        self.pbr_material_overrides.resolve_texture_path(entity_id)
+    }
     /// 视口宽高比（宽/高）；宽高为 0 时返回 1.0
     pub fn aspect(&self) -> f32 {
         let w = self.viewport_extent.width as f32;
