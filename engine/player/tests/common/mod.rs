@@ -164,6 +164,33 @@ pub fn skinned_fixture_dir() -> PathBuf {
         .join("skinned")
 }
 
+/// 生成最小 PCM16 单声道 WAV（0.2s @ 44100Hz）并写入临时目录，返回路径。
+pub fn write_test_wav(temp: &TempDir, relative: &str) -> PathBuf {
+    let sample_rate: u32 = 44_100;
+    let samples: u32 = 8_820; // 0.2s
+    let data_size = samples * 2;
+    let mut bytes = Vec::with_capacity(44 + data_size as usize);
+    bytes.extend_from_slice(b"RIFF");
+    bytes.extend_from_slice(&(36 + data_size).to_le_bytes());
+    bytes.extend_from_slice(b"WAVE");
+    bytes.extend_from_slice(b"fmt ");
+    bytes.extend_from_slice(&16u32.to_le_bytes());
+    bytes.extend_from_slice(&1u16.to_le_bytes()); // PCM
+    bytes.extend_from_slice(&1u16.to_le_bytes()); // mono
+    bytes.extend_from_slice(&sample_rate.to_le_bytes());
+    bytes.extend_from_slice(&(sample_rate * 2).to_le_bytes()); // byte rate
+    bytes.extend_from_slice(&2u16.to_le_bytes()); // block align
+    bytes.extend_from_slice(&16u16.to_le_bytes()); // bits
+    bytes.extend_from_slice(b"data");
+    bytes.extend_from_slice(&data_size.to_le_bytes());
+    for index in 0..samples {
+        // 440Hz 正弦，幅度 0.1，避免爆音。
+        let sample = (3000.0 * (2.0 * std::f64::consts::PI * 440.0 * index as f64 / sample_rate as f64).sin()) as i16;
+        bytes.extend_from_slice(&sample.to_le_bytes());
+    }
+    temp.write(relative, &bytes)
+}
+
 /// 编译 `tests/fixtures/mono/PlayerGame.cs` 为临时 DLL（需要本机 mcs/Mono）。
 ///
 /// 用于 mono-host 真实调用测试；mcs 不存在或编译失败时返回 `None`（测试跳过）。

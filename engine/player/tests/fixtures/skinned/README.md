@@ -1,10 +1,11 @@
 # Player 最小 skinned fixture
 
-用于验证 Player window host 消费真实 cook 导入蒙皮资产（task-29）：
+用于验证 Player window host 消费真实 cook 导入蒙皮资产（task-29）与音频/资产 API（task-35）：
 
 ```text
-cook_manifest.json              # gltf + mesh/skeleton/animation 子资产 entry
+cook_manifest.json              # gltf + mesh/skeleton/animation 子资产 + audio entry
 assets/scenes/<uuid>.scene      # 起始场景 Project JSON（fallback cube + directional light）
+assets/audio/test.wav           # 最小 PCM WAV 音频资产（task-35）
 assets/imported/<uuid>.json     # ImportedScene：2 关节 skeleton、1 三角形蒙皮 mesh、
                                 # 1 个 Y 轴 0→90° 旋转 clip
 scripts/Game.dll                # 占位 C# 程序集
@@ -30,3 +31,4 @@ cargo build -p hezhou-player --features window-host
 HEZHOU_PLAYER_WINDOW_FRAMES=60 ../dist/player-skinned/windows/skinned-fixture.exe \
   --run --host window --manifest ../dist/player-skinned/windows/manifest.json --log-dir ../dist/player-skinned-logs
 ```
+

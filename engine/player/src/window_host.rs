@@ -35,6 +35,8 @@ use hezhou_rhi_vulkan::UIVulkanRenderer;
 use crate::host::{HostError, HostOutcome, PlayerHost, PlayerHostContext};
 use crate::logging::LogLevel;
 use crate::animation_control::PlayerAnimationState;
+use crate::asset_catalog::PlayerAssetCatalog;
+use crate::audio_runtime::PlayerAudioRuntime;
 #[cfg(feature = "mono-host")]
 use crate::mono_host::{find_player_game_script, PlayerGameScript};
 use crate::skinned_asset::{select_first_skinned_asset, SelectedSkinnedAsset};
@@ -259,14 +261,52 @@ impl PlayerHost for WindowPlayerHost {
             &format!("蒙皮动画运行时：{}", animation_state.summary()),
         );
 
+        // 资产目录 + 音频运行时（task-35）：默认 null backend，可选 audio-cpal。
+        let asset_catalog = PlayerAssetCatalog::from_index(&context.index);
+        context.log.host_log(LogLevel::Info, &asset_catalog.summary());
+        let mut audio_runtime = PlayerAudioRuntime::new();
+        context.log.host_log(
+            LogLevel::Info,
+            &format!(
+                "音频引擎：backend={}（silent={}）",
+                audio_runtime.backend(),
+                audio_runtime.is_silent()
+            ),
+        );
+        match audio_runtime.load_first_audio(&context.assets_dir, &context.index) {
+            Ok(Some(sound_id)) => context.log.host_log(
+                LogLevel::Info,
+                &format!(
+                    "音频：加载首个 Audio 资产 {}（backend={}，source={}）",
+                    sound_id,
+                    audio_runtime.backend(),
+                    audio_runtime
+                        .source()
+                        .map(|path| path.display().to_string())
+                        .unwrap_or_else(|| "<none>".to_string())
+                ),
+            ),
+            Ok(None) => context.log.host_log(
+                LogLevel::Warn,
+                "包内没有 Audio 资产：音频 API 安全空转（play_first 返回失败）",
+            ),
+            Err(error) => context.log.host_log(
+                LogLevel::Warn,
+                &format!("加载首个音频资产失败：{error}；音频 API 安全空转"),
+            ),
+        }
+        let mut last_audio_tick = Instant::now();
+
         // ---- 可选 C# PlayerGame 入口（feature = mono-host）----
         #[cfg(feature = "mono-host")]
         let mut mono_state: Option<MonoHostState> = None;
         // PlayerCSharpContext 必须覆盖整个帧循环（C# 只在 Initialize/Update/Shutdown 内调用）。
         #[cfg(feature = "mono-host")]
-        let csharp_context = crate::csharp_context::PlayerCSharpContext::new_with_animation(
+        let csharp_context = crate::csharp_context::PlayerCSharpContext::new_with_runtime(
             context.start_scene as *mut Scene,
             &mut animation_state as *mut PlayerAnimationState,
+            &asset_catalog as *const PlayerAssetCatalog as *mut PlayerAssetCatalog,
+            &mut audio_runtime as *mut PlayerAudioRuntime,
         );
         #[cfg(feature = "mono-host")]
         match find_player_game_script(context.manifest, context.root) {
@@ -417,6 +457,11 @@ impl PlayerHost for WindowPlayerHost {
                 }
             }
 
+            // 可选：每帧推进音频状态机（null backend 必需；cpal 设备线程也会推进）。
+            let audio_dt = last_audio_tick.elapsed().as_secs_f32();
+            last_audio_tick = Instant::now();
+            audio_runtime.update(audio_dt);
+
             // 可选：每帧驱动 C# PlayerGame.Update(dt)。
             #[cfg(feature = "mono-host")]
             {
@@ -478,6 +523,13 @@ impl PlayerHost for WindowPlayerHost {
                 "mono-host：本次未加载 C# PlayerGame 入口，纯 Rust 渲染",
             );
         }
+
+        // 音频结束统计（C# Shutdown 通常会 stop；兜底停止并记录）。
+        context.log.host_log(
+            LogLevel::Info,
+            &format!("音频统计：{}", audio_runtime.summary()),
+        );
+        audio_runtime.stop();
 
         // 不调用 renderer.cleanup()：见模块文档"已知限制（上游 rhi-vulkan）"。
         let elapsed_ms = started.elapsed().as_secs_f64() * 1000.0;

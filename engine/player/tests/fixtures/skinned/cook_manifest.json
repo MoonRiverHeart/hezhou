@@ -53,6 +53,15 @@
       "dependencies": [],
       "source_size": 4096,
       "source_hash": "0123456789abcdef"
+    },
+    {
+      "id": "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+      "kind": "audio",
+      "locator": "assets/audio/test.wav",
+      "output": "assets/audio/test.wav",
+      "dependencies": [],
+      "source_size": 88244,
+      "source_hash": "31e049106eeda10f"
     }
   ]
 }

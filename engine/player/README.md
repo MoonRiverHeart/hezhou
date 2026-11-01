@@ -35,8 +35,10 @@ Hezhou 0.2 **Player 导出构建器 + 最小运行时**（Windows / Linux）。
 10. **Player C# Scene Context ABI**：`#[repr(C)] PlayerCSharpContext`（v2：版本 + scene
     指针 + count/create/position/rotation/scale/exists/destroy/log 函数指针；
     v3 tail：animation_state + clip 枚举/play/time/speed/playing 函数指针；
-    catch_unwind 安全），window host 传给 C#；C# 通过 context 真实创建/摆放/销毁
-    Scene 实体并控制蒙皮动画，`context=0` 安全空转；v1/v2 布局只追加不改，兼容旧 DLL。
+    v4 tail：assets/audio 指针 + 资产枚举（count/id/kind/path）与音频控制
+    （play_first/pause/resume/stop/volume/is_playing/backend）；catch_unwind 安全），
+    window host 传给 C#；C# 通过 context 创建/摆放/销毁实体、控制蒙皮动画、
+    枚举资产并控制音频，`context=0` 安全空转；v1/v2/v3 布局只追加不改，兼容旧 DLL。
 
 不绑定具体游戏内容；真实 cooker 产物可原样替换测试 fixture。
 
@@ -54,6 +56,8 @@ engine/player/
 │   ├── mono_host.rs    # feature mono-host：加载 scripts/*.dll → PlayerGame Initialize/Update/Shutdown
 │   ├── csharp_context.rs# repr(C) PlayerCSharpContext：scene + count/create/transform/动画函数指针
 │   ├── animation_control.rs# 蒙皮动画运行时：clip 列表/当前索引/时间/速度/playing（palette 驱动）
+│   ├── asset_catalog.rs# 运行时资产目录：AssetId/kind/output（C# v4 资产枚举）
+│   ├── audio_runtime.rs# 音频运行时：默认 null backend/可选 cpal、首个音频加载与 play/pause/volume
 │   ├── scene_loader.rs# 起始场景：Project JSON → Scene（失败回退内置 cube+light）
 │   ├── host.rs       # PlayerHost trait / HostOutcome / DefaultPlayerHost
 │   ├── window_host.rs# （feature window-host）WindowPlayerHost：窗口+Vulkan 固定帧渲染
@@ -67,7 +71,7 @@ engine/player/
 └── tests/
     ├── fixtures/minimal/  # 最小 fixture（legacy assets[]，空场景 + 占位 DLL/runtime）
     ├── fixtures/cooked/   # hezhou-asset 真实 cook 输出布局 fixture
-    └── *.rs               # 默认 108；window-host 共 111；mono-host 共 119（+5 ignored 真窗口 smoke）
+    └── *.rs               # 默认 112；window-host 共 115；mono-host 共 123（+6 ignored 真窗口 smoke）
 ```
 
 > 硬性边界：本 crate 只改 `engine/player/**`。installer、CI、examples、editor
@@ -658,18 +662,21 @@ script.update(dt)?;                                          // 每帧；C# 通�
 script.shutdown();                                           // C# Shutdown + Mono shutdown
 ```
 
-- **PlayerCSharpContext ABI（v3）**：`#[repr(C)]` = `version(u32) + reserved(u32) +
-  scene(IntPtr) + animation_state(IntPtr) + 22 个函数指针`。v1 基础：count/create/
-  position/log；v2 tail：rotation（欧拉角，度）/scale/exists/destroy；v3 tail：
-  `animation_clip_count` / `animation_clip_name`（两段式 UTF-8）/
+- **PlayerCSharpContext ABI（v4）**：`#[repr(C)]` = `version(u32) + reserved(u32) +
+  scene(IntPtr) + animation_state(IntPtr) + assets(IntPtr) + audio(IntPtr) + 32 个函数指针`。
+  v1 基础：count/create/position/log；v2 tail：rotation（欧拉角，度）/scale/exists/destroy；
+  v3 tail：`animation_clip_count` / `animation_clip_name`（两段式 UTF-8）/
   `animation_clip_duration` / `animation_current` / `animation_play` /
   `animation_set_time` / `animation_get_time` / `animation_set_speed` /
-  `animation_get_speed` / `animation_set_playing`。Rust 函数全部 `extern "C"` +
-  `catch_unwind`；空 scene/动画状态、实体不存在、输出指针为空 → 返回 0/-1/NaN、
-  不 panic。C# 用 `StructLayout(Sequential)` + `Cdecl` delegates +
-  `Marshal.GetDelegateForFunctionPointer` 解析；`context == 0` 时 C# 安全空转；
-  `version == 2` 时跳过动画 API、`== 1` 时只解析 v1（兼容旧 Player/DLL）；旧 v2 DLL
-  遇到 v3 context 会安全回退（日志 + 纯 Rust）。
+  `animation_get_speed` / `animation_set_playing`；v4 tail：
+  `asset_count` / `asset_id` / `asset_kind` / `asset_path` 与
+  `audio_play_first` / `audio_pause` / `audio_resume` / `audio_stop` /
+  `audio_set_volume` / `audio_is_playing` / `audio_backend`。Rust 函数全部
+  `extern "C"` + `catch_unwind`；空 scene/动画/资产/音频状态、实体不存在、输出指针
+  为空 → 返回 0/-1/NaN、不 panic。C# 用 `StructLayout(Sequential)` + `Cdecl`
+  delegates + `Marshal.GetDelegateForFunctionPointer` 解析；`context == 0` 时 C#
+  安全空转；`version < 4` 时跳过资产/音频（v3 跳资产+音频、v2 再跳动画、v1 只
+  position）；旧 DLL 遇到更高 version 会日志 + 纯 Rust 安全回退。
   完整 ABI 表/C# 用法/扩展点见 [`engine/scripts/PLAYER_GAME_0_2.md`](../../scripts/PLAYER_GAME_0_2.md)。
 - **加载**：`manifest.scripts` 中第一个 `.dll`，路径 `<root>/scripts/<name>`；
   无 `.dll`/文件缺失/路径非法/assembly 加载失败/Initialize 失败 → WARN 并继续
@@ -718,37 +725,59 @@ script.shutdown();                                           // C# Shutdown + Mo
 
   C# 通过 ABI v3 枚举 1 个 clip、播放并设置 time=0.25s/speed=1.5；窗口 host 每帧按
   `PlayerAnimationState` 推进时间并重算 joint palette（真实 palette 随时间变化）。
+
+- **资产/音频实测（task-35，skinned fixture 6 资产含 1s WAV，30 帧）**：
+
+  ```text
+  资产目录：6 条（首个 scene / assets/scenes/...）
+  音频引擎：backend=null（silent=true）
+  音频：加载首个 Audio 资产 dddddddd-...（backend=null，source=.../assets/audio/test.wav）
+  C# Assets: count=6 [0:scene:...:1111..., ..., 5:audio:assets/audio/test.wav:dddd...]
+  C# Audio: backend=null playResult=0 pauseResult=0 isPlayingAfterPause=0
+            resumeResult=0 isPlayingAfterResume=1 volumeResult=0 volume=0.500
+  C# Audio: frame=1 isPlaying=1
+  C# Audio: Shutdown isPlaying=1 stopResult=0 isPlayingAfterStop=0
+  音频统计：音频：backend=null（silent=true）loaded=dddd... state=stopped volume=0.50 ...
+  窗口 host 结束：30 帧
+  ```
+
+  C# 枚举 6 个资产（含 WAV），通过 null backend 播放/暂停/恢复/设音量/停止音频；
+  默认构建无需声卡（可选 `--features audio-cpal` 使用真实设备，失败自动降级）。
 - **测试**：`mono_host`（路径定位/缺失 DLL/非法路径，不初始化 Mono）、
   `mono_host_safety`（无效 DLL 加载失败可读、不 panic）、`mono_host_call`（mcs 编译
   C# fixture → Initialize(0)/Update(dt)/Shutdown 真实调用，无 mcs 时跳过）、
-  `csharp_context`（lib 单元：v3 ABI 布局/空指针安全/创建+位置/rotation+scale+
-  exists+destroy/动画 clip 枚举+play+time+speed+playing）、
+  `csharp_context`（lib 单元：v4 ABI 布局/空指针安全/创建+位置/rotation+scale+
+  exists+destroy/动画 clip 枚举+play+time+speed+playing/资产枚举+音频控制）、
   `csharp_context_csharp`（真实 `PlayerGame.cs`：context 创建 cube + position
   + rotation(0,90,0)+scale(1.5,1.5,1.5)，Rust 断言 Scene 实体数 2→3；
   v3 动画：C# 枚举 2 clip、播放 clip0、time=0.25/speed=1.5，Rust 断言状态生效；
-  Shutdown 销毁后 exists=false、实体数回到 2，C# 日志）、
+  v4 资产/音频：2 资产、null backend 播放/暂停/恢复/音量 0.5，Rust 断言音频状态；
+  Shutdown 销毁后 exists=false、音频停止、实体数回到 2，C# 日志）、
   `csharp_context_null`（context=0 安全空转）、`window_host` ignored
-  `actual_window_host_calls_csharp_scene_context`（真窗口 5 帧 + Scene 实体 3→4→3 +
-  rotation/scale/exists/destroy C# 日志断言）、
-  `actual_window_host_animates_skinned_clip_via_csharp`（真 skinned fixture 30 帧：
-  C# 枚举/播放 `Spin`、设 time/speed，Rust 动画运行时与 palette 由 C# 状态驱动）。
+  `actual_window_host_calls_csharp_scene_context`（真窗口 5 帧 + Scene 实体 3→4→3）、
+  `actual_window_host_animates_skinned_clip_via_csharp`（真 skinned 30 帧动画控制）、
+  `actual_window_host_calls_csharp_assets_and_audio`（真 skinned 10 帧：6 资产 +
+  WAV 音频播放/暂停/恢复/音量/停止）。
   CI 建议：单独 job 安装 Mono 后跑
   `cargo test -p hezhou-player --features mono-host`（无显示环境时跳过 ignored）。
 - **限制（本轮）**：只加载第一个 DLL；context 覆盖场景实体 count/创建/position/
-  rotation/scale/exists/destroy + 单 clip 动画（枚举/play/time/speed/playing）+ log；
-  动画无交叉淡化/混合/状态机/事件，时间循环 [0,duration]，speed 限制 [-8,8]；
-  `Shutdown()` 默认销毁自己创建的 cube（验证生命周期）；`scene`/`animation_state`
-  指针仅覆盖 Player 帧循环，C# 不得在 `Shutdown()` 后使用；无热重载/脚本热更新；
-  旧包无 `PlayerGame` 时安全回退；gameplay/audio/材质/组件 API 留待后续（按扩展点追加）。
+  rotation/scale/exists/destroy + 单 clip 动画 + 资产枚举 + 首个 2D 音频控制 + log；
+  动画无交叉淡化/混合/状态机/事件；音频无 3D 位置/循环/总线（默认 null backend，
+  `audio-cpal` 可选真实设备）；`Shutdown()` 默认销毁自己创建的 cube 并停止音频；
+  `scene`/`animation_state`/`assets`/`audio` 指针仅覆盖 Player 帧循环，C# 不得在
+  `Shutdown()` 后使用；无热重载/脚本热更新；旧包无 `PlayerGame` 时安全回退；
+  gameplay/材质/组件 API 留待后续（按扩展点追加）。
 
 ## 7. 测试
 
 ```bash
 cd engine
-cargo test -p hezhou-player                        # 默认 108 个测试
+cargo test -p hezhou-player                        # 默认 112 个测试
 cargo build -p hezhou-player                       # 构建两个二进制 + 库
-cargo test -p hezhou-player --features window-host # 111 个（含 window-host 单元/契约测试）
-cargo test -p hezhou-player --features mono-host   # 119 个（含 C# 入口/context/动画；需 Mono/mcs，缺失时跳过真实调用）
+cargo test -p hezhou-player --features window-host # 115 个（含 window-host 单元/契约测试）
+cargo test -p hezhou-player --features mono-host   # 123 个（含 C# 入口/context/动画/资产/音频；需 Mono/mcs）
+# 可选真实音频输出后端（默认 null，无需声卡；失败自动降级）
+cargo test -p hezhou-player --features mono-host --features audio-cpal
 # 真实窗口 smoke：需显示环境 + Vulkan GPU，CI 跳过；本机已实测通过（30 帧，exit 0）
 cargo test -p hezhou-player --features window-host --test window_host -- --ignored --nocapture
 # mono-host 真窗口 + C# 调用（需显示环境 + Vulkan GPU + Mono）
@@ -777,14 +806,15 @@ kind/index/数量严格校验、坏 JSON/越界/数量不匹配错误、未引�
 cooked 与 skinned 两个 fixture）、**mono-host feature**（manifest scripts 首个 DLL 定位/
 非法路径/缺失 DLL 错误安全、无效 DLL 加载失败不 panic、mcs 编译 C# fixture 后真实
 Initialize/Update(dt)/Shutdown 调用、真窗口 5 帧 C# 日志断言；Mono 缺失时安全跳过/
-回退）、**Player C# Scene Context v3**（repr(C) 布局/空指针安全、count/create/position/
+回退）、**Player C# Scene Context v4**（repr(C) 布局/空指针安全、count/create/position/
 rotation（欧拉角）/scale/exists/destroy 真实修改 Scene、真实 PlayerGame.cs context
 创建 cube + 设置 position/rotation/scale（Scene 2→3，rotation 90°/scale 1.5）、
 Shutdown destroy 后 exists=false 且实体数回到 2、context=0 空转、**动画运行时**
 （clip 列表/当前索引/时间/速度/playing、play/set_time/set_speed、palette 由当前
 clip/time 驱动、C# 真实枚举 1/2 个 clip 并设置 time=0.25/speed=1.5、真窗口
-skinned fixture 30 帧 palette 随时间变化 + C# 日志断言）、真窗口 Scene 实体
-3→4→3、日志时间戳。
+skinned fixture 30 帧 palette 随时间变化）、**资产目录/音频**（6 资产枚举含
+AssetId/kind/path、null backend、WAV 加载/播放/暂停/恢复/音量 0.5/停止、
+Rust 断言音频状态、真窗口日志）、真窗口 Scene 实体 3→4→3、日志时间戳。
 
 最小 fixture（`tests/fixtures/minimal/`）依赖零外部资产：空场景 3 字节、字体占位
 12 字节、假 C# 程序集 21 字节、占位 runtime 库 19 字节，用于无真实 cook 数据时
@@ -801,14 +831,18 @@ skinned fixture 30 帧 palette 随时间变化 + C# 日志断言）、真窗口 
 的 entry，imported JSON 是手写 `ImportedScene`（2 关节 skeleton、1 个带 joints/weights
 的三角形蒙皮 mesh、1 个 `Spin` rotation clip），用于真实窗口渲染蒙皮网格并输出统计。
 
-C# fixture（`tests/fixtures/mono/PlayerGame.cs`）与 task-30 入口签名一致
+**C# fixture（`tests/fixtures/mono/PlayerGame.cs`）与 task-30 入口签名一致
 （`namespace Hezhou` / `static class PlayerGame` / `Initialize(IntPtr)` / `Update(float)` /
 `Shutdown()`），测试时用本机 `mcs` 编译为临时 DLL；通过
-`HEZHOU_PLAYER_MONO_LOG` 记录调用序列供 Rust 断言。task-32 的
+`HEZHOU_PLAYER_MONO_LOG` 记录调用序列供 Rust 断言。task-32+ 的
 `csharp_context_csharp` / `csharp_context_null` 直接编译真实
-`engine/scripts/PlayerGame.cs`（不重复 fixture），验证 context ABI 与 Scene 变更；
-真实集成还验证了 task-30 编译产物 `scripts/bin/Mono/EditorScript.dll`
-（含 `Hezhou.PlayerGame`，见 §6.7 实测）。
+`engine/scripts/PlayerGame.cs`（不重复 fixture），验证 context ABI/Scene 变更/
+动画/资产/音频；真实集成还验证了 task-30 编译产物
+`scripts/bin/Mono/EditorScript.dll`（含 `Hezhou.PlayerGame`，见 §6.7 实测）。
+
+skinned fixture（`tests/fixtures/skinned/`）额外包含 1s PCM WAV
+（`assets/audio/test.wav` + cook manifest `kind: audio` 条目），用于 task-35
+资产枚举/音频控制实测。
 
 ## 8. 与其它模块 / CI / installer 的集成点
 
@@ -868,12 +902,18 @@ C# fixture（`tests/fixtures/mono/PlayerGame.cs`）与 task-30 入口签名一�
 - 真实 cooker 接入后只需把 CLI `--cook` 指向 `<cook_out>/cook_manifest.json`，
   无需改 Player 构建代码。
 
-### audio
+### audio — 已接入（task-35）
 
 - 音频资源以 `kind: "audio"` 进入 cook 清单并落在 `assets/`；构建器不解析音频格式；
-- 运行时初始化 `hezhou-audio` 后，通过清单路径解析音频（相对 `assets/`），
-  不使用系统绝对路径；
-- 无音频时的 `assets/` 允许为空目录（构建器按资产条目生成清单）。
+- 运行时 `PlayerAudioRuntime` 初始化 `hezhou-audio`（默认 `default_backend()`：
+  未启用 `audio-cpal` 为 null backend，启用后 cpal 设备失败自动降级 null），
+  从 `PlayerAssetIndex` 找第一个 `AssetKind::Audio`，按清单 output 相对 `assets/`
+  加载（WAV/OGG 由 audio 解码器注册表处理），不使用系统绝对路径；
+- 每帧 `engine.update(dt)` 推进无声后端状态机；C# 通过 context v4 控制
+  play_first/pause/resume/stop/volume/is_playing/backend；Shutdown 默认停止；
+- 无音频时 WARN 并安全空转（`assets/` 允许为空目录）。
+- 限制：只加载/播放第一个音频、2D、无循环/3D 位置/总线；真实发声需
+  `--features audio-cpal` + 可用设备。
 
 ### render
 
@@ -894,10 +934,10 @@ C# fixture（`tests/fixtures/mono/PlayerGame.cs`）与 task-30 入口签名一�
   仍不依赖 render（构建器可独立编译）。
 - C# 入口（§6.7）：window host 加载 `manifest.scripts[]` 第一个 DLL，调用
   `Hezhou.PlayerGame.Initialize(context_ptr)` / 每帧 `Update(dt)` / 结束 `Shutdown()`；
-  task-33/34 起传入 `PlayerCSharpContext` v3（scene + count/create/transform/
-  exists/destroy + 动画 clip 枚举/play/time/speed/playing 函数指针），C# 可真实
-  创建/摆放/销毁 Scene 实体并控制蒙皮动画；gameplay/physics/audio API 后续按
-  `scripts/PLAYER_GAME_0_2.md` 扩展点追加。
+  task-33/34/35 起传入 `PlayerCSharpContext` v4（scene + count/create/transform/
+  exists/destroy + 动画 clip 枚举/play/time/speed/playing + 资产枚举/音频控制
+  函数指针），C# 可真实创建/摆放/销毁 Scene 实体、控制蒙皮动画、枚举资产并
+  控制音频；gameplay/physics API 后续按 `scripts/PLAYER_GAME_0_2.md` 扩展点追加。
 - 部署要求：mono-host 的 Player 包运行机器需安装 Mono，或随包 `runtime/` 提供
   Mono 运行时（`--runtime-dir` 复制；`lib/`、`etc/`、`libmono` 等）；CI/安装包
   需把 Mono 运行时纳入 Player 附件。
@@ -962,13 +1002,15 @@ C# fixture（`tests/fixtures/mono/PlayerGame.cs`）与 task-30 入口签名一�
 - [x] 可选 C# 入口（`mono-host`）：加载 scripts 首个 DLL，调用
   `Hezhou.PlayerGame.Initialize(0)`/`Update(dt)`/`Shutdown()`，失败安全回退，
   真实 task-30 `EditorScript.dll` 窗口实测通过；
-- [x] Player C# Scene Context（`PlayerCSharpContext` v3）：repr(C) ABI
+- [x] Player C# Scene Context（`PlayerCSharpContext` v4）：repr(C) ABI
   （count/create/position/rotation/scale/exists/destroy/log + 动画 clip 枚举/
-  play/time/speed/playing）、window host 传入真实 context + `PlayerAnimationState`、
-  C# PlayerGame 创建 cube/设置 Transform/销毁/控制动画、context=0 安全空转、
+  play/time/speed/playing + 资产枚举/音频控制）、window host 传入真实 context +
+  `PlayerAnimationState`/`PlayerAssetCatalog`/`PlayerAudioRuntime`、C# PlayerGame
+  创建 cube/设置 Transform/销毁/控制动画/枚举资产/控制音频、context=0 安全空转、
   真实窗口 skinned fixture 30 帧实测；
+- [ ] 音频扩展：多音频/按名播放/3D 位置/循环/总线（当前仅首个音频 2D）；
 - [ ] 动画状态机/混合/事件（当前单 clip play/time/speed）；
-- [ ] context 扩展：材质/组件/层级/父子、gameplay/physics/audio API（按 ABI 尾部
+- [ ] context 扩展：材质/组件/层级/父子、gameplay/physics API（按 ABI 尾部
   追加 + version 递增，见 `scripts/PLAYER_GAME_0_2.md`）；
 - [ ] 多蒙皮 mesh/primitive、多 clip/状态机/混合、材质/纹理绑定（当前只第一个 mesh/clip，
   upload material/texture_path 传 None）；

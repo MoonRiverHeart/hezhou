@@ -266,7 +266,7 @@ fn actual_window_host_calls_csharp_scene_context() {
 
     let log = std::fs::read_to_string(log_dir.join("player.log")).expect("读取 player.log");
     assert!(
-        log.contains("mono-host：Scene context 已提供（初始 3 实体，ABI v3"),
+        log.contains("mono-host：Scene context 已提供（初始 3 实体，ABI v4"),
         "日志：{log}"
     );
     assert!(
@@ -375,6 +375,78 @@ fn actual_window_host_animates_skinned_clip_via_csharp() {
     assert!(
         csharp_log.contains("Animation: Shutdown current=0 time=")
             && csharp_log.contains("speed=1.500"),
+        "C# 日志：{csharp_log}"
+    );
+}
+
+/// 真实窗口 + C# 资产枚举/音频控制（feature = mono-host，task-35）：
+/// skinned fixture 内有 6 个资产（含 WAV），C# 枚举资产、播放/暂停/恢复/音量/停止音频。
+#[cfg(feature = "mono-host")]
+#[ignore = "需要显示环境 + Vulkan GPU + Mono；CI 默认跳过，本机手工验证"]
+#[test]
+fn actual_window_host_calls_csharp_assets_and_audio() {
+    use common::compile_engine_player_game;
+
+    let temp = TempDir::new("window-host-csharp-assets-audio");
+    let fixture = skinned_fixture_dir();
+    let Some(dll) = compile_engine_player_game(&temp) else {
+        return;
+    };
+    let scripts = vec![ScriptAssembly::with_source("PlayerGame.dll", &dll)];
+    let (package, stem) = build_fixture_package_with_scripts(&temp, &fixture, Some(scripts));
+    let log_dir = temp.join("logs");
+    let mono_log = temp.join("mono-assets-audio.log");
+
+    let result = run_window_host_with_env(
+        &package,
+        &stem,
+        "10",
+        &log_dir,
+        &[("HEZHOU_PLAYER_MONO_LOG", mono_log.to_str().unwrap())],
+    );
+    assert!(
+        result.status.success(),
+        "资产/音频窗口 host 失败\nstdout: {}\nstderr: {}",
+        String::from_utf8_lossy(&result.stdout),
+        String::from_utf8_lossy(&result.stderr)
+    );
+    assert_eq!(result.status.code(), Some(0));
+
+    let log = std::fs::read_to_string(log_dir.join("player.log")).expect("读取 player.log");
+    assert!(log.contains("资产目录：6 条"), "日志：{log}");
+    assert!(
+        log.contains("音频引擎：backend=null（silent=true）"),
+        "日志：{log}"
+    );
+    assert!(
+        log.contains("音频：加载首个 Audio 资产"),
+        "日志：{log}"
+    );
+    assert!(log.contains("音频统计：音频：backend=null"), "日志：{log}");
+    assert!(log.contains("窗口 host 结束：10 帧"), "日志：{log}");
+
+    let csharp_log = std::fs::read_to_string(&mono_log).expect("读取 C# 调用日志");
+    assert!(csharp_log.contains("Assets: count=6 ["), "C# 日志：{csharp_log}");
+    assert!(
+        csharp_log.contains("audio:assets/audio/test.wav"),
+        "C# 日志：{csharp_log}"
+    );
+    assert!(
+        csharp_log.contains("Audio: backend=null")
+            && csharp_log.contains("playResult=0")
+            && csharp_log.contains("pauseResult=0")
+            && csharp_log.contains("isPlayingAfterPause=0")
+            && csharp_log.contains("resumeResult=0")
+            && csharp_log.contains("isPlayingAfterResume=1")
+            && csharp_log.contains("volumeResult=0 volume=0.500"),
+        "C# 日志：{csharp_log}"
+    );
+    assert!(
+        csharp_log.contains("Audio: frame=1 isPlaying=1"),
+        "C# 日志：{csharp_log}"
+    );
+    assert!(
+        csharp_log.contains("Audio: Shutdown isPlaying=1 stopResult=0 isPlayingAfterStop=0"),
         "C# 日志：{csharp_log}"
     );
 }

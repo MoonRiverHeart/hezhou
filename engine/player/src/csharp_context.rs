@@ -1,6 +1,6 @@
-//! Player C# Scene Context ABI（task-32 v1 / task-33 v2 / task-34 v3）：把
-//! `hezhou_core::Scene` 与 Player 动画运行时以 `#[repr(C)]` 函数指针表暴露给
-//! C# `Hezhou.PlayerGame`。
+//! Player C# Scene Context ABI（task-32 v1 / task-33 v2 / task-34 v3 / task-35 v4）：
+//! 把 `hezhou_core::Scene`、Player 动画运行时、资产目录与音频运行时以
+//! `#[repr(C)]` 函数指针表暴露给 C# `Hezhou.PlayerGame`。
 //!
 //! # ABI 契约（C# `[StructLayout(LayoutKind.Sequential)]` 必须一致）
 //!
@@ -46,16 +46,35 @@
 //! | 184 | `animation_get_speed` | `float(IntPtr)`（失败 NaN） |
 //! | 192 | `animation_set_playing` | `int(IntPtr, int playing)`（0/-1） |
 //!
+//! v4 tail 追加（task-35；资产目录 + 音频运行时）：
+//!
+//! | offset | 字段 | 类型 / delegate |
+//! |---|---|---|
+//! | 200 | `assets` | `IntPtr` → `PlayerAssetCatalog`（可空） |
+//! | 208 | `asset_count` | `uint(IntPtr assets)` |
+//! | 216 | `asset_id` | `int(IntPtr, uint index, u8* buf, uint len)`（UTF-8 UUID） |
+//! | 224 | `asset_kind` | `int(IntPtr, uint index, u8* buf, uint len)`（如 `scene`/`audio`） |
+//! | 232 | `asset_path` | `int(IntPtr, uint index, u8* buf, uint len)`（包内 output） |
+//! | 240 | `audio` | `IntPtr` → `PlayerAudioRuntime`（可空） |
+//! | 248 | `audio_play_first` | `int(IntPtr)`（0/-1） |
+//! | 256 | `audio_pause` | `int(IntPtr)`（0/-1） |
+//! | 264 | `audio_resume` | `int(IntPtr)`（0/-1） |
+//! | 272 | `audio_stop` | `int(IntPtr)`（0/-1） |
+//! | 280 | `audio_set_volume` | `int(IntPtr, float volume)`（0/-1） |
+//! | 288 | `audio_is_playing` | `int(IntPtr)`（1/0） |
+//! | 296 | `audio_backend` | `int(IntPtr, u32 unused, u8* buf, uint len)`（UTF-8，如 `null`） |
+//!
 //! 所有函数均为 `extern "C"`、内部 `catch_unwind`；`scene == null`、实体不存在、
 //! 输出指针为空时返回 0/-1 且绝不 panic（panic 跨 FFI 是 UB）。rotation 使用
 //! **欧拉角（度）**，与 core `Quaternion::from_euler_degrees`/`to_euler_degrees` 对应。
 //!
 //! # 版本兼容策略
 //!
-//! v2/v3 只在尾部追加字段、不改旧布局；C# 侧读取 `Version`：
-//! - `>= 3`：解析 v1/v2/v3 全部字段（动画 API 可用）；
-//! - `== 2`：解析 v1+v2，动画 API 跳过；
-//! - `== 1`：只解析 v1，rotation/scale/动画跳过（兼容旧 Player/DLL）；
+//! v2/v3/v4 只在尾部追加字段、不改旧布局；C# 侧读取 `Version`：
+//! - `>= 4`：解析全部字段（资产/音频 API 可用）；
+//! - `== 3`：解析 v1/v2/v3，资产/音频跳过；
+//! - `== 2`：解析 v1+v2，动画/资产/音频跳过；
+//! - `== 1`：只解析 v1（兼容旧 Player/DLL）；
 //! - 其他：记录日志后回退空转。
 //!
 //! # 生命周期
@@ -73,9 +92,11 @@ use hezhou_core::ecs::{Entity, Scene};
 use hezhou_core::math::{Quaternion, Vec3};
 
 use crate::animation_control::PlayerAnimationState;
+use crate::asset_catalog::{PlayerAssetCatalog, PlayerAssetEntry};
+use crate::audio_runtime::PlayerAudioRuntime;
 
 /// 当前 Player C# Context ABI 版本。
-pub const PLAYER_CSHARP_CONTEXT_VERSION: u32 = 3;
+pub const PLAYER_CSHARP_CONTEXT_VERSION: u32 = 4;
 
 /// C# 侧函数指针：`scene_entity_count(scene) -> u32`。
 pub type SceneEntityCountFn = unsafe extern "C" fn(*mut Scene) -> u32;
@@ -131,6 +152,27 @@ pub type AnimationSetSpeedFn = unsafe extern "C" fn(*mut PlayerAnimationState, f
 pub type AnimationGetSpeedFn = unsafe extern "C" fn(*mut PlayerAnimationState) -> f32;
 /// C# 侧函数指针：`animation_set_playing(state, playing) -> 0/-1`。
 pub type AnimationSetPlayingFn = unsafe extern "C" fn(*mut PlayerAnimationState, i32) -> i32;
+
+// ==== v4：资产目录 + 音频运行时（task-35）====
+/// C# 侧函数指针：`asset_count(assets) -> u32`。
+pub type AssetCountFn = unsafe extern "C" fn(*mut PlayerAssetCatalog) -> u32;
+/// C# 侧函数指针：`asset_id/asset_kind/asset_path(assets, index, buf, len) -> i32`。
+pub type AssetStringFn =
+    unsafe extern "C" fn(*mut PlayerAssetCatalog, u32, *mut u8, u32) -> i32;
+/// C# 侧函数指针：`audio_play_first(audio) -> 0/-1`。
+pub type AudioPlayFirstFn = unsafe extern "C" fn(*mut PlayerAudioRuntime) -> i32;
+/// C# 侧函数指针：`audio_pause(audio) -> 0/-1`。
+pub type AudioPauseFn = unsafe extern "C" fn(*mut PlayerAudioRuntime) -> i32;
+/// C# 侧函数指针：`audio_resume(audio) -> 0/-1`。
+pub type AudioResumeFn = unsafe extern "C" fn(*mut PlayerAudioRuntime) -> i32;
+/// C# 侧函数指针：`audio_stop(audio) -> 0/-1`。
+pub type AudioStopFn = unsafe extern "C" fn(*mut PlayerAudioRuntime) -> i32;
+/// C# 侧函数指针：`audio_set_volume(audio, volume) -> 0/-1`。
+pub type AudioSetVolumeFn = unsafe extern "C" fn(*mut PlayerAudioRuntime, f32) -> i32;
+/// C# 侧函数指针：`audio_is_playing(audio) -> 1/0`。
+pub type AudioIsPlayingFn = unsafe extern "C" fn(*mut PlayerAudioRuntime) -> i32;
+/// C# 侧函数指针：`audio_backend(audio, unused, buf, len) -> i32`（UTF-8）。
+pub type AudioBackendFn = unsafe extern "C" fn(*mut PlayerAudioRuntime, u32, *mut u8, u32) -> i32;
 
 /// `#[repr(C)]` Player C# Context：版本 + Scene 指针 + 6 个函数指针。
 #[repr(C)]
@@ -189,6 +231,33 @@ pub struct PlayerCSharpContext {
     pub animation_get_speed: Option<AnimationGetSpeedFn>,
     /// 设置播放/暂停。
     pub animation_set_playing: Option<AnimationSetPlayingFn>,
+    // ==== v4 tail 追加（task-35）：资产目录 + 音频运行时 ====
+    /// 资产目录指针（host 栈上；可空）。
+    pub assets: *mut PlayerAssetCatalog,
+    /// 资产数量。
+    pub asset_count: Option<AssetCountFn>,
+    /// 资产 AssetId（UTF-8 UUID）。
+    pub asset_id: Option<AssetStringFn>,
+    /// 资产 kind（如 `scene`/`audio`）。
+    pub asset_kind: Option<AssetStringFn>,
+    /// 资产包内 output 路径。
+    pub asset_path: Option<AssetStringFn>,
+    /// 音频运行时指针（host 栈上；可空）。
+    pub audio: *mut PlayerAudioRuntime,
+    /// 播放第一个音频。
+    pub audio_play_first: Option<AudioPlayFirstFn>,
+    /// 暂停音频。
+    pub audio_pause: Option<AudioPauseFn>,
+    /// 恢复音频。
+    pub audio_resume: Option<AudioResumeFn>,
+    /// 停止音频。
+    pub audio_stop: Option<AudioStopFn>,
+    /// 设置音频主音量。
+    pub audio_set_volume: Option<AudioSetVolumeFn>,
+    /// 音频是否在播放。
+    pub audio_is_playing: Option<AudioIsPlayingFn>,
+    /// 音频后端名称（UTF-8，如 `null`/`cpal`）。
+    pub audio_backend: Option<AudioBackendFn>,
 }
 
 impl PlayerCSharpContext {
@@ -204,6 +273,23 @@ impl PlayerCSharpContext {
     pub fn new_with_animation(
         scene: *mut Scene,
         animation_state: *mut PlayerAnimationState,
+    ) -> Self {
+        Self::new_with_runtime(
+            scene,
+            animation_state,
+            std::ptr::null_mut(),
+            std::ptr::null_mut(),
+        )
+    }
+
+    /// 为场景 + 动画 + 资产目录 + 音频运行时创建 context（v4）。
+    ///
+    /// 指针必须在本 context 使用期间保持有效（host 栈上状态）；可为 null（功能关闭）。
+    pub fn new_with_runtime(
+        scene: *mut Scene,
+        animation_state: *mut PlayerAnimationState,
+        assets: *mut PlayerAssetCatalog,
+        audio: *mut PlayerAudioRuntime,
     ) -> Self {
         Self {
             version: PLAYER_CSHARP_CONTEXT_VERSION,
@@ -232,6 +318,19 @@ impl PlayerCSharpContext {
             animation_set_speed: Some(animation_set_speed),
             animation_get_speed: Some(animation_get_speed),
             animation_set_playing: Some(animation_set_playing),
+            assets,
+            asset_count: Some(asset_count),
+            asset_id: Some(asset_id),
+            asset_kind: Some(asset_kind),
+            asset_path: Some(asset_path),
+            audio,
+            audio_play_first: Some(audio_play_first),
+            audio_pause: Some(audio_pause),
+            audio_resume: Some(audio_resume),
+            audio_stop: Some(audio_stop),
+            audio_set_volume: Some(audio_set_volume),
+            audio_is_playing: Some(audio_is_playing),
+            audio_backend: Some(audio_backend),
         }
     }
 
@@ -575,6 +674,149 @@ pub unsafe extern "C" fn animation_set_playing(
     })
 }
 
+/// 在 `catch_unwind` + 空指针保护下访问资产目录。
+fn with_catalog<R>(
+    catalog: *mut PlayerAssetCatalog,
+    default: R,
+    f: impl FnOnce(&mut PlayerAssetCatalog) -> R,
+) -> R {
+    if catalog.is_null() {
+        return default;
+    }
+    match catch_unwind(AssertUnwindSafe(|| f(unsafe { &mut *catalog }))) {
+        Ok(value) => value,
+        Err(_) => default,
+    }
+}
+
+/// 在 `catch_unwind` + 空指针保护下访问音频运行时。
+fn with_audio<R>(
+    audio: *mut PlayerAudioRuntime,
+    default: R,
+    f: impl FnOnce(&mut PlayerAudioRuntime) -> R,
+) -> R {
+    if audio.is_null() {
+        return default;
+    }
+    match catch_unwind(AssertUnwindSafe(|| f(unsafe { &mut *audio }))) {
+        Ok(value) => value,
+        Err(_) => default,
+    }
+}
+
+/// 把 UTF-8 文本写入调用方 buffer；`buf=null/len=0` 时返回所需字节数。
+fn write_utf8(text: &str, buf: *mut u8, len: u32) -> i32 {
+    let bytes = text.as_bytes();
+    if buf.is_null() || len == 0 {
+        return bytes.len().min(i32::MAX as usize) as i32;
+    }
+    let written = bytes.len().min(len as usize);
+    unsafe {
+        std::ptr::copy_nonoverlapping(bytes.as_ptr(), buf, written);
+    }
+    written as i32
+}
+
+/// `asset_count(assets)`：资产数量（空/panic → 0）。
+pub unsafe extern "C" fn asset_count(assets: *mut PlayerAssetCatalog) -> u32 {
+    with_catalog(assets, 0, |assets| assets.len().min(u32::MAX as usize) as u32)
+}
+
+fn asset_text(
+    assets: *mut PlayerAssetCatalog,
+    index: u32,
+    buf: *mut u8,
+    len: u32,
+    select: fn(&PlayerAssetEntry) -> String,
+) -> i32 {
+    with_catalog(assets, -1, |assets| {
+        let Some(entry) = assets.entry(index as usize) else {
+            return -1;
+        };
+        write_utf8(&select(entry), buf, len)
+    })
+}
+
+/// `asset_id(assets, index, buf, len)`：AssetId UUID（UTF-8）；越界 -1。
+pub unsafe extern "C" fn asset_id(
+    assets: *mut PlayerAssetCatalog,
+    index: u32,
+    buf: *mut u8,
+    len: u32,
+) -> i32 {
+    asset_text(assets, index, buf, len, |entry| entry.id.to_string())
+}
+
+/// `asset_kind(assets, index, buf, len)`：资产 kind（UTF-8，如 `scene`/`audio`）。
+pub unsafe extern "C" fn asset_kind(
+    assets: *mut PlayerAssetCatalog,
+    index: u32,
+    buf: *mut u8,
+    len: u32,
+) -> i32 {
+    asset_text(assets, index, buf, len, |entry| {
+        entry.kind.as_str().to_string()
+    })
+}
+
+/// `asset_path(assets, index, buf, len)`：包内相对 `assets/` 的 output 路径。
+pub unsafe extern "C" fn asset_path(
+    assets: *mut PlayerAssetCatalog,
+    index: u32,
+    buf: *mut u8,
+    len: u32,
+) -> i32 {
+    asset_text(assets, index, buf, len, |entry| entry.output.clone())
+}
+
+/// `audio_play_first(audio)`：播放第一个音频；0 成功 / -1 失败。
+pub unsafe extern "C" fn audio_play_first(audio: *mut PlayerAudioRuntime) -> i32 {
+    with_audio(audio, -1, |audio| if audio.play_first() { 0 } else { -1 })
+}
+
+/// `audio_pause(audio)`：暂停；0 成功 / -1 失败。
+pub unsafe extern "C" fn audio_pause(audio: *mut PlayerAudioRuntime) -> i32 {
+    with_audio(audio, -1, |audio| if audio.pause() { 0 } else { -1 })
+}
+
+/// `audio_resume(audio)`：恢复；0 成功 / -1 失败。
+pub unsafe extern "C" fn audio_resume(audio: *mut PlayerAudioRuntime) -> i32 {
+    with_audio(audio, -1, |audio| if audio.resume() { 0 } else { -1 })
+}
+
+/// `audio_stop(audio)`：停止；0 成功 / -1 失败。
+pub unsafe extern "C" fn audio_stop(audio: *mut PlayerAudioRuntime) -> i32 {
+    with_audio(audio, -1, |audio| if audio.stop() { 0 } else { -1 })
+}
+
+/// `audio_set_volume(audio, volume)`：设置主音量；0 成功 / -1 失败。
+pub unsafe extern "C" fn audio_set_volume(
+    audio: *mut PlayerAudioRuntime,
+    volume: f32,
+) -> i32 {
+    with_audio(audio, -1, |audio| {
+        audio.set_volume(volume);
+        0
+    })
+}
+
+/// `audio_is_playing(audio)`：1 播放中 / 0 其他。
+pub unsafe extern "C" fn audio_is_playing(audio: *mut PlayerAudioRuntime) -> i32 {
+    with_audio(audio, 0, |audio| i32::from(audio.is_playing()))
+}
+
+/// `audio_backend(audio, unused, buf, len)`：后端名称（UTF-8，如 `null`/`cpal`）。
+pub unsafe extern "C" fn audio_backend(
+    audio: *mut PlayerAudioRuntime,
+    _unused: u32,
+    buf: *mut u8,
+    len: u32,
+) -> i32 {
+    with_audio(audio, -1, |audio| {
+        write_utf8(&audio.backend(), buf, len)
+    })
+}
+
 /// `log(ptr)`：把 C 字符串写到 stderr（Player 日志/控制台）；空指针/panic 安全。
 ///
 /// 该函数仅用于 C# 侧需要把消息回传 Rust 日志时；C# 也可以直接 Console.Error。
@@ -591,14 +833,15 @@ pub unsafe extern "C" fn player_context_log(message: *const c_char) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use hezhou_asset::{AssetId, AssetKind};
 
     #[test]
     fn context_layout_matches_csharp_contract() {
-        assert_eq!(PLAYER_CSHARP_CONTEXT_VERSION, 3);
-        // 8 字节头 + scene 指针 + v1 6 + v2 6 + v3（state + 10 函数指针）= 24 个槽。
+        assert_eq!(PLAYER_CSHARP_CONTEXT_VERSION, 4);
+        // 8 字节头 + scene 指针 + v1 6 + v2 6 + v3 11 + v4 13 = 37 个 8 字节槽。
         assert_eq!(
             std::mem::size_of::<PlayerCSharpContext>(),
-            8 + std::mem::size_of::<usize>() * 24
+            8 + std::mem::size_of::<usize>() * 37
         );
         assert_eq!(std::mem::align_of::<PlayerCSharpContext>(), 8);
         let scene = Scene::new();
@@ -629,6 +872,20 @@ mod tests {
         assert!(context.animation_set_speed.is_some());
         assert!(context.animation_get_speed.is_some());
         assert!(context.animation_set_playing.is_some());
+        // v4 tail：默认无资产/音频指针。
+        assert!(context.assets.is_null());
+        assert!(context.asset_count.is_some());
+        assert!(context.asset_id.is_some());
+        assert!(context.asset_kind.is_some());
+        assert!(context.asset_path.is_some());
+        assert!(context.audio.is_null());
+        assert!(context.audio_play_first.is_some());
+        assert!(context.audio_pause.is_some());
+        assert!(context.audio_resume.is_some());
+        assert!(context.audio_stop.is_some());
+        assert!(context.audio_set_volume.is_some());
+        assert!(context.audio_is_playing.is_some());
+        assert!(context.audio_backend.is_some());
         // 通过 context 里的函数指针调用，验证 ABI 字段可执行。
         let scene_ptr = context.scene;
         let count = unsafe { context.scene_entity_count.unwrap()(scene_ptr) };
@@ -683,6 +940,70 @@ mod tests {
         // 越界/非法值安全失败。
         assert_eq!(unsafe { animation_play(state, 9) }, -1);
         assert_eq!(unsafe { animation_set_speed(state, f32::NAN) }, -1);
+    }
+
+    #[test]
+    fn v4_asset_catalog_and_audio_api() {
+        let scene_id = AssetId::parse("11111111-1111-4111-8111-111111111111").unwrap();
+        let audio_id = AssetId::parse("22222222-2222-4222-8222-222222222222").unwrap();
+        let catalog = PlayerAssetCatalog::from_entries(vec![
+            PlayerAssetEntry {
+                id: scene_id,
+                kind: AssetKind::Scene,
+                output: "assets/main.scene".to_string(),
+            },
+            PlayerAssetEntry {
+                id: audio_id,
+                kind: AssetKind::Audio,
+                output: "assets/audio/test.wav".to_string(),
+            },
+        ]);
+        let mut audio = PlayerAudioRuntime::null();
+        let mut scene = Scene::new();
+        let mut animation = PlayerAnimationState::empty();
+        let context = PlayerCSharpContext::new_with_runtime(
+            &mut scene as *mut Scene,
+            &mut animation as *mut PlayerAnimationState,
+            &catalog as *const PlayerAssetCatalog as *mut PlayerAssetCatalog,
+            &mut audio as *mut PlayerAudioRuntime,
+        );
+        assert!(!context.assets.is_null());
+        assert!(!context.audio.is_null());
+        let assets = context.assets;
+
+        assert_eq!(unsafe { asset_count(assets) }, 2);
+        let mut buffer = vec![0u8; 64];
+        let len = unsafe { asset_id(assets, 0, buffer.as_mut_ptr(), buffer.len() as u32) };
+        assert!(len > 0);
+        assert_eq!(
+            std::str::from_utf8(&buffer[..len as usize]).unwrap(),
+            scene_id.to_string()
+        );
+        let len = unsafe { asset_kind(assets, 1, buffer.as_mut_ptr(), buffer.len() as u32) };
+        assert_eq!(std::str::from_utf8(&buffer[..len as usize]).unwrap(), "audio");
+        let len = unsafe { asset_path(assets, 1, buffer.as_mut_ptr(), buffer.len() as u32) };
+        assert_eq!(
+            std::str::from_utf8(&buffer[..len as usize]).unwrap(),
+            "assets/audio/test.wav"
+        );
+        // 越界安全失败。
+        assert_eq!(
+            unsafe { asset_kind(assets, 9, buffer.as_mut_ptr(), buffer.len() as u32) },
+            -1
+        );
+
+        let backend_len = unsafe { audio_backend(context.audio, 0, buffer.as_mut_ptr(), 64) };
+        assert_eq!(
+            std::str::from_utf8(&buffer[..backend_len as usize]).unwrap(),
+            "null"
+        );
+        assert_eq!(unsafe { audio_play_first(context.audio) }, -1);
+        assert_eq!(unsafe { audio_is_playing(context.audio) }, 0);
+        assert_eq!(unsafe { audio_set_volume(context.audio, 0.5) }, 0);
+        assert!((audio.volume() - 0.5).abs() < 1e-6);
+        assert_eq!(unsafe { audio_pause(context.audio) }, -1);
+        assert_eq!(unsafe { audio_resume(context.audio) }, -1);
+        assert_eq!(unsafe { audio_stop(context.audio) }, -1);
     }
 
     #[test]
@@ -759,6 +1080,35 @@ mod tests {
             assert_eq!(animation_set_speed(std::ptr::null_mut(), 2.0), -1);
             assert!(animation_get_speed(std::ptr::null_mut()).is_nan());
             assert_eq!(animation_set_playing(std::ptr::null_mut(), 1), -1);
+            // v4：空资产/音频安全返回。
+            assert_eq!(asset_count(std::ptr::null_mut()), 0);
+            assert_eq!(
+                asset_id(std::ptr::null_mut(), 0, std::ptr::null_mut(), 0),
+                -1
+            );
+            assert_eq!(
+                asset_kind(std::ptr::null_mut(), 0, std::ptr::null_mut(), 0),
+                -1
+            );
+            assert_eq!(
+                asset_path(std::ptr::null_mut(), 0, std::ptr::null_mut(), 0),
+                -1
+            );
+            assert_eq!(audio_play_first(std::ptr::null_mut()), -1);
+            assert_eq!(audio_pause(std::ptr::null_mut()), -1);
+            assert_eq!(audio_resume(std::ptr::null_mut()), -1);
+            assert_eq!(audio_stop(std::ptr::null_mut()), -1);
+            assert_eq!(audio_set_volume(std::ptr::null_mut(), 0.5), -1);
+            assert_eq!(audio_is_playing(std::ptr::null_mut()), 0);
+            assert_eq!(
+                audio_backend(
+                    std::ptr::null_mut(),
+                    0,
+                    std::ptr::null_mut(),
+                    0
+                ),
+                -1
+            );
             player_context_log(std::ptr::null());
         }
     }

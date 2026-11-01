@@ -28,7 +28,7 @@ namespace Hezhou
     /// <summary>Player C# 游戏入口（Rust Player host 静态调用）。</summary>
     public static class PlayerGame
     {
-        private const uint PlayerContextVersion = 3;
+        private const uint PlayerContextVersion = 4;
         private const float CubeX = 2.5f;
         private const float CubeY = 0.5f;
         private const float CubeZ = -1.5f;
@@ -222,6 +222,56 @@ namespace Hezhou
                 {
                     SafeLog("Animation: context 无 v3 动画 API（v1/v2 DLL 或 Player 未提供动画状态）");
                 }
+
+                // v4：资产枚举 + 音频控制。
+                if (api.HasAssets)
+                {
+                    uint assetCount = api.AssetCount();
+                    uint shown = assetCount < 8 ? assetCount : 8;
+                    string assetList = "";
+                    for (uint index = 0; index < shown; index++)
+                    {
+                        string id = api.AssetIdString(index);
+                        string kind = api.AssetKindString(index);
+                        string path = api.AssetPathString(index);
+                        if (index > 0)
+                        {
+                            assetList += ", ";
+                        }
+                        assetList += index.ToString(CultureInfo.InvariantCulture)
+                            + ":" + kind + ":" + path + ":" + id;
+                    }
+                    SafeLog("Assets: count="
+                        + assetCount.ToString(CultureInfo.InvariantCulture)
+                        + " [" + assetList + "]");
+                }
+                else
+                {
+                    SafeLog("Assets: context 无 v4 资产 API");
+                }
+
+                if (api.HasAudio)
+                {
+                    string backend = api.AudioBackendString();
+                    int playResult = api.AudioPlayFirst();
+                    int pauseResult = api.AudioPause();
+                    int playingAfterPause = api.AudioIsPlaying();
+                    int resumeResult = api.AudioResume();
+                    int playingAfterResume = api.AudioIsPlaying();
+                    int volumeResult = api.AudioSetVolume(0.5f);
+                    SafeLog("Audio: backend=" + backend
+                        + " playResult=" + playResult.ToString(CultureInfo.InvariantCulture)
+                        + " pauseResult=" + pauseResult.ToString(CultureInfo.InvariantCulture)
+                        + " isPlayingAfterPause=" + playingAfterPause.ToString(CultureInfo.InvariantCulture)
+                        + " resumeResult=" + resumeResult.ToString(CultureInfo.InvariantCulture)
+                        + " isPlayingAfterResume=" + playingAfterResume.ToString(CultureInfo.InvariantCulture)
+                        + " volumeResult=" + volumeResult.ToString(CultureInfo.InvariantCulture)
+                        + " volume=0.500");
+                }
+                else
+                {
+                    SafeLog("Audio: context 无 v4 音频 API");
+                }
             }
             catch (Exception exception)
             {
@@ -301,6 +351,12 @@ namespace Hezhou
                                 + " speed=" + Fmt(_lastAnimationSpeed));
                         }
                     }
+                    if (_sceneContext.HasAudio && (_frameCount == 1 || _frameCount % 60 == 0))
+                    {
+                        SafeLog("Audio: frame="
+                            + _frameCount.ToString(CultureInfo.InvariantCulture)
+                            + " isPlaying=" + _sceneContext.AudioIsPlaying().ToString(CultureInfo.InvariantCulture));
+                    }
                 }
                 catch (Exception exception)
                 {
@@ -372,6 +428,16 @@ namespace Hezhou
                             + _sceneContext.AnimationCurrent().ToString(CultureInfo.InvariantCulture)
                             + " time=" + Fmt(_sceneContext.AnimationGetTime())
                             + " speed=" + Fmt(_sceneContext.AnimationGetSpeed()));
+                    }
+                    if (_sceneContext.HasAudio)
+                    {
+                        int playing = _sceneContext.AudioIsPlaying();
+                        int stopResult = _sceneContext.AudioStop();
+                        int playingAfterStop = _sceneContext.AudioIsPlaying();
+                        SafeLog("Audio: Shutdown isPlaying="
+                            + playing.ToString(CultureInfo.InvariantCulture)
+                            + " stopResult=" + stopResult.ToString(CultureInfo.InvariantCulture)
+                            + " isPlayingAfterStop=" + playingAfterStop.ToString(CultureInfo.InvariantCulture));
                     }
                 }
                 catch (Exception exception)
@@ -483,6 +549,20 @@ namespace Hezhou
             public IntPtr AnimationSetSpeed;
             public IntPtr AnimationGetSpeed;
             public IntPtr AnimationSetPlaying;
+            // v4 tail（task-35）：资产目录 + 音频。
+            public IntPtr Assets;
+            public IntPtr AssetCount;
+            public IntPtr AssetId;
+            public IntPtr AssetKind;
+            public IntPtr AssetPath;
+            public IntPtr Audio;
+            public IntPtr AudioPlayFirst;
+            public IntPtr AudioPause;
+            public IntPtr AudioResume;
+            public IntPtr AudioStop;
+            public IntPtr AudioSetVolume;
+            public IntPtr AudioIsPlaying;
+            public IntPtr AudioBackend;
         }
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
@@ -556,6 +636,36 @@ namespace Hezhou
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         private delegate int AnimationSetPlayingDelegate(IntPtr state, int playing);
 
+        // v4：资产目录 + 音频（task-35）。
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        private delegate uint AssetCountDelegate(IntPtr assets);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        private delegate int AssetStringDelegate(
+            IntPtr assets, uint index, IntPtr buffer, uint bufferLength);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        private delegate int AudioPlayFirstDelegate(IntPtr audio);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        private delegate int AudioPauseDelegate(IntPtr audio);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        private delegate int AudioResumeDelegate(IntPtr audio);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        private delegate int AudioStopDelegate(IntPtr audio);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        private delegate int AudioSetVolumeDelegate(IntPtr audio, float volume);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        private delegate int AudioIsPlayingDelegate(IntPtr audio);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        private delegate int AudioBackendDelegate(
+            IntPtr audio, uint unused, IntPtr buffer, uint bufferLength);
+
         /// <summary>已解析的 PlayerContext（函数指针 + scene）；GC 期间保持委托存活。</summary>
         private sealed class ContextApi
         {
@@ -585,6 +695,22 @@ namespace Hezhou
             public AnimationSetSpeedDelegate AnimationSetSpeedFn;
             public AnimationGetSpeedDelegate AnimationGetSpeedFn;
             public AnimationSetPlayingDelegate AnimationSetPlayingFn;
+            // v4 资产/音频。
+            public bool HasAssets;
+            public IntPtr Assets;
+            public AssetCountDelegate AssetCountFn;
+            public AssetStringDelegate AssetIdFn;
+            public AssetStringDelegate AssetKindFn;
+            public AssetStringDelegate AssetPathFn;
+            public bool HasAudio;
+            public IntPtr Audio;
+            public AudioPlayFirstDelegate AudioPlayFirstFn;
+            public AudioPauseDelegate AudioPauseFn;
+            public AudioResumeDelegate AudioResumeFn;
+            public AudioStopDelegate AudioStopFn;
+            public AudioSetVolumeDelegate AudioSetVolumeFn;
+            public AudioIsPlayingDelegate AudioIsPlayingFn;
+            public AudioBackendDelegate AudioBackendFn;
 
             public uint EntityCount()
             {
@@ -691,6 +817,106 @@ namespace Hezhou
                 return AnimationSetPlayingFn(AnimationState, playing ? 1 : 0);
             }
 
+            public uint AssetCount()
+            {
+                return AssetCountFn(Assets);
+            }
+
+            public string AssetIdString(uint index)
+            {
+                return ReadUtf8(AssetIdFn, Assets, index);
+            }
+
+            public string AssetKindString(uint index)
+            {
+                return ReadUtf8(AssetKindFn, Assets, index);
+            }
+
+            public string AssetPathString(uint index)
+            {
+                return ReadUtf8(AssetPathFn, Assets, index);
+            }
+
+            public int AudioPlayFirst()
+            {
+                return AudioPlayFirstFn(Audio);
+            }
+
+            public int AudioPause()
+            {
+                return AudioPauseFn(Audio);
+            }
+
+            public int AudioResume()
+            {
+                return AudioResumeFn(Audio);
+            }
+
+            public int AudioStop()
+            {
+                return AudioStopFn(Audio);
+            }
+
+            public int AudioSetVolume(float volume)
+            {
+                return AudioSetVolumeFn(Audio, volume);
+            }
+
+            public int AudioIsPlaying()
+            {
+                return AudioIsPlayingFn(Audio);
+            }
+
+            public string AudioBackendString()
+            {
+                int needed = AudioBackendFn(Audio, 0, IntPtr.Zero, 0);
+                if (needed <= 0)
+                {
+                    return "";
+                }
+                IntPtr buffer = Marshal.AllocHGlobal(needed);
+                try
+                {
+                    int written = AudioBackendFn(Audio, 0, buffer, (uint)needed);
+                    if (written <= 0)
+                    {
+                        return "";
+                    }
+                    byte[] bytes = new byte[written];
+                    Marshal.Copy(buffer, bytes, 0, written);
+                    return System.Text.Encoding.UTF8.GetString(bytes);
+                }
+                finally
+                {
+                    Marshal.FreeHGlobal(buffer);
+                }
+            }
+
+            private static string ReadUtf8(AssetStringDelegate reader, IntPtr owner, uint index)
+            {
+                int needed = reader(owner, index, IntPtr.Zero, 0);
+                if (needed <= 0)
+                {
+                    return "";
+                }
+                IntPtr buffer = Marshal.AllocHGlobal(needed);
+                try
+                {
+                    int written = reader(owner, index, buffer, (uint)needed);
+                    if (written <= 0)
+                    {
+                        return "";
+                    }
+                    byte[] bytes = new byte[written];
+                    Marshal.Copy(buffer, bytes, 0, written);
+                    return System.Text.Encoding.UTF8.GetString(bytes);
+                }
+                finally
+                {
+                    Marshal.FreeHGlobal(buffer);
+                }
+            }
+
             public static ContextApi TryParse(IntPtr context, out string error)
             {
                 error = null;
@@ -706,8 +932,8 @@ namespace Hezhou
                     return null;
                 }
 
-                // v3 兼容策略：接受 v1（position）/v2（Transform/生命周期）/
-                // v3（+动画）；旧 Player 的 context 版本低时跳过对应 API。
+                // v4 兼容策略：接受 v1（position）/v2（Transform/生命周期）/
+                // v3（+动画）/v4（+资产/音频）；旧 Player 版本低时跳过对应 API。
                 if (native.Version < 1 || native.Version > PlayerContextVersion)
                 {
                     error = "ABI 版本不支持：native=" + native.Version
@@ -716,6 +942,8 @@ namespace Hezhou
                 }
                 bool hasTransform = native.Version >= 2;
                 bool hasAnimation = native.Version >= 3 && native.AnimationState != IntPtr.Zero;
+                bool hasAssets = native.Version >= 4 && native.Assets != IntPtr.Zero;
+                bool hasAudio = native.Version >= 4 && native.Audio != IntPtr.Zero;
                 if (native.Scene == IntPtr.Zero)
                 {
                     error = "scene 指针为 0";
@@ -754,6 +982,27 @@ namespace Hezhou
                         || native.AnimationSetPlaying == IntPtr.Zero))
                 {
                     error = "v3 动画函数指针缺失";
+                    return null;
+                }
+                if (hasAssets
+                    && (native.AssetCount == IntPtr.Zero
+                        || native.AssetId == IntPtr.Zero
+                        || native.AssetKind == IntPtr.Zero
+                        || native.AssetPath == IntPtr.Zero))
+                {
+                    error = "v4 资产函数指针缺失";
+                    return null;
+                }
+                if (hasAudio
+                    && (native.AudioPlayFirst == IntPtr.Zero
+                        || native.AudioPause == IntPtr.Zero
+                        || native.AudioResume == IntPtr.Zero
+                        || native.AudioStop == IntPtr.Zero
+                        || native.AudioSetVolume == IntPtr.Zero
+                        || native.AudioIsPlaying == IntPtr.Zero
+                        || native.AudioBackend == IntPtr.Zero))
+                {
+                    error = "v4 音频函数指针缺失";
                     return null;
                 }
 
@@ -813,6 +1062,38 @@ namespace Hezhou
                             native.AnimationGetSpeed);
                         api.AnimationSetPlayingFn = Marshal.GetDelegateForFunctionPointer<AnimationSetPlayingDelegate>(
                             native.AnimationSetPlaying);
+                    }
+                    if (hasAssets)
+                    {
+                        api.HasAssets = true;
+                        api.Assets = native.Assets;
+                        api.AssetCountFn = Marshal.GetDelegateForFunctionPointer<AssetCountDelegate>(
+                            native.AssetCount);
+                        api.AssetIdFn = Marshal.GetDelegateForFunctionPointer<AssetStringDelegate>(
+                            native.AssetId);
+                        api.AssetKindFn = Marshal.GetDelegateForFunctionPointer<AssetStringDelegate>(
+                            native.AssetKind);
+                        api.AssetPathFn = Marshal.GetDelegateForFunctionPointer<AssetStringDelegate>(
+                            native.AssetPath);
+                    }
+                    if (hasAudio)
+                    {
+                        api.HasAudio = true;
+                        api.Audio = native.Audio;
+                        api.AudioPlayFirstFn = Marshal.GetDelegateForFunctionPointer<AudioPlayFirstDelegate>(
+                            native.AudioPlayFirst);
+                        api.AudioPauseFn = Marshal.GetDelegateForFunctionPointer<AudioPauseDelegate>(
+                            native.AudioPause);
+                        api.AudioResumeFn = Marshal.GetDelegateForFunctionPointer<AudioResumeDelegate>(
+                            native.AudioResume);
+                        api.AudioStopFn = Marshal.GetDelegateForFunctionPointer<AudioStopDelegate>(
+                            native.AudioStop);
+                        api.AudioSetVolumeFn = Marshal.GetDelegateForFunctionPointer<AudioSetVolumeDelegate>(
+                            native.AudioSetVolume);
+                        api.AudioIsPlayingFn = Marshal.GetDelegateForFunctionPointer<AudioIsPlayingDelegate>(
+                            native.AudioIsPlaying);
+                        api.AudioBackendFn = Marshal.GetDelegateForFunctionPointer<AudioBackendDelegate>(
+                            native.AudioBackend);
                     }
                     return api;
                 }

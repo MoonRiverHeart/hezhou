@@ -8,9 +8,12 @@
 
 mod common;
 
-use common::{compile_engine_player_game, TempDir};
+use common::{compile_engine_player_game, write_test_wav, TempDir};
+use hezhou_asset::{AssetId, AssetKind};
 use hezhou_core::ecs::Scene;
 use hezhou_player::animation_control::{AnimationClipEntry, PlayerAnimationState};
+use hezhou_player::asset_catalog::{PlayerAssetCatalog, PlayerAssetEntry};
+use hezhou_player::audio_runtime::PlayerAudioRuntime;
 use hezhou_player::csharp_context::PlayerCSharpContext;
 use hezhou_player::mono_host::PlayerGameScript;
 
@@ -39,9 +42,26 @@ fn csharp_creates_and_positions_entity_through_context() {
             duration: 0.5,
         },
     ]);
-    let mut context = PlayerCSharpContext::new_with_animation(
+    let catalog = PlayerAssetCatalog::from_entries(vec![
+        PlayerAssetEntry {
+            id: AssetId::parse("11111111-1111-4111-8111-111111111111").unwrap(),
+            kind: AssetKind::Scene,
+            output: "assets/main.scene".to_string(),
+        },
+        PlayerAssetEntry {
+            id: AssetId::parse("22222222-2222-4222-8222-222222222222").unwrap(),
+            kind: AssetKind::Audio,
+            output: "assets/audio/test.wav".to_string(),
+        },
+    ]);
+    let wav = write_test_wav(&temp, "audio/test.wav");
+    let mut audio = PlayerAudioRuntime::null();
+    audio.load_wav_file("test", &wav).expect("加载测试 WAV");
+    let mut context = PlayerCSharpContext::new_with_runtime(
         &mut scene as *mut Scene,
         &mut animation as *mut PlayerAnimationState,
+        &catalog as *const PlayerAssetCatalog as *mut PlayerAssetCatalog,
+        &mut audio as *mut PlayerAudioRuntime,
     );
     assert!(context.is_supported());
 
@@ -73,6 +93,9 @@ fn csharp_creates_and_positions_entity_through_context() {
     assert!((animation.time() - 0.25).abs() < 1e-6);
     assert!((animation.speed() - 1.5).abs() < 1e-6);
     assert!(animation.is_playing());
+    // context ABI v4 音频：C# play→pause→resume→volume=0.5，最终 playing。
+    assert!(audio.is_playing(), "C# Initialize 后应恢复播放");
+    assert!((audio.volume() - 0.5).abs() < 1e-6);
 
     script.update(0.016).expect("Update");
     script.update(0.032).expect("Update");
@@ -133,6 +156,31 @@ fn csharp_creates_and_positions_entity_through_context() {
     assert_eq!(animation.current(), 0);
     assert!((animation.time() - 0.25).abs() < 1e-6);
     assert!((animation.speed() - 1.5).abs() < 1e-6);
+    // C# Shutdown 停止音频。
+    assert!(!audio.is_playing(), "C# Shutdown 应停止音频");
+
+    // v4 资产/音频日志。
+    assert!(
+        log.contains("Assets: count=2 ["),
+        "C# 日志：{log}"
+    );
+    assert!(
+        log.contains("kind=audio") || log.contains(":audio:assets/audio/test.wav:"),
+        "C# 日志：{log}"
+    );
+    assert!(
+        log.contains("Audio: backend=null")
+            && log.contains("playResult=0")
+            && log.contains("isPlayingAfterPause=0")
+            && log.contains("resumeResult=0")
+            && log.contains("isPlayingAfterResume=1")
+            && log.contains("volumeResult=0 volume=0.500"),
+        "C# 日志：{log}"
+    );
+    assert!(
+        log.contains("Audio: Shutdown isPlaying=1 stopResult=0 isPlayingAfterStop=0"),
+        "C# 日志：{log}"
+    );
     // Rust 侧统计：Initialize/Update×2/Shutdown 各调用成功。
     let stats = script.stats();
     assert_eq!(stats.initialize_calls, 1);
