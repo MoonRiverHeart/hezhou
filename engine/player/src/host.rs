@@ -16,9 +16,12 @@
 use std::fmt;
 use std::path::Path;
 
+use hezhou_core::Scene;
+
 use crate::asset_index::PlayerAssetIndex;
 use crate::logging::{FileLogger, LogLevel};
 use crate::manifest::PlayerManifest;
+use crate::scene_loader::StartSceneSource;
 
 /// 默认 host 名称。
 pub const DEFAULT_HOST_NAME: &str = "default";
@@ -47,6 +50,10 @@ pub struct PlayerHostContext<'a> {
     pub manifest: &'a PlayerManifest,
     /// 已加载并校验 output 的资产索引。
     pub index: &'a PlayerAssetIndex,
+    /// 已加载的起始场景（Project JSON 恢复；失败时为内置 cube+light 回退）。
+    pub start_scene: &'a mut Scene,
+    /// 起始场景来源（供 host 日志区分真实场景/回退）。
+    pub start_scene_source: &'a StartSceneSource,
     /// 写入 `player.log` 的日志句柄。
     pub log: &'a mut dyn HostLog,
 }
@@ -152,6 +159,20 @@ impl PlayerHost for DefaultPlayerHost {
         context
             .log
             .host_log(LogLevel::Info, &format!("{}", index.summary()));
+        context.log.host_log(
+            LogLevel::Info,
+            &format!(
+                "起始场景：{}（运行时已加载 {} 个实体）",
+                context.start_scene_source.summary(),
+                context.start_scene.get_all_entities().len()
+            ),
+        );
+        if context.start_scene_source.is_fallback() {
+            context.log.host_log(
+                LogLevel::Warn,
+                "起始场景使用内置回退（cube + directional light），不是包内真实场景",
+            );
+        }
         if index.is_empty() {
             context.log.host_log(
                 LogLevel::Warn,

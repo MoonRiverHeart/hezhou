@@ -119,7 +119,12 @@ fn actual_window_host_renders_fixed_frames() {
         log.contains("窗口与 Vulkan 渲染器创建成功"),
         "日志：{log}"
     );
-    assert!(log.contains("内置测试场景：cube entity="), "日志：{log}");
+    // 起始场景来自包内 Project JSON（cooked fixture 场景 = 3 个实体：cube/child cube/sun）。
+    assert!(
+        log.contains("使用起始场景：3 个实体"),
+        "日志：{log}"
+    );
+    assert!(log.contains("来源：Project JSON"), "日志：{log}");
     assert!(log.contains("窗口 host 结束：5 帧"), "日志：{log}");
     assert!(log.contains("达到固定帧数"), "日志：{log}");
 }

@@ -6,8 +6,10 @@
 //!
 //! 行为：
 //! - 按 `manifest.window`（title/width/height）创建 `UIVulkanRenderer`；
-//! - 内置测试场景：`Scene::new()` + `create_cube()` + `create_directional_light()`，
-//!   `set_game_state(1)`（Running）+ 固定相机 + 天空盒；
+//! - 使用运行时加载的起始场景（`context.start_scene`：包内 Project JSON 恢复，
+//!   失败时由 `scene_loader` 回退到内置 cube + directional light）；
+//!   host 不再无条件自建 cube，只记录实体数/来源；
+//! - `set_game_state(1)`（Running）+ 固定相机 + 天空盒；
 //! - 运行固定帧数（默认 [`DEFAULT_FRAME_LIMIT`]，可用环境变量
 //!   [`FRAME_LIMIT_ENV`] 覆盖）或直到用户关闭窗口；
 //! - 每帧写 `player.log`，返回 `HostOutcome::Running { frames }`（退出码 0）；
@@ -97,17 +99,21 @@ impl PlayerHost for WindowPlayerHost {
             ),
         );
 
-        // 内置测试场景先创建：它比 renderer 生命周期更长（renderer 持有 raw 指针）。
-        let mut scene = Box::new(Scene::new());
-        let cube = scene.create_cube();
-        let light = scene.create_directional_light();
+        // 使用运行时已加载的起始场景（Project JSON 恢复；失败时已回退内置 cube+light）。
+        let entities = context.start_scene.get_all_entities().len();
         context.log.host_log(
             LogLevel::Info,
             &format!(
-                "内置测试场景：cube entity={}、directional light entity={}",
-                cube.id, light.id
+                "使用起始场景：{entities} 个实体（来源：{}）",
+                context.start_scene_source.summary()
             ),
         );
+        if context.start_scene_source.is_fallback() {
+            context.log.host_log(
+                LogLevel::Warn,
+                "起始场景使用内置回退（cube + directional light），不是包内真实场景",
+            );
+        }
 
         // 创建窗口 + Vulkan 渲染器；失败/panic 都转为可读 HostError。
         let mut renderer = match catch_unwind(AssertUnwindSafe(|| {
@@ -138,7 +144,7 @@ impl PlayerHost for WindowPlayerHost {
             ),
         );
 
-        renderer.set_scene(&mut *scene as *mut Scene);
+        renderer.set_scene(context.start_scene as *mut Scene);
         renderer.set_camera_params(CAMERA.0, CAMERA.1, CAMERA.2, CAMERA.3, CAMERA.4);
         renderer.set_skybox([0.08, 0.10, 0.16], [0.02, 0.02, 0.03]);
         // GameState::Running = 1（见 engine/AGENTS.md）

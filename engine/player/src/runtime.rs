@@ -23,6 +23,7 @@ use crate::logging::{format_timestamp_utc, FileLogger, STARTUP_ERROR_LOG};
 use crate::manifest::{ManifestError, PlayerManifest};
 use crate::paths::to_native_path;
 use crate::platform::TargetPlatform;
+use crate::scene_loader::{load_start_scene, StartSceneSummary};
 use crate::RUNTIME_ENGINE_VERSION;
 
 /// 运行时命令行选项。
@@ -70,6 +71,8 @@ pub struct RuntimeReport {
     pub log_path: PathBuf,
     /// 已加载并校验 output 的资产索引。
     pub index: PlayerAssetIndex,
+    /// 起始场景摘要（Project JSON 恢复或内置回退）。
+    pub start_scene: StartSceneSummary,
     /// `--run`/`--host` 模式下的 host 结果（`--validate`/默认模式为 `None`）。
     pub host: Option<HostRunReport>,
 }
@@ -78,7 +81,7 @@ impl RuntimeReport {
     /// 单行启动摘要（带控制台时打印；无终端时只进日志）。
     pub fn summary(&self) -> String {
         let mut text = format!(
-            "hezhou-player {} 启动检查通过：{} v{}（{}，质量 {}）场景 {}；{}；日志 {}",
+            "hezhou-player {} 启动检查通过：{} v{}（{}，质量 {}）场景 {}；{}；起始场景 {}；日志 {}",
             RUNTIME_ENGINE_VERSION,
             self.manifest.product_name,
             self.manifest.version,
@@ -86,6 +89,7 @@ impl RuntimeReport {
             self.manifest.quality.as_str(),
             self.layout.start_scene.display(),
             self.index.summary(),
+            self.start_scene.source.summary(),
             self.log_path.display(),
         );
         if let Some(host) = &self.host {
@@ -372,11 +376,19 @@ pub fn run(options: RuntimeOptions) -> Result<RuntimeReport, RuntimeError> {
         )?;
     }
 
-    // 7) 模式：--validate / --run(host) / 默认骨架启动。
+    // 7) 加载起始场景：manifest.start_scene → Project JSON → Scene；失败回退内置场景。
+    let mut loaded_scene = load_start_scene(&root, &manifest, &index);
+    for warning in &loaded_scene.warnings {
+        log_warn(&mut logger, &format!("起始场景：{warning}"))?;
+    }
+    log_info(&mut logger, &loaded_scene.summary())?;
+    let start_scene_summary = StartSceneSummary::from_loaded(&loaded_scene);
+
+    // 8) 模式：--validate / --run(host) / 默认骨架启动。
     let host_report = if options.validate_only {
         log_info(
             &mut logger,
-            "validate-only 模式：启动检查完成（资产索引已加载）",
+            "validate-only 模式：启动检查完成（资产索引与起始场景已加载）",
         )?;
         None
     } else if options.run {
@@ -392,6 +404,8 @@ pub fn run(options: RuntimeOptions) -> Result<RuntimeReport, RuntimeError> {
                 assets_dir: &layout.assets_dir,
                 manifest: &manifest,
                 index: &index,
+                start_scene: &mut loaded_scene.scene,
+                start_scene_source: &loaded_scene.source,
                 log: &mut logger,
             };
             host.run(&mut context).map_err(RuntimeError::Host)?
@@ -426,6 +440,7 @@ pub fn run(options: RuntimeOptions) -> Result<RuntimeReport, RuntimeError> {
         layout,
         log_path,
         index,
+        start_scene: start_scene_summary,
         host: host_report,
     })
 }

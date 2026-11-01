@@ -3,7 +3,7 @@
 Hezhou 0.2 **Player 导出构建器 + 最小运行时**（Windows / Linux）。
 
 本 crate 是 `engine/player`，对应 `docs/PROJECT_PLAN.md` §1.5 Player 导出与
-§9 AI 并行工作流中的 Player 工作流。已完成五轮：
+§9 AI 并行工作流中的 Player 工作流。已完成六轮：
 
 1. **格式契约 + dry-run**：产物目录、`manifest.json`、跨平台路径规则、双平台清单；
 2. **真实产物构建**：按计划复制 exe/assets/scripts/runtime/manifest，staging 原子提交、
@@ -16,8 +16,10 @@ Hezhou 0.2 **Player 导出构建器 + 最小运行时**（Windows / Linux）。
    `--run`/`--host` 加载索引后调用 `PlayerHost` trait，默认 host 明确报告
    "等待 game host 接入"（退出码 3）；
 5. **可选窗口渲染 host**（`feature = "window-host"`）：`WindowPlayerHost` 按清单创建
-   GLFW 窗口 + `UIVulkanRenderer`，内置 cube + directional light 场景，跑固定帧数
-   （或窗口关闭）后返回 `Running`（退出码 0）；默认 feature 关闭仍为 Pending。
+   GLFW 窗口 + `UIVulkanRenderer`，跑固定帧数（或窗口关闭）后返回 `Running`（退出码 0）；
+6. **真实起始场景加载**：`scene_loader` 把 `manifest.start_scene` 对应的包内 Project JSON
+   用 `hezhou_core::Project::restore_from_json` 恢复成 `Scene`（实体/层级/Transform），
+   WindowPlayerHost 渲染该场景；缺失/坏 JSON/空场景回退内置 cube+light 并 WARN。
 
 不绑定具体游戏内容；真实 cooker 产物可原样替换测试 fixture。
 
@@ -30,6 +32,7 @@ engine/player/
 │   ├── asset_index.rs# 运行时资产索引（cook_manifest.json → AssetId 查询/校验）
 │   ├── builder.rs    # 构建器：dry-run 计划 + 真实复制（预检/staging/校验/权限）
 │   ├── cook_bridge.rs# hezhou-asset CookManifest → Player assets[]/文件映射
+│   ├── scene_loader.rs# 起始场景：Project JSON → Scene（失败回退内置 cube+light）
 │   ├── host.rs       # PlayerHost trait / HostOutcome / DefaultPlayerHost
 │   ├── window_host.rs# （feature window-host）WindowPlayerHost：窗口+Vulkan 固定帧渲染
 │   ├── paths.rs      # 逻辑路径规则（分隔符/大小写/保留名/权限位）
@@ -42,7 +45,7 @@ engine/player/
 └── tests/
     ├── fixtures/minimal/  # 最小 fixture（legacy assets[]，空场景 + 占位 DLL/runtime）
     ├── fixtures/cooked/   # hezhou-asset 真实 cook 输出布局 fixture
-    └── *.rs               # 默认 73 个测试；--features window-host 共 76 个（+1 ignored 真窗口 smoke）
+    └── *.rs               # 默认 79 个测试；--features window-host 共 82 个（+1 ignored 真窗口 smoke）
 ```
 
 > 硬性边界：本 crate 只改 `engine/player/**`。installer、CI、examples、editor
@@ -340,7 +343,7 @@ cargo run -p hezhou-player --bin hezhou-player-build -- \
 6. 按模式结束：
    - 默认：记录"运行时骨架启动成功"并以 0 退出；
    - `--validate`：启动检查完成（含资产索引）并以 0 退出；
-   - `--run` / `--host <name>`：加载索引后调用 `PlayerHost`（见 §6.2），本轮默认 host
+   - `--run` / `--host <name>`：加载索引后调用 `PlayerHost`（见 §6.3），本轮默认 host
      返回 `Pending`，退出码 **3**（不是错误，表示 game host 尚未接入）。
 
 参数：
@@ -392,7 +395,37 @@ index.len();                                  // 条目数
 - 坏 JSON / 读失败返回 `AssetIndexError::CookManifest`（含路径 + serde 错误），
   运行时转为退出码 2 并写 `startup-error.log`。
 
-### 6.2 `PlayerHost` 接口（game host 接入契约）
+### 6.2 起始场景加载（`scene_loader`）
+
+运行时在资产索引加载后、调用 host 前执行：
+
+1. **路径解析**：索引 `start_scene()` 条目 → `<PlayerRoot>/assets/<output>`；
+   legacy 包（无 cook 索引）退回 `manifest.start_scene` 相对 `assets/` 的路径；
+2. **恢复**：读取 JSON → `hezhou_core::Project::restore_from_json`（替换语义，保留实体 ID/
+   层级/Transform/组件/方向光）；
+3. **安全回退**：文件缺失、JSON 非法、Project 格式不兼容、恢复 panic、或合法但 0 实体时，
+   使用内置测试场景（cube + directional light）并把可读原因写 WARN，**不 panic、不阻塞启动**；
+4. **结果**：`LoadedStartScene { scene, source, warnings }`，
+   `StartSceneSource::{Project { path, entities } | BuiltinFallback { reason }}`；
+   运行时摘要写入 `RuntimeReport.start_scene`，host 通过
+   `PlayerHostContext.start_scene: &mut Scene` 拿到场景；
+   `WindowPlayerHost` 直接渲染该场景（不再无条件自建 cube）。
+5. `--validate` 也会加载起始场景（只是不渲染），启动日志会记录实体数/回退原因。
+
+```rust
+pub fn load_start_scene(
+    root: &Path,
+    manifest: &PlayerManifest,
+    index: &PlayerAssetIndex,
+) -> LoadedStartScene; // 永远成功；失败时 source=BuiltinFallback + warnings
+
+pub fn builtin_test_scene() -> Scene; // cube + directional light
+```
+
+已知限制：只加载**工程 Project JSON**（编辑器工程/快照格式）；cook `imported/*.json`
+资产内容、C# `Initialize()`、Gameplay/Animation 等运行时数据仍在后续 TODO。
+
+### 6.3 `PlayerHost` 接口（game host 接入契约）
 
 提供接口与两个实现：无窗口的 `DefaultPlayerHost`（`Pending`，退出码 3）与可选的
 `WindowPlayerHost`（`feature = "window-host"`，真实窗口/帧循环，`Running`，退出码 0）。
@@ -432,7 +465,7 @@ pub enum HostOutcome {
 - CI：默认 feature 下 `--run` 应视为"host pending = 退出码 3"；编译 `window-host` 后
   `--run` 会真实开窗（CI 无显示环境请用 `--host headless` 或 `--validate`）。
 
-### 6.3 可选窗口渲染 host（`feature = "window-host"`）
+### 6.4 可选窗口渲染 host（`feature = "window-host"`）
 
 默认构建**不编译** `hezhou-core`/`hezhou-rhi-vulkan`/`hezhou-platform` 依赖，二进制与
 依赖面保持最小；需要真实窗口渲染时显式开启 feature：
@@ -457,44 +490,46 @@ hezhou-player --run --host headless --manifest <pkg>/manifest.json
 
 - 按 `manifest.window`（title/width/height）创建 GLFW 窗口 + `UIVulkanRenderer`
   （Vulkan device/swapchain/render pass/pipeline/FXAA）；
-- 内置测试场景：`Scene::new()` + `create_cube()` + `create_directional_light()`，
+- 使用运行时加载的起始场景（§6.2：`manifest.start_scene` 的 Project JSON → `Scene`；
+  失败时 loader 已回退内置 cube+light），host 不再无条件自建 cube；
   `set_game_state(1)`（Running）+ 固定相机 + 天空盒；
 - 跑固定帧数（`HEZHOU_PLAYER_WINDOW_FRAMES`，默认 120，上限 100000）或用户关闭窗口；
-- 每 30 帧/结束时写 `player.log`（窗口尺寸、实体 id、帧数、耗时），返回
+- 每 30 帧/结束时写 `player.log`（窗口尺寸、起始场景实体数/来源、帧数、耗时），返回
   `HostOutcome::Running { frames }` → 进程退出码 0；
 - 窗口/Vulkan/GPU 不可用、渲染 panic 都转为可读 `HostError`（运行时退出码 2 +
   `startup-error.log`），不 panic、不静默崩溃。
 
-**本机实测（2026-11-01，Windows + Intel Arc B370）**：
+**本机实测（2026-11-01，Windows + Intel Arc B370，debug feature）**：
 
 ```text
 WindowPlayerHost：创建窗口 960x540 mode=windowed title="Hezhou Cooked Fixture"
-内置测试场景：cube entity=1、directional light entity=2
+使用起始场景：3 个实体（来源：Project JSON .../assets/assets/1111...scene）
 窗口与 Vulkan 渲染器创建成功：960x540，quality=low，frame_limit=30
-窗口渲染进度：30/30 帧，664.1 ms
-窗口 host 结束：30 帧，680.5 ms（达到固定帧数）
+窗口渲染进度：30/30 帧，658.4 ms
+窗口 host 结束：30 帧，674.7 ms（达到固定帧数）
 PlayerHost `window` 返回退出码 0
 ```
 
-**已知限制（上游 rhi-vulkan，未在本任务范围修复）**：
+起始场景 3 个实体来自 cooked fixture 的真实 Project JSON（CubeA + 子 Cube + DirectionalLight），
+不再是内置测试 cube。
 
-- 本 host 结束时不调用 `UIVulkanRenderer::cleanup()`：当前该函数在"仅渲染内置场景"
+**已知限制**：
+
+- 本 host 结束时不调用 `UIVulkanRenderer::cleanup()`：当前该函数在"仅渲染起始场景"
   路径下会触发 Windows 堆损坏（`0xC0000374`）；窗口 host 是一次性运行、返回后进程
   即将退出，由操作系统回收 Vulkan/GLFW 资源。上游修复后应恢复显式 cleanup。
 - Esc 退出尚未接线：`process_events` 把按键交给 UI input handler，未暴露给 host；
   当前用固定帧数或窗口关闭（`draw_frame` 返回 false）退出（见 TODO）。
-- 尚未加载 cooked 场景/资产/C#：窗口只是最小渲染验证，下一轮在 host 内按 AssetId
-  加载 `imported/*.json` 并调用 C# `Initialize()`。
-
-## 7. 测试
+- 场景内资产加载/C#：Project JSON 只恢复实体/组件；cook `imported/*.json` 内容、
+  C# `Initialize()`、Gameplay/Animation/Physics 运行时数据仍留待后续 game host。
 
 ## 7. 测试
 
 ```bash
 cd engine
-cargo test -p hezhou-player                        # 默认 73 个测试（不编译窗口依赖）
+cargo test -p hezhou-player                        # 默认 79 个测试
 cargo build -p hezhou-player                       # 构建两个二进制 + 库
-cargo test -p hezhou-player --features window-host # 76 个（含 window-host 单元/契约测试）
+cargo test -p hezhou-player --features window-host # 82 个（含 window-host 单元/契约测试）
 # 真实窗口 smoke：需显示环境 + Vulkan GPU，CI 跳过；本机已实测通过（30 帧，exit 0）
 cargo test -p hezhou-player --features window-host --test window_host -- --ignored --nocapture
 ```
@@ -506,17 +541,22 @@ cargo test -p hezhou-player --features window-host --test window_host -- --ignor
 映射、cook_manifest.json 入包、缺失输出、产物大小/哈希损坏、格式版本、启动场景/字体
 定位、CLI 真实构建 + validate）、**运行时资产索引**（按 AssetId/kind/locator/output
 查询、start_scene/font 解析、缺失 output、坏 JSON、manifest/索引不一致、legacy 空索引、
-`--run`/`--host` 退出码 3、未知 host、`--validate` 不回归）、**window-host feature**
-（默认 host 选择、frame limit 解析/clamp、真实窗口固定帧渲染 + `Running`/退出码 0；
-真实窗口测试 `#[ignore]`，本机手工已验证）、日志时间戳。
+`--run`/`--host` 退出码 3、未知 host、`--validate` 不回归）、**起始场景加载**
+（`hezhou_core::Project::restore_from_json`：实体/层级/Transform/方向光恢复、
+缺失文件/坏 JSON/空场景安全回退内置 cube+light、与 `PlayerAssetIndex.start_scene`
+output 对接、runtime 摘要/日志）、**window-host feature**
+（默认 host 选择、frame limit 解析/clamp、真实窗口固定帧渲染加载真实场景 + `Running`/
+退出码 0；真实窗口测试 `#[ignore]`，本机手工已验证）、日志时间戳。
 
 最小 fixture（`tests/fixtures/minimal/`）依赖零外部资产：空场景 3 字节、字体占位
 12 字节、假 C# 程序集 21 字节、占位 runtime 库 19 字节，用于无真实 cook 数据时
-验证"构建 → 打包目录 → 运行时启动校验"的完整链路。
+验证"构建 → 打包目录 → 运行时启动校验"的完整链路（场景非 Project JSON，会走回退）。
 
 真实 cook fixture（`tests/fixtures/cooked/`）模拟 `Cooker::cook_to_dir` 的
 `cook_manifest.json + imported/<uuid>.json + assets/<uuid>.<ext>` 布局
-（scene/font/texture/gltf 四个条目），用于验证 asset → Player 的字段与文件映射。
+（scene/font/texture/gltf 四个条目）。其中 scene 是真实 Project JSON（1488 字节、
+3 个实体：CubeA + 子 Cube + DirectionalLight），用于端到端验证
+"cook → Player 包 → 起始场景恢复 → 窗口渲染"。
 
 ## 8. 与其它模块 / CI / installer 的集成点
 
@@ -589,7 +629,7 @@ cargo test -p hezhou-player --features window-host --test window_host -- --ignor
 - `scripts[]` 是预编译 C# 程序集（`mcs -target:library`，禁止 .NET 8 编译产物）；
 - C# 无 `Main()`，入口为静态 `Initialize()`，由 Rust 运行时调用；
 - 本轮 Player crate 故意**不依赖** core/render/scripting（保持构建器可独立编译）；
-  下一轮实现 `PlayerHost`（见 §6.2）时再启用 `mono` feature 并链接引擎 crate，
+  下一轮实现 `PlayerHost`（见 §6.3）时再启用 `mono` feature 并链接引擎 crate，
   在 host 内加载 `manifest.scripts[]`、调用 C# 静态 `Initialize()`、按 AssetId
   从资产索引加载 gameplay/animation/physics/audio 数据。
 
@@ -637,8 +677,11 @@ cargo test -p hezhou-player --features window-host --test window_host -- --ignor
   校验 output/start_scene/font（`PlayerAssetIndex`）；
 - [x] `PlayerHost` trait + 默认 host + `--run`/`--host`（明确 host pending，退出码 3）；
 - [x] 可选窗口渲染 host（feature `window-host`）：GLFW 窗口 + `UIVulkanRenderer` +
-  内置 cube/light 场景 + 固定帧循环（`Running`，退出码 0）；
-- [ ] WindowPlayerHost 加载 cooked 场景（按 AssetId 读 `imported/*.json`）替换内置 cube/light；
+  固定帧循环（`Running`，退出码 0）；
+- [x] 起始场景加载：`manifest.start_scene` 的 Project JSON → `Scene`（实体/层级/
+  Transform/方向光），缺失/坏 JSON/空场景回退内置 cube+light 并 WARN；
+- [ ] 场景内 cook 资产加载（按 AssetId 读 `imported/*.json`、纹理/音频字节）与
+  C# 脚本 `Initialize()`（scripting）；
 - [ ] Mono 加载 + C# 静态 `Initialize()`（scripting）；
 - [ ] Esc 退出接线（`UIVulkanRenderer` 未把 ESC 暴露给 host；当前用固定帧数/窗口关闭）；
 - [ ] 上游修复 `UIVulkanRenderer::cleanup()` 堆损坏后恢复窗口 host 显式清理；

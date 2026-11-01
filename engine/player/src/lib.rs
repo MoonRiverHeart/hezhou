@@ -27,6 +27,7 @@ pub mod manifest;
 pub mod paths;
 pub mod platform;
 pub mod runtime;
+pub mod scene_loader;
 pub mod version;
 
 /// 可选的真实窗口渲染 host（`--features window-host`）。
@@ -48,6 +49,9 @@ pub use cook_bridge::{find_entry_by_project_path, CookedAssets};
 pub use host::{
     resolve_host, DefaultPlayerHost, HostError, HostLog, HostOutcome, PlayerHost,
     PlayerHostContext, DEFAULT_HOST_NAME, HOST_PENDING_EXIT_CODE,
+};
+pub use scene_loader::{
+    builtin_test_scene, load_start_scene, LoadedStartScene, StartSceneSource, StartSceneSummary,
 };
 
 #[cfg(feature = "window-host")]

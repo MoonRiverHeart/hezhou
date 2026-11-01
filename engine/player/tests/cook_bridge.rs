@@ -80,9 +80,9 @@ fn cooked_manifest_maps_assets_and_traceability() {
         Some("assets/scenes/empty.scene")
     );
     assert_eq!(scene.path, scene.output.clone().unwrap());
-    assert_eq!(scene.size_bytes, Some(3));
-    assert_eq!(scene.source_size, Some(3));
-    assert_eq!(scene.source_hash.as_deref(), Some("c735ad1983dc7ddd"));
+    assert_eq!(scene.size_bytes, Some(1488));
+    assert_eq!(scene.source_size, Some(1488));
+    assert_eq!(scene.source_hash.as_deref(), Some("6b5c3ea0eb323f19"));
     assert!(scene
         .checksum
         .as_deref()

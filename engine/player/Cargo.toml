@@ -12,22 +12,20 @@ serde_json = "1.0"
 # 关闭默认 gltf feature：Player 只消费 cook 产物（JSON/原始资产），不需要 glTF 解析器。
 hezhou-asset = { path = "../asset", default-features = false }
 
+# hezhou-core：起始场景加载（manifest.start_scene 的 Project JSON → Scene）。
+# 默认构建就需要（`--validate` 也会校验/加载起始场景），因此不作为可选依赖。
+hezhou-core = { path = "../core" }
+
 # 可选：真实窗口渲染 host（feature = window-host）。默认构建不编译这些依赖。
 # - rhi-vulkan 内部通过 GLFW + Vulkan 创建窗口/渲染器（UIVulkanRenderer）；
-# - core 提供内置测试场景（Cube + DirectionalLight）；
 # - platform 作为窗口/输入抽象的契约依赖保留（当前窗口由 UIVulkanRenderer 管理，
 #   Player 不重复初始化 GLFW，避免两个 GLFW 实例冲突）。
-hezhou-core = { path = "../core", optional = true }
 hezhou-rhi-vulkan = { path = "../rhi-vulkan", optional = true }
 hezhou-platform = { path = "../platform", optional = true }
 
 [features]
 default = []
-window-host = [
-    "dep:hezhou-core",
-    "dep:hezhou-rhi-vulkan",
-    "dep:hezhou-platform",
-]
+window-host = ["dep:hezhou-rhi-vulkan", "dep:hezhou-platform"]
 
 [[bin]]
 name = "hezhou-player"
