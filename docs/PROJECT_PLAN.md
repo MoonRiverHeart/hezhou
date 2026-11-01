@@ -20,17 +20,17 @@
 - ✅ Core：Prefab（一层嵌套/覆盖/循环检测）与 SceneManager。
 - ✅ 编辑器：Prefab 捕获/实例化、SceneManager 场景槽切换/卸载/加载、Player 导出 dry-run（双平台 plan/manifest）；启动自检 **PASS=68**。
 - ✅ 渲染：PBR 每实体材质/纹理链路 + 三实体不同材质 GPU 冒烟。
-- ✅ Player：可选 `window-host` feature 实际创建 960x540 窗口、Vulkan 渲染内置 cube/light 场景，30/30 帧 exit 0。
+- ✅ Player：可选 `window-host` feature 实际创建 960x540 窗口、Vulkan 渲染；已可从包内 Project JSON 加载起始场景（cooked fixture 3 实体，30/30 帧 exit 0）。
+- ✅ 编辑器：Player 真实构建（Cooker + PlayerBuilder + 产物内 validate）已通过 fixture；启动自检 **PASS=71**。
 - ✅ 本地 CI `ci_local.ps1 -Offline` 通过（默认测试 + feature 测试 + FFI 契约 + C# 编译 + 图标一致性）。
 - ✅ 验证证据：capability_demo 14/14 项通过；Player 72 tests；Core 43 tests；编辑器启动自检 PASS=57、FAIL=0；FFI 301/301/301。
 - ⏳ 未完成（0.2 验收尚未达成）：
-  1. Player 真正加载 cooked 场景/C# Initialize/资产（当前 window host 只有内置测试场景）；
-  2. Editor 真实 Player 构建（当前只有 dry-run）与 Prefab 编辑 UI（当前是捕获/实例化命令）；
-  3. per-entity PBR 材质进 core/Inspector/Project 持久化；
-  4. 真实角色蒙皮 mesh 数据源（当前为合成 mesh 验证 pipeline）；
-  5. C# 对 gameplay/animation/asset/audio 的完整 API 绑定；
-  6. Player 发布附件、真实 cooker 端到端、双平台 release 验证；
-  7. 文档/测试收尾与 0.2 Release。
+  1. Player 加载 cook `imported/*.json` 资产与 C# `Initialize()`（当前只加载 Project JSON 场景）；
+  2. per-entity PBR 材质进 core/Inspector/Project 持久化；
+  3. 真实角色蒙皮 mesh 数据源（当前为合成 mesh 验证 pipeline）；
+  4. C# 对 gameplay/animation/asset/audio 的完整 API 绑定；
+  5. Player 发布附件、真实 cooker 端到端、双平台 release 验证；
+  6. 文档/测试收尾与 0.2 Release。
 - 0.2 仍处于进行中，不满足发布 Definition of Done。
 
 ## 1. 执行摘要
