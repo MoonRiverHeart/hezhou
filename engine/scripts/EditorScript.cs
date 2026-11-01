@@ -54,6 +54,14 @@ namespace Hezhou
             _assetScanCallback = OnAssetScanClick;
             _assetImportCallback = OnAssetImportClick;
             _assetImportDialogResultCallback = OnAssetImportDialogResult;
+            _sceneSaveCallback = OnSceneSaveClick;
+            _sceneSwitchCallback = OnSceneSwitchClick;
+            _sceneUnloadCallback = OnSceneUnloadClick;
+            _sceneLoadCallback = OnSceneLoadClick;
+            _prefabCaptureCallback = OnPrefabCaptureClick;
+            _prefabInstantiateCallback = OnPrefabInstantiateClick;
+            _playerExportCallback = OnPlayerExportClick;
+            _sceneFileDialogResultCallback = OnSceneFileDialogResult;
             _rightMaxClickCallback = OnRightMaxClick;
             _consoleDialogResultCallback = OnConsoleDialogResult;
             _consoleRefreshCallback = OnConsoleRefresh;
@@ -418,6 +426,20 @@ _bindScriptClickCallback = OnBindScriptClick;
                         UI.SetText(_assetDbSummaryLabelId,
                             "资产: " + ShortenFfiSummary(UI.AssetGetSummary(), 90));
                     }
+                    // 0.2 场景槽 / Player 导出状态（task-21）
+                    if (_sceneInfoLabelId != 0)
+                    {
+                        string slotName = UI.SceneManagerCurrentName();
+                        if (string.IsNullOrEmpty(slotName)) slotName = "(未保存)";
+                        UI.SetText(_sceneInfoLabelId,
+                            "场景: " + slotName + "  槽=" + UI.SceneManagerCount());
+                    }
+                    if (_exportInfoLabelId != 0 && _lastPlayerExportSummary.Length > 0)
+                    {
+                        UI.SetText(_exportInfoLabelId,
+                            "Player 导出: " + ShortenFfiSummary(
+                                _lastPlayerExportSummary.Replace('\n', ' '), 90));
+                    }
 
                     // === 脚本属性runtime值→UI同步 (每5帧) ===
                     SyncScriptPropertyValuesToUI();
@@ -658,6 +680,295 @@ _bindScriptClickCallback = OnBindScriptClick;
             int space = rest.IndexOf(' ');
             string name = space > 0 ? rest.Substring(0, space) : rest;
             return "ON/" + name;
+        }
+
+        // === 0.2 Prefab / SceneManager / Player 导出（task-21） ===
+
+        /// <summary>保存当前编辑场景为命名场景槽。</summary>
+        private static void OnSceneSaveClick(ulong widgetId)
+        {
+            string name = UI.SceneManagerCurrentName();
+            if (string.IsNullOrEmpty(name))
+            {
+                name = UI.SceneManagerCount() == 0 ? "main" : "scene" + (UI.SceneManagerCount() + 1);
+            }
+            int rc = UI.SceneManagerSaveCurrent(name);
+            if (rc == 0)
+            {
+                Log.Info("SceneManager", "保存场景槽: " + name + " | " + UI.SceneManagerCount() + " 个槽");
+                if (_statusItem != null) _statusItem.Text = "场景已保存: " + name;
+            }
+            else
+            {
+                Log.Warn("SceneManager", "保存场景失败 rc=" + rc);
+                if (_statusItem != null) _statusItem.Text = "场景保存失败: rc=" + rc;
+            }
+        }
+
+        /// <summary>循环切换已保存的场景槽。</summary>
+        private static void OnSceneSwitchClick(ulong widgetId)
+        {
+            string[] names = UI.SceneManagerNames();
+            if (names.Length == 0)
+            {
+                if (_statusItem != null) _statusItem.Text = "没有场景槽，请先保存当前场景";
+                return;
+            }
+            string current = UI.SceneManagerCurrentName();
+            int nextIndex = 0;
+            for (int i = 0; i < names.Length; i++)
+            {
+                if (names[i] == current)
+                {
+                    nextIndex = (i + 1) % names.Length;
+                    break;
+                }
+            }
+            string next = names[nextIndex];
+            int rc = UI.SceneManagerSwitch(next);
+            if (rc == 0)
+            {
+                RefreshSceneAfterSwitch();
+                Log.Info("SceneManager", "切换场景: " + current + " -> " + next);
+                if (_statusItem != null) _statusItem.Text = "切换场景: " + next;
+            }
+            else
+            {
+                Log.Warn("SceneManager", "切换场景失败 rc=" + rc + "（-2=当前场景未保存为槽）");
+                if (_statusItem != null) _statusItem.Text = "切换场景失败: rc=" + rc;
+            }
+        }
+
+        /// <summary>卸载当前场景槽。</summary>
+        private static void OnSceneUnloadClick(ulong widgetId)
+        {
+            string current = UI.SceneManagerCurrentName();
+            if (string.IsNullOrEmpty(current))
+            {
+                if (_statusItem != null) _statusItem.Text = "当前没有场景槽可卸载";
+                return;
+            }
+            int rc = UI.SceneManagerUnload(current);
+            if (rc == 0)
+            {
+                Log.Info("SceneManager", "卸载场景槽: " + current + " | 剩余 " + UI.SceneManagerCount());
+                if (_statusItem != null) _statusItem.Text = "已卸载场景槽: " + current;
+            }
+            else
+            {
+                Log.Warn("SceneManager", "卸载场景失败 rc=" + rc);
+                if (_statusItem != null) _statusItem.Text = "卸载场景失败: rc=" + rc;
+            }
+        }
+
+        private static void OnSceneLoadClick(ulong widgetId) { ShowSceneFileDialog(1); }
+
+        private static void OnPrefabInstantiateClick(ulong widgetId) { ShowSceneFileDialog(2); }
+
+        /// <summary>把当前选中实体子树捕获为 Prefab JSON（assets/prefabs/）。</summary>
+        private static void OnPrefabCaptureClick(ulong widgetId)
+        {
+            if (_gameScene == null || _selectedEntityId == 0)
+            {
+                if (_statusItem != null) _statusItem.Text = "请先在层级中选择实体再捕获 Prefab";
+                return;
+            }
+            try
+            {
+                System.IO.Directory.CreateDirectory("assets/prefabs");
+            }
+            catch (Exception ex)
+            {
+                Log.Warn("Prefab", "创建 assets/prefabs 失败: " + ex.Message);
+            }
+            string name = "prefab_" + _selectedEntityId + "_" + System.DateTime.Now.ToString("HHmmss");
+            string path = "assets/prefabs/" + name + ".prefab.json";
+            int rc = UI.PrefabCaptureFromScene(_gameScene.ScenePtr, _selectedEntityId, name, path);
+            if (rc == 0)
+            {
+                Log.Info("Prefab", "捕获 Prefab: " + name + " -> " + path);
+                if (_statusItem != null) _statusItem.Text = "Prefab 已保存: " + path;
+            }
+            else
+            {
+                Log.Warn("Prefab", "捕获 Prefab 失败 rc=" + rc);
+                if (_statusItem != null) _statusItem.Text = "Prefab 捕获失败: rc=" + rc;
+            }
+        }
+
+        private static void ShowSceneFileDialog(int mode)
+        {
+            _sceneFileDialogMode = mode;
+            ulong rootId = UI.GetRootId();
+            float dialogWidth = 560f;
+            float dialogHeight = 420f;
+            _sceneFileDialogId = UI.CreateDialog(
+                rootId, mode == 1 ? "加载场景文件" : "实例化 Prefab", dialogWidth, dialogHeight);
+            UI.DialogSetOnResult(_sceneFileDialogId, _sceneFileDialogResultCallback);
+            ulong contentId = UI.CreateVStack(_sceneFileDialogId, 10f);
+            UI.CreateLabel(contentId, dialogWidth - 40f, 30f,
+                mode == 1 ? "选择 Project JSON 场景文件:" : "选择 .prefab.json 文件:");
+            _sceneFileBrowserId = UI.CreateFileBrowser(
+                contentId, 10f, 10f, dialogWidth - 60f, dialogHeight - 120f, ".");
+            UI.FileBrowserSetFilter(_sceneFileBrowserId, "*.*");
+            UI.DialogSetContent(_sceneFileDialogId, contentId);
+            UI.DialogAddButton(_sceneFileDialogId, mode == 1 ? "加载" : "实例化", 1);
+            UI.DialogAddButton(_sceneFileDialogId, "取消", 0);
+            UI.DialogShow(_sceneFileDialogId);
+        }
+
+        private static void OnSceneFileDialogResult(ulong dialogId, int result)
+        {
+            UI.DialogHide(_sceneFileDialogId);
+            if (result != 1) return;
+            string selectedPath = GetBrowserSelectedOrCurrent(_sceneFileBrowserId);
+            if (string.IsNullOrEmpty(selectedPath))
+            {
+                if (_statusItem != null) _statusItem.Text = "未选择文件";
+                return;
+            }
+
+            if (_sceneFileDialogMode == 1)
+            {
+                string name = System.IO.Path.GetFileNameWithoutExtension(selectedPath);
+                if (string.IsNullOrEmpty(name)) name = "scene";
+                int loadRc = UI.SceneManagerLoadFile(name, selectedPath);
+                if (loadRc != 0)
+                {
+                    Log.Warn("SceneManager", "加载场景文件失败 rc=" + loadRc + ": " + selectedPath);
+                    if (_statusItem != null) _statusItem.Text = "加载场景文件失败: rc=" + loadRc;
+                    return;
+                }
+                // 切换需要“当前场景槽”；首次加载时自动把当前场景保存为 main。
+                if (string.IsNullOrEmpty(UI.SceneManagerCurrentName()))
+                {
+                    int saveRc = UI.SceneManagerSaveCurrent("main");
+                    if (saveRc != 0)
+                    {
+                        if (_statusItem != null) _statusItem.Text = "场景已加载，但保存当前场景失败: rc=" + saveRc;
+                        return;
+                    }
+                }
+                int switchRc = UI.SceneManagerSwitch(name);
+                if (switchRc == 0)
+                {
+                    RefreshSceneAfterSwitch();
+                    Log.Info("SceneManager", "加载并切换场景: " + name + " <- " + selectedPath);
+                    if (_statusItem != null) _statusItem.Text = "加载并切换场景: " + name;
+                }
+                else
+                {
+                    if (_statusItem != null) _statusItem.Text = "场景已加载，切换失败: rc=" + switchRc;
+                }
+            }
+            else
+            {
+                if (_gameScene == null)
+                {
+                    if (_statusItem != null) _statusItem.Text = "场景未初始化";
+                    return;
+                }
+                ulong rootId = UI.PrefabInstantiate(_gameScene.ScenePtr, selectedPath, 0, 0f, 0f, 0f);
+                if (rootId != 0)
+                {
+                    try
+                    {
+                        RefreshSceneTreeAfterLoad();
+                        _gameScene.SelectEntity(rootId);
+                        _selectedEntityId = rootId;
+                        _selectedEntityIds.Clear();
+                        _selectedEntityIds.Add(rootId);
+                        RefreshEntityTree();
+                        UpdatePropertiesPanel(rootId);
+                        _propertiesDirty = true;
+                    }
+                    catch (Exception ex)
+                    {
+                        Log.Warn("Prefab", "实例化后刷新 UI 失败: " + ex.Message);
+                    }
+                    Log.Info("Prefab", "实例化 Prefab: " + selectedPath + " -> root=" + rootId);
+                    if (_statusItem != null) _statusItem.Text = "Prefab 实例化: root=" + rootId;
+                }
+                else
+                {
+                    Log.Warn("Prefab", "实例化 Prefab 失败: " + selectedPath);
+                    if (_statusItem != null) _statusItem.Text = "Prefab 实例化失败";
+                }
+            }
+        }
+
+        private static void RefreshSceneAfterSwitch()
+        {
+            try
+            {
+                RefreshSceneTreeAfterLoad();
+                ResetUndoHistory();
+            }
+            catch (Exception ex)
+            {
+                Log.Warn("SceneManager", "刷新场景 UI 失败: " + ex.Message);
+            }
+        }
+
+        /// <summary>导出 Player dry-run（双平台计划 + manifest，不复制二进制）。</summary>
+        private static void OnPlayerExportClick(ulong widgetId)
+        {
+            string root = System.IO.Directory.GetCurrentDirectory();
+            string output = System.IO.Path.Combine(root, "logs", "player_dry_run");
+            string product = Project.IsLoaded() ? Project.GetName() : "HezhouGame";
+            string json = "{"
+                + "\"project_root\":\"" + EscapeJsonPath(root) + "\","
+                + "\"output_dir\":\"" + EscapeJsonPath(output) + "\","
+                + "\"product_name\":\"" + EscapeJsonPath(product) + "\","
+                + "\"version\":\"0.1.0\","
+                + "\"start_scene\":\"scenes/main.scene.json\","
+                + "\"scripts_dir\":\"" + EscapeJsonPath(System.IO.Path.Combine(root, "scripts")) + "\","
+                + "\"runtime_dir\":\"" + EscapeJsonPath(System.IO.Path.Combine(root, "runtime", "mono")) + "\","
+                + "\"required_font\":\"fonts/HarmonyOS_Sans_SC.ttf\""
+                + "}";
+            int rc = UI.PlayerExportDryRun(json);
+            _lastPlayerExportSummary = UI.PlayerExportSummary();
+            if (rc == 0)
+            {
+                Log.Info("Player", "Player 导出 dry-run 完成:\n" + _lastPlayerExportSummary);
+                if (_statusItem != null) _statusItem.Text = "Player dry-run 完成";
+            }
+            else
+            {
+                Log.Warn("Player", "Player 导出 dry-run 失败: " + _lastPlayerExportSummary);
+                if (_statusItem != null) _statusItem.Text = "Player dry-run 失败";
+            }
+        }
+
+        private static string EscapeJsonPath(string value)
+        {
+            if (string.IsNullOrEmpty(value)) return "";
+            return value.Replace("\\", "\\\\").Replace("\"", "\\\"");
+        }
+
+        // === 自检用只读辅助（TestRunner 调用） ===
+
+        /// <summary>当前编辑场景指针（0=未初始化）。</summary>
+        public static IntPtr TestGetScenePtr()
+        {
+            return _gameScene != null ? _gameScene.ScenePtr : IntPtr.Zero;
+        }
+
+        /// <summary>当前场景第一个根实体 ID（0=无）。</summary>
+        public static ulong TestGetFirstRootEntityId()
+        {
+            IntPtr scenePtr = TestGetScenePtr();
+            if (scenePtr == IntPtr.Zero) return 0;
+            if (UI.SceneRootEntityCount(scenePtr) == 0) return 0;
+            return UI.SceneGetRootEntityIdAt(scenePtr, 0);
+        }
+
+        /// <summary>当前场景实体数量（自检用）。</summary>
+        public static int TestGetSceneEntityCount()
+        {
+            IntPtr scenePtr = TestGetScenePtr();
+            if (scenePtr == IntPtr.Zero) return 0;
+            return (int)UI.SceneGetEntityCount(scenePtr);
         }
 
         public static void ApplyTheme(ThemeMode mode, bool rebuild)

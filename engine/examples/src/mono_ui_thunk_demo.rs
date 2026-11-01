@@ -458,6 +458,17 @@ fn main() {
         asset_count: stub_asset_count,
         asset_get_summary: stub_asset_get_summary,
         asset_get_asset: stub_asset_get_asset,
+        prefab_capture_from_scene: stub_prefab_capture,
+        prefab_instantiate: stub_prefab_instantiate,
+        scene_manager_save_current: stub_scene_manager_save,
+        scene_manager_load_file: stub_scene_manager_load,
+        scene_manager_switch: stub_scene_manager_switch,
+        scene_manager_unload: stub_scene_manager_unload,
+        scene_manager_count: stub_scene_manager_count,
+        scene_manager_current_name: stub_scene_manager_current_name,
+        scene_manager_names: stub_scene_manager_names,
+        player_export_dry_run: stub_player_export_dry_run,
+        player_export_summary: stub_player_export_summary,
     };
     hezhou_scripting::ffi_context::set_ffi_context(ffi_ctx);
     let ffi_ptr = hezhou_scripting::ffi_context::get_ffi_context_ptr();
@@ -651,6 +662,39 @@ extern "C" fn stub_asset_get_asset(
 ) -> i32 {
     0
 }
+
+extern "C" fn stub_prefab_capture(
+    _: *mut std::ffi::c_void,
+    _: u64,
+    _: *const std::ffi::c_char,
+    _: *const std::ffi::c_char,
+) -> i32 {
+    0
+}
+extern "C" fn stub_prefab_instantiate(
+    _: *mut std::ffi::c_void,
+    _: *const std::ffi::c_char,
+    _: u64,
+    _: f32,
+    _: f32,
+    _: f32,
+) -> u64 {
+    0
+}
+extern "C" fn stub_scene_manager_save(_: *const std::ffi::c_char) -> i32 { 0 }
+extern "C" fn stub_scene_manager_load(
+    _: *const std::ffi::c_char,
+    _: *const std::ffi::c_char,
+) -> i32 {
+    0
+}
+extern "C" fn stub_scene_manager_switch(_: *const std::ffi::c_char) -> i32 { 0 }
+extern "C" fn stub_scene_manager_unload(_: *const std::ffi::c_char) -> i32 { 0 }
+extern "C" fn stub_scene_manager_count() -> i32 { 0 }
+extern "C" fn stub_scene_manager_current_name(_: *mut std::ffi::c_char, _: usize) -> usize { 0 }
+extern "C" fn stub_scene_manager_names(_: *mut std::ffi::c_char, _: usize) -> usize { 0 }
+extern "C" fn stub_player_export_dry_run(_: *const std::ffi::c_char) -> i32 { 0 }
+extern "C" fn stub_player_export_summary(_: *mut std::ffi::c_char, _: usize) -> usize { 0 }
 
 // 新增stub函数 — Feature 1脚本绑定
 pub extern "C" fn scene_get_existing_ptr_stub() -> *mut std::ffi::c_void { std::ptr::null_mut() }

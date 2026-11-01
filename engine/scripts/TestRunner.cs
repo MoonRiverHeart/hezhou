@@ -43,6 +43,9 @@ namespace Hezhou
             try { TestAudioAssetFfi(); }
             catch (Exception ex) { Log.Error("TestRunner", "TestAudioAssetFfi异常: " + ex.Message); }
 
+            try { TestPrefabScenePlayerFfi(); }
+            catch (Exception ex) { Log.Error("TestRunner", "TestPrefabScenePlayerFfi异常: " + ex.Message); }
+
             Log.Info("TestRunner", "===== 测试完成: PASS=" + _passCount + ", FAIL=" + _failCount + " =====");
         }
 
@@ -430,6 +433,85 @@ namespace Hezhou
             UI.AudioSetMasterVolume(0.8f);
             int rcListener = UI.AudioSetListener(0f, 1.5f, -3f);
             AssertTrue("AudioAsset", rcListener == 0, "AudioSetListener 返回 0");
+        }
+
+        /// <summary>
+        /// 0.2 Prefab / SceneManager / Player 导出 dry-run 自检（task-21）：
+        /// Prefab 捕获+实例化（并清理新增实体）、场景槽 保存/切换/卸载、双平台 dry-run 计划生成。
+        /// </summary>
+        private static void TestPrefabScenePlayerFfi()
+        {
+            // --- Prefab：捕获第一个根实体 → 实例化 → 清理 ---
+            ulong rootEntity = EditorScript.TestGetFirstRootEntityId();
+            int before = EditorScript.TestGetSceneEntityCount();
+            if (rootEntity != 0)
+            {
+                System.IO.Directory.CreateDirectory("logs");
+                string prefabPath = System.IO.Path.Combine("logs", "__ffi_prefab_selftest.prefab.json");
+                int captureRc = UI.PrefabCaptureFromScene(
+                    EditorScript.TestGetScenePtr(), rootEntity, "__ffi_selftest_prefab", prefabPath);
+                AssertTrue("PrefabScene", captureRc == 0,
+                    "PrefabCaptureFromScene 返回 0 (rc=" + captureRc + ")");
+                ulong prefabRoot = UI.PrefabInstantiate(
+                    EditorScript.TestGetScenePtr(), prefabPath, 0, 1f, 2f, 3f);
+                AssertTrue("PrefabScene", prefabRoot != 0,
+                    "PrefabInstantiate 返回新根实体 (root=" + prefabRoot + ")");
+                int after = EditorScript.TestGetSceneEntityCount();
+                AssertTrue("PrefabScene", after > before,
+                    "实例化后实体数增加 (" + before + " -> " + after + ")");
+                if (prefabRoot != 0)
+                {
+                    UI.SceneRemoveEntity(EditorScript.TestGetScenePtr(), prefabRoot);
+                }
+                try { if (System.IO.File.Exists(prefabPath)) System.IO.File.Delete(prefabPath); } catch (Exception) { }
+            }
+            else
+            {
+                AssertTrue("PrefabScene", true, "场景无根实体，跳过 Prefab 捕获/实例化");
+            }
+
+            // --- SceneManager：保存当前场景 → 切换 → 卸载 ---
+            int saveRc = UI.SceneManagerSaveCurrent("__ffi_selftest_scene__");
+            AssertTrue("PrefabScene", saveRc == 0,
+                "SceneManagerSaveCurrent 返回 0 (rc=" + saveRc + ")");
+            int slotCount = UI.SceneManagerCount();
+            AssertTrue("PrefabScene", slotCount >= 1, "场景槽数量 >=1 (" + slotCount + ")");
+            string slotName = UI.SceneManagerCurrentName();
+            AssertTrue("PrefabScene", slotName == "__ffi_selftest_scene__",
+                "当前场景槽名正确 (" + slotName + ")");
+            int switchRc = UI.SceneManagerSwitch("__ffi_selftest_scene__");
+            AssertTrue("PrefabScene", switchRc == 0,
+                "SceneManagerSwitch 返回 0 (rc=" + switchRc + ")");
+            int unloadRc = UI.SceneManagerUnload("__ffi_selftest_scene__");
+            AssertTrue("PrefabScene", unloadRc == 0,
+                "SceneManagerUnload 返回 0 (rc=" + unloadRc + ")");
+
+            // --- Player 导出 dry-run（输出到 logs/，不污染工程 assets） ---
+            string rootDir = System.IO.Directory.GetCurrentDirectory();
+            string outputDir = System.IO.Path.Combine(rootDir, "logs", "player_dry_run_selftest");
+            string requestJson = "{"
+                + "\"project_root\":\"" + rootDir.Replace("\\", "\\\\") + "\","
+                + "\"output_dir\":\"" + outputDir.Replace("\\", "\\\\") + "\","
+                + "\"product_name\":\"HezhouSelfTest\","
+                + "\"version\":\"0.1.0\","
+                + "\"start_scene\":\"scenes/main.scene.json\","
+                + "\"scripts_dir\":\"" + System.IO.Path.Combine(rootDir, "scripts").Replace("\\", "\\\\") + "\","
+                + "\"runtime_dir\":\"" + System.IO.Path.Combine(rootDir, "runtime", "mono").Replace("\\", "\\\\") + "\","
+                + "\"required_font\":\"fonts/HarmonyOS_Sans_SC.ttf\""
+                + "}";
+            int exportRc = UI.PlayerExportDryRun(requestJson);
+            AssertTrue("PrefabScene", exportRc == 0,
+                "PlayerExportDryRun 返回 0 (rc=" + exportRc + ")");
+            string exportSummary = UI.PlayerExportSummary();
+            AssertTrue("PrefabScene", exportSummary.IndexOf("Player 导出 dry-run") >= 0,
+                "导出摘要包含 dry-run (" + exportSummary.Replace('\n', ' ') + ")");
+            bool windowsPlan = System.IO.File.Exists(
+                System.IO.Path.Combine(outputDir, "windows", "plan.json"));
+            bool linuxPlan = System.IO.File.Exists(
+                System.IO.Path.Combine(outputDir, "linux", "plan.json"));
+            AssertTrue("PrefabScene", windowsPlan && linuxPlan,
+                "双平台 plan.json 已生成 (win=" + windowsPlan + ", linux=" + linuxPlan + ")");
+            try { System.IO.Directory.Delete(outputDir, true); } catch (Exception) { }
         }
 
         // 内存保存值结构（模拟SavedScriptPropertyValue，用于测试）

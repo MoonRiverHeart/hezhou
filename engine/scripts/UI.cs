@@ -956,6 +956,32 @@ namespace Hezhou
         public delegate int AssetGetAssetDelegate(
             int index, IntPtr idBuffer, ulong idSize, IntPtr pathBuffer, ulong pathSize);
 
+        // 0.2 Prefab / SceneManager / Player 导出 FFI（Rust: editor/prefab_scene_player_ffi.rs）
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate int PrefabCaptureFromSceneDelegate(
+            IntPtr scene, ulong entityId, IntPtr name, IntPtr path);
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate ulong PrefabInstantiateDelegate(
+            IntPtr scene, IntPtr path, ulong parentId, float x, float y, float z);
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate int SceneManagerSaveCurrentDelegate(IntPtr name);
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate int SceneManagerLoadFileDelegate(IntPtr name, IntPtr path);
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate int SceneManagerSwitchDelegate(IntPtr name);
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate int SceneManagerUnloadDelegate(IntPtr name);
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate int SceneManagerCountDelegate();
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate ulong SceneManagerCurrentNameDelegate(IntPtr buffer, ulong bufferSize);
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate ulong SceneManagerNamesDelegate(IntPtr buffer, ulong bufferSize);
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate int PlayerExportDryRunDelegate(IntPtr requestJson);
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate ulong PlayerExportSummaryDelegate(IntPtr buffer, ulong bufferSize);
+
 [StructLayout(LayoutKind.Sequential)]
         public struct FfiContext
         {
@@ -1270,6 +1296,18 @@ namespace Hezhou
             public IntPtr asset_count;
             public IntPtr asset_get_summary;
             public IntPtr asset_get_asset;
+            // 0.2 Prefab / SceneManager / Player 导出 FFI（tail；必须与 Rust FfiContext 字段顺序一致）
+            public IntPtr prefab_capture_from_scene;
+            public IntPtr prefab_instantiate;
+            public IntPtr scene_manager_save_current;
+            public IntPtr scene_manager_load_file;
+            public IntPtr scene_manager_switch;
+            public IntPtr scene_manager_unload;
+            public IntPtr scene_manager_count;
+            public IntPtr scene_manager_current_name;
+            public IntPtr scene_manager_names;
+            public IntPtr player_export_dry_run;
+            public IntPtr player_export_summary;
         }
 
         public static void InitFromContext(IntPtr contextPtr)
@@ -1824,6 +1862,213 @@ public static void RegisterResizeCallback(ResizeCallbackDelegate callback)
             {
                 Marshal.FreeHGlobal(idBuffer);
                 Marshal.FreeHGlobal(pathBuffer);
+            }
+        }
+
+        // === 0.2 Prefab FFI ===
+
+        /// <summary>捕获场景实体子树为 Prefab JSON 文件；返回 0 成功。</summary>
+        public static int PrefabCaptureFromScene(IntPtr scene, ulong entityId, string name, string path)
+        {
+            if (_ffi.prefab_capture_from_scene == IntPtr.Zero) return -1;
+            IntPtr namePtr = Marshal.StringToHGlobalAnsi(name ?? "");
+            IntPtr pathPtr = Marshal.StringToHGlobalAnsi(path ?? "");
+            try
+            {
+                var func = Marshal.GetDelegateForFunctionPointer<PrefabCaptureFromSceneDelegate>(
+                    _ffi.prefab_capture_from_scene);
+                return func(scene, entityId, namePtr, pathPtr);
+            }
+            finally
+            {
+                Marshal.FreeHGlobal(namePtr);
+                Marshal.FreeHGlobal(pathPtr);
+            }
+        }
+
+        /// <summary>从 Prefab JSON 文件实例化，返回新根实体 ID（0=失败）。</summary>
+        public static ulong PrefabInstantiate(
+            IntPtr scene, string prefabPath, ulong parentId, float x, float y, float z)
+        {
+            if (_ffi.prefab_instantiate == IntPtr.Zero) return 0;
+            IntPtr pathPtr = Marshal.StringToHGlobalAnsi(prefabPath ?? "");
+            try
+            {
+                var func = Marshal.GetDelegateForFunctionPointer<PrefabInstantiateDelegate>(
+                    _ffi.prefab_instantiate);
+                return func(scene, pathPtr, parentId, x, y, z);
+            }
+            finally
+            {
+                Marshal.FreeHGlobal(pathPtr);
+            }
+        }
+
+        // === 0.2 SceneManager FFI ===
+
+        /// <summary>把当前编辑场景保存为命名场景槽（0 成功）。</summary>
+        public static int SceneManagerSaveCurrent(string name)
+        {
+            if (_ffi.scene_manager_save_current == IntPtr.Zero) return -1;
+            IntPtr namePtr = Marshal.StringToHGlobalAnsi(name ?? "");
+            try
+            {
+                var func = Marshal.GetDelegateForFunctionPointer<SceneManagerSaveCurrentDelegate>(
+                    _ffi.scene_manager_save_current);
+                return func(namePtr);
+            }
+            finally
+            {
+                Marshal.FreeHGlobal(namePtr);
+            }
+        }
+
+        /// <summary>从 Project JSON 文件加载场景槽（0 成功）。</summary>
+        public static int SceneManagerLoadFile(string name, string path)
+        {
+            if (_ffi.scene_manager_load_file == IntPtr.Zero) return -1;
+            IntPtr namePtr = Marshal.StringToHGlobalAnsi(name ?? "");
+            IntPtr pathPtr = Marshal.StringToHGlobalAnsi(path ?? "");
+            try
+            {
+                var func = Marshal.GetDelegateForFunctionPointer<SceneManagerLoadFileDelegate>(
+                    _ffi.scene_manager_load_file);
+                return func(namePtr, pathPtr);
+            }
+            finally
+            {
+                Marshal.FreeHGlobal(namePtr);
+                Marshal.FreeHGlobal(pathPtr);
+            }
+        }
+
+        /// <summary>切换场景槽（0 成功；-2 表示当前场景尚未保存为场景槽）。</summary>
+        public static int SceneManagerSwitch(string name)
+        {
+            if (_ffi.scene_manager_switch == IntPtr.Zero) return -1;
+            IntPtr namePtr = Marshal.StringToHGlobalAnsi(name ?? "");
+            try
+            {
+                var func = Marshal.GetDelegateForFunctionPointer<SceneManagerSwitchDelegate>(
+                    _ffi.scene_manager_switch);
+                return func(namePtr);
+            }
+            finally
+            {
+                Marshal.FreeHGlobal(namePtr);
+            }
+        }
+
+        /// <summary>卸载场景槽（0 成功）。</summary>
+        public static int SceneManagerUnload(string name)
+        {
+            if (_ffi.scene_manager_unload == IntPtr.Zero) return -1;
+            IntPtr namePtr = Marshal.StringToHGlobalAnsi(name ?? "");
+            try
+            {
+                var func = Marshal.GetDelegateForFunctionPointer<SceneManagerUnloadDelegate>(
+                    _ffi.scene_manager_unload);
+                return func(namePtr);
+            }
+            finally
+            {
+                Marshal.FreeHGlobal(namePtr);
+            }
+        }
+
+        /// <summary>场景槽数量。</summary>
+        public static int SceneManagerCount()
+        {
+            if (_ffi.scene_manager_count == IntPtr.Zero) return 0;
+            var func = Marshal.GetDelegateForFunctionPointer<SceneManagerCountDelegate>(
+                _ffi.scene_manager_count);
+            return func();
+        }
+
+        /// <summary>当前场景槽名（无则空串）。</summary>
+        public static string SceneManagerCurrentName()
+        {
+            if (_ffi.scene_manager_current_name == IntPtr.Zero) return "";
+            const int bufferSize = 256;
+            IntPtr buffer = Marshal.AllocHGlobal(bufferSize);
+            try
+            {
+                Marshal.WriteByte(buffer, 0, 0);
+                var func = Marshal.GetDelegateForFunctionPointer<SceneManagerCurrentNameDelegate>(
+                    _ffi.scene_manager_current_name);
+                ulong written = func(buffer, (ulong)bufferSize);
+                return written == 0UL ? "" : (Marshal.PtrToStringAnsi(buffer) ?? "");
+            }
+            finally
+            {
+                Marshal.FreeHGlobal(buffer);
+            }
+        }
+
+        /// <summary>全部场景槽名（排序）。</summary>
+        public static string[] SceneManagerNames()
+        {
+            if (_ffi.scene_manager_names == IntPtr.Zero) return new string[0];
+            const int bufferSize = 2048;
+            IntPtr buffer = Marshal.AllocHGlobal(bufferSize);
+            try
+            {
+                Marshal.WriteByte(buffer, 0, 0);
+                var func = Marshal.GetDelegateForFunctionPointer<SceneManagerNamesDelegate>(
+                    _ffi.scene_manager_names);
+                ulong written = func(buffer, (ulong)bufferSize);
+                if (written == 0UL) return new string[0];
+                string joined = Marshal.PtrToStringAnsi(buffer, (int)written) ?? "";
+                string[] parts = joined.Split('\0');
+                System.Collections.Generic.List<string> names = new System.Collections.Generic.List<string>();
+                for (int i = 0; i < parts.Length; i++)
+                {
+                    if (!string.IsNullOrEmpty(parts[i])) names.Add(parts[i]);
+                }
+                return names.ToArray();
+            }
+            finally
+            {
+                Marshal.FreeHGlobal(buffer);
+            }
+        }
+
+        // === 0.2 Player 导出 dry-run FFI ===
+
+        /// <summary>生成双平台 Player dry-run 计划（0 成功）。</summary>
+        public static int PlayerExportDryRun(string requestJson)
+        {
+            if (_ffi.player_export_dry_run == IntPtr.Zero) return -1;
+            IntPtr jsonPtr = Marshal.StringToHGlobalAnsi(requestJson ?? "");
+            try
+            {
+                var func = Marshal.GetDelegateForFunctionPointer<PlayerExportDryRunDelegate>(
+                    _ffi.player_export_dry_run);
+                return func(jsonPtr);
+            }
+            finally
+            {
+                Marshal.FreeHGlobal(jsonPtr);
+            }
+        }
+
+        /// <summary>最近一次 Player dry-run 摘要。</summary>
+        public static string PlayerExportSummary()
+        {
+            if (_ffi.player_export_summary == IntPtr.Zero) return "";
+            const int bufferSize = 4096;
+            IntPtr buffer = Marshal.AllocHGlobal(bufferSize);
+            try
+            {
+                Marshal.WriteByte(buffer, 0, 0);
+                var func = Marshal.GetDelegateForFunctionPointer<PlayerExportSummaryDelegate>(
+                    _ffi.player_export_summary);
+                ulong written = func(buffer, (ulong)bufferSize);
+                return written == 0UL ? "" : (Marshal.PtrToStringAnsi(buffer, (int)written) ?? "");
+            }
+            finally
+            {
+                Marshal.FreeHGlobal(buffer);
             }
         }
     }

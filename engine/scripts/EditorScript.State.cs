@@ -208,6 +208,22 @@ namespace Hezhou
         private static ListItem _assetItem;
         private static ListItem _audioItem;
 
+        // === 0.2 Prefab / SceneManager / Player 导出（task-21） ===
+        private static UI.WidgetCallbackDelegate _sceneSaveCallback;
+        private static UI.WidgetCallbackDelegate _sceneSwitchCallback;
+        private static UI.WidgetCallbackDelegate _sceneUnloadCallback;
+        private static UI.WidgetCallbackDelegate _sceneLoadCallback;
+        private static UI.WidgetCallbackDelegate _prefabCaptureCallback;
+        private static UI.WidgetCallbackDelegate _prefabInstantiateCallback;
+        private static UI.WidgetCallbackDelegate _playerExportCallback;
+        private static ulong _sceneInfoLabelId;
+        private static ulong _exportInfoLabelId;
+        private static ulong _sceneFileDialogId;
+        private static ulong _sceneFileBrowserId;
+        private static UI.DialogResultCallbackDelegate _sceneFileDialogResultCallback;
+        private static int _sceneFileDialogMode; // 1=加载场景文件，2=实例化 Prefab
+        private static string _lastPlayerExportSummary = "";
+
         // === Dock / Layout State ===
         private static ulong _rightMaxButtonId;
         private static UI.WidgetCallbackDelegate _rightMaxClickCallback;

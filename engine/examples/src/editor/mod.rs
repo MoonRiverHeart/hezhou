@@ -10,6 +10,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 pub mod ffi_impl;
 pub mod scene_ffi_impl;
 pub mod audio_asset_ffi;
+pub mod prefab_scene_player_ffi;
 pub mod hot_reload;
 pub mod dfx_init;
 #[cfg(feature = "mcp")]
@@ -195,6 +196,9 @@ pub fn run() {
     dfx_trace_begin!("AudioAsset", "init");
     audio_asset_ffi::startup_init();
     dfx_trace_end!("AudioAsset", "init");
+
+    // 0.2 Prefab / SceneManager / Player 导出：场景管理器启动初始化。
+    prefab_scene_player_ffi::startup_init();
 
     dfx_trace_begin!("Script", "compile");
     hot_reload::compile_editor_script();
@@ -446,6 +450,17 @@ ui_tree_view_set_on_select_thunk_ptr: unsafe { std::mem::transmute(ui_ffi::ui_tr
         asset_count: audio_asset_ffi::asset_count,
         asset_get_summary: audio_asset_ffi::asset_get_summary,
         asset_get_asset: audio_asset_ffi::asset_get_asset,
+        prefab_capture_from_scene: prefab_scene_player_ffi::prefab_capture_from_scene,
+        prefab_instantiate: prefab_scene_player_ffi::prefab_instantiate,
+        scene_manager_save_current: prefab_scene_player_ffi::scene_manager_save_current,
+        scene_manager_load_file: prefab_scene_player_ffi::scene_manager_load_file,
+        scene_manager_switch: prefab_scene_player_ffi::scene_manager_switch,
+        scene_manager_unload: prefab_scene_player_ffi::scene_manager_unload,
+        scene_manager_count: prefab_scene_player_ffi::scene_manager_count,
+        scene_manager_current_name: prefab_scene_player_ffi::scene_manager_current_name,
+        scene_manager_names: prefab_scene_player_ffi::scene_manager_names,
+        player_export_dry_run: prefab_scene_player_ffi::player_export_dry_run,
+        player_export_summary: prefab_scene_player_ffi::player_export_summary,
         on_hot_reload_complete: ffi_impl::on_hot_reload_complete_placeholder,
         register_hot_reload_complete_callback: unsafe { std::mem::transmute(hot_reload::register_hot_reload_complete_callback as *const std::ffi::c_void) },
         ui_debug_print_widget_tree: unsafe { std::mem::transmute(ui_ffi::ui_debug_print_widget_tree as *const std::ffi::c_void) },

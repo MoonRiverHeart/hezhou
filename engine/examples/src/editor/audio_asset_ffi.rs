@@ -436,6 +436,53 @@ fn read_c_string(ptr: *const c_char) -> Option<String> {
     unsafe { CStr::from_ptr(ptr).to_str().ok().map(str::to_string) }
 }
 
+// === 资产数据库导出辅助（供 Player 导出 dry-run 使用） ===
+
+/// Player 导出用的资产行（相对 `assets/` 的路径 + 元数据）。
+#[derive(Clone, Debug)]
+pub(crate) struct ExportAssetRow {
+    /// 相对 `assets/` 的路径（Player manifest 的 `path`）。
+    pub path: String,
+    /// 资产类型（snake_case）。
+    pub kind: String,
+    /// 源文件字节数。
+    pub size_bytes: Option<u64>,
+    /// 内容校验（`fnv1a64:...`）。
+    pub checksum: Option<String>,
+    /// 稳定 AssetId（UUID 字符串）。
+    pub asset_id: String,
+}
+
+/// 收集 AssetDatabase 中所有文件资产（不含子资产），供 Player dry-run manifest 使用。
+pub(crate) fn export_asset_rows() -> Vec<ExportAssetRow> {
+    let Some(db) = db_ref() else {
+        return Vec::new();
+    };
+    let mut rows = Vec::new();
+    for entry in db.entries() {
+        if entry.is_sub_asset() {
+            continue;
+        }
+        let Some(relative) = entry.locator.path().strip_prefix(db.assets_root()) else {
+            continue;
+        };
+        let fs_path = entry.locator.path().to_fs_path(db.project_root());
+        let metadata = std::fs::metadata(&fs_path).ok();
+        let checksum = std::fs::read(&fs_path)
+            .ok()
+            .map(|bytes| format!("fnv1a64:{}", hezhou_asset::fnv1a64_hex(&bytes)));
+        rows.push(ExportAssetRow {
+            path: relative.as_str().to_string(),
+            kind: entry.kind.as_str().to_string(),
+            size_bytes: metadata.map(|meta| meta.len()),
+            checksum,
+            asset_id: entry.id.to_string(),
+        });
+    }
+    rows.sort_by(|left, right| left.path.cmp(&right.path));
+    rows
+}
+
 // === extern "C" FFI（注册到 FfiContext；见 scripting/src/ffi_context/audio_asset.rs） ===
 
 #[unsafe(no_mangle)]

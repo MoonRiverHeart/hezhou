@@ -307,6 +307,26 @@ namespace Hezhou
             _assetDbSummaryLabelId = UI.CreateLabel(projectAssetTabContent, 640f, 24f, "资产: 未初始化");
             UI.CreateLabel(projectAssetTabContent, 640f, 22f, "扫描结果同时输出到 Console；AssetId 可用 UI.AssetGetAsset(index) 查询");
 
+            // 0.2 场景 / Prefab / Player 导出（task-21）
+            UI.CreateLabel(projectAssetTabContent, 520f, 24f, "场景 / Prefab / Player 导出（task-21）");
+            ulong sceneSaveButton = UI.CreateButton(projectAssetTabContent, 150f, 26f, "保存当前场景");
+            UI.SetOnClick(sceneSaveButton, _sceneSaveCallback);
+            ulong sceneSwitchButton = UI.CreateButton(projectAssetTabContent, 130f, 26f, "切换场景");
+            UI.SetOnClick(sceneSwitchButton, _sceneSwitchCallback);
+            ulong sceneUnloadButton = UI.CreateButton(projectAssetTabContent, 130f, 26f, "卸载当前场景");
+            UI.SetOnClick(sceneUnloadButton, _sceneUnloadCallback);
+            ulong sceneLoadButton = UI.CreateButton(projectAssetTabContent, 150f, 26f, "加载场景文件");
+            UI.SetOnClick(sceneLoadButton, _sceneLoadCallback);
+            ulong prefabCaptureButton = UI.CreateButton(projectAssetTabContent, 170f, 26f, "捕获选中为 Prefab");
+            UI.SetOnClick(prefabCaptureButton, _prefabCaptureCallback);
+            ulong prefabInstantiateButton = UI.CreateButton(projectAssetTabContent, 150f, 26f, "实例化 Prefab");
+            UI.SetOnClick(prefabInstantiateButton, _prefabInstantiateCallback);
+            ulong playerExportButton = UI.CreateButton(projectAssetTabContent, 180f, 26f, "导出 Player（DryRun）");
+            UI.SetOnClick(playerExportButton, _playerExportCallback);
+            _sceneInfoLabelId = UI.CreateLabel(projectAssetTabContent, 720f, 24f, "场景: 未保存（槽 0）");
+            _exportInfoLabelId = UI.CreateLabel(projectAssetTabContent, 720f, 24f, "Player 导出: 未执行");
+            UI.CreateLabel(projectAssetTabContent, 720f, 22f, "Dry-run 输出到 logs/player_dry_run（双平台 manifest/plan/file-list）");
+
             _assetTabWidget.AddTab("模型", modelTabContent, false);
             _assetTabWidget.AddTab("材质", materialTabContent, false);
             if (!_textureDockedRight)

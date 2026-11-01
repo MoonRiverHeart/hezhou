@@ -10,6 +10,7 @@ mod property;
 mod asset_project;
 mod pipeline;
 mod audio_asset;
+mod prefab_scene_player;
 
 pub use types::*;
 pub use ui_system::*;
@@ -23,6 +24,7 @@ pub use property::*;
 pub use asset_project::*;
 pub use pipeline::*;
 pub use audio_asset::*;
+pub use prefab_scene_player::*;
 
 use std::ffi::c_void;
 
@@ -334,6 +336,18 @@ pub project_add_entity: ProjectAddEntityFn,
         pub asset_count: AssetCountFn,
         pub asset_get_summary: AssetGetSummaryFn,
         pub asset_get_asset: AssetGetAssetFn,
+        // 0.2 Prefab / SceneManager / Player 导出 FFI（tail；必须与 C# FfiContext 字段顺序一致）
+        pub prefab_capture_from_scene: PrefabCaptureFromSceneFn,
+        pub prefab_instantiate: PrefabInstantiateFn,
+        pub scene_manager_save_current: SceneManagerSaveCurrentFn,
+        pub scene_manager_load_file: SceneManagerLoadFileFn,
+        pub scene_manager_switch: SceneManagerSwitchFn,
+        pub scene_manager_unload: SceneManagerUnloadFn,
+        pub scene_manager_count: SceneManagerCountFn,
+        pub scene_manager_current_name: SceneManagerCurrentNameFn,
+        pub scene_manager_names: SceneManagerNamesFn,
+        pub player_export_dry_run: PlayerExportDryRunFn,
+        pub player_export_summary: PlayerExportSummaryFn,
     }
 
 static mut FFI_CONTEXT: Option<Box<FfiContext>> = None;
