@@ -11,9 +11,15 @@
 ## STRUCTURE
 ```
 hezhou/
-├── engine/          # Rust workspace — 13 crates（详见 engine/AGENTS.md）
+├── engine/          # Rust workspace — 20 crates（详见 engine/AGENTS.md）
 │   ├── examples/    # mono_editor_demo（编辑器主程序）
 │   │   └── src/hezhou_launcher.rs  # Windows GUI 启动器（无终端）
+│   ├── audio/       # 0.2 音频能力（Null/cpal 后端、混音、3D）
+│   ├── asset/       # 0.2 资产管线（AssetId/Meta/glTF/cook）
+│   ├── gameplay/    # 0.2 动作能力（Motor/Camera/Combat）
+│   ├── animation/   # 0.2 骨骼/蒙皮/状态机
+│   ├── integration/ # animation/gameplay/physics 适配层
+│   ├── player/      # Windows/Linux Player 导出
 │   ├── scripts/     # 34 个 C# 脚本 + build_mono.ps1
 │   ├── fonts/       # HarmonyOS_Sans_SC.ttf（已入库，安装包必须包含）
 │   └── target/      # 构建产物（gitignore）
@@ -41,8 +47,10 @@ hezhou/
 | Windows MSI | `installer/windows/build_msi.ps1` | WiX v5，Start Menu 指向 launcher |
 | Windows MSIX | `installer/windows/build_msix.ps1` | MakeAppx + signtool，自签名证书 |
 | Linux DEB | `installer/linux/build_deb.sh` | Python 生成 ar/control/data |
+| 0.2 能力模块 | `engine/{audio,asset,gameplay,animation,integration,player}/` | 先跑各自 `cargo test -p ...` |
 | CI / 发布 | `.github/workflows/ci.yml` | tag `v*` 或 workflow_dispatch |
 | 引擎完整 KB | `engine/AGENTS.md` | 架构、FFI、Widget、测试细节 |
+| 0.2 项目计划 | `docs/PROJECT_PLAN.md` | 路线图、验收、ADR、当前进度 |
 
 ## CONVENTIONS
 - Cargo workspace 在 `engine/`，任何 cargo 命令先 `cd engine`。

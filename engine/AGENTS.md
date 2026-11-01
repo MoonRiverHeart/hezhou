@@ -62,7 +62,7 @@ engine/
 - **C# has NO Main() methods**: All scripts are DLL assemblies, entry via static Initialize() called from Rust
 - **Shader compilation**: NO automated pipeline. `.spv` files manually compiled via glslc and committed to repo
 - **Mono build**: 3 inconsistent PowerShell scripts (build_mono.ps1, build_mono_ui.ps1, build_ui_mono.ps1)
-- **13 crate workspace**: core, ui, rhi, rhi-vulkan, render, scripting, platform, dfx, physics, harmony, geometry, examples, mcp
+- **20 crate workspace**: core, ui, rhi, rhi-vulkan, render, render-pipeline, scripting, platform, dfx, physics, harmony, geometry, examples, mcp, audio, asset, gameplay, animation, integration, player
 - **Platform feature gates**: `glfw` (Windows/Linux), `harmony` (OpenHarmony) — PlatformManager selects backend at init
 - **RHI is trait-based**: rhi/ defines abstract Device/CommandBuffer/Pipeline traits, rhi-vulkan/ implements them
 
@@ -146,6 +146,7 @@ glslc shaders/rotation.frag -o shaders/rotation.frag.spv
 - Editor startup: FontAtlas init + C# compile + Mono load ≈ 2-3s
 - 3 inconsistent Mono build scripts (build_mono.ps1 hardcoded mcs path, build_mono_ui.ps1 uses PATH + -unsafe flag, build_ui_mono.ps1 hardcoded + subset) — should consolidate
 - CI: `.github/workflows/ci.yml`（rust-tests / csharp-build / package-windows / package-linux / publish-release）；tag `v*` 触发 MSI+MSIX+DEB 打包并发布 GitHub Release
+- 0.2 新模块（audio/asset/gameplay/animation/integration/player）已加入 workspace；`scripts/ci_local.ps1` 已覆盖默认测试，可选 feature 测试单独跑
 - No rust-toolchain.toml — no pinned toolchain
 - workspace.dependencies under-used: only 3 deps (parking_lot, tokio unused, wrapped_mono) — version skew risk
 - editor/mod.rs uses 7 `static mut` globals — soundness hazard (undefined behavior from multiple threads)

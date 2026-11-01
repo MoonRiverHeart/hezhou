@@ -23,6 +23,16 @@ cargo test -j 1 `
     -p hezhou-physics -p hezhou-render-pipeline -p hezhou-rhi-vulkan
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
+Step "0.2 capability feature tests"
+cargo test -j 1 -p hezhou-audio --features cpal-backend,ogg
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+cargo test -j 1 -p hezhou-asset --features animation-bridge
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+cargo test -j 1 -p hezhou-gameplay --features physics
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+cargo test -j 1 -p hezhou-integration --no-default-features
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
 Step "FFI contract"
 python scripts/check_ffi_contract.py
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

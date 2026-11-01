@@ -9,10 +9,13 @@ name = "hezhou_integration"
 path = "src/lib.rs"
 
 [dependencies]
-# 集成层是唯一同时依赖两个能力 crate 的地方：
-# - animation / gameplay 本身保持互不依赖，只通过 trait / 适配层组合。
+# 集成层是唯一同时依赖多个能力 crate 的地方：
+# - animation / gameplay 本身保持互不依赖，只通过 trait / 适配层组合；
+# - gameplay 启用其 `physics` feature：复用 gameplay-owner 已实现的
+#   `PhysicsQuery` / `PhysicsHitQuery`（不重复实现查询 trait）。
 hezhou-animation = { path = "../animation" }
-hezhou-gameplay = { path = "../gameplay" }
+hezhou-gameplay = { path = "../gameplay", features = ["physics"] }
+hezhou-physics = { path = "../physics" }
 
 [features]
 # animation task-11 已合入 Land/Dodge/Block，默认开启一一映射；
