@@ -28,10 +28,11 @@
 - ✅ Player C# SceneContext v1：C# 可创建 cube/实体、设置/读取 position；真实窗口 C# 创建 cube，Scene 3→4，30 帧 exit 0；mono-host 111 tests。
 - ✅ Player C# SceneContext v2：rotation/scale/exists/destroy；C# 创建 cube 并设置完整 Transform，Shutdown 销毁，真实窗口 30 帧 exit 0；mono-host 112 tests。
 - ✅ Player C# 动画 API v3：C# 枚举/播放/设置 clip 时间/速度，palette 由 C# 驱动；真实 skinned fixture 30 帧 exit 0；mono-host 119 tests。
+- ✅ Player C# 资产/音频 API v4：C# 枚举 6 个资产、加载 WAV、play/pause/resume/volume/stop；真实窗口 30 帧 exit 0；mono-host 123 tests。
 - ✅ 本地 CI `ci_local.ps1 -Offline` 通过（默认测试 + feature 测试 + FFI 契约 + C# 编译 + 图标一致性）。
 - ✅ 验证证据：capability_demo 14/14 项通过；Player 72 tests；Core 43 tests；编辑器启动自检 PASS=57、FAIL=0；FFI 301/301/301。
 - ⏳ 未完成（0.2 验收尚未达成）：
-  1. C# 对 gameplay/asset/audio 的完整 API 绑定（Scene/Transform/动画控制已接入）；
+  1. C# 对 gameplay 的 API 绑定（Scene/Transform/动画/资产/音频已接入）；
   2. Player 发布附件、真实 cooker 端到端、双平台 release 验证；
   3. 0.2 最终测试/文档收尾与 Release。
 - 0.2 仍处于进行中，不满足发布 Definition of Done。
