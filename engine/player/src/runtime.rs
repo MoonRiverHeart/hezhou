@@ -19,6 +19,7 @@ use crate::host::{
     resolve_host, HostError, HostOutcome, PlayerHostContext, DEFAULT_HOST_NAME,
     HOST_PENDING_EXIT_CODE,
 };
+use crate::imported_assets::{ImportedAssetBundle, ImportedAssetError, ImportedAssetSummary};
 use crate::logging::{format_timestamp_utc, FileLogger, STARTUP_ERROR_LOG};
 use crate::manifest::{ManifestError, PlayerManifest};
 use crate::paths::to_native_path;
@@ -71,6 +72,8 @@ pub struct RuntimeReport {
     pub log_path: PathBuf,
     /// 已加载并校验 output 的资产索引。
     pub index: PlayerAssetIndex,
+    /// cook 导入资产（`imported/*.json`）加载摘要。
+    pub imported_assets: ImportedAssetSummary,
     /// 起始场景摘要（Project JSON 恢复或内置回退）。
     pub start_scene: StartSceneSummary,
     /// `--run`/`--host` 模式下的 host 结果（`--validate`/默认模式为 `None`）。
@@ -81,7 +84,7 @@ impl RuntimeReport {
     /// 单行启动摘要（带控制台时打印；无终端时只进日志）。
     pub fn summary(&self) -> String {
         let mut text = format!(
-            "hezhou-player {} 启动检查通过：{} v{}（{}，质量 {}）场景 {}；{}；起始场景 {}；日志 {}",
+            "hezhou-player {} 启动检查通过：{} v{}（{}，质量 {}）场景 {}；{}；{}；起始场景 {}；日志 {}",
             RUNTIME_ENGINE_VERSION,
             self.manifest.product_name,
             self.manifest.version,
@@ -89,6 +92,7 @@ impl RuntimeReport {
             self.manifest.quality.as_str(),
             self.layout.start_scene.display(),
             self.index.summary(),
+            self.imported_assets.summary(),
             self.start_scene.source.summary(),
             self.log_path.display(),
         );
@@ -122,6 +126,7 @@ impl RuntimeReport {
 pub enum RuntimeError {
     Manifest(ManifestError),
     AssetIndex(AssetIndexError),
+    ImportedAssets(ImportedAssetError),
     Host(HostError),
     Io {
         context: String,
@@ -143,6 +148,7 @@ impl fmt::Display for RuntimeError {
         match self {
             Self::Manifest(source) => write!(f, "{source}"),
             Self::AssetIndex(source) => write!(f, "{source}"),
+            Self::ImportedAssets(source) => write!(f, "{source}"),
             Self::Host(source) => write!(f, "PlayerHost 失败：{source}"),
             Self::Io { context, source } => write!(f, "{context} 失败：{source}"),
             Self::InvalidRoot { path } => write!(
@@ -161,6 +167,7 @@ impl std::error::Error for RuntimeError {
         match self {
             Self::Manifest(source) => Some(source),
             Self::AssetIndex(source) => Some(source),
+            Self::ImportedAssets(source) => Some(source),
             Self::Host(source) => Some(source),
             Self::Io { source, .. } => Some(source),
             _ => None,
@@ -376,7 +383,15 @@ pub fn run(options: RuntimeOptions) -> Result<RuntimeReport, RuntimeError> {
         )?;
     }
 
-    // 7) 加载起始场景：manifest.start_scene → Project JSON → Scene；失败回退内置场景。
+    // 7) 加载 cook 导入资产 bundle（assets/imported/*.json），严格核对 cook manifest。
+    let imported_assets = ImportedAssetBundle::load(&layout.assets_dir, &index)
+        .map_err(RuntimeError::ImportedAssets)?;
+    for warning in imported_assets.warnings() {
+        log_warn(&mut logger, &format!("imported 资产：{warning}"))?;
+    }
+    log_info(&mut logger, &imported_assets.summary())?;
+
+    // 8) 加载起始场景：manifest.start_scene → Project JSON → Scene；失败回退内置场景。
     let mut loaded_scene = load_start_scene(&root, &manifest, &index);
     for warning in &loaded_scene.warnings {
         log_warn(&mut logger, &format!("起始场景：{warning}"))?;
@@ -384,11 +399,11 @@ pub fn run(options: RuntimeOptions) -> Result<RuntimeReport, RuntimeError> {
     log_info(&mut logger, &loaded_scene.summary())?;
     let start_scene_summary = StartSceneSummary::from_loaded(&loaded_scene);
 
-    // 8) 模式：--validate / --run(host) / 默认骨架启动。
+    // 9) 模式：--validate / --run(host) / 默认骨架启动。
     let host_report = if options.validate_only {
         log_info(
             &mut logger,
-            "validate-only 模式：启动检查完成（资产索引与起始场景已加载）",
+            "validate-only 模式：启动检查完成（资产索引、imported 资产与起始场景已加载）",
         )?;
         None
     } else if options.run {
@@ -404,6 +419,7 @@ pub fn run(options: RuntimeOptions) -> Result<RuntimeReport, RuntimeError> {
                 assets_dir: &layout.assets_dir,
                 manifest: &manifest,
                 index: &index,
+                imported_assets: &imported_assets,
                 start_scene: &mut loaded_scene.scene,
                 start_scene_source: &loaded_scene.source,
                 log: &mut logger,
@@ -440,6 +456,7 @@ pub fn run(options: RuntimeOptions) -> Result<RuntimeReport, RuntimeError> {
         layout,
         log_path,
         index,
+        imported_assets: imported_assets.summary_data(),
         start_scene: start_scene_summary,
         host: host_report,
     })

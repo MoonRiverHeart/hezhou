@@ -320,7 +320,7 @@ fn validate_still_passes_with_index() {
     let log = std::fs::read_to_string(log_dir.join("player.log")).expect("读取 player.log");
     assert!(log.contains("资产索引 4 条"), "日志：{log}");
     assert!(
-        log.contains("启动检查完成（资产索引与起始场景已加载）"),
+        log.contains("启动检查完成（资产索引、imported 资产与起始场景已加载）"),
         "日志：{log}"
     );
 }

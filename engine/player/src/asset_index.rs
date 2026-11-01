@@ -344,13 +344,22 @@ impl IndexBuilder {
         if self.entries.contains_key(&entry.id) {
             return Err(AssetIndexError::DuplicateAssetId { id: entry.id });
         }
+        // glTF 子资产（mesh/material/...）与父 glTF 共用同一个 imported/*.json output；
+        // 只有文件级条目才要求 output 唯一（子资产用 locator 的 `kind:index` 区分）。
+        let is_sub_asset = entry
+            .locator
+            .as_ref()
+            .map(|locator| locator.is_sub_asset())
+            .unwrap_or(false);
         let key = entry.output.to_lowercase();
-        if self.outputs.contains_key(&key) {
-            return Err(AssetIndexError::DuplicateOutput {
-                output: entry.output.clone(),
-            });
+        if !is_sub_asset {
+            if self.outputs.contains_key(&key) {
+                return Err(AssetIndexError::DuplicateOutput {
+                    output: entry.output.clone(),
+                });
+            }
+            self.outputs.insert(key, entry.id);
         }
-        self.outputs.insert(key, entry.id);
         self.entries.insert(entry.id, entry);
         Ok(())
     }
@@ -406,7 +415,7 @@ pub enum AssetIndexError {
     InvalidOutputPath { output: String, source: PathError },
     /// 重复 AssetId。
     DuplicateAssetId { id: AssetId },
-    /// 两个条目 output 仅大小写不同/完全相同。
+    /// 两个文件级条目 output 仅大小写不同/完全相同（子资产共享 output 不算）。
     DuplicateOutput { output: String },
     /// 索引条目对应的包内文件不存在。
     MissingOutput { output: String, path: PathBuf },

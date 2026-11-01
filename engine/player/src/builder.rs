@@ -1395,7 +1395,9 @@ impl PlayerBuilder {
                 source,
             })?;
         }
-        fs::rename(&staging_path, output_dir).map_err(|source| BuildError::Io {
+        // Windows 上目录 rename 可能被杀毒/索引服务短暂占用（PermissionDenied），
+        // 重试几次；仍失败才返回错误（staging guard 会清理临时目录）。
+        rename_with_retry(&staging_path, output_dir).map_err(|source| BuildError::Io {
             context: format!(
                 "提交产物目录 {} -> {}",
                 staging_path.display(),
@@ -1702,4 +1704,21 @@ fn staging_path(output_dir: &Path) -> PathBuf {
         ".{name}.staging-{}-{counter}",
         std::process::id()
     ))
+}
+
+/// 目录 rename 的小重试封装（Windows 杀毒/索引服务可能短暂占用刚写入的目录）。
+fn rename_with_retry(from: &Path, to: &Path) -> std::io::Result<()> {
+    let mut last_error = None;
+    for attempt in 0u64..5 {
+        match fs::rename(from, to) {
+            Ok(()) => return Ok(()),
+            Err(error) => {
+                last_error = Some(error);
+                if attempt < 4 {
+                    std::thread::sleep(std::time::Duration::from_millis(50 * (attempt + 1)));
+                }
+            }
+        }
+    }
+    Err(last_error.expect("至少尝试过一次 rename"))
 }

@@ -19,7 +19,11 @@ Hezhou 0.2 **Player 导出构建器 + 最小运行时**（Windows / Linux）。
    GLFW 窗口 + `UIVulkanRenderer`，跑固定帧数（或窗口关闭）后返回 `Running`（退出码 0）；
 6. **真实起始场景加载**：`scene_loader` 把 `manifest.start_scene` 对应的包内 Project JSON
    用 `hezhou_core::Project::restore_from_json` 恢复成 `Scene`（实体/层级/Transform），
-   WindowPlayerHost 渲染该场景；缺失/坏 JSON/空场景回退内置 cube+light 并 WARN。
+   WindowPlayerHost 渲染该场景；缺失/坏 JSON/空场景回退内置 cube+light 并 WARN；
+7. **cook 导入资产 bundle**：解析包内 `assets/imported/*.json`（`hezhou_asset::ImportedScene`），
+   建立 `AssetId → mesh/material/texture/skeleton/animation` 查询，严格核对
+   `cook_manifest`（kind/index/数量/scene 数据一致性），启动打印加载统计；错误安全
+   （坏 JSON/不一致 → 可读 exit 2，未引用文件仅 WARN）。
 
 不绑定具体游戏内容；真实 cooker 产物可原样替换测试 fixture。
 
@@ -32,6 +36,7 @@ engine/player/
 │   ├── asset_index.rs# 运行时资产索引（cook_manifest.json → AssetId 查询/校验）
 │   ├── builder.rs    # 构建器：dry-run 计划 + 真实复制（预检/staging/校验/权限）
 │   ├── cook_bridge.rs# hezhou-asset CookManifest → Player assets[]/文件映射
+│   ├── imported_assets.rs# cook imported/*.json → ImportedScene / AssetId 查询（严格校验）
 │   ├── scene_loader.rs# 起始场景：Project JSON → Scene（失败回退内置 cube+light）
 │   ├── host.rs       # PlayerHost trait / HostOutcome / DefaultPlayerHost
 │   ├── window_host.rs# （feature window-host）WindowPlayerHost：窗口+Vulkan 固定帧渲染
@@ -45,7 +50,7 @@ engine/player/
 └── tests/
     ├── fixtures/minimal/  # 最小 fixture（legacy assets[]，空场景 + 占位 DLL/runtime）
     ├── fixtures/cooked/   # hezhou-asset 真实 cook 输出布局 fixture
-    └── *.rs               # 默认 79 个测试；--features window-host 共 82 个（+1 ignored 真窗口 smoke）
+    └── *.rs               # 默认 89 个测试；--features window-host 共 92 个（+1 ignored 真窗口 smoke）
 ```
 
 > 硬性边界：本 crate 只改 `engine/player/**`。installer、CI、examples、editor
@@ -343,7 +348,7 @@ cargo run -p hezhou-player --bin hezhou-player-build -- \
 6. 按模式结束：
    - 默认：记录"运行时骨架启动成功"并以 0 退出；
    - `--validate`：启动检查完成（含资产索引）并以 0 退出；
-   - `--run` / `--host <name>`：加载索引后调用 `PlayerHost`（见 §6.3），本轮默认 host
+   - `--run` / `--host <name>`：加载索引后调用 `PlayerHost`（见 §6.4），本轮默认 host
      返回 `Pending`，退出码 **3**（不是错误，表示 game host 尚未接入）。
 
 参数：
@@ -425,7 +430,52 @@ pub fn builtin_test_scene() -> Scene; // cube + directional light
 已知限制：只加载**工程 Project JSON**（编辑器工程/快照格式）；cook `imported/*.json`
 资产内容、C# `Initialize()`、Gameplay/Animation 等运行时数据仍在后续 TODO。
 
-### 6.3 `PlayerHost` 接口（game host 接入契约）
+### 6.3 cook 导入资产 bundle（`imported_assets`）
+
+运行时在资产索引之后、起始场景之前解析包内 `assets/imported/*.json`
+（`hezhou_asset::ImportedScene`），建立 **`AssetId → 元素`** 查询：
+
+```rust
+let bundle = ImportedAssetBundle::load(&layout.assets_dir, &index)?;
+
+bundle.scene(gltf_asset_id);        // 整个 ImportedScene（每份 glTF 一个）
+bundle.mesh(asset_id);              // ImportedMesh（顶点/索引/蒙皮/材质索引）
+bundle.material(asset_id);          // ImportedMaterial（PBR 因子 + 纹理引用）
+bundle.texture(asset_id);           // ImportedTexture
+bundle.skeleton(asset_id);          // ImportedSkeleton（joints/IBM）
+bundle.animation(asset_id);         // ImportedAnimation（通道/关键帧）
+bundle.scene_of(sub_asset_id);      // 所属 glTF 场景 AssetId
+bundle.stats();                     // scenes/meshes/materials/textures/skeletons/animations/mapped
+```
+
+**映射规则**：`gltf` entry 的 `output = imported/<uuid>.json` 解析为 `ImportedScene`；
+子资产 entry 的 `locator` 子资产键（`#mesh:0`/`#material:0`/`#skeleton:0`/`#animation:0`/
+`#texture:0`）定位数组下标，`AssetId` 来自 cook manifest。
+
+**严格校验（失败 → 可读错误，启动/`--validate` exit 2 + startup-error.log）**：
+
+- `imported/*.json` 必须存在、JSON 可解析、通过 `hezhou_asset::validate_imported_scene`；
+- 子资产必须有同 output 的 glTF 父 entry；子资产键 kind/index 与 entry.kind 一致且不越界；
+- 每份 `ImportedScene` 的数组长度必须等于 cook manifest 中对应子资产 entry 数量
+  （防止 cook 产物与 manifest 过期/不一致）。
+
+未被 manifest 引用的 `imported/*.json` 只产生 WARN 并忽略；无 gltf/imported 条目的
+legacy/最小包得到空 bundle（不报错）。
+
+**C# 衔接契约（下一轮 scripting，`Initialize()`）**：
+
+- 每个子资产以 cook `AssetId`（UUID）为稳定句柄，C# 侧不需要路径/ID 重建；
+- host 通过 [`PlayerHostContext.imported_assets`] 拿到只读 bundle；下一轮在
+  `scripting` 侧暴露 C# 可见句柄（建议 FFI：`player_get_mesh(id)` /
+  `player_get_material(id)` / `player_get_skeleton(id)` / `player_get_animation(id)`，
+  返回只读数据指针/长度或由 host 拷贝为托管对象）；
+- `scene_of(id)` 用于按 glTF 场景管理生命周期（一次反序列化，子资产共享）；
+- C# 侧字段映射：`ImportedMesh`（primitives/positions/normals/indices/joints/weights/
+  material/skeleton）、`ImportedMaterial`（base_color_factor/metallic/roughness/纹理索引）、
+  `ImportedSkeleton`（joints[node,parent,IBM]/root_joint）、
+  `ImportedAnimation`（channels/property/times/values/duration）。
+
+### 6.4 `PlayerHost` 接口（game host 接入契约）
 
 提供接口与两个实现：无窗口的 `DefaultPlayerHost`（`Pending`，退出码 3）与可选的
 `WindowPlayerHost`（`feature = "window-host"`，真实窗口/帧循环，`Running`，退出码 0）。
@@ -465,7 +515,7 @@ pub enum HostOutcome {
 - CI：默认 feature 下 `--run` 应视为"host pending = 退出码 3"；编译 `window-host` 后
   `--run` 会真实开窗（CI 无显示环境请用 `--host headless` 或 `--validate`）。
 
-### 6.4 可选窗口渲染 host（`feature = "window-host"`）
+### 6.5 可选窗口渲染 host（`feature = "window-host"`）
 
 默认构建**不编译** `hezhou-core`/`hezhou-rhi-vulkan`/`hezhou-platform` 依赖，二进制与
 依赖面保持最小；需要真实窗口渲染时显式开启 feature：
@@ -527,9 +577,9 @@ PlayerHost `window` 返回退出码 0
 
 ```bash
 cd engine
-cargo test -p hezhou-player                        # 默认 79 个测试
+cargo test -p hezhou-player                        # 默认 89 个测试
 cargo build -p hezhou-player                       # 构建两个二进制 + 库
-cargo test -p hezhou-player --features window-host # 82 个（含 window-host 单元/契约测试）
+cargo test -p hezhou-player --features window-host # 92 个（含 window-host 单元/契约测试）
 # 真实窗口 smoke：需显示环境 + Vulkan GPU，CI 跳过；本机已实测通过（30 帧，exit 0）
 cargo test -p hezhou-player --features window-host --test window_host -- --ignored --nocapture
 ```
@@ -544,9 +594,11 @@ cargo test -p hezhou-player --features window-host --test window_host -- --ignor
 `--run`/`--host` 退出码 3、未知 host、`--validate` 不回归）、**起始场景加载**
 （`hezhou_core::Project::restore_from_json`：实体/层级/Transform/方向光恢复、
 缺失文件/坏 JSON/空场景安全回退内置 cube+light、与 `PlayerAssetIndex.start_scene`
-output 对接、runtime 摘要/日志）、**window-host feature**
-（默认 host 选择、frame limit 解析/clamp、真实窗口固定帧渲染加载真实场景 + `Running`/
-退出码 0；真实窗口测试 `#[ignore]`，本机手工已验证）、日志时间戳。
+output 对接、runtime 摘要/日志）、**cook imported 资产 bundle**
+（`ImportedScene` 解析、AssetId→mesh/material/texture/skeleton/animation 查询、
+kind/index/数量严格校验、坏 JSON/越界/数量不匹配错误、未引用文件 WARN、runtime 统计）、
+**window-host feature**（默认 host 选择、frame limit 解析/clamp、真实窗口固定帧渲染加载
+真实场景 + `Running`/退出码 0；真实窗口测试 `#[ignore]`，本机手工已验证）、日志时间戳。
 
 最小 fixture（`tests/fixtures/minimal/`）依赖零外部资产：空场景 3 字节、字体占位
 12 字节、假 C# 程序集 21 字节、占位 runtime 库 19 字节，用于无真实 cook 数据时
@@ -629,7 +681,7 @@ output 对接、runtime 摘要/日志）、**window-host feature**
 - `scripts[]` 是预编译 C# 程序集（`mcs -target:library`，禁止 .NET 8 编译产物）；
 - C# 无 `Main()`，入口为静态 `Initialize()`，由 Rust 运行时调用；
 - 本轮 Player crate 故意**不依赖** core/render/scripting（保持构建器可独立编译）；
-  下一轮实现 `PlayerHost`（见 §6.3）时再启用 `mono` feature 并链接引擎 crate，
+  下一轮实现 `PlayerHost`（见 §6.4）时再启用 `mono` feature 并链接引擎 crate，
   在 host 内加载 `manifest.scripts[]`、调用 C# 静态 `Initialize()`、按 AssetId
   从资产索引加载 gameplay/animation/physics/audio 数据。
 
@@ -680,8 +732,13 @@ output 对接、runtime 摘要/日志）、**window-host feature**
   固定帧循环（`Running`，退出码 0）；
 - [x] 起始场景加载：`manifest.start_scene` 的 Project JSON → `Scene`（实体/层级/
   Transform/方向光），缺失/坏 JSON/空场景回退内置 cube+light 并 WARN；
-- [ ] 场景内 cook 资产加载（按 AssetId 读 `imported/*.json`、纹理/音频字节）与
-  C# 脚本 `Initialize()`（scripting）；
+- [x] cook 导入资产 bundle：解析 `assets/imported/*.json`（`ImportedScene`），
+  AssetId→mesh/material/texture/skeleton/animation 查询，严格核对 cook manifest，
+  启动统计 + 错误安全；
+- [ ] C# 脚本 `Initialize()`（scripting）与 host 消费 bundle（mesh/material/animation
+  接入 render/animation/gameplay）；
+- [ ] 纹理/音频原始字节加载（`assets/*`，非 imported JSON）；
+- [ ] WindowPlayerHost 的 Esc/输入接线与显式 cleanup（上游修复后）；
 - [ ] Mono 加载 + C# 静态 `Initialize()`（scripting）；
 - [ ] Esc 退出接线（`UIVulkanRenderer` 未把 ESC 暴露给 host；当前用固定帧数/窗口关闭）；
 - [ ] 上游修复 `UIVulkanRenderer::cleanup()` 堆损坏后恢复窗口 host 显式清理；

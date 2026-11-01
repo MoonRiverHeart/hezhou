@@ -19,6 +19,7 @@ use std::path::Path;
 use hezhou_core::Scene;
 
 use crate::asset_index::PlayerAssetIndex;
+use crate::imported_assets::ImportedAssetBundle;
 use crate::logging::{FileLogger, LogLevel};
 use crate::manifest::PlayerManifest;
 use crate::scene_loader::StartSceneSource;
@@ -50,6 +51,8 @@ pub struct PlayerHostContext<'a> {
     pub manifest: &'a PlayerManifest,
     /// 已加载并校验 output 的资产索引。
     pub index: &'a PlayerAssetIndex,
+    /// 已解析的 cook 导入资产（AssetId → ImportedScene 元素）。
+    pub imported_assets: &'a ImportedAssetBundle,
     /// 已加载的起始场景（Project JSON 恢复；失败时为内置 cube+light 回退）。
     pub start_scene: &'a mut Scene,
     /// 起始场景来源（供 host 日志区分真实场景/回退）。
@@ -159,6 +162,10 @@ impl PlayerHost for DefaultPlayerHost {
         context
             .log
             .host_log(LogLevel::Info, &format!("{}", index.summary()));
+        context.log.host_log(
+            LogLevel::Info,
+            &format!("{}", context.imported_assets.summary()),
+        );
         context.log.host_log(
             LogLevel::Info,
             &format!(

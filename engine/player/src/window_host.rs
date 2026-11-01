@@ -108,6 +108,10 @@ impl PlayerHost for WindowPlayerHost {
                 context.start_scene_source.summary()
             ),
         );
+        context.log.host_log(
+            LogLevel::Info,
+            &format!("{}", context.imported_assets.summary()),
+        );
         if context.start_scene_source.is_fallback() {
             context.log.host_log(
                 LogLevel::Warn,
