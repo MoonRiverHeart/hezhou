@@ -33,9 +33,10 @@ Hezhou 0.2 **Player 导出构建器 + 最小运行时**（Windows / Linux）。
    调用 `Hezhou.PlayerGame.Initialize(0)` / 每帧 `Update(dt)` / 结束 `Shutdown()`；
    Mono/加载/调用失败 → WARN 回退纯 Rust 渲染，不 panic；默认 feature 关闭；
 10. **Player C# Scene Context ABI**：`#[repr(C)] PlayerCSharpContext`（v2：版本 + scene
-    指针 + count/create/position/rotation/scale/exists/destroy/log 函数指针，
+    指针 + count/create/position/rotation/scale/exists/destroy/log 函数指针；
+    v3 tail：animation_state + clip 枚举/play/time/speed/playing 函数指针；
     catch_unwind 安全），window host 传给 C#；C# 通过 context 真实创建/摆放/销毁
-    Scene 实体，`context=0` 安全空转；v1 布局只追加不改，兼容旧 DLL。
+    Scene 实体并控制蒙皮动画，`context=0` 安全空转；v1/v2 布局只追加不改，兼容旧 DLL。
 
 不绑定具体游戏内容；真实 cooker 产物可原样替换测试 fixture。
 
@@ -51,7 +52,8 @@ engine/player/
 │   ├── imported_assets.rs# cook imported/*.json → ImportedScene / AssetId 查询（严格校验）
 │   ├── skinned_asset.rs# ImportedPrimitive → SkinnedVertex / skeleton+clip 选择 / joint palette
 │   ├── mono_host.rs    # feature mono-host：加载 scripts/*.dll → PlayerGame Initialize/Update/Shutdown
-│   ├── csharp_context.rs# repr(C) PlayerCSharpContext：scene + count/create/position 函数指针
+│   ├── csharp_context.rs# repr(C) PlayerCSharpContext：scene + count/create/transform/动画函数指针
+│   ├── animation_control.rs# 蒙皮动画运行时：clip 列表/当前索引/时间/速度/playing（palette 驱动）
 │   ├── scene_loader.rs# 起始场景：Project JSON → Scene（失败回退内置 cube+light）
 │   ├── host.rs       # PlayerHost trait / HostOutcome / DefaultPlayerHost
 │   ├── window_host.rs# （feature window-host）WindowPlayerHost：窗口+Vulkan 固定帧渲染
@@ -65,7 +67,7 @@ engine/player/
 └── tests/
     ├── fixtures/minimal/  # 最小 fixture（legacy assets[]，空场景 + 占位 DLL/runtime）
     ├── fixtures/cooked/   # hezhou-asset 真实 cook 输出布局 fixture
-    └── *.rs               # 默认 101；window-host 共 104；mono-host 共 112（+4 ignored 真窗口 smoke）
+    └── *.rs               # 默认 108；window-host 共 111；mono-host 共 119（+5 ignored 真窗口 smoke）
 ```
 
 > 硬性边界：本 crate 只改 `engine/player/**`。installer、CI、examples、editor
@@ -656,16 +658,18 @@ script.update(dt)?;                                          // 每帧；C# 通�
 script.shutdown();                                           // C# Shutdown + Mono shutdown
 ```
 
-- **PlayerCSharpContext ABI（v2）**：`#[repr(C)]` = `version(u32) + reserved(u32) +
-  scene(IntPtr) + 12 个函数指针`。v1 基础：`scene_entity_count` / `scene_create_cube` /
-  `scene_create_entity` / `scene_set_entity_position` / `scene_get_entity_position` /
-  `log`；v2 tail 追加：`scene_set_entity_rotation`（欧拉角，度）/
-  `scene_get_entity_rotation` / `scene_set_entity_scale` / `scene_get_entity_scale` /
-  `scene_entity_exists` / `scene_destroy_entity`。Rust 函数全部 `extern "C"` +
-  `catch_unwind`；空 scene、实体不存在、输出指针为空 → 返回 0/-1、不 panic。
-  C# 用 `StructLayout(Sequential)` + `Cdecl` delegates + `Marshal.GetDelegateForFunctionPointer`
-  解析；`context == 0` 时 C# 安全空转；`version == 1` 时 C# 只解析 v1 字段（兼容旧
-  Player/DLL），`>= 2` 才启用 rotation/scale/exists/destroy。
+- **PlayerCSharpContext ABI（v3）**：`#[repr(C)]` = `version(u32) + reserved(u32) +
+  scene(IntPtr) + animation_state(IntPtr) + 22 个函数指针`。v1 基础：count/create/
+  position/log；v2 tail：rotation（欧拉角，度）/scale/exists/destroy；v3 tail：
+  `animation_clip_count` / `animation_clip_name`（两段式 UTF-8）/
+  `animation_clip_duration` / `animation_current` / `animation_play` /
+  `animation_set_time` / `animation_get_time` / `animation_set_speed` /
+  `animation_get_speed` / `animation_set_playing`。Rust 函数全部 `extern "C"` +
+  `catch_unwind`；空 scene/动画状态、实体不存在、输出指针为空 → 返回 0/-1/NaN、
+  不 panic。C# 用 `StructLayout(Sequential)` + `Cdecl` delegates +
+  `Marshal.GetDelegateForFunctionPointer` 解析；`context == 0` 时 C# 安全空转；
+  `version == 2` 时跳过动画 API、`== 1` 时只解析 v1（兼容旧 Player/DLL）；旧 v2 DLL
+  遇到 v3 context 会安全回退（日志 + 纯 Rust）。
   完整 ABI 表/C# 用法/扩展点见 [`engine/scripts/PLAYER_GAME_0_2.md`](../../scripts/PLAYER_GAME_0_2.md)。
 - **加载**：`manifest.scripts` 中第一个 `.dll`，路径 `<root>/scripts/<name>`；
   无 `.dll`/文件缺失/路径非法/assembly 加载失败/Initialize 失败 → WARN 并继续
@@ -699,32 +703,52 @@ script.shutdown();                                           // C# Shutdown + Mo
   即 C# 已通过 context 真实创建 Scene 实体、设置 position/rotation/scale，并在
   Shutdown 销毁自己创建的 cube（exists=false，实体数 3→4→3）；task-30 的 context=0
   路径仍安全空转（旧包/旧 DLL 不受影响）。
+
+- **skinned 动画实测（task-34，skinned fixture 1 个 `Spin` clip，30 帧）**：
+
+  ```text
+  蒙皮动画运行时：clip 0/1 `Spin` t=0.000/1.000s speed=1.00 playing=true
+  C# Animation: clips=1 [0:Spin(1.000s)]
+  C# Animation: play clip=0 ... time=0.250 speed=1.500
+  C# Animation: frame=1 current=0 time=0.600 speed=1.500
+  C# Animation: Shutdown current=0 time=0.335 speed=1.500
+  蒙皮绘制统计：3 顶点 / 1 三角形 / 2 关节；palette 更新 30 次（动画驱动）；动画 clip 0/1 `Spin` t=0.335 speed=1.50 playing=true
+  窗口 host 结束：30 帧
+  ```
+
+  C# 通过 ABI v3 枚举 1 个 clip、播放并设置 time=0.25s/speed=1.5；窗口 host 每帧按
+  `PlayerAnimationState` 推进时间并重算 joint palette（真实 palette 随时间变化）。
 - **测试**：`mono_host`（路径定位/缺失 DLL/非法路径，不初始化 Mono）、
   `mono_host_safety`（无效 DLL 加载失败可读、不 panic）、`mono_host_call`（mcs 编译
   C# fixture → Initialize(0)/Update(dt)/Shutdown 真实调用，无 mcs 时跳过）、
-  `csharp_context`（lib 单元：v2 ABI 布局/空指针安全/创建+位置函数/
-  rotation+scale+exists+destroy）、
+  `csharp_context`（lib 单元：v3 ABI 布局/空指针安全/创建+位置/rotation+scale+
+  exists+destroy/动画 clip 枚举+play+time+speed+playing）、
   `csharp_context_csharp`（真实 `PlayerGame.cs`：context 创建 cube + position
   + rotation(0,90,0)+scale(1.5,1.5,1.5)，Rust 断言 Scene 实体数 2→3；
+  v3 动画：C# 枚举 2 clip、播放 clip0、time=0.25/speed=1.5，Rust 断言状态生效；
   Shutdown 销毁后 exists=false、实体数回到 2，C# 日志）、
   `csharp_context_null`（context=0 安全空转）、`window_host` ignored
-  `actual_window_host_calls_csharp_scene_context`（真窗口 5 帧 + Scene 实体 3→4→3、
-  rotation/scale/exists/destroy C# 日志断言）。CI 建议：单独 job 安装 Mono 后跑
+  `actual_window_host_calls_csharp_scene_context`（真窗口 5 帧 + Scene 实体 3→4→3 +
+  rotation/scale/exists/destroy C# 日志断言）、
+  `actual_window_host_animates_skinned_clip_via_csharp`（真 skinned fixture 30 帧：
+  C# 枚举/播放 `Spin`、设 time/speed，Rust 动画运行时与 palette 由 C# 状态驱动）。
+  CI 建议：单独 job 安装 Mono 后跑
   `cargo test -p hezhou-player --features mono-host`（无显示环境时跳过 ignored）。
 - **限制（本轮）**：只加载第一个 DLL；context 覆盖场景实体 count/创建/position/
-  rotation/scale/exists/destroy 9 个操作 + log（无材质/组件/层级/动画/物理/音频）；
-  `Shutdown()` 默认销毁自己创建的 cube（验证生命周期）；`scene` 指针仅覆盖
-  Player 帧循环，C# 不得在 `Shutdown()` 后使用；无热重载/脚本热更新；旧包无
-  `PlayerGame` 时安全回退；gameplay/animation/audio/FFI API 留待后续（按 §3 扩展点追加）。
+  rotation/scale/exists/destroy + 单 clip 动画（枚举/play/time/speed/playing）+ log；
+  动画无交叉淡化/混合/状态机/事件，时间循环 [0,duration]，speed 限制 [-8,8]；
+  `Shutdown()` 默认销毁自己创建的 cube（验证生命周期）；`scene`/`animation_state`
+  指针仅覆盖 Player 帧循环，C# 不得在 `Shutdown()` 后使用；无热重载/脚本热更新；
+  旧包无 `PlayerGame` 时安全回退；gameplay/audio/材质/组件 API 留待后续（按扩展点追加）。
 
 ## 7. 测试
 
 ```bash
 cd engine
-cargo test -p hezhou-player                        # 默认 101 个测试
+cargo test -p hezhou-player                        # 默认 108 个测试
 cargo build -p hezhou-player                       # 构建两个二进制 + 库
-cargo test -p hezhou-player --features window-host # 104 个（含 window-host 单元/契约测试）
-cargo test -p hezhou-player --features mono-host   # 112 个（含 C# 入口/context；需 Mono/mcs，缺失时跳过真实调用）
+cargo test -p hezhou-player --features window-host # 111 个（含 window-host 单元/契约测试）
+cargo test -p hezhou-player --features mono-host   # 119 个（含 C# 入口/context/动画；需 Mono/mcs，缺失时跳过真实调用）
 # 真实窗口 smoke：需显示环境 + Vulkan GPU，CI 跳过；本机已实测通过（30 帧，exit 0）
 cargo test -p hezhou-player --features window-host --test window_host -- --ignored --nocapture
 # mono-host 真窗口 + C# 调用（需显示环境 + Vulkan GPU + Mono）
@@ -753,11 +777,14 @@ kind/index/数量严格校验、坏 JSON/越界/数量不匹配错误、未引�
 cooked 与 skinned 两个 fixture）、**mono-host feature**（manifest scripts 首个 DLL 定位/
 非法路径/缺失 DLL 错误安全、无效 DLL 加载失败不 panic、mcs 编译 C# fixture 后真实
 Initialize/Update(dt)/Shutdown 调用、真窗口 5 帧 C# 日志断言；Mono 缺失时安全跳过/
-回退）、**Player C# Scene Context v2**（repr(C) 布局/空指针安全、count/create/position/
+回退）、**Player C# Scene Context v3**（repr(C) 布局/空指针安全、count/create/position/
 rotation（欧拉角）/scale/exists/destroy 真实修改 Scene、真实 PlayerGame.cs context
 创建 cube + 设置 position/rotation/scale（Scene 2→3，rotation 90°/scale 1.5）、
-Shutdown destroy 后 exists=false 且实体数回到 2、context=0 空转、真窗口 Scene
-实体 3→4→3 + C# 日志断言）、日志时间戳。
+Shutdown destroy 后 exists=false 且实体数回到 2、context=0 空转、**动画运行时**
+（clip 列表/当前索引/时间/速度/playing、play/set_time/set_speed、palette 由当前
+clip/time 驱动、C# 真实枚举 1/2 个 clip 并设置 time=0.25/speed=1.5、真窗口
+skinned fixture 30 帧 palette 随时间变化 + C# 日志断言）、真窗口 Scene 实体
+3→4→3、日志时间戳。
 
 最小 fixture（`tests/fixtures/minimal/`）依赖零外部资产：空场景 3 字节、字体占位
 12 字节、假 C# 程序集 21 字节、占位 runtime 库 19 字节，用于无真实 cook 数据时
@@ -867,9 +894,10 @@ C# fixture（`tests/fixtures/mono/PlayerGame.cs`）与 task-30 入口签名一�
   仍不依赖 render（构建器可独立编译）。
 - C# 入口（§6.7）：window host 加载 `manifest.scripts[]` 第一个 DLL，调用
   `Hezhou.PlayerGame.Initialize(context_ptr)` / 每帧 `Update(dt)` / 结束 `Shutdown()`；
-  task-33 起传入 `PlayerCSharpContext` v2（scene + count/create/position/rotation/
-  scale/exists/destroy 函数指针），C# 可真实创建/摆放/销毁 Scene 实体；gameplay/
-  animation/physics/audio API 后续按 `scripts/PLAYER_GAME_0_2.md` 扩展点追加。
+  task-33/34 起传入 `PlayerCSharpContext` v3（scene + count/create/transform/
+  exists/destroy + 动画 clip 枚举/play/time/speed/playing 函数指针），C# 可真实
+  创建/摆放/销毁 Scene 实体并控制蒙皮动画；gameplay/physics/audio API 后续按
+  `scripts/PLAYER_GAME_0_2.md` 扩展点追加。
 - 部署要求：mono-host 的 Player 包运行机器需安装 Mono，或随包 `runtime/` 提供
   Mono 运行时（`--runtime-dir` 复制；`lib/`、`etc/`、`libmono` 等）；CI/安装包
   需把 Mono 运行时纳入 Player 附件。
@@ -934,12 +962,14 @@ C# fixture（`tests/fixtures/mono/PlayerGame.cs`）与 task-30 入口签名一�
 - [x] 可选 C# 入口（`mono-host`）：加载 scripts 首个 DLL，调用
   `Hezhou.PlayerGame.Initialize(0)`/`Update(dt)`/`Shutdown()`，失败安全回退，
   真实 task-30 `EditorScript.dll` 窗口实测通过；
-- [x] Player C# Scene Context（`PlayerCSharpContext` v1）：repr(C) ABI
-  （count/create_cube/create_entity/set/get position/log）、window host 传入真实
-  context、C# PlayerGame 创建 cube 并设置/读取 position、context=0 安全空转、
-  真实窗口 Scene 实体 3→4 实测；
-- [ ] context 扩展：材质/组件/层级/父子、gameplay/animation/
-  physics/audio API（按 ABI 尾部追加 + version 递增，见 `scripts/PLAYER_GAME_0_2.md`）；
+- [x] Player C# Scene Context（`PlayerCSharpContext` v3）：repr(C) ABI
+  （count/create/position/rotation/scale/exists/destroy/log + 动画 clip 枚举/
+  play/time/speed/playing）、window host 传入真实 context + `PlayerAnimationState`、
+  C# PlayerGame 创建 cube/设置 Transform/销毁/控制动画、context=0 安全空转、
+  真实窗口 skinned fixture 30 帧实测；
+- [ ] 动画状态机/混合/事件（当前单 clip play/time/speed）；
+- [ ] context 扩展：材质/组件/层级/父子、gameplay/physics/audio API（按 ABI 尾部
+  追加 + version 递增，见 `scripts/PLAYER_GAME_0_2.md`）；
 - [ ] 多蒙皮 mesh/primitive、多 clip/状态机/混合、材质/纹理绑定（当前只第一个 mesh/clip，
   upload material/texture_path 传 None）；
 - [ ] C# 侧 FFI context 接入（Initialize 当前传 0）、gameplay/animation/physics/audio

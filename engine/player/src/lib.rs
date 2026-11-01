@@ -18,6 +18,7 @@
 //! ```
 
 pub mod asset_index;
+pub mod animation_control;
 pub mod builder;
 pub mod config;
 pub mod cook_bridge;
@@ -46,6 +47,10 @@ pub use mono_host::{
 };
 
 pub use asset_index::{AssetIndexEntry, AssetIndexError, PlayerAssetIndex};
+pub use animation_control::{
+    AnimationClipEntry, AnimationControlError, PlayerAnimationState,
+    DEFAULT_ANIMATION_SPEED, MAX_ANIMATION_SPEED,
+};
 pub use builder::{
     checksum_bytes, checksum_file, normalize_asset_relative, ArtifactCategory, BuildError,
     BuildSources, BuildWarning, BuiltFile, CookManifest, PlannedFile, PlayerBuildInput,

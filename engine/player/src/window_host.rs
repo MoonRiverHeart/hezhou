@@ -34,6 +34,7 @@ use hezhou_rhi_vulkan::UIVulkanRenderer;
 
 use crate::host::{HostError, HostOutcome, PlayerHost, PlayerHostContext};
 use crate::logging::LogLevel;
+use crate::animation_control::PlayerAnimationState;
 #[cfg(feature = "mono-host")]
 use crate::mono_host::{find_player_game_script, PlayerGameScript};
 use crate::skinned_asset::{select_first_skinned_asset, SelectedSkinnedAsset};
@@ -249,13 +250,23 @@ impl PlayerHost for WindowPlayerHost {
         }
         let mut palette_updates: u64 = 0;
 
+        // 动画运行时状态：clip 列表/当前索引/时间/速度；palette 由本状态驱动（task-34）。
+        let mut animation_state =
+            PlayerAnimationState::from_selected_asset(skinned.as_ref().map(|state| &state.asset));
+        let mut last_animation_tick = Instant::now();
+        context.log.host_log(
+            LogLevel::Info,
+            &format!("蒙皮动画运行时：{}", animation_state.summary()),
+        );
+
         // ---- 可选 C# PlayerGame 入口（feature = mono-host）----
         #[cfg(feature = "mono-host")]
         let mut mono_state: Option<MonoHostState> = None;
         // PlayerCSharpContext 必须覆盖整个帧循环（C# 只在 Initialize/Update/Shutdown 内调用）。
         #[cfg(feature = "mono-host")]
-        let csharp_context = crate::csharp_context::PlayerCSharpContext::new(
+        let csharp_context = crate::csharp_context::PlayerCSharpContext::new_with_animation(
             context.start_scene as *mut Scene,
+            &mut animation_state as *mut PlayerAnimationState,
         );
         #[cfg(feature = "mono-host")]
         match find_player_game_script(context.manifest, context.root) {
@@ -378,24 +389,14 @@ impl PlayerHost for WindowPlayerHost {
                 );
             }
 
-            // 每帧更新真实蒙皮 joint palette（无动画时为静态绑定姿态）。
+            // 每帧推进动画状态并上传当前 clip/time 的 joint palette（无动画时静态姿态）。
             if let Some(state) = &skinned {
-                let time = if state.animated {
-                    let duration = state
-                        .asset
-                        .animation
-                        .as_ref()
-                        .map(|animation| animation.duration)
-                        .unwrap_or(0.0);
-                    if duration > 0.0 {
-                        started.elapsed().as_secs_f32() % duration
-                    } else {
-                        0.0
-                    }
-                } else {
-                    0.0
-                };
-                match state.asset.palette_at(time) {
+                let frame_dt = last_animation_tick.elapsed().as_secs_f32();
+                last_animation_tick = Instant::now();
+                animation_state.advance(frame_dt);
+                let clip = animation_state.current_index();
+                let time = animation_state.time();
+                match state.asset.palette_for_clip(clip, time) {
                     Ok(palette) => {
                         if let Err(error) = renderer.upload_skin_palette(
                             PLAYER_SKINNED_ENTITY_ID,
@@ -484,7 +485,7 @@ impl PlayerHost for WindowPlayerHost {
             context.log.host_log(
                 LogLevel::Info,
                 &format!(
-                    "蒙皮绘制统计：{} 顶点 / {} 三角形 / {} 关节；palette 更新 {} 次（{}）",
+                    "蒙皮绘制统计：{} 顶点 / {} 三角形 / {} 关节；palette 更新 {} 次（{}）；动画 {}",
                     state.asset.vertex_count(),
                     state.asset.triangle_count(),
                     state.asset.joint_count(),
@@ -493,7 +494,8 @@ impl PlayerHost for WindowPlayerHost {
                         "动画驱动"
                     } else {
                         "静态绑定姿态"
-                    }
+                    },
+                    animation_state.summary()
                 ),
             );
         }

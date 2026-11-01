@@ -10,6 +10,7 @@ mod common;
 
 use common::{compile_engine_player_game, TempDir};
 use hezhou_core::ecs::Scene;
+use hezhou_player::animation_control::{AnimationClipEntry, PlayerAnimationState};
 use hezhou_player::csharp_context::PlayerCSharpContext;
 use hezhou_player::mono_host::PlayerGameScript;
 
@@ -28,7 +29,20 @@ fn csharp_creates_and_positions_entity_through_context() {
     assert_eq!(scene.entity_count(), 2);
     let before: Vec<u64> = scene.get_all_entities().iter().map(|e| e.id).collect();
 
-    let mut context = PlayerCSharpContext::new(&mut scene as *mut Scene);
+    let mut animation = PlayerAnimationState::new(vec![
+        AnimationClipEntry {
+            name: Some("Spin".to_string()),
+            duration: 1.0,
+        },
+        AnimationClipEntry {
+            name: Some("Walk".to_string()),
+            duration: 0.5,
+        },
+    ]);
+    let mut context = PlayerCSharpContext::new_with_animation(
+        &mut scene as *mut Scene,
+        &mut animation as *mut PlayerAnimationState,
+    );
     assert!(context.is_supported());
 
     let mut script = PlayerGameScript::load(&dll).expect("加载真实 PlayerGame.cs DLL");
@@ -54,6 +68,11 @@ fn csharp_creates_and_positions_entity_through_context() {
         unsafe { hezhou_player::scene_entity_exists(context.scene, created.id) },
         1
     );
+    // context ABI v3 动画：C# Initialize 播放 clip0 并设置 time/speed。
+    assert_eq!(animation.current(), 0);
+    assert!((animation.time() - 0.25).abs() < 1e-6);
+    assert!((animation.speed() - 1.5).abs() < 1e-6);
+    assert!(animation.is_playing());
 
     script.update(0.016).expect("Update");
     script.update(0.032).expect("Update");
@@ -95,6 +114,25 @@ fn csharp_creates_and_positions_entity_through_context() {
             && log.contains("existsAfter=0"),
         "C# 日志：{log}"
     );
+    // v3 动画枚举/播放/时间/速度。
+    assert!(
+        log.contains("Animation: clips=2 [0:Spin(1.000s), 1:Walk(0.500s)]"),
+        "C# 日志：{log}"
+    );
+    assert!(
+        log.contains("Animation: play clip=0")
+            && log.contains("time=0.250")
+            && log.contains("speed=1.500"),
+        "C# 日志：{log}"
+    );
+    assert!(
+        log.contains("Animation: Shutdown current=0 time=0.250 speed=1.500"),
+        "C# 日志：{log}"
+    );
+    // C# Shutdown 不改变 Rust 动画状态。
+    assert_eq!(animation.current(), 0);
+    assert!((animation.time() - 0.25).abs() < 1e-6);
+    assert!((animation.speed() - 1.5).abs() < 1e-6);
     // Rust 侧统计：Initialize/Update×2/Shutdown 各调用成功。
     let stats = script.stats();
     assert_eq!(stats.initialize_calls, 1);

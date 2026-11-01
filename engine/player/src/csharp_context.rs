@@ -1,5 +1,6 @@
-//! Player C# Scene Context ABI（task-32 v1 / task-33 v2）：把 `hezhou_core::Scene` 的
-//! 最小读写能力以 `#[repr(C)]` 函数指针表暴露给 C# `Hezhou.PlayerGame`。
+//! Player C# Scene Context ABI（task-32 v1 / task-33 v2 / task-34 v3）：把
+//! `hezhou_core::Scene` 与 Player 动画运行时以 `#[repr(C)]` 函数指针表暴露给
+//! C# `Hezhou.PlayerGame`。
 //!
 //! # ABI 契约（C# `[StructLayout(LayoutKind.Sequential)]` 必须一致）
 //!
@@ -28,16 +29,33 @@
 //! | 96 | scene_entity_exists | `int(IntPtr, ulong)`（1 存在 / 0 不存在） |
 //! | 104 | scene_destroy_entity | `int(IntPtr, ulong)`（0 成功 / -1 失败） |
 //!
+//! v3 tail 追加（task-34；保持 v1/v2 布局；`animation_state` 指向 host 栈上的
+//! [`crate::animation_control::PlayerAnimationState`]）：
+//!
+//! | offset | 字段 | 类型 / delegate |
+//! |---|---|---|
+//! | 112 | `animation_state` | `IntPtr`（可为 0 = 无动画） |
+//! | 120 | `animation_clip_count` | `uint(IntPtr state)` |
+//! | 128 | `animation_clip_name` | `int(IntPtr, uint index, u8* buf, uint len)`（返回所需/写入字节数） |
+//! | 136 | `animation_clip_duration` | `float(IntPtr, uint index)`（失败 -1） |
+//! | 144 | `animation_current` | `int(IntPtr)`（当前 clip 下标，无 -1） |
+//! | 152 | `animation_play` | `int(IntPtr, uint index)`（0/-1） |
+//! | 160 | `animation_set_time` | `int(IntPtr, float seconds)`（0/-1） |
+//! | 168 | `animation_get_time` | `float(IntPtr)`（失败 NaN） |
+//! | 176 | `animation_set_speed` | `int(IntPtr, float speed)`（0/-1） |
+//! | 184 | `animation_get_speed` | `float(IntPtr)`（失败 NaN） |
+//! | 192 | `animation_set_playing` | `int(IntPtr, int playing)`（0/-1） |
+//!
 //! 所有函数均为 `extern "C"`、内部 `catch_unwind`；`scene == null`、实体不存在、
 //! 输出指针为空时返回 0/-1 且绝不 panic（panic 跨 FFI 是 UB）。rotation 使用
 //! **欧拉角（度）**，与 core `Quaternion::from_euler_degrees`/`to_euler_degrees` 对应。
 //!
-//! # v1 → v2 兼容策略
+//! # 版本兼容策略
 //!
-//! v2 只在尾部追加字段、不改 v1 布局；C# 侧读取 `Version`：
-//! - `>= 2`：解析全部字段（rotation/scale/exists/destroy 可用）；
-//! - `== 1`：只解析 v1 字段，rotation/scale/destroy 不调用、只保留 position（兼容旧
-//!   Player/DLL 组合）；
+//! v2/v3 只在尾部追加字段、不改旧布局；C# 侧读取 `Version`：
+//! - `>= 3`：解析 v1/v2/v3 全部字段（动画 API 可用）；
+//! - `== 2`：解析 v1+v2，动画 API 跳过；
+//! - `== 1`：只解析 v1，rotation/scale/动画跳过（兼容旧 Player/DLL）；
 //! - 其他：记录日志后回退空转。
 //!
 //! # 生命周期
@@ -54,8 +72,10 @@ use std::panic::{catch_unwind, AssertUnwindSafe};
 use hezhou_core::ecs::{Entity, Scene};
 use hezhou_core::math::{Quaternion, Vec3};
 
+use crate::animation_control::PlayerAnimationState;
+
 /// 当前 Player C# Context ABI 版本。
-pub const PLAYER_CSHARP_CONTEXT_VERSION: u32 = 2;
+pub const PLAYER_CSHARP_CONTEXT_VERSION: u32 = 3;
 
 /// C# 侧函数指针：`scene_entity_count(scene) -> u32`。
 pub type SceneEntityCountFn = unsafe extern "C" fn(*mut Scene) -> u32;
@@ -88,6 +108,29 @@ pub type SceneGetEntityScaleFn =
 pub type SceneEntityExistsFn = unsafe extern "C" fn(*mut Scene, u64) -> i32;
 /// C# 侧函数指针：`scene_destroy_entity(scene, entity) -> 0/-1`。
 pub type SceneDestroyEntityFn = unsafe extern "C" fn(*mut Scene, u64) -> i32;
+
+// ==== v3：蒙皮动画运行时（task-34）====
+/// C# 侧函数指针：`animation_clip_count(state) -> u32`。
+pub type AnimationClipCountFn = unsafe extern "C" fn(*mut PlayerAnimationState) -> u32;
+/// C# 侧函数指针：`animation_clip_name(state, index, buf, len) -> i32`。
+pub type AnimationClipNameFn =
+    unsafe extern "C" fn(*mut PlayerAnimationState, u32, *mut u8, u32) -> i32;
+/// C# 侧函数指针：`animation_clip_duration(state, index) -> f32`。
+pub type AnimationClipDurationFn = unsafe extern "C" fn(*mut PlayerAnimationState, u32) -> f32;
+/// C# 侧函数指针：`animation_current(state) -> i32`。
+pub type AnimationCurrentFn = unsafe extern "C" fn(*mut PlayerAnimationState) -> i32;
+/// C# 侧函数指针：`animation_play(state, index) -> 0/-1`。
+pub type AnimationPlayFn = unsafe extern "C" fn(*mut PlayerAnimationState, u32) -> i32;
+/// C# 侧函数指针：`animation_set_time(state, seconds) -> 0/-1`。
+pub type AnimationSetTimeFn = unsafe extern "C" fn(*mut PlayerAnimationState, f32) -> i32;
+/// C# 侧函数指针：`animation_get_time(state) -> f32`。
+pub type AnimationGetTimeFn = unsafe extern "C" fn(*mut PlayerAnimationState) -> f32;
+/// C# 侧函数指针：`animation_set_speed(state, speed) -> 0/-1`。
+pub type AnimationSetSpeedFn = unsafe extern "C" fn(*mut PlayerAnimationState, f32) -> i32;
+/// C# 侧函数指针：`animation_get_speed(state) -> f32`。
+pub type AnimationGetSpeedFn = unsafe extern "C" fn(*mut PlayerAnimationState) -> f32;
+/// C# 侧函数指针：`animation_set_playing(state, playing) -> 0/-1`。
+pub type AnimationSetPlayingFn = unsafe extern "C" fn(*mut PlayerAnimationState, i32) -> i32;
 
 /// `#[repr(C)]` Player C# Context：版本 + Scene 指针 + 6 个函数指针。
 #[repr(C)]
@@ -123,11 +166,45 @@ pub struct PlayerCSharpContext {
     pub scene_entity_exists: Option<SceneEntityExistsFn>,
     /// 销毁实体：0 成功 / -1 失败。
     pub scene_destroy_entity: Option<SceneDestroyEntityFn>,
+    // ==== v3 tail 追加（task-34）：蒙皮动画运行时 ====
+    /// 动画运行时状态指针（host 栈上；0 = 无动画）。
+    pub animation_state: *mut PlayerAnimationState,
+    /// clip 数量。
+    pub animation_clip_count: Option<AnimationClipCountFn>,
+    /// clip 名（UTF-8 写入调用方 buffer）。
+    pub animation_clip_name: Option<AnimationClipNameFn>,
+    /// clip 时长；失败 -1。
+    pub animation_clip_duration: Option<AnimationClipDurationFn>,
+    /// 当前 clip 下标；无 -1。
+    pub animation_current: Option<AnimationCurrentFn>,
+    /// 播放指定 clip。
+    pub animation_play: Option<AnimationPlayFn>,
+    /// 设置当前时间。
+    pub animation_set_time: Option<AnimationSetTimeFn>,
+    /// 读取当前时间；失败 NaN。
+    pub animation_get_time: Option<AnimationGetTimeFn>,
+    /// 设置播放速度。
+    pub animation_set_speed: Option<AnimationSetSpeedFn>,
+    /// 读取播放速度；失败 NaN。
+    pub animation_get_speed: Option<AnimationGetSpeedFn>,
+    /// 设置播放/暂停。
+    pub animation_set_playing: Option<AnimationSetPlayingFn>,
 }
 
 impl PlayerCSharpContext {
     /// 为场景创建 context；`scene` 必须在本 context 使用期间保持有效。
+    /// 动画 API 默认不可用（`animation_state = null`）。
     pub fn new(scene: *mut Scene) -> Self {
+        Self::new_with_animation(scene, std::ptr::null_mut())
+    }
+
+    /// 为场景 + 动画运行时状态创建 context（v3）。
+    ///
+    /// `animation_state` 必须在本 context 使用期间保持有效（host 栈上状态）。
+    pub fn new_with_animation(
+        scene: *mut Scene,
+        animation_state: *mut PlayerAnimationState,
+    ) -> Self {
         Self {
             version: PLAYER_CSHARP_CONTEXT_VERSION,
             reserved: 0,
@@ -144,6 +221,17 @@ impl PlayerCSharpContext {
             scene_get_entity_scale: Some(scene_get_entity_scale),
             scene_entity_exists: Some(scene_entity_exists),
             scene_destroy_entity: Some(scene_destroy_entity),
+            animation_state,
+            animation_clip_count: Some(animation_clip_count),
+            animation_clip_name: Some(animation_clip_name),
+            animation_clip_duration: Some(animation_clip_duration),
+            animation_current: Some(animation_current),
+            animation_play: Some(animation_play),
+            animation_set_time: Some(animation_set_time),
+            animation_get_time: Some(animation_get_time),
+            animation_set_speed: Some(animation_set_speed),
+            animation_get_speed: Some(animation_get_speed),
+            animation_set_playing: Some(animation_set_playing),
         }
     }
 
@@ -362,6 +450,131 @@ pub unsafe extern "C" fn scene_destroy_entity(scene: *mut Scene, entity_id: u64)
     })
 }
 
+/// 在 `catch_unwind` + 空指针保护下访问动画运行时状态。
+fn with_animation<R>(
+    state: *mut PlayerAnimationState,
+    default: R,
+    f: impl FnOnce(&mut PlayerAnimationState) -> R,
+) -> R {
+    if state.is_null() {
+        return default;
+    }
+    match catch_unwind(AssertUnwindSafe(|| f(unsafe { &mut *state }))) {
+        Ok(value) => value,
+        Err(_) => default,
+    }
+}
+
+/// `animation_clip_count(state)`：clip 数量（空状态/panic → 0）。
+pub unsafe extern "C" fn animation_clip_count(state: *mut PlayerAnimationState) -> u32 {
+    with_animation(state, 0, |state| state.clip_count().min(u32::MAX as usize) as u32)
+}
+
+/// `animation_clip_name(state, index, buf, len) -> i32`：UTF-8 clip 名。
+///
+/// - `buf == null || len == 0`：返回所需字节数（不写）；
+/// - 否则写入最多 `len` 字节，返回写入字节数；调用方可用返回值判断截断；
+/// - 无 clip/越界 → -1。
+pub unsafe extern "C" fn animation_clip_name(
+    state: *mut PlayerAnimationState,
+    index: u32,
+    buf: *mut u8,
+    len: u32,
+) -> i32 {
+    with_animation(state, -1, |state| {
+        let Some(name) = state.clip_name(index as usize) else {
+            return -1;
+        };
+        let bytes = name.unwrap_or("").as_bytes();
+        if buf.is_null() || len == 0 {
+            return bytes.len().min(i32::MAX as usize) as i32;
+        }
+        let written = bytes.len().min(len as usize);
+        unsafe {
+            std::ptr::copy_nonoverlapping(bytes.as_ptr(), buf, written);
+        }
+        written as i32
+    })
+}
+
+/// `animation_clip_duration(state, index)`：clip 时长（秒）；无效/越界 → -1。
+pub unsafe extern "C" fn animation_clip_duration(
+    state: *mut PlayerAnimationState,
+    index: u32,
+) -> f32 {
+    with_animation(state, -1.0, |state| {
+        state.clip_duration(index as usize).unwrap_or(-1.0)
+    })
+}
+
+/// `animation_current(state)`：当前 clip 下标；无 → -1。
+pub unsafe extern "C" fn animation_current(state: *mut PlayerAnimationState) -> i32 {
+    with_animation(state, -1, |state| state.current())
+}
+
+/// `animation_play(state, index)`：播放指定 clip；0 成功 / -1 失败。
+pub unsafe extern "C" fn animation_play(
+    state: *mut PlayerAnimationState,
+    index: u32,
+) -> i32 {
+    with_animation(state, -1, |state| {
+        if state.play(index as usize).is_ok() {
+            0
+        } else {
+            -1
+        }
+    })
+}
+
+/// `animation_set_time(state, seconds)`：设置当前时间；0 成功 / -1 失败。
+pub unsafe extern "C" fn animation_set_time(
+    state: *mut PlayerAnimationState,
+    seconds: f32,
+) -> i32 {
+    with_animation(state, -1, |state| {
+        if state.set_time(seconds).is_ok() {
+            0
+        } else {
+            -1
+        }
+    })
+}
+
+/// `animation_get_time(state)`：当前时间（秒）；无效/panic → NaN。
+pub unsafe extern "C" fn animation_get_time(state: *mut PlayerAnimationState) -> f32 {
+    with_animation(state, f32::NAN, |state| state.time())
+}
+
+/// `animation_set_speed(state, speed)`：设置播放速度；0 成功 / -1 失败。
+pub unsafe extern "C" fn animation_set_speed(
+    state: *mut PlayerAnimationState,
+    speed: f32,
+) -> i32 {
+    with_animation(state, -1, |state| {
+        if state.set_speed(speed).is_ok() {
+            0
+        } else {
+            -1
+        }
+    })
+}
+
+/// `animation_get_speed(state)`：播放速度；无效/panic → NaN。
+pub unsafe extern "C" fn animation_get_speed(state: *mut PlayerAnimationState) -> f32 {
+    with_animation(state, f32::NAN, |state| state.speed())
+}
+
+/// `animation_set_playing(state, playing)`：播放/暂停；0 成功 / -1 失败。
+pub unsafe extern "C" fn animation_set_playing(
+    state: *mut PlayerAnimationState,
+    playing: i32,
+) -> i32 {
+    with_animation(state, -1, |state| {
+        state.set_playing(playing != 0);
+        0
+    })
+}
+
 /// `log(ptr)`：把 C 字符串写到 stderr（Player 日志/控制台）；空指针/panic 安全。
 ///
 /// 该函数仅用于 C# 侧需要把消息回传 Rust 日志时；C# 也可以直接 Console.Error。
@@ -381,11 +594,11 @@ mod tests {
 
     #[test]
     fn context_layout_matches_csharp_contract() {
-        assert_eq!(PLAYER_CSHARP_CONTEXT_VERSION, 2);
-        // 8 字节头（version + reserved）+ scene 指针 + 12 个函数指针（v1 6 + v2 6）。
+        assert_eq!(PLAYER_CSHARP_CONTEXT_VERSION, 3);
+        // 8 字节头 + scene 指针 + v1 6 + v2 6 + v3（state + 10 函数指针）= 24 个槽。
         assert_eq!(
             std::mem::size_of::<PlayerCSharpContext>(),
-            8 + std::mem::size_of::<usize>() * 13
+            8 + std::mem::size_of::<usize>() * 24
         );
         assert_eq!(std::mem::align_of::<PlayerCSharpContext>(), 8);
         let scene = Scene::new();
@@ -404,10 +617,72 @@ mod tests {
         assert!(context.scene_get_entity_scale.is_some());
         assert!(context.scene_entity_exists.is_some());
         assert!(context.scene_destroy_entity.is_some());
+        // v3 tail：默认无动画状态（指针 0），函数仍可用并安全返回。
+        assert!(context.animation_state.is_null());
+        assert!(context.animation_clip_count.is_some());
+        assert!(context.animation_clip_name.is_some());
+        assert!(context.animation_clip_duration.is_some());
+        assert!(context.animation_current.is_some());
+        assert!(context.animation_play.is_some());
+        assert!(context.animation_set_time.is_some());
+        assert!(context.animation_get_time.is_some());
+        assert!(context.animation_set_speed.is_some());
+        assert!(context.animation_get_speed.is_some());
+        assert!(context.animation_set_playing.is_some());
         // 通过 context 里的函数指针调用，验证 ABI 字段可执行。
         let scene_ptr = context.scene;
         let count = unsafe { context.scene_entity_count.unwrap()(scene_ptr) };
         assert_eq!(count, 0);
+    }
+
+    #[test]
+    fn v3_animation_api_controls_runtime_state() {
+        use crate::animation_control::AnimationClipEntry;
+
+        let mut scene = Scene::new();
+        let mut animation = PlayerAnimationState::new(vec![
+            AnimationClipEntry {
+                name: Some("Idle".to_string()),
+                duration: 1.0,
+            },
+            AnimationClipEntry {
+                name: Some("Run".to_string()),
+                duration: 0.5,
+            },
+        ]);
+        let context = PlayerCSharpContext::new_with_animation(
+            &mut scene as *mut Scene,
+            &mut animation as *mut PlayerAnimationState,
+        );
+        assert!(!context.animation_state.is_null());
+        let state = context.animation_state;
+
+        assert_eq!(unsafe { animation_clip_count(state) }, 2);
+        // 两段式读取 clip 名：先问长度，再写入。
+        let needed = unsafe { animation_clip_name(state, 0, std::ptr::null_mut(), 0) };
+        assert_eq!(needed, 4);
+        let mut buffer = vec![0u8; needed as usize];
+        let written =
+            unsafe { animation_clip_name(state, 0, buffer.as_mut_ptr(), buffer.len() as u32) };
+        assert_eq!(written, 4);
+        assert_eq!(std::str::from_utf8(&buffer).unwrap(), "Idle");
+        assert!((unsafe { animation_clip_duration(state, 1) } - 0.5).abs() < 1e-6);
+        assert_eq!(unsafe { animation_current(state) }, 0);
+
+        assert_eq!(unsafe { animation_play(state, 1) }, 0);
+        assert_eq!(unsafe { animation_current(state) }, 1);
+        assert_eq!(unsafe { animation_set_time(state, 0.25) }, 0);
+        assert!((unsafe { animation_get_time(state) } - 0.25).abs() < 1e-6);
+        assert_eq!(unsafe { animation_set_speed(state, 2.5) }, 0);
+        assert!((unsafe { animation_get_speed(state) } - 2.5).abs() < 1e-6);
+        animation.advance(0.1);
+        // Run 时长 0.5s：0.25 + 0.1*2.5 = 0.5 → 循环回 0。
+        assert!((unsafe { animation_get_time(state) } - 0.0).abs() < 1e-6);
+        assert_eq!(unsafe { animation_set_playing(state, 0) }, 0);
+        assert!(!animation.is_playing());
+        // 越界/非法值安全失败。
+        assert_eq!(unsafe { animation_play(state, 9) }, -1);
+        assert_eq!(unsafe { animation_set_speed(state, f32::NAN) }, -1);
     }
 
     #[test]
@@ -465,6 +740,25 @@ mod tests {
             );
             assert_eq!(scene_entity_exists(std::ptr::null_mut(), 1), 0);
             assert_eq!(scene_destroy_entity(std::ptr::null_mut(), 1), -1);
+            // v3：空动画状态安全返回。
+            assert_eq!(animation_clip_count(std::ptr::null_mut()), 0);
+            assert_eq!(
+                animation_clip_name(
+                    std::ptr::null_mut(),
+                    0,
+                    std::ptr::null_mut(),
+                    0
+                ),
+                -1
+            );
+            assert_eq!(animation_clip_duration(std::ptr::null_mut(), 0), -1.0);
+            assert_eq!(animation_current(std::ptr::null_mut()), -1);
+            assert_eq!(animation_play(std::ptr::null_mut(), 0), -1);
+            assert_eq!(animation_set_time(std::ptr::null_mut(), 1.0), -1);
+            assert!(animation_get_time(std::ptr::null_mut()).is_nan());
+            assert_eq!(animation_set_speed(std::ptr::null_mut(), 2.0), -1);
+            assert!(animation_get_speed(std::ptr::null_mut()).is_nan());
+            assert_eq!(animation_set_playing(std::ptr::null_mut(), 1), -1);
             player_context_log(std::ptr::null());
         }
     }

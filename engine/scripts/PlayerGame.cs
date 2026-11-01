@@ -28,12 +28,14 @@ namespace Hezhou
     /// <summary>Player C# 游戏入口（Rust Player host 静态调用）。</summary>
     public static class PlayerGame
     {
-        private const uint PlayerContextVersion = 2;
+        private const uint PlayerContextVersion = 3;
         private const float CubeX = 2.5f;
         private const float CubeY = 0.5f;
         private const float CubeZ = -1.5f;
         private const float CubeRotationY = 90.0f;
         private const float CubeScale = 1.5f;
+        private const float InitialAnimationTime = 0.25f;
+        private const float InitialAnimationSpeed = 1.5f;
 
         private static bool _initialized;
         private static ContextApi _sceneContext;
@@ -48,6 +50,9 @@ namespace Hezhou
         private static float _lastScaleX = 1.0f;
         private static float _lastScaleY = 1.0f;
         private static float _lastScaleZ = 1.0f;
+        private static int _lastAnimationClip = -1;
+        private static float _lastAnimationTime;
+        private static float _lastAnimationSpeed = 1.0f;
         private static long _frameCount;
         private static double _elapsedSeconds;
         private static long _lastLogFrame = -1;
@@ -103,6 +108,9 @@ namespace Hezhou
             _lastScaleX = 1.0f;
             _lastScaleY = 1.0f;
             _lastScaleZ = 1.0f;
+            _lastAnimationClip = -1;
+            _lastAnimationTime = 0.0f;
+            _lastAnimationSpeed = 1.0f;
 
             if (context == IntPtr.Zero)
             {
@@ -173,6 +181,47 @@ namespace Hezhou
                     + " scaleSet=" + scaleSet.ToString(CultureInfo.InvariantCulture)
                     + " scaleGet=" + scaleGet.ToString(CultureInfo.InvariantCulture)
                     + " scale=(" + Fmt(sx) + "," + Fmt(sy) + "," + Fmt(sz) + ")");
+
+                // v3：枚举 clip、播放 clip 0、设置 time/speed（v1/v2 context 跳过）。
+                if (api.HasAnimation)
+                {
+                    uint clipCount = api.AnimationClipCount();
+                    string clipList = "";
+                    for (uint index = 0; index < clipCount; index++)
+                    {
+                        float duration = api.AnimationClipDuration(index);
+                        string name = ReadClipName(api, index);
+                        if (index > 0)
+                        {
+                            clipList += ", ";
+                        }
+                        clipList += index.ToString(CultureInfo.InvariantCulture)
+                            + ":" + name + "(" + Fmt(duration) + "s)";
+                    }
+                    SafeLog("Animation: clips="
+                        + clipCount.ToString(CultureInfo.InvariantCulture)
+                        + " [" + clipList + "]");
+                    if (clipCount > 0)
+                    {
+                        int playResult = api.AnimationPlay(0);
+                        int timeResult = api.AnimationSetTime(InitialAnimationTime);
+                        int speedResult = api.AnimationSetSpeed(InitialAnimationSpeed);
+                        _lastAnimationClip = api.AnimationCurrent();
+                        _lastAnimationTime = api.AnimationGetTime();
+                        _lastAnimationSpeed = api.AnimationGetSpeed();
+                        SafeLog("Animation: play clip="
+                            + _lastAnimationClip.ToString(CultureInfo.InvariantCulture)
+                            + " playResult=" + playResult.ToString(CultureInfo.InvariantCulture)
+                            + " setTimeResult=" + timeResult.ToString(CultureInfo.InvariantCulture)
+                            + " time=" + Fmt(_lastAnimationTime)
+                            + " setSpeedResult=" + speedResult.ToString(CultureInfo.InvariantCulture)
+                            + " speed=" + Fmt(_lastAnimationSpeed));
+                    }
+                }
+                else
+                {
+                    SafeLog("Animation: context 无 v3 动画 API（v1/v2 DLL 或 Player 未提供动画状态）");
+                }
             }
             catch (Exception exception)
             {
@@ -237,6 +286,20 @@ namespace Hezhou
                             + " scaleResult=" + scaleResult.ToString(CultureInfo.InvariantCulture)
                             + " scale=(" + Fmt(_lastScaleX) + "," + Fmt(_lastScaleY)
                             + "," + Fmt(_lastScaleZ) + ")");
+                    }
+                    if (_sceneContext.HasAnimation)
+                    {
+                        _lastAnimationClip = _sceneContext.AnimationCurrent();
+                        _lastAnimationTime = _sceneContext.AnimationGetTime();
+                        _lastAnimationSpeed = _sceneContext.AnimationGetSpeed();
+                        if (_frameCount == 1 || _frameCount % 60 == 0)
+                        {
+                            SafeLog("Animation: frame="
+                                + _frameCount.ToString(CultureInfo.InvariantCulture)
+                                + " current=" + _lastAnimationClip.ToString(CultureInfo.InvariantCulture)
+                                + " time=" + Fmt(_lastAnimationTime)
+                                + " speed=" + Fmt(_lastAnimationSpeed));
+                        }
                     }
                 }
                 catch (Exception exception)
@@ -303,6 +366,13 @@ namespace Hezhou
                         + " existsAfter=" + BoolText(existsAfter)
                         + " getResult=" + getResult.ToString(CultureInfo.InvariantCulture)
                         + " position=(" + Fmt(x) + "," + Fmt(y) + "," + Fmt(z) + ")");
+                    if (_sceneContext.HasAnimation)
+                    {
+                        SafeLog("Animation: Shutdown current="
+                            + _sceneContext.AnimationCurrent().ToString(CultureInfo.InvariantCulture)
+                            + " time=" + Fmt(_sceneContext.AnimationGetTime())
+                            + " speed=" + Fmt(_sceneContext.AnimationGetSpeed()));
+                    }
                 }
                 catch (Exception exception)
                 {
@@ -335,6 +405,31 @@ namespace Hezhou
             return BoolText(api.EntityExists(entityId) != 0);
         }
 
+        private static string ReadClipName(ContextApi api, uint index)
+        {
+            int needed = api.AnimationClipName(index, IntPtr.Zero, 0);
+            if (needed <= 0)
+            {
+                return "";
+            }
+            IntPtr buffer = Marshal.AllocHGlobal(needed);
+            try
+            {
+                int written = api.AnimationClipName(index, buffer, (uint)needed);
+                if (written <= 0)
+                {
+                    return "";
+                }
+                byte[] bytes = new byte[written];
+                Marshal.Copy(buffer, bytes, 0, written);
+                return System.Text.Encoding.UTF8.GetString(bytes);
+            }
+            finally
+            {
+                Marshal.FreeHGlobal(buffer);
+            }
+        }
+
         /// <summary>日志安全包装：任何输出异常都不允许中断 Player。</summary>
         private static void SafeLog(string message)
         {
@@ -356,7 +451,7 @@ namespace Hezhou
 
         // ==== PlayerCSharpContext ABI（必须与 Rust repr(C) 布局一致）====
 
-        /// <summary>Rust `PlayerCSharpContext` 的 C# 镜像（v2：13 个 8 字节槽）。</summary>
+        /// <summary>Rust `PlayerCSharpContext` 的 C# 镜像（v3：24 个 8 字节槽）。</summary>
         [StructLayout(LayoutKind.Sequential)]
         private struct PlayerCSharpContextNative
         {
@@ -376,6 +471,18 @@ namespace Hezhou
             public IntPtr SceneGetEntityScale;
             public IntPtr SceneEntityExists;
             public IntPtr SceneDestroyEntity;
+            // v3 tail（task-34）：动画运行时。
+            public IntPtr AnimationState;
+            public IntPtr AnimationClipCount;
+            public IntPtr AnimationClipName;
+            public IntPtr AnimationClipDuration;
+            public IntPtr AnimationCurrent;
+            public IntPtr AnimationPlay;
+            public IntPtr AnimationSetTime;
+            public IntPtr AnimationGetTime;
+            public IntPtr AnimationSetSpeed;
+            public IntPtr AnimationGetSpeed;
+            public IntPtr AnimationSetPlaying;
         }
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
@@ -417,6 +524,38 @@ namespace Hezhou
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         private delegate int SceneDestroyEntityDelegate(IntPtr scene, ulong entityId);
 
+        // v3：动画运行时（task-34）。
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        private delegate uint AnimationClipCountDelegate(IntPtr state);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        private delegate int AnimationClipNameDelegate(
+            IntPtr state, uint index, IntPtr buffer, uint bufferLength);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        private delegate float AnimationClipDurationDelegate(IntPtr state, uint index);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        private delegate int AnimationCurrentDelegate(IntPtr state);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        private delegate int AnimationPlayDelegate(IntPtr state, uint index);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        private delegate int AnimationSetTimeDelegate(IntPtr state, float seconds);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        private delegate float AnimationGetTimeDelegate(IntPtr state);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        private delegate int AnimationSetSpeedDelegate(IntPtr state, float speed);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        private delegate float AnimationGetSpeedDelegate(IntPtr state);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        private delegate int AnimationSetPlayingDelegate(IntPtr state, int playing);
+
         /// <summary>已解析的 PlayerContext（函数指针 + scene）；GC 期间保持委托存活。</summary>
         private sealed class ContextApi
         {
@@ -433,6 +572,19 @@ namespace Hezhou
             public SceneGetEntityScaleDelegate GetScaleFn;
             public SceneEntityExistsDelegate EntityExistsFn;
             public SceneDestroyEntityDelegate DestroyEntityFn;
+            // v3 动画。
+            public bool HasAnimation;
+            public IntPtr AnimationState;
+            public AnimationClipCountDelegate AnimationClipCountFn;
+            public AnimationClipNameDelegate AnimationClipNameFn;
+            public AnimationClipDurationDelegate AnimationClipDurationFn;
+            public AnimationCurrentDelegate AnimationCurrentFn;
+            public AnimationPlayDelegate AnimationPlayFn;
+            public AnimationSetTimeDelegate AnimationSetTimeFn;
+            public AnimationGetTimeDelegate AnimationGetTimeFn;
+            public AnimationSetSpeedDelegate AnimationSetSpeedFn;
+            public AnimationGetSpeedDelegate AnimationGetSpeedFn;
+            public AnimationSetPlayingDelegate AnimationSetPlayingFn;
 
             public uint EntityCount()
             {
@@ -489,6 +641,56 @@ namespace Hezhou
                 return DestroyEntityFn(Scene, entityId);
             }
 
+            public uint AnimationClipCount()
+            {
+                return AnimationClipCountFn(AnimationState);
+            }
+
+            public int AnimationClipName(uint index, IntPtr buffer, uint bufferLength)
+            {
+                return AnimationClipNameFn(AnimationState, index, buffer, bufferLength);
+            }
+
+            public float AnimationClipDuration(uint index)
+            {
+                return AnimationClipDurationFn(AnimationState, index);
+            }
+
+            public int AnimationCurrent()
+            {
+                return AnimationCurrentFn(AnimationState);
+            }
+
+            public int AnimationPlay(uint index)
+            {
+                return AnimationPlayFn(AnimationState, index);
+            }
+
+            public int AnimationSetTime(float seconds)
+            {
+                return AnimationSetTimeFn(AnimationState, seconds);
+            }
+
+            public float AnimationGetTime()
+            {
+                return AnimationGetTimeFn(AnimationState);
+            }
+
+            public int AnimationSetSpeed(float speed)
+            {
+                return AnimationSetSpeedFn(AnimationState, speed);
+            }
+
+            public float AnimationGetSpeed()
+            {
+                return AnimationGetSpeedFn(AnimationState);
+            }
+
+            public int AnimationSetPlaying(bool playing)
+            {
+                return AnimationSetPlayingFn(AnimationState, playing ? 1 : 0);
+            }
+
             public static ContextApi TryParse(IntPtr context, out string error)
             {
                 error = null;
@@ -504,7 +706,8 @@ namespace Hezhou
                     return null;
                 }
 
-                // v2 兼容策略：接受 v1（只用 position）与 v2（完整 Transform/生命周期）。
+                // v3 兼容策略：接受 v1（position）/v2（Transform/生命周期）/
+                // v3（+动画）；旧 Player 的 context 版本低时跳过对应 API。
                 if (native.Version < 1 || native.Version > PlayerContextVersion)
                 {
                     error = "ABI 版本不支持：native=" + native.Version
@@ -512,6 +715,7 @@ namespace Hezhou
                     return null;
                 }
                 bool hasTransform = native.Version >= 2;
+                bool hasAnimation = native.Version >= 3 && native.AnimationState != IntPtr.Zero;
                 if (native.Scene == IntPtr.Zero)
                 {
                     error = "scene 指针为 0";
@@ -535,6 +739,21 @@ namespace Hezhou
                         || native.SceneDestroyEntity == IntPtr.Zero))
                 {
                     error = "v2 函数指针缺失";
+                    return null;
+                }
+                if (hasAnimation
+                    && (native.AnimationClipCount == IntPtr.Zero
+                        || native.AnimationClipName == IntPtr.Zero
+                        || native.AnimationClipDuration == IntPtr.Zero
+                        || native.AnimationCurrent == IntPtr.Zero
+                        || native.AnimationPlay == IntPtr.Zero
+                        || native.AnimationSetTime == IntPtr.Zero
+                        || native.AnimationGetTime == IntPtr.Zero
+                        || native.AnimationSetSpeed == IntPtr.Zero
+                        || native.AnimationGetSpeed == IntPtr.Zero
+                        || native.AnimationSetPlaying == IntPtr.Zero))
+                {
+                    error = "v3 动画函数指针缺失";
                     return null;
                 }
 
@@ -569,6 +788,31 @@ namespace Hezhou
                             native.SceneEntityExists);
                         api.DestroyEntityFn = Marshal.GetDelegateForFunctionPointer<SceneDestroyEntityDelegate>(
                             native.SceneDestroyEntity);
+                    }
+                    if (hasAnimation)
+                    {
+                        api.HasAnimation = true;
+                        api.AnimationState = native.AnimationState;
+                        api.AnimationClipCountFn = Marshal.GetDelegateForFunctionPointer<AnimationClipCountDelegate>(
+                            native.AnimationClipCount);
+                        api.AnimationClipNameFn = Marshal.GetDelegateForFunctionPointer<AnimationClipNameDelegate>(
+                            native.AnimationClipName);
+                        api.AnimationClipDurationFn = Marshal.GetDelegateForFunctionPointer<AnimationClipDurationDelegate>(
+                            native.AnimationClipDuration);
+                        api.AnimationCurrentFn = Marshal.GetDelegateForFunctionPointer<AnimationCurrentDelegate>(
+                            native.AnimationCurrent);
+                        api.AnimationPlayFn = Marshal.GetDelegateForFunctionPointer<AnimationPlayDelegate>(
+                            native.AnimationPlay);
+                        api.AnimationSetTimeFn = Marshal.GetDelegateForFunctionPointer<AnimationSetTimeDelegate>(
+                            native.AnimationSetTime);
+                        api.AnimationGetTimeFn = Marshal.GetDelegateForFunctionPointer<AnimationGetTimeDelegate>(
+                            native.AnimationGetTime);
+                        api.AnimationSetSpeedFn = Marshal.GetDelegateForFunctionPointer<AnimationSetSpeedDelegate>(
+                            native.AnimationSetSpeed);
+                        api.AnimationGetSpeedFn = Marshal.GetDelegateForFunctionPointer<AnimationGetSpeedDelegate>(
+                            native.AnimationGetSpeed);
+                        api.AnimationSetPlayingFn = Marshal.GetDelegateForFunctionPointer<AnimationSetPlayingDelegate>(
+                            native.AnimationSetPlaying);
                     }
                     return api;
                 }

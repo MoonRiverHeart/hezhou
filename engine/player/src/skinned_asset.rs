@@ -132,19 +132,28 @@ impl SelectedSkinnedAsset {
         )
     }
 
-    /// 计算 `time` 时刻的 joint palette（静态姿态时传 0.0 即可）。
+    /// 计算 `time` 时刻、指定 clip 的 joint palette；`clip_index=None` 为静态绑定姿态。
     ///
-    /// 无 skeleton / 关节数超过 GPU palette 上限时报可读错误。
-    pub fn palette_at(&self, time: f32) -> Result<JointPalette, SkinnedAssetError> {
+    /// task-34：窗口 host 的动画运行时用当前 clip/time 调用本方法驱动 palette。
+    pub fn palette_for_clip(
+        &self,
+        clip_index: Option<usize>,
+        time: f32,
+    ) -> Result<JointPalette, SkinnedAssetError> {
         let info = self
             .skeleton
             .as_ref()
             .ok_or(SkinnedAssetError::NoSkeleton {
                 mesh: self.mesh_asset_id,
             })?;
-        compute_joint_palette(
-            &self.scene,
-            info.scene_index,
+        compute_joint_palette(&self.scene, info.scene_index, clip_index, time)
+    }
+
+    /// 计算 `time` 时刻的 joint palette（使用选择的第一个 clip；静态姿态时传 0.0）。
+    ///
+    /// 无 skeleton / 关节数超过 GPU palette 上限时报可读错误。
+    pub fn palette_at(&self, time: f32) -> Result<JointPalette, SkinnedAssetError> {
+        self.palette_for_clip(
             self.animation.as_ref().map(|animation| animation.scene_index),
             time,
         )

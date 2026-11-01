@@ -266,7 +266,7 @@ fn actual_window_host_calls_csharp_scene_context() {
 
     let log = std::fs::read_to_string(log_dir.join("player.log")).expect("读取 player.log");
     assert!(
-        log.contains("mono-host：Scene context 已提供（初始 3 实体，ABI v2"),
+        log.contains("mono-host：Scene context 已提供（初始 3 实体，ABI v3"),
         "日志：{log}"
     );
     assert!(
@@ -302,6 +302,79 @@ fn actual_window_host_calls_csharp_scene_context() {
             && csharp_log.contains("existsBefore=1")
             && csharp_log.contains("destroyResult=0")
             && csharp_log.contains("existsAfter=0"),
+        "C# 日志：{csharp_log}"
+    );
+}
+
+/// 真实窗口 + 真实 C# 动画控制（feature = mono-host）：skinned fixture 的 1 个 clip
+/// 通过 PlayerCSharpContext v3 枚举/播放/设 time/speed，Rust palette 由该状态驱动。
+#[cfg(feature = "mono-host")]
+#[ignore = "需要显示环境 + Vulkan GPU + Mono；CI 默认跳过，本机手工验证"]
+#[test]
+fn actual_window_host_animates_skinned_clip_via_csharp() {
+    use common::compile_engine_player_game;
+
+    let temp = TempDir::new("window-host-csharp-animation");
+    let fixture = skinned_fixture_dir();
+    let Some(dll) = compile_engine_player_game(&temp) else {
+        return;
+    };
+    let scripts = vec![ScriptAssembly::with_source("PlayerGame.dll", &dll)];
+    let (package, stem) = build_fixture_package_with_scripts(&temp, &fixture, Some(scripts));
+    let log_dir = temp.join("logs");
+    let mono_log = temp.join("mono-animation.log");
+
+    let result = run_window_host_with_env(
+        &package,
+        &stem,
+        "30",
+        &log_dir,
+        &[("HEZHOU_PLAYER_MONO_LOG", mono_log.to_str().unwrap())],
+    );
+    assert!(
+        result.status.success(),
+        "C# 动画窗口 host 失败\nstdout: {}\nstderr: {}",
+        String::from_utf8_lossy(&result.stdout),
+        String::from_utf8_lossy(&result.stderr)
+    );
+    assert_eq!(result.status.code(), Some(0));
+
+    let log = std::fs::read_to_string(log_dir.join("player.log")).expect("读取 player.log");
+    // 蒙皮资产 + 动画运行时由窗口 host 维护，palette 每帧驱动。
+    assert!(log.contains("蒙皮资产：mesh aaaaaaaa-"), "日志：{log}");
+    assert!(log.contains("蒙皮网格上传成功：3 顶点 / 1 三角形 / 2 关节"), "日志：{log}");
+    assert!(
+        log.contains("蒙皮动画运行时：clip 0/1 `Spin`"),
+        "日志：{log}"
+    );
+    assert!(
+        log.contains("蒙皮绘制统计：3 顶点 / 1 三角形 / 2 关节；palette 更新 30 次"),
+        "日志：{log}"
+    );
+    assert!(
+        log.contains("动画 clip 0/1 `Spin`") && log.contains("speed=1.50"),
+        "日志：{log}"
+    );
+    assert!(log.contains("窗口 host 结束：30 帧"), "日志：{log}");
+
+    let csharp_log = std::fs::read_to_string(&mono_log).expect("读取 C# 调用日志");
+    assert!(
+        csharp_log.contains("Animation: clips=1 [0:Spin(1.000s)]"),
+        "C# 日志：{csharp_log}"
+    );
+    assert!(
+        csharp_log.contains("Animation: play clip=0")
+            && csharp_log.contains("time=0.250")
+            && csharp_log.contains("speed=1.500"),
+        "C# 日志：{csharp_log}"
+    );
+    assert!(
+        csharp_log.contains("Animation: frame=1 current=0 time="),
+        "C# 日志：{csharp_log}"
+    );
+    assert!(
+        csharp_log.contains("Animation: Shutdown current=0 time=")
+            && csharp_log.contains("speed=1.500"),
         "C# 日志：{csharp_log}"
     );
 }
