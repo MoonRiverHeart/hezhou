@@ -26,10 +26,11 @@
 - ✅ 真实蒙皮：渲染器支持 SkinnedMeshUpload/每实体 palette；Player 从 imported 资产转换 SkinnedVertex、播放首个 clip，窗口 30 帧 exit 0。
 - ✅ Player C# 入口：PlayerGame.cs + mono-host；真实窗口加载 DLL 调用 Initialize/Update/Shutdown，5 帧 exit 0；mono-host 106 tests。
 - ✅ Player C# SceneContext v1：C# 可创建 cube/实体、设置/读取 position；真实窗口 C# 创建 cube，Scene 3→4，30 帧 exit 0；mono-host 111 tests。
+- ✅ Player C# SceneContext v2：rotation/scale/exists/destroy；C# 创建 cube 并设置完整 Transform，Shutdown 销毁，真实窗口 30 帧 exit 0；mono-host 112 tests。
 - ✅ 本地 CI `ci_local.ps1 -Offline` 通过（默认测试 + feature 测试 + FFI 契约 + C# 编译 + 图标一致性）。
 - ✅ 验证证据：capability_demo 14/14 项通过；Player 72 tests；Core 43 tests；编辑器启动自检 PASS=57、FAIL=0；FFI 301/301/301。
 - ⏳ 未完成（0.2 验收尚未达成）：
-  1. C# 对 gameplay/animation/asset/audio 的完整 API 绑定（当前 context 仅 Scene count/create/position）；
+  1. C# 对 gameplay/animation/asset/audio 的完整 API 绑定（当前 context 仅 Scene 实体/Transform/生命周期）；
   2. Player 发布附件、真实 cooker 端到端、双平台 release 验证；
   3. 0.2 最终测试/文档收尾与 Release。
 - 0.2 仍处于进行中，不满足发布 Definition of Done。
