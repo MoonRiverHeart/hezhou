@@ -89,7 +89,9 @@ $AllSourceFiles = @(
     "$ScriptsDir/ExposeAttribute.cs",
     "$ScriptsDir/IScriptEntity.cs",
     "$ScriptsDir/RotatingEntity.cs",
-    "$ScriptsDir/TestRunner.cs"
+    "$ScriptsDir/TestRunner.cs",
+    # Player C# 入口（task-30）：不依赖 UI/FfiContext，供 Player host 静态调用
+    "$ScriptsDir/PlayerGame.cs"
 )
 
 # UI相关脚本子集（用于快速编译UI模块）
