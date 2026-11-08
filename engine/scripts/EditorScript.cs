@@ -77,6 +77,9 @@ namespace Hezhou
             _animClipSelectCallback = OnAnimClipSelected;
             _animSliderChangeCallback = OnAnimSliderChanged;
             _animFileDialogResultCallback = OnAnimationFileDialogResult;
+            _textureAssetClickCallback = OnTextureAssetClick;
+            _textureRefreshCallback = OnTextureRefreshClick;
+            _textureClearCallback = OnTextureClearClick;
             _sceneFileDialogResultCallback = OnSceneFileDialogResult;
             _rightMaxClickCallback = OnRightMaxClick;
             _consoleDialogResultCallback = OnConsoleDialogResult;
@@ -245,6 +248,7 @@ _bindScriptClickCallback = OnBindScriptClick;
             {
                 _profilerTickCounter = 0;
                 if (!_profilerPaused) RefreshProfilerPanel();
+                RefreshMaterialTextureStatus();
             }
 
             // 0.3 动画时间轴：播放时间由编辑器每帧驱动（暂停时保持当前时间）。
@@ -1797,6 +1801,174 @@ _bindScriptClickCallback = OnBindScriptClick;
             }
         }
 
+        // === 0.3 材质纹理编辑（task-45） ===
+
+        /// <summary>重新读取 AssetDatabase Texture 资产并重建材质 Tab 纹理按钮列表。</summary>
+        private static void RefreshMaterialTextureList()
+        {
+            if (_textureAssetContainerId == 0) return;
+            for (int i = 0; i < _textureAssetButtonIds.Count; i++)
+            {
+                UI.RemoveWidget(_textureAssetButtonIds[i]);
+            }
+            _textureAssetButtonIds.Clear();
+            _textureAssetButtonPaths.Clear();
+
+            string json = UI.AssetTextureListJson();
+            string[] paths;
+            string[] labels;
+            ParseTextureAssets(json, out paths, out labels);
+            for (int i = 0; i < paths.Length; i++)
+            {
+                ulong button = UI.CreateButton(_textureAssetContainerId, 460f, 26f, labels[i]);
+                UI.SetOnClick(button, _textureAssetClickCallback);
+                _textureAssetButtonIds.Add(button);
+                _textureAssetButtonPaths[button] = paths[i];
+            }
+            if (paths.Length == 0)
+            {
+                ulong placeholder = UI.CreateButton(_textureAssetContainerId, 460f, 26f,
+                    "（无 Texture 资产，请先扫描工程/导入贴图）");
+                _textureAssetButtonIds.Add(placeholder);
+            }
+            SetTextureStatus("纹理: " + paths.Length + " 个 Texture 资产（点击赋给选中实体 PBR albedo）");
+        }
+
+        private static void ParseTextureAssets(string json, out string[] paths, out string[] labels)
+        {
+            System.Collections.Generic.List<string> pathList =
+                new System.Collections.Generic.List<string>();
+            System.Collections.Generic.List<string> labelList =
+                new System.Collections.Generic.List<string>();
+            int texturesIndex = json.IndexOf("\"textures\":[");
+            if (texturesIndex >= 0)
+            {
+                int pos = texturesIndex + "\"textures\":[".Length;
+                while (pos < json.Length)
+                {
+                    int open = json.IndexOf('{', pos);
+                    if (open < 0) break;
+                    int close = json.IndexOf('}', open + 1);
+                    if (close < 0) break;
+                    string segment = json.Substring(open, close - open + 1);
+                    string path = ParsePbrString(segment, "path");
+                    long size = (long)PbrJsonFloat(segment, "size_bytes", 0f);
+                    string format = ParsePbrString(segment, "format");
+                    if (path.Length > 0)
+                    {
+                        string fileName = path;
+                        int slash = path.LastIndexOf('/');
+                        if (slash >= 0) fileName = path.Substring(slash + 1);
+                        pathList.Add(path);
+                        labelList.Add("🖼 " + fileName + "  [" + format + " " + size + "B]");
+                    }
+                    int nextOpen = json.IndexOf('{', close + 1);
+                    if (nextOpen < 0) break;
+                    pos = nextOpen;
+                }
+            }
+            paths = pathList.ToArray();
+            labels = labelList.ToArray();
+        }
+
+        private static void OnTextureRefreshClick(ulong widgetId)
+        {
+            RefreshMaterialTextureList();
+            Log.Info("Material", "纹理列表已刷新（" + _textureAssetButtonPaths.Count + " 个）");
+        }
+
+        private static void OnTextureAssetClick(ulong widgetId)
+        {
+            string path;
+            if (!_textureAssetButtonPaths.TryGetValue(widgetId, out path))
+            {
+                return;
+            }
+            AssignPbrTexture(path, true);
+        }
+
+        private static void OnTextureClearClick(ulong widgetId)
+        {
+            AssignPbrTexture("", false);
+        }
+
+        /// <summary>把纹理路径写入/清除选中实体的 PBR albedo（复用 PBR JSON 接口）。</summary>
+        private static void AssignPbrTexture(string path, bool assign)
+        {
+            if (_gameScene == null || _selectedEntityId == 0)
+            {
+                SetTextureStatus("纹理: 请先在层级中选择实体");
+                return;
+            }
+            string existing = UI.SceneGetEntityPbrMaterial(_gameScene.ScenePtr, _selectedEntityId);
+            string json = BuildPbrJsonWithTexture(existing, assign ? path : null);
+            int rc = UI.SceneSetEntityPbrMaterial(_gameScene.ScenePtr, _selectedEntityId, json);
+            if (rc == 0)
+            {
+                int synced = UI.EditorSyncPbrMaterialsNow();
+                if (_pbrPanelBuilt) RefreshPbrMaterialPanel(_selectedEntityId);
+                _propertiesDirty = true;
+                string message = assign ? ("已赋 albedo 纹理: " + path) : "已清除 albedo 纹理";
+                SetTextureStatus("纹理: " + message + "（renderer 覆盖 " + synced + "）");
+                RefreshMaterialTextureStatus();
+                Log.Info("Material", message + " entity=" + _selectedEntityId);
+            }
+            else
+            {
+                SetTextureStatus("纹理: 设置失败 rc=" + rc);
+                Log.Warn("Material", "设置 albedo 纹理失败 rc=" + rc + " entity=" + _selectedEntityId);
+            }
+        }
+
+        /// <summary>在现有 PBR JSON 上设置/清除 albedo_texture_path（缺失字段用默认值）。</summary>
+        private static string BuildPbrJsonWithTexture(string existingJson, string texturePath)
+        {
+            if (string.IsNullOrEmpty(existingJson)) existingJson = "{}";
+            float[] albedo = ParsePbrArray(existingJson, "albedo", 4, new float[] { 1f, 1f, 1f, 1f });
+            float[] emissive = ParsePbrArray(existingJson, "emissive", 3, new float[] { 0f, 0f, 0f });
+            string textureJson = string.IsNullOrEmpty(texturePath)
+                ? "null"
+                : "\"" + EscapeJsonPath(texturePath) + "\"";
+            return "{"
+                + "\"albedo\":[" + FormatPbrFloat(albedo[0]) + "," + FormatPbrFloat(albedo[1]) + ","
+                + FormatPbrFloat(albedo[2]) + "," + FormatPbrFloat(albedo[3]) + "],"
+                + "\"metallic\":" + FormatPbrFloat(PbrJsonFloat(existingJson, "metallic", 0f)) + ","
+                + "\"roughness\":" + FormatPbrFloat(PbrJsonFloat(existingJson, "roughness", 0.5f)) + ","
+                + "\"normal_scale\":" + FormatPbrFloat(PbrJsonFloat(existingJson, "normal_scale", 1f)) + ","
+                + "\"ao\":" + FormatPbrFloat(PbrJsonFloat(existingJson, "ao", 1f)) + ","
+                + "\"emissive\":[" + FormatPbrFloat(emissive[0]) + "," + FormatPbrFloat(emissive[1])
+                + "," + FormatPbrFloat(emissive[2]) + "],"
+                + "\"emissive_strength\":"
+                + FormatPbrFloat(PbrJsonFloat(existingJson, "emissive_strength", 1f)) + ","
+                + "\"albedo_texture_path\":" + textureJson
+                + "}";
+        }
+
+        /// <summary>显示当前选中实体 PBR albedo 纹理路径（无则提示默认贴图）。</summary>
+        private static void RefreshMaterialTextureStatus()
+        {
+            if (_textureCurrentLabelId == 0) return;
+            if (_gameScene == null || _selectedEntityId == 0)
+            {
+                UI.SetText(_textureCurrentLabelId, "当前纹理: （未选择实体）");
+                return;
+            }
+            string json = UI.SceneGetEntityPbrMaterial(_gameScene.ScenePtr, _selectedEntityId);
+            string path = ParsePbrString(json, "albedo_texture_path");
+            UI.SetText(_textureCurrentLabelId,
+                path.Length == 0
+                    ? "当前纹理: （默认中性贴图 / 未设置）"
+                    : "当前纹理: " + path);
+        }
+
+        private static void SetTextureStatus(string text)
+        {
+            if (_textureAssignStatusLabelId != 0)
+            {
+                UI.SetText(_textureAssignStatusLabelId, text);
+            }
+        }
+
         // === 自检用只读辅助（TestRunner 调用） ===
 
         /// <summary>当前编辑场景指针（0=未初始化）。</summary>
@@ -1835,6 +2007,12 @@ _bindScriptClickCallback = OnBindScriptClick;
             {
                 _gameScene.RemoveEntity(entityId);
             }
+        }
+
+        /// <summary>自检用：刷新材质 Tab 纹理列表。</summary>
+        public static void TestRefreshMaterialTextureList()
+        {
+            RefreshMaterialTextureList();
         }
 
         public static void ApplyTheme(ThemeMode mode, bool rebuild)

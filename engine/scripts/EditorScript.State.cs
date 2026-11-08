@@ -282,6 +282,18 @@ namespace Hezhou
         private static float[] _animClipDurations = new float[0];
         private static float _animDuration;
 
+        // === 0.3 材质纹理编辑（task-45） ===
+        private static ulong _textureAssetContainerId;
+        private static ulong _textureCurrentLabelId;
+        private static ulong _textureAssignStatusLabelId;
+        private static readonly System.Collections.Generic.List<ulong> _textureAssetButtonIds =
+            new System.Collections.Generic.List<ulong>();
+        private static readonly System.Collections.Generic.Dictionary<ulong, string> _textureAssetButtonPaths =
+            new System.Collections.Generic.Dictionary<ulong, string>();
+        private static UI.WidgetCallbackDelegate _textureAssetClickCallback;
+        private static UI.WidgetCallbackDelegate _textureRefreshCallback;
+        private static UI.WidgetCallbackDelegate _textureClearCallback;
+
         // === Dock / Layout State ===
         private static ulong _rightMaxButtonId;
         private static UI.WidgetCallbackDelegate _rightMaxClickCallback;

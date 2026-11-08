@@ -956,6 +956,10 @@ namespace Hezhou
         public delegate int AssetGetAssetDelegate(
             int index, IntPtr idBuffer, ulong idSize, IntPtr pathBuffer, ulong pathSize);
 
+        // 0.3 材质纹理列表 FFI（task-45）
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate ulong AssetTextureListJsonDelegate(IntPtr buffer, ulong bufferSize);
+
         // 0.2 Prefab / SceneManager / Player 导出 FFI（Rust: editor/prefab_scene_player_ffi.rs）
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public delegate int PrefabCaptureFromSceneDelegate(
@@ -1339,6 +1343,7 @@ namespace Hezhou
             public IntPtr asset_count;
             public IntPtr asset_get_summary;
             public IntPtr asset_get_asset;
+            public IntPtr asset_texture_list_json;
             // 0.2 Prefab / SceneManager / Player 导出 FFI（tail；必须与 Rust FfiContext 字段顺序一致）
             public IntPtr prefab_capture_from_scene;
             public IntPtr prefab_instantiate;
@@ -1930,6 +1935,26 @@ public static void RegisterResizeCallback(ResizeCallbackDelegate callback)
         }
 
         // === 0.2 Prefab FFI ===
+
+        /// <summary>列出 AssetDatabase 中的 Texture 源资产（JSON：count/textures[]）。</summary>
+        public static string AssetTextureListJson()
+        {
+            if (_ffi.asset_texture_list_json == IntPtr.Zero) return "";
+            const int bufferSize = 32768;
+            IntPtr buffer = Marshal.AllocHGlobal(bufferSize);
+            try
+            {
+                Marshal.WriteByte(buffer, 0, 0);
+                var func = Marshal.GetDelegateForFunctionPointer<AssetTextureListJsonDelegate>(
+                    _ffi.asset_texture_list_json);
+                ulong written = func(buffer, (ulong)bufferSize);
+                return written == 0UL ? "" : (Marshal.PtrToStringAnsi(buffer, (int)written) ?? "");
+            }
+            finally
+            {
+                Marshal.FreeHGlobal(buffer);
+            }
+        }
 
         /// <summary>捕获场景实体子树为 Prefab JSON 文件；返回 0 成功。</summary>
         public static int PrefabCaptureFromScene(IntPtr scene, ulong entityId, string name, string path)

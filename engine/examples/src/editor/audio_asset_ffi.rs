@@ -15,6 +15,7 @@ use std::path::Path;
 use hezhou_asset::{AssetDatabase, AssetKind, LogicalPath};
 use hezhou_audio::{AudioEngine, Listener, PlayOptions, SoundData, Vec3};
 use hezhou_dfx::*;
+use serde_json::json;
 
 /// 编辑器级音频引擎（延迟到启动时初始化；无声卡时自动降级）。
 static mut AUDIO: Option<Box<AudioEngine>> = None;
@@ -655,3 +656,45 @@ pub extern "C" fn asset_get_asset(
     0
 }
 
+
+
+/// FFI：列出 AssetDatabase 中 Texture 源资产（路径/大小/格式）。
+///
+/// 返回 JSON：`{"count":N,"textures":[{"path":"assets/..","asset_id":"..","size_bytes":N,"format":"png"}]}`；
+/// 数据库未初始化时返回空列表，不失败。
+#[unsafe(no_mangle)]
+pub extern "C" fn asset_texture_list_json(buffer: *mut c_char, buffer_size: usize) -> usize {
+    if buffer.is_null() || buffer_size == 0 {
+        return 0;
+    }
+    let Some(db) = db_ref() else {
+        return write_c_string(buffer, buffer_size, "{\"count\":0,\"textures\":[]}");
+    };
+    let mut textures = Vec::new();
+    for entry in db.entries() {
+        if entry.is_sub_asset() || entry.kind != AssetKind::Texture {
+            continue;
+        }
+        let Some(relative) = entry.locator.path().strip_prefix(db.assets_root()) else {
+            continue;
+        };
+        let fs_path = entry.locator.path().to_fs_path(db.project_root());
+        let size_bytes = std::fs::metadata(&fs_path).map(|meta| meta.len()).unwrap_or(0);
+        let format = fs_path
+            .extension()
+            .and_then(|ext| ext.to_str())
+            .unwrap_or("")
+            .to_ascii_lowercase();
+        textures.push(json!({
+            "path": relative.as_str(),
+            "asset_id": entry.id.to_string(),
+            "size_bytes": size_bytes,
+            "format": format,
+        }));
+    }
+    textures.sort_by(|left, right| {
+        left["path"].as_str().unwrap_or("").cmp(right["path"].as_str().unwrap_or(""))
+    });
+    let value = json!({ "count": textures.len(), "textures": textures });
+    write_c_string(buffer, buffer_size, &value.to_string())
+}

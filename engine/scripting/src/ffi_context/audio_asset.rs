@@ -69,3 +69,6 @@ pub type AssetGetSummaryFn = extern "C" fn(*mut c_char, usize) -> usize;
 /// 返回 0=成功，-1=未打开工程或索引越界；两个 buffer 均写 NUL 结尾字符串。
 pub type AssetGetAssetFn =
     extern "C" fn(i32, *mut c_char, usize, *mut c_char, usize) -> i32;
+
+/// 列出 AssetDatabase 中 Texture 源资产（JSON：count/textures[]）。
+pub type AssetTextureListJsonFn = extern "C" fn(*mut std::ffi::c_char, usize) -> usize;

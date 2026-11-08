@@ -336,6 +336,7 @@ pub project_add_entity: ProjectAddEntityFn,
         pub asset_count: AssetCountFn,
         pub asset_get_summary: AssetGetSummaryFn,
         pub asset_get_asset: AssetGetAssetFn,
+        pub asset_texture_list_json: AssetTextureListJsonFn,
         // 0.2 Prefab / SceneManager / Player 导出 FFI（tail；必须与 C# FfiContext 字段顺序一致）
         pub prefab_capture_from_scene: PrefabCaptureFromSceneFn,
         pub prefab_instantiate: PrefabInstantiateFn,
@@ -388,4 +389,5 @@ pub fn get_ffi_context_ptr() -> *const FfiContext {
         }
     }
 }
+
 

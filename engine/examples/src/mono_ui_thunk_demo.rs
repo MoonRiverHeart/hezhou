@@ -458,6 +458,7 @@ fn main() {
         asset_count: stub_asset_count,
         asset_get_summary: stub_asset_get_summary,
         asset_get_asset: stub_asset_get_asset,
+        asset_texture_list_json: stub_asset_texture_list_json,
         prefab_capture_from_scene: stub_prefab_capture,
         prefab_instantiate: stub_prefab_instantiate,
         scene_manager_save_current: stub_scene_manager_save,
@@ -670,6 +671,7 @@ extern "C" fn stub_asset_scan() -> i32 { 0 }
 extern "C" fn stub_asset_import_gltf(_: *const std::ffi::c_char) -> i32 { 0 }
 extern "C" fn stub_asset_count() -> i32 { 0 }
 extern "C" fn stub_asset_get_summary(_: *mut std::ffi::c_char, _: usize) -> usize { 0 }
+extern "C" fn stub_asset_texture_list_json(_: *mut std::ffi::c_char, _: usize) -> usize { 0 }
 extern "C" fn stub_asset_get_asset(
     _: i32,
     _: *mut std::ffi::c_char,
@@ -780,4 +782,5 @@ fn compile_csharp_script() {
         }
     }
 }
+
 

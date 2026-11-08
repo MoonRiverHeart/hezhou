@@ -456,6 +456,7 @@ ui_tree_view_set_on_select_thunk_ptr: unsafe { std::mem::transmute(ui_ffi::ui_tr
         asset_count: audio_asset_ffi::asset_count,
         asset_get_summary: audio_asset_ffi::asset_get_summary,
         asset_get_asset: audio_asset_ffi::asset_get_asset,
+        asset_texture_list_json: audio_asset_ffi::asset_texture_list_json,
         prefab_capture_from_scene: prefab_scene_player_ffi::prefab_capture_from_scene,
         prefab_instantiate: prefab_scene_player_ffi::prefab_instantiate,
         scene_manager_save_current: prefab_scene_player_ffi::scene_manager_save_current,
@@ -834,6 +835,8 @@ dfx_trace_begin!("ProcessEvents", "ui");
     let exit_code = if auto_test_mode && auto_test_status != "pass" { 2 } else { 0 };
     std::process::exit(exit_code);
 }
+
+
 
 
 

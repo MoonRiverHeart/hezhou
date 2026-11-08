@@ -284,6 +284,18 @@ namespace Hezhou
                 }
             }
             _materialTabItemCount = materialTotal;
+
+            // 0.3 材质纹理编辑（task-45）：PBR albedo 纹理资产列表
+            UI.CreateLabel(materialContentStack, 300f, 22f, "PBR albedo 纹理（AssetDatabase）");
+            _textureCurrentLabelId = UI.CreateLabel(materialContentStack, 660f, 22f, "当前纹理: （未选择实体）");
+            _textureAssetContainerId = UI.CreateVStack(materialContentStack, 3f);
+            ulong textureControlRow = UI.CreateHStack(materialContentStack, 6f);
+            ulong textureRefreshButton = UI.CreateButton(textureControlRow, 130f, 26f, "刷新纹理列表");
+            UI.SetOnClick(textureRefreshButton, _textureRefreshCallback);
+            ulong textureClearButton = UI.CreateButton(textureControlRow, 150f, 26f, "清除 albedo 纹理");
+            UI.SetOnClick(textureClearButton, _textureClearCallback);
+            _textureAssignStatusLabelId = UI.CreateLabel(materialContentStack, 680f, 22f, "纹理: 未加载");
+            RefreshMaterialTextureList();
             
             ulong textureTabContent = 0;
             if (!_textureDockedRight)

@@ -61,6 +61,9 @@ namespace Hezhou
             try { TestAnimationFfi(); }
             catch (Exception ex) { Log.Error("TestRunner", "TestAnimationFfi异常: " + ex.Message); }
 
+            try { TestMaterialTextureFfi(); }
+            catch (Exception ex) { Log.Error("TestRunner", "TestMaterialTextureFfi异常: " + ex.Message); }
+
             Log.Info("TestRunner", "===== 测试完成: PASS=" + _passCount + ", FAIL=" + _failCount + " =====");
         }
 
@@ -821,6 +824,61 @@ namespace Hezhou
             double clamped = UI.AnimationPreviewSetTime(0.25f);
             AssertTrue("Animation", clamped >= 0.0 && clamped <= 1e-6,
                 "无 clip 时 set_time clamp 到 0 (t=" + clamped + ")");
+        }
+
+        /// <summary>
+        /// 0.3 材质纹理自检（task-45）：
+        /// 写临时 PNG 到 assets → 扫描 → asset_texture_list_json 包含该纹理 →
+        /// 设置/清除实体 PBR albedo_texture_path roundtrip → 清理文件与实体。
+        /// </summary>
+        private static void TestMaterialTextureFfi()
+        {
+            string root = System.IO.Directory.GetCurrentDirectory();
+            string texturePath = System.IO.Path.Combine(root, "assets", "__ffi_tex_selftest__.png");
+            string metaPath = texturePath + ".meta";
+            ulong cube = 0;
+            try
+            {
+                byte[] png = Convert.FromBase64String(
+                    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=");
+                System.IO.File.WriteAllBytes(texturePath, png);
+                UI.AssetScan();
+
+                string listJson = UI.AssetTextureListJson();
+                bool listed = listJson.IndexOf("__ffi_tex_selftest__.png") >= 0
+                    && listJson.IndexOf("\"png\"") >= 0;
+                AssertTrue("MaterialTexture", listed,
+                    "纹理列表包含临时 PNG（len=" + listJson.Length + "）");
+
+                cube = EditorScript.TestCreateCubeEntity();
+                IntPtr scenePtr = EditorScript.TestGetScenePtr();
+                string materialJson = "{"
+                    + "\"albedo\":[0.8,0.8,0.8,1.0],\"metallic\":0.1,\"roughness\":0.6,"
+                    + "\"normal_scale\":1.0,\"ao\":1.0,\"emissive\":[0,0,0],"
+                    + "\"emissive_strength\":1.0,"
+                    + "\"albedo_texture_path\":\"assets/__ffi_tex_selftest__.png\""
+                    + "}";
+                int setRc = UI.SceneSetEntityPbrMaterial(scenePtr, cube, materialJson);
+                string stored = UI.SceneGetEntityPbrMaterial(scenePtr, cube);
+                AssertTrue("MaterialTexture",
+                    setRc == 0 && stored.IndexOf("__ffi_tex_selftest__.png") >= 0,
+                    "设置 albedo 纹理 roundtrip (rc=" + setRc + ", json=" + stored + ")");
+
+                int clearRc = UI.SceneSetEntityPbrMaterial(scenePtr, cube, "null");
+                string cleared = UI.SceneGetEntityPbrMaterial(scenePtr, cube);
+                AssertTrue("MaterialTexture",
+                    clearRc == 0 && cleared.Length == 0,
+                    "清除 albedo 纹理后读取为空 (rc=" + clearRc + ", len=" + cleared.Length + ")");
+                UI.EditorSyncPbrMaterialsNow();
+            }
+            finally
+            {
+                if (cube != 0) EditorScript.TestRemoveEntity(cube);
+                try { if (System.IO.File.Exists(texturePath)) System.IO.File.Delete(texturePath); } catch (Exception) { }
+                try { if (System.IO.File.Exists(metaPath)) System.IO.File.Delete(metaPath); } catch (Exception) { }
+                try { UI.AssetScan(); } catch (Exception) { }
+                try { EditorScript.TestRefreshMaterialTextureList(); } catch (Exception) { }
+            }
         }
 
         // 内存保存值结构（模拟SavedScriptPropertyValue，用于测试）
