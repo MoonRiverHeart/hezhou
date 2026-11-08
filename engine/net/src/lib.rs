@@ -11,6 +11,8 @@
 //! | 消息协议 | [`Message`]（ClientHello/ServerWelcome/Snapshot/Rpc/Heartbeat/Disconnect/Room 等）+ 自定义二进制 |
 //! | 会话 | [`SessionManager`]、[`Session`]、[`SessionEvent`]：握手、序列号、心跳、超时断开 |
 //! | 房间 | [`RoomManager`]、[`Room`]：加入/离开/广播/定向发送 |
+//! | 快照同步 | [`EntityState`]、[`WorldSnapshot`]、[`SnapshotPacket`]：全量/delta 二进制；[`ReplicationServer`]、[`ReplicationClient`]、[`SnapshotBuffer`] |
+//! | RPC | [`RpcRegistry`]、[`RpcCall`]、[`RpcResult`]：方法注册/调用 + 二进制结果 |
 //! | 开箱 server/client | [`NetServer`]、[`NetClient`]、[`NetConfig`] |
 //!
 //! ## 快速开始（UDP loopback）
@@ -48,27 +50,48 @@ pub mod error;
 pub mod framing;
 pub mod ids;
 pub mod message;
+pub mod replication;
 pub mod room;
+pub mod rpc;
 pub mod server;
 pub mod session;
+pub mod snapshot;
 pub mod tcp;
 pub mod transport;
 pub mod udp;
 
 pub use client::{ClientEvent, NetClient};
 pub use config::NetConfig;
-pub use error::{FrameError, MessageError, RoomError, SessionError, TransportError};
+pub use error::{
+    FrameError, MessageError, ReplicationError, RoomError, RpcError, SessionError, SnapshotError,
+    TransportError,
+};
 pub use framing::{FrameCodec, FrameDecoder, DEFAULT_MAX_FRAME_BYTES, FRAME_HEADER_SIZE};
 pub use ids::{PeerId, PlayerId, RoomId, SessionId};
 pub use message::{
     DisconnectReason, Message, MessageKind, RoomRejectReason, MAX_MESSAGE_BYTES, MESSAGE_VERSION,
     PROTOCOL_VERSION,
 };
+pub use replication::{
+    ClientReplicationStats, ClientSnapshot, ReceiveOutcome, ReplicationClient,
+    ReplicationClientStats, ReplicationConfig, ReplicationServer,
+    DEFAULT_FULL_SNAPSHOT_INTERVAL_TICKS, DEFAULT_REPLICATION_HISTORY,
+    DEFAULT_REPLICATION_MAX_ENTITIES, DEFAULT_REPLICATION_MAX_SNAPSHOT_BYTES,
+};
 pub use room::{JoinError, JoinOutcome, LeaveOutcome, Room, RoomConfig, RoomManager, RoomMember};
+pub use rpc::{
+    RpcCall, RpcRegistry, RpcResult, MAX_RPC_BYTES, MAX_RPC_ERROR_BYTES, MAX_RPC_METHOD_BYTES,
+    MAX_RPC_PAYLOAD_BYTES, RPC_VERSION,
+};
 pub use server::{NetServer, ServerEvent};
 pub use session::{
     OutboundDatagram, Packet, Session, SessionConfig, SessionEvent, SessionManager, SessionRole,
     SessionState, SessionStats,
+};
+pub use snapshot::{
+    EntityState, SnapshotBuffer, SnapshotPacket, WorldSnapshot, DEFAULT_SNAPSHOT_BUFFER_CAPACITY,
+    MAX_SNAPSHOT_BYTES, MAX_SNAPSHOT_ENTITIES, SNAPSHOT_ENTITY_BYTES, SNAPSHOT_HEADER_BYTES,
+    SNAPSHOT_LENGTH_PREFIX_BYTES, SNAPSHOT_VERSION,
 };
 pub use tcp::{TcpConnection, TcpListener, TcpStats};
 pub use transport::{PeerAddr, Transport, TransportStats, DEFAULT_MAX_DATAGRAM_BYTES};

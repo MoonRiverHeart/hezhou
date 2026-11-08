@@ -193,3 +193,189 @@ impl fmt::Display for RoomError {
 }
 
 impl std::error::Error for RoomError {}
+
+/// 快照编解码/应用错误。
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum SnapshotError {
+    /// 超过快照大小上限。
+    TooLarge {
+        /// 实际大小（字节）。
+        size: usize,
+        /// 上限（字节）。
+        max: usize,
+    },
+    /// 输入字节不足（长度前缀/头/实体不完整）。
+    Truncated,
+    /// 不支持的快照格式版本。
+    UnsupportedVersion(u8),
+    /// 未知快照类型（全量/增量之外）。
+    UnknownKind(u8),
+    /// 长度前缀声明的长度与实际字节数不一致。
+    InvalidLength {
+        /// 声明的长度。
+        declared: usize,
+        /// 实际长度。
+        actual: usize,
+    },
+    /// 实体数量超过上限。
+    EntityLimit {
+        /// 实际数量。
+        count: usize,
+        /// 上限。
+        max: usize,
+    },
+    /// 快照内出现重复实体 ID。
+    DuplicateEntity(u32),
+    /// delta 的 base_tick 与本地 baseline 不一致。
+    BaseTickMismatch {
+        /// delta 声明的 baseline tick。
+        expected: u64,
+        /// 本地 baseline 的 tick。
+        actual: u64,
+    },
+    /// delta 的 tick 没有比 base tick 更新。
+    TickNotNewer {
+        /// baseline tick。
+        base: u64,
+        /// 新 tick。
+        tick: u64,
+    },
+    /// 应用 delta 时没有 baseline。
+    MissingBaseline,
+    /// 收到的快照 tick 不新于已应用 tick（旧快照拒绝）。
+    StaleTick {
+        /// 已应用的 tick。
+        last: u64,
+        /// 新收到的 tick。
+        received: u64,
+    },
+}
+
+impl fmt::Display for SnapshotError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::TooLarge { size, max } => {
+                write!(f, "快照过大: {size} > {max} 字节")
+            }
+            Self::Truncated => write!(f, "快照数据被截断"),
+            Self::UnsupportedVersion(version) => {
+                write!(f, "不支持的快照版本: {version}")
+            }
+            Self::UnknownKind(kind) => write!(f, "未知快照类型: {kind}"),
+            Self::InvalidLength { declared, actual } => {
+                write!(f, "快照长度前缀不一致: 声明 {declared}，实际 {actual}")
+            }
+            Self::EntityLimit { count, max } => {
+                write!(f, "快照实体过多: {count} > {max}")
+            }
+            Self::DuplicateEntity(id) => write!(f, "快照实体 ID 重复: {id}"),
+            Self::BaseTickMismatch { expected, actual } => {
+                write!(
+                    f,
+                    "delta baseline 不匹配: 需要 tick {expected}，本地 {actual}"
+                )
+            }
+            Self::TickNotNewer { base, tick } => {
+                write!(f, "delta tick 未更新: base {base} >= tick {tick}")
+            }
+            Self::MissingBaseline => write!(f, "应用 delta 前缺少 baseline 快照"),
+            Self::StaleTick { last, received } => {
+                write!(f, "旧快照拒绝: 已应用 tick {last}，收到 {received}")
+            }
+        }
+    }
+}
+
+impl std::error::Error for SnapshotError {}
+
+/// 服务器复制层错误（构建/发送快照时）。
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum ReplicationError {
+    /// 编码后的快照超过单包/带宽上限，需要背压（本 tick 丢弃）。
+    Backpressure {
+        /// 编码后大小。
+        size: usize,
+        /// 上限。
+        max: usize,
+    },
+    /// 世界实体数超过上限。
+    EntityLimit {
+        /// 尝试后的数量。
+        count: usize,
+        /// 上限。
+        max: usize,
+    },
+    /// 客户端未注册到复制层。
+    UnknownClient(crate::ids::PlayerId),
+    /// 快照编解码错误。
+    Snapshot(SnapshotError),
+}
+
+impl fmt::Display for ReplicationError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Backpressure { size, max } => {
+                write!(f, "快照背压: {size} > {max} 字节，本 tick 丢弃")
+            }
+            Self::EntityLimit { count, max } => {
+                write!(f, "世界实体超过上限: {count} > {max}")
+            }
+            Self::UnknownClient(player) => write!(f, "未注册的复制客户端: {player}"),
+            Self::Snapshot(error) => write!(f, "快照错误: {error}"),
+        }
+    }
+}
+
+impl std::error::Error for ReplicationError {}
+
+impl From<SnapshotError> for ReplicationError {
+    fn from(error: SnapshotError) -> Self {
+        Self::Snapshot(error)
+    }
+}
+
+/// RPC 注册/调用错误。
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum RpcError {
+    /// 方法未注册。
+    UnknownMethod(String),
+    /// payload 超过上限。
+    PayloadTooLarge {
+        /// 实际大小。
+        size: usize,
+        /// 上限。
+        max: usize,
+    },
+    /// 方法名超过上限。
+    MethodTooLong {
+        /// 实际大小。
+        size: usize,
+        /// 上限。
+        max: usize,
+    },
+    /// 编解码失败。
+    Decode(String),
+    /// 重复注册同名方法。
+    DuplicateMethod(String),
+    /// handler 返回的业务错误。
+    HandlerError(String),
+}
+
+impl fmt::Display for RpcError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::UnknownMethod(method) => write!(f, "未知 RPC 方法: {method}"),
+            Self::PayloadTooLarge { size, max } => {
+                write!(f, "RPC payload 过大: {size} > {max} 字节")
+            }
+            Self::MethodTooLong { size, max } => {
+                write!(f, "RPC 方法名过长: {size} > {max} 字节")
+            }
+            Self::Decode(message) => write!(f, "RPC 编解码失败: {message}"),
+            Self::DuplicateMethod(method) => write!(f, "RPC 方法重复注册: {method}"),
+            Self::HandlerError(message) => write!(f, "RPC handler 错误: {message}"),
+        }
+    }
+}
+
+impl std::error::Error for RpcError {}
