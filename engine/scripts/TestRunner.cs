@@ -58,6 +58,9 @@ namespace Hezhou
             try { TestBuildSettingsFfi(); }
             catch (Exception ex) { Log.Error("TestRunner", "TestBuildSettingsFfi异常: " + ex.Message); }
 
+            try { TestAnimationFfi(); }
+            catch (Exception ex) { Log.Error("TestRunner", "TestAnimationFfi异常: " + ex.Message); }
+
             Log.Info("TestRunner", "===== 测试完成: PASS=" + _passCount + ", FAIL=" + _failCount + " =====");
         }
 
@@ -791,6 +794,33 @@ namespace Hezhou
                 }
                 catch (Exception) { }
             }
+        }
+
+        /// <summary>
+        /// 0.3 动画时间轴自检（task-43）：
+        /// 缺失资产返回安全错误 JSON；play/pause 状态；无 clip 时 set_time clamp。
+        /// </summary>
+        private static void TestAnimationFfi()
+        {
+            string missing = UI.AnimationAssetSummary("logs/__missing_animation__.gltf");
+            bool summarySafe = missing.IndexOf("\"clips\"") >= 0
+                && missing.IndexOf("\"error\"") >= 0;
+            AssertTrue("Animation", summarySafe,
+                "缺失资产返回安全错误 JSON（len=" + missing.Length + "）");
+
+            UI.AnimationPreviewPlay();
+            string playing = UI.AnimationPreviewSnapshot();
+            AssertTrue("Animation", playing.IndexOf("\"playing\":true") >= 0,
+                "Play 后 snapshot playing=true (" + playing + ")");
+
+            UI.AnimationPreviewPause();
+            string paused = UI.AnimationPreviewSnapshot();
+            AssertTrue("Animation", paused.IndexOf("\"playing\":false") >= 0,
+                "Pause 后 snapshot playing=false");
+
+            double clamped = UI.AnimationPreviewSetTime(0.25f);
+            AssertTrue("Animation", clamped >= 0.0 && clamped <= 1e-6,
+                "无 clip 时 set_time clamp 到 0 (t=" + clamped + ")");
         }
 
         // 内存保存值结构（模拟SavedScriptPropertyValue，用于测试）

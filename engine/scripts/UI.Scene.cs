@@ -1065,5 +1065,115 @@ UI.SceneSelectEntity(_scenePtr, entityId);
                 Marshal.FreeHGlobal(jsonPtr);
             }
         }
+
+        // === 0.3 动画时间轴（task-43） ===
+
+        /// <summary>查询 glTF 资产动画/骨骼摘要 JSON（失败返回含 error 的 JSON）。</summary>
+        public static string AnimationAssetSummary(string path)
+        {
+            if (_ffi.animation_asset_summary == IntPtr.Zero)
+            {
+                return "";
+            }
+            IntPtr pathPtr = Marshal.StringToHGlobalAnsi(path ?? "");
+            const int bufferSize = 32768;
+            IntPtr buffer = Marshal.AllocHGlobal(bufferSize);
+            try
+            {
+                Marshal.WriteByte(buffer, 0, 0);
+                var func = Marshal.GetDelegateForFunctionPointer<AnimationAssetSummaryDelegate>(
+                    _ffi.animation_asset_summary);
+                ulong written = func(pathPtr, buffer, (ulong)bufferSize);
+                return written == 0UL ? "" : (Marshal.PtrToStringAnsi(buffer, (int)written) ?? "");
+            }
+            finally
+            {
+                Marshal.FreeHGlobal(buffer);
+                Marshal.FreeHGlobal(pathPtr);
+            }
+        }
+
+        /// <summary>每帧驱动预览时间（playing>=0 时设置播放状态），返回当前时间。</summary>
+        public static double AnimationPreviewTick(float dt, int playing)
+        {
+            if (_ffi.animation_preview_tick == IntPtr.Zero)
+            {
+                return 0.0;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<AnimationPreviewTickDelegate>(
+                _ffi.animation_preview_tick);
+            return func(dt, playing);
+        }
+
+        /// <summary>选择 clip；返回 0=成功。</summary>
+        public static int AnimationPreviewSetClip(int index)
+        {
+            if (_ffi.animation_preview_set_clip == IntPtr.Zero)
+            {
+                return -1;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<AnimationPreviewSetClipDelegate>(
+                _ffi.animation_preview_set_clip);
+            return func(index);
+        }
+
+        /// <summary>设置预览时间（clamp 到 [0,duration]），返回实际时间。</summary>
+        public static double AnimationPreviewSetTime(float time)
+        {
+            if (_ffi.animation_preview_set_time == IntPtr.Zero)
+            {
+                return 0.0;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<AnimationPreviewSetTimeDelegate>(
+                _ffi.animation_preview_set_time);
+            return func(time);
+        }
+
+        /// <summary>开始播放。</summary>
+        public static int AnimationPreviewPlay()
+        {
+            if (_ffi.animation_preview_play == IntPtr.Zero)
+            {
+                return -1;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<AnimationPreviewPlayDelegate>(
+                _ffi.animation_preview_play);
+            return func();
+        }
+
+        /// <summary>暂停播放。</summary>
+        public static int AnimationPreviewPause()
+        {
+            if (_ffi.animation_preview_pause == IntPtr.Zero)
+            {
+                return -1;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<AnimationPreviewPauseDelegate>(
+                _ffi.animation_preview_pause);
+            return func();
+        }
+
+        /// <summary>预览状态快照 JSON。</summary>
+        public static string AnimationPreviewSnapshot()
+        {
+            if (_ffi.animation_preview_snapshot == IntPtr.Zero)
+            {
+                return "";
+            }
+            const int bufferSize = 4096;
+            IntPtr buffer = Marshal.AllocHGlobal(bufferSize);
+            try
+            {
+                Marshal.WriteByte(buffer, 0, 0);
+                var func = Marshal.GetDelegateForFunctionPointer<AnimationPreviewSnapshotDelegate>(
+                    _ffi.animation_preview_snapshot);
+                ulong written = func(buffer, (ulong)bufferSize);
+                return written == 0UL ? "" : (Marshal.PtrToStringAnsi(buffer, (int)written) ?? "");
+            }
+            finally
+            {
+                Marshal.FreeHGlobal(buffer);
+            }
+        }
     }
 }

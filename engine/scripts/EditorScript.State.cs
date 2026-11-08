@@ -260,6 +260,28 @@ namespace Hezhou
         private static UI.WidgetCallbackDelegate _buildSettingsValidateCallback;
         private static bool _buildSettingsLoaded;
 
+        // === 0.3 动画时间轴（task-43） ===
+        private static ulong _animPathFieldId;
+        private static ulong _animClipDropdownId;
+        private static ulong _animSliderId;
+        private static ulong _animTimeLabelId;
+        private static ulong _animStatusLabelId;
+        private static ulong _animFileDialogId;
+        private static ulong _animFileBrowserId;
+        private static UI.WidgetCallbackDelegate _animLoadCallback;
+        private static UI.WidgetCallbackDelegate _animBrowseCallback;
+        private static UI.WidgetCallbackDelegate _animPlayCallback;
+        private static UI.WidgetCallbackDelegate _animPauseCallback;
+        private static UI.WidgetCallbackDelegate _animResetCallback;
+        private static UI.DropdownSelectCallbackDelegate _animClipSelectCallback;
+        private static UI.SliderChangeCallbackDelegate _animSliderChangeCallback;
+        private static UI.DialogResultCallbackDelegate _animFileDialogResultCallback;
+        private static bool _animPlaying;
+        private static bool _animLoaded;
+        private static string[] _animClipNames = new string[0];
+        private static float[] _animClipDurations = new float[0];
+        private static float _animDuration;
+
         // === Dock / Layout State ===
         private static ulong _rightMaxButtonId;
         private static UI.WidgetCallbackDelegate _rightMaxClickCallback;

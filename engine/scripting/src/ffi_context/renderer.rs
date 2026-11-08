@@ -78,3 +78,28 @@ pub type BuildSettingsSaveJsonFn = extern "C" fn(*const std::ffi::c_char) -> i32
 pub type BuildSettingsValidateJsonFn =
     extern "C" fn(*const std::ffi::c_char, *mut std::ffi::c_char, usize) -> i32;
 
+// === 0.3 动画时间轴（task-43） ===
+
+/// 查询 glTF 资产动画/骨骼摘要 JSON（失败返回 error JSON）。
+pub type AnimationAssetSummaryFn =
+    extern "C" fn(*const std::ffi::c_char, *mut std::ffi::c_char, usize) -> usize;
+
+/// 每帧驱动预览时间（dt 秒；playing>=0 时设置播放状态），返回当前时间。
+pub type AnimationPreviewTickFn = extern "C" fn(f32, i32) -> f64;
+
+/// 选择 clip（越界 -1），返回 0=成功。
+pub type AnimationPreviewSetClipFn = extern "C" fn(i32) -> i32;
+
+/// 设置预览时间（clamp 到 [0,duration]），返回实际时间。
+pub type AnimationPreviewSetTimeFn = extern "C" fn(f32) -> f64;
+
+/// 开始播放。
+pub type AnimationPreviewPlayFn = extern "C" fn() -> i32;
+
+/// 暂停播放。
+pub type AnimationPreviewPauseFn = extern "C" fn() -> i32;
+
+/// 预览状态快照 JSON。
+pub type AnimationPreviewSnapshotFn =
+    extern "C" fn(*mut std::ffi::c_char, usize) -> usize;
+

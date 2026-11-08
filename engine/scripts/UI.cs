@@ -1009,6 +1009,22 @@ namespace Hezhou
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public delegate int BuildSettingsValidateJsonDelegate(IntPtr json, IntPtr errors, ulong errorsSize);
 
+        // 0.3 动画时间轴 FFI（task-43）
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate ulong AnimationAssetSummaryDelegate(IntPtr path, IntPtr buffer, ulong bufferSize);
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate double AnimationPreviewTickDelegate(float dt, int playing);
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate int AnimationPreviewSetClipDelegate(int index);
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate double AnimationPreviewSetTimeDelegate(float time);
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate int AnimationPreviewPlayDelegate();
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate int AnimationPreviewPauseDelegate();
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate ulong AnimationPreviewSnapshotDelegate(IntPtr buffer, ulong bufferSize);
+
 [StructLayout(LayoutKind.Sequential)]
         public struct FfiContext
         {
@@ -1348,6 +1364,14 @@ namespace Hezhou
             public IntPtr build_settings_snapshot_json;
             public IntPtr build_settings_save_json;
             public IntPtr build_settings_validate_json;
+            // 0.3 动画时间轴 FFI（tail）
+            public IntPtr animation_asset_summary;
+            public IntPtr animation_preview_tick;
+            public IntPtr animation_preview_set_clip;
+            public IntPtr animation_preview_set_time;
+            public IntPtr animation_preview_play;
+            public IntPtr animation_preview_pause;
+            public IntPtr animation_preview_snapshot;
         }
 
         public static void InitFromContext(IntPtr contextPtr)

@@ -372,6 +372,31 @@ namespace Hezhou
             // 启动时自动读取（新建/加载工程时 RefreshSceneTreeAfterLoad 也会刷新）。
             LoadBuildSettingsIntoFields();
 
+            // 0.3 动画时间轴（task-43）：glTF clip/骨骼浏览 + 时间轴播放（本轮无角色渲染）
+            ulong animationTabContent = UI.CreateVStack(_assetTabWidget.Id, 5f);
+            UI.CreateLabel(animationTabContent, 480f, 24f, "动画预览（glTF clip / skeleton）");
+            ulong animPathRow = UI.CreateHStack(animationTabContent, 4f);
+            UI.CreateLabel(animPathRow, 50f, 22f, "资产");
+            _animPathFieldId = UI.CreateInputField(animPathRow, 300f, 22f);
+            UI.InputFieldSetPlaceholder(_animPathFieldId, "assets/models/hero.gltf（或绝对路径）");
+            ulong animLoadButton = UI.CreateButton(animPathRow, 70f, 24f, "加载");
+            UI.SetOnClick(animLoadButton, _animLoadCallback);
+            ulong animBrowseButton = UI.CreateButton(animPathRow, 70f, 24f, "浏览");
+            UI.SetOnClick(animBrowseButton, _animBrowseCallback);
+            _animClipDropdownId = UI.CreateDropdown(animationTabContent, 320f, 26f);
+            _animSliderId = UI.CreateSlider(animationTabContent, 0f, 0f, 460f, 26f, 0f, 1f, 0f);
+            UI.SliderSetStep(_animSliderId, 0.01f);
+            UI.SliderSetOnChange(_animSliderId, _animSliderChangeCallback);
+            _animTimeLabelId = UI.CreateLabel(animationTabContent, 640f, 22f, "时间: 0.000 / 0.000 s");
+            ulong animButtonRow = UI.CreateHStack(animationTabContent, 6f);
+            ulong animPlayButton = UI.CreateButton(animButtonRow, 100f, 26f, "播放");
+            UI.SetOnClick(animPlayButton, _animPlayCallback);
+            ulong animPauseButton = UI.CreateButton(animButtonRow, 100f, 26f, "暂停");
+            UI.SetOnClick(animPauseButton, _animPauseCallback);
+            ulong animResetButton = UI.CreateButton(animButtonRow, 100f, 26f, "回到起点");
+            UI.SetOnClick(animResetButton, _animResetCallback);
+            _animStatusLabelId = UI.CreateLabel(animationTabContent, 660f, 22f, "动画: 未加载");
+
             _assetTabWidget.AddTab("模型", modelTabContent, false);
             _assetTabWidget.AddTab("材质", materialTabContent, false);
             if (!_textureDockedRight)
@@ -383,6 +408,7 @@ namespace Hezhou
             _assetTabWidget.AddTab("工程", projectAssetTabContent, false);
             _assetTabWidget.AddTab("Profiler", _profilerTabContentId, false);
             _assetTabWidget.AddTab("Build", buildSettingsTabContent, false);
+            _assetTabWidget.AddTab("动画", animationTabContent, false);
             _assetTabWidget.SetReorderable(true);
 
             // === Properties Panel: 5-tab TabWidget ===

@@ -69,6 +69,14 @@ namespace Hezhou
             _buildSettingsLoadCallback = OnBuildSettingsLoadClick;
             _buildSettingsSaveCallback = OnBuildSettingsSaveClick;
             _buildSettingsValidateCallback = OnBuildSettingsValidateClick;
+            _animLoadCallback = OnAnimLoadClick;
+            _animBrowseCallback = OnAnimBrowseClick;
+            _animPlayCallback = OnAnimPlayClick;
+            _animPauseCallback = OnAnimPauseClick;
+            _animResetCallback = OnAnimResetClick;
+            _animClipSelectCallback = OnAnimClipSelected;
+            _animSliderChangeCallback = OnAnimSliderChanged;
+            _animFileDialogResultCallback = OnAnimationFileDialogResult;
             _sceneFileDialogResultCallback = OnSceneFileDialogResult;
             _rightMaxClickCallback = OnRightMaxClick;
             _consoleDialogResultCallback = OnConsoleDialogResult;
@@ -237,6 +245,20 @@ _bindScriptClickCallback = OnBindScriptClick;
             {
                 _profilerTickCounter = 0;
                 if (!_profilerPaused) RefreshProfilerPanel();
+            }
+
+            // 0.3 动画时间轴：播放时间由编辑器每帧驱动（暂停时保持当前时间）。
+            if (_animLoaded)
+            {
+                float animTime = (float)UI.AnimationPreviewTick(deltaTime, _animPlaying ? 1 : 0);
+                if (_animPlaying)
+                {
+                    if (_animSliderId != 0 && _animDuration > 0f)
+                    {
+                        UI.SliderSetValue(_animSliderId, animTime);
+                    }
+                    UpdateAnimTimeLabel(animTime);
+                }
             }
 
             if (deltaTime > 0 && _fpsItem != null)
@@ -1581,6 +1603,198 @@ _bindScriptClickCallback = OnBindScriptClick;
                 }
             }
             return result;
+        }
+
+        // === 0.3 动画时间轴（task-43） ===
+
+        private static void OnAnimLoadClick(ulong widgetId)
+        {
+            LoadAnimationAssetFromField();
+        }
+
+        private static void OnAnimBrowseClick(ulong widgetId)
+        {
+            ShowAnimationFileDialog();
+        }
+
+        private static void ShowAnimationFileDialog()
+        {
+            ulong rootId = UI.GetRootId();
+            _animFileDialogId = UI.CreateDialog(rootId, "选择 glTF/GLB 资产", 560f, 420f);
+            UI.DialogSetOnResult(_animFileDialogId, _animFileDialogResultCallback);
+            ulong contentId = UI.CreateVStack(_animFileDialogId, 10f);
+            UI.CreateLabel(contentId, 520f, 30f, "选择 glTF/GLB 资产文件:");
+            _animFileBrowserId = UI.CreateFileBrowser(contentId, 10f, 10f, 500f, 300f, ".");
+            UI.FileBrowserSetFilter(_animFileBrowserId, "*.gltf");
+            UI.DialogSetContent(_animFileDialogId, contentId);
+            UI.DialogAddButton(_animFileDialogId, "加载", 1);
+            UI.DialogAddButton(_animFileDialogId, "取消", 0);
+            UI.DialogShow(_animFileDialogId);
+        }
+
+        private static void OnAnimationFileDialogResult(ulong dialogId, int result)
+        {
+            UI.DialogHide(_animFileDialogId);
+            if (result != 1) return;
+            string selected = GetBrowserSelectedOrCurrent(_animFileBrowserId);
+            if (string.IsNullOrEmpty(selected))
+            {
+                SetAnimStatus("动画: 未选择文件");
+                return;
+            }
+            UI.InputFieldSetText(_animPathFieldId, selected);
+            LoadAnimationAssetFromField();
+        }
+
+        /// <summary>读取路径字段 → animation_asset_summary → 填 clip 下拉/时间轴。</summary>
+        private static void LoadAnimationAssetFromField()
+        {
+            if (_animPathFieldId == 0 || _animStatusLabelId == 0) return;
+            string path = UI.InputFieldGetText(_animPathFieldId);
+            if (string.IsNullOrEmpty(path) || path.Trim().Length == 0)
+            {
+                SetAnimStatus("动画: 请输入 glTF/GLB 资产路径");
+                return;
+            }
+            path = path.Trim();
+            string json = UI.AnimationAssetSummary(path);
+            string error = ParsePbrString(json, "error");
+            if (error.Length > 0)
+            {
+                _animLoaded = false;
+                _animPlaying = false;
+                _animClipNames = new string[0];
+                _animClipDurations = new float[0];
+                _animDuration = 0f;
+                SetAnimStatus("动画: 加载失败（" + error + "）");
+                Log.Warn("Animation", "加载失败: " + error);
+                return;
+            }
+
+            string[] names;
+            float[] durations;
+            ParseAnimationClips(json, out names, out durations);
+            _animClipNames = names;
+            _animClipDurations = durations;
+            _animDuration = durations.Length > 0 ? durations[0] : 0f;
+            _animLoaded = true;
+            _animPlaying = false;
+            int jointCount = (int)PbrJsonFloat(json, "joint_count", 0f);
+            string[] options = names.Length > 0 ? names : new string[] { "(无 clip)" };
+            UI.DropdownSetOptions(_animClipDropdownId, options);
+            UI.DropdownSetSelected(_animClipDropdownId, 0);
+            if (names.Length > 0) UI.AnimationPreviewSetClip(0);
+            UI.AnimationPreviewSetTime(0f);
+            UI.SliderSetRange(_animSliderId, 0f, _animDuration > 0f ? _animDuration : 1f);
+            UI.SliderSetStep(_animSliderId, _animDuration > 0f ? _animDuration / 200f : 0.01f);
+            UI.SliderSetValue(_animSliderId, 0f);
+            UpdateAnimTimeLabel(0f);
+            SetAnimStatus("动画: " + names.Length + " clip / skeleton joints=" + jointCount
+                + " / 时长 " + FormatPbrFloat(_animDuration) + "s");
+            Log.Info("Animation", "加载完成: " + path + " clips=" + names.Length + " joints=" + jointCount);
+        }
+
+        /// <summary>解析 summary JSON 中 clips[] 的 name/duration。</summary>
+        private static void ParseAnimationClips(string json, out string[] names, out float[] durations)
+        {
+            System.Collections.Generic.List<string> nameList =
+                new System.Collections.Generic.List<string>();
+            System.Collections.Generic.List<float> durationList =
+                new System.Collections.Generic.List<float>();
+            int clipsIndex = json.IndexOf("\"clips\":[");
+            if (clipsIndex >= 0)
+            {
+                int pos = clipsIndex + "\"clips\":[".Length;
+                while (pos < json.Length)
+                {
+                    int open = json.IndexOf('{', pos);
+                    if (open < 0) break;
+                    int close = json.IndexOf('}', open + 1);
+                    if (close < 0) break;
+                    string segment = json.Substring(open, close - open + 1);
+                    nameList.Add(ParsePbrString(segment, "name"));
+                    durationList.Add(PbrJsonFloat(segment, "duration", 0f));
+                    int nextOpen = json.IndexOf('{', close + 1);
+                    if (nextOpen < 0) break;
+                    pos = nextOpen;
+                }
+            }
+            names = nameList.ToArray();
+            durations = durationList.ToArray();
+        }
+
+        private static void OnAnimClipSelected(ulong widgetId, ulong index)
+        {
+            if (!_animLoaded) return;
+            if (UI.AnimationPreviewSetClip((int)index) != 0) return;
+            _animPlaying = false;
+            UI.AnimationPreviewPause();
+            _animDuration = (index < (ulong)_animClipDurations.Length)
+                ? _animClipDurations[index] : 0f;
+            UI.SliderSetRange(_animSliderId, 0f, _animDuration > 0f ? _animDuration : 1f);
+            UI.SliderSetValue(_animSliderId, 0f);
+            UpdateAnimTimeLabel(0f);
+            SetAnimStatus("动画: clip=" + index + " 时长 " + FormatPbrFloat(_animDuration) + "s");
+        }
+
+        private static void OnAnimPlayClick(ulong widgetId)
+        {
+            if (!_animLoaded)
+            {
+                SetAnimStatus("动画: 请先加载 glTF 资产");
+                return;
+            }
+            if (_animDuration <= 0f)
+            {
+                SetAnimStatus("动画: 当前 clip 无时长，无法播放");
+                return;
+            }
+            UI.AnimationPreviewPlay();
+            _animPlaying = true;
+            SetAnimStatus("动画: 播放中（" + FormatPbrFloat(_animDuration) + "s）");
+        }
+
+        private static void OnAnimPauseClick(ulong widgetId)
+        {
+            UI.AnimationPreviewPause();
+            _animPlaying = false;
+            SetAnimStatus("动画: 已暂停");
+        }
+
+        private static void OnAnimResetClick(ulong widgetId)
+        {
+            UI.AnimationPreviewPause();
+            _animPlaying = false;
+            UI.AnimationPreviewSetTime(0f);
+            if (_animSliderId != 0) UI.SliderSetValue(_animSliderId, 0f);
+            UpdateAnimTimeLabel(0f);
+            SetAnimStatus("动画: 回到起点");
+        }
+
+        private static void OnAnimSliderChanged(ulong widgetId, float value)
+        {
+            if (!_animLoaded) return;
+            _animPlaying = false;
+            UI.AnimationPreviewPause();
+            float actual = (float)UI.AnimationPreviewSetTime(value);
+            UpdateAnimTimeLabel(actual);
+        }
+
+        private static void UpdateAnimTimeLabel(float time)
+        {
+            if (_animTimeLabelId != 0)
+            {
+                UI.SetText(_animTimeLabelId, "时间: " + FormatPbrFloat(time)
+                    + " / " + FormatPbrFloat(_animDuration) + " s");
+            }
+        }
+
+        private static void SetAnimStatus(string text)
+        {
+            if (_animStatusLabelId != 0)
+            {
+                UI.SetText(_animStatusLabelId, text);
+            }
         }
 
         // === 自检用只读辅助（TestRunner 调用） ===

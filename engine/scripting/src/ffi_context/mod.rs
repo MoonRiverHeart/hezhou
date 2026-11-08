@@ -361,6 +361,14 @@ pub project_add_entity: ProjectAddEntityFn,
         pub build_settings_snapshot_json: BuildSettingsSnapshotJsonFn,
         pub build_settings_save_json: BuildSettingsSaveJsonFn,
         pub build_settings_validate_json: BuildSettingsValidateJsonFn,
+        // 0.3 动画时间轴 FFI（tail；必须与 C# FfiContext 字段顺序一致）
+        pub animation_asset_summary: AnimationAssetSummaryFn,
+        pub animation_preview_tick: AnimationPreviewTickFn,
+        pub animation_preview_set_clip: AnimationPreviewSetClipFn,
+        pub animation_preview_set_time: AnimationPreviewSetTimeFn,
+        pub animation_preview_play: AnimationPreviewPlayFn,
+        pub animation_preview_pause: AnimationPreviewPauseFn,
+        pub animation_preview_snapshot: AnimationPreviewSnapshotFn,
     }
 
 static mut FFI_CONTEXT: Option<Box<FfiContext>> = None;
@@ -380,3 +388,4 @@ pub fn get_ffi_context_ptr() -> *const FfiContext {
         }
     }
 }
+
