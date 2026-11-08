@@ -50,7 +50,7 @@ def add_file(tar: tarfile.TarFile, path: Path, arcname: str, mode: int = 0o644):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--binary", default=str(ENGINE / "target/release/mono_editor_demo"))
-    ap.add_argument("--version", default="0.4.0")
+    ap.add_argument("--version", default="1.0.0")
     ap.add_argument("--arch", default="amd64")
     ap.add_argument("--out", default=str(ROOT / "dist"))
     ap.add_argument("--mono-root", default="/usr")
