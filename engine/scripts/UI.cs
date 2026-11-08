@@ -1043,6 +1043,16 @@ namespace Hezhou
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public delegate int TemplateCreateDelegate(IntPtr templateId, IntPtr destDir, IntPtr projectName);
 
+        // 0.4 包管理器 FFI（task-52）
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate ulong PackageRegistryListJsonDelegate(IntPtr registryDir, IntPtr buffer, ulong bufferSize);
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate int PackageInstallJsonDelegate(IntPtr projectRoot, IntPtr registryDir, IntPtr name, IntPtr buffer, ulong bufferSize);
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate ulong PackageInstalledJsonDelegate(IntPtr projectRoot, IntPtr buffer, ulong bufferSize);
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate int PackageUninstallDelegate(IntPtr projectRoot, IntPtr name);
+
 [StructLayout(LayoutKind.Sequential)]
         public struct FfiContext
         {
@@ -1398,6 +1408,11 @@ namespace Hezhou
             // 0.4 项目模板 FFI（tail）
             public IntPtr template_list_json;
             public IntPtr template_create;
+            // 0.4 包管理器 FFI（tail）
+            public IntPtr package_registry_list_json;
+            public IntPtr package_install_json;
+            public IntPtr package_installed_json;
+            public IntPtr package_uninstall;
         }
 
         public static void InitFromContext(IntPtr contextPtr)
@@ -2200,4 +2215,5 @@ public static void RegisterResizeCallback(ResizeCallbackDelegate callback)
         }
     }
 }
+
 

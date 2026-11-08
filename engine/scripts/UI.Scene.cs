@@ -1272,6 +1272,100 @@ UI.SceneSelectEntity(_scenePtr, entityId);
                 Marshal.FreeHGlobal(namePtr);
             }
         }
+
+        // === 0.4 包管理器（task-52） ===
+
+        /// <summary>列出本地 registry 包 + 已安装状态 JSON。</summary>
+        public static string PackageRegistryListJson(string registryDir)
+        {
+            if (_ffi.package_registry_list_json == IntPtr.Zero) return "";
+            IntPtr dirPtr = Marshal.StringToHGlobalAnsi(registryDir ?? "");
+            const int bufferSize = 32768;
+            IntPtr buffer = Marshal.AllocHGlobal(bufferSize);
+            try
+            {
+                Marshal.WriteByte(buffer, 0, 0);
+                var func = Marshal.GetDelegateForFunctionPointer<PackageRegistryListJsonDelegate>(
+                    _ffi.package_registry_list_json);
+                ulong written = func(dirPtr, buffer, (ulong)bufferSize);
+                return written == 0UL ? "" : (Marshal.PtrToStringAnsi(buffer, (int)written) ?? "");
+            }
+            finally
+            {
+                Marshal.FreeHGlobal(buffer);
+                Marshal.FreeHGlobal(dirPtr);
+            }
+        }
+
+        /// <summary>安装包（含依赖闭包）；返回 0 成功，report 为结果/错误 JSON。</summary>
+        public static int PackageInstallJson(string projectRoot, string registryDir, string name, out string report)
+        {
+            report = "";
+            if (_ffi.package_install_json == IntPtr.Zero) return -1;
+            IntPtr rootPtr = Marshal.StringToHGlobalAnsi(projectRoot ?? "");
+            IntPtr dirPtr = Marshal.StringToHGlobalAnsi(registryDir ?? "");
+            IntPtr namePtr = Marshal.StringToHGlobalAnsi(name ?? "");
+            const int bufferSize = 16384;
+            IntPtr buffer = Marshal.AllocHGlobal(bufferSize);
+            try
+            {
+                Marshal.WriteByte(buffer, 0, 0);
+                var func = Marshal.GetDelegateForFunctionPointer<PackageInstallJsonDelegate>(
+                    _ffi.package_install_json);
+                int rc = func(rootPtr, dirPtr, namePtr, buffer, (ulong)bufferSize);
+                report = Marshal.PtrToStringAnsi(buffer) ?? "";
+                return rc;
+            }
+            finally
+            {
+                Marshal.FreeHGlobal(buffer);
+                Marshal.FreeHGlobal(rootPtr);
+                Marshal.FreeHGlobal(dirPtr);
+                Marshal.FreeHGlobal(namePtr);
+            }
+        }
+
+        /// <summary>读取已安装列表（lockfile JSON）。</summary>
+        public static string PackageInstalledJson(string projectRoot)
+        {
+            if (_ffi.package_installed_json == IntPtr.Zero) return "";
+            IntPtr rootPtr = Marshal.StringToHGlobalAnsi(projectRoot ?? "");
+            const int bufferSize = 16384;
+            IntPtr buffer = Marshal.AllocHGlobal(bufferSize);
+            try
+            {
+                Marshal.WriteByte(buffer, 0, 0);
+                var func = Marshal.GetDelegateForFunctionPointer<PackageInstalledJsonDelegate>(
+                    _ffi.package_installed_json);
+                ulong written = func(rootPtr, buffer, (ulong)bufferSize);
+                return written == 0UL ? "" : (Marshal.PtrToStringAnsi(buffer, (int)written) ?? "");
+            }
+            finally
+            {
+                Marshal.FreeHGlobal(buffer);
+                Marshal.FreeHGlobal(rootPtr);
+            }
+        }
+
+        /// <summary>卸载包；0=成功。</summary>
+        public static int PackageUninstall(string projectRoot, string name)
+        {
+            if (_ffi.package_uninstall == IntPtr.Zero) return -1;
+            IntPtr rootPtr = Marshal.StringToHGlobalAnsi(projectRoot ?? "");
+            IntPtr namePtr = Marshal.StringToHGlobalAnsi(name ?? "");
+            try
+            {
+                var func = Marshal.GetDelegateForFunctionPointer<PackageUninstallDelegate>(
+                    _ffi.package_uninstall);
+                return func(rootPtr, namePtr);
+            }
+            finally
+            {
+                Marshal.FreeHGlobal(rootPtr);
+                Marshal.FreeHGlobal(namePtr);
+            }
+        }
     }
 }
+
 

@@ -439,6 +439,21 @@ namespace Hezhou
             _animGraphStatusLabelId = UI.CreateLabel(animationTabContent, 660f, 22f,
                 "状态机: 选择 glTF 后点“初始化状态图”");
 
+            // 0.4 包管理器（task-52）：本地 registry 列表 + 已安装（lock.json）
+            ulong packageTabContent = UI.CreateVStack(_assetTabWidget.Id, 5f);
+            UI.CreateLabel(packageTabContent, 460f, 24f, "本地包管理器（packages/registry）");
+            ulong packageControlRow = UI.CreateHStack(packageTabContent, 6f);
+            ulong packageRefreshButton = UI.CreateButton(packageControlRow, 130f, 26f, "刷新包列表");
+            UI.SetOnClick(packageRefreshButton, _packageRefreshCallback);
+            _packageStatusLabelId = UI.CreateLabel(packageTabContent, 680f, 22f, "包: 未加载");
+            UI.CreateLabel(packageTabContent, 460f, 22f, "可安装（本地 registry）:");
+            _packageRegistryContainerId = UI.CreateVStack(packageTabContent, 3f);
+            UI.CreateLabel(packageTabContent, 460f, 22f, "已安装（packages/lock.json）:");
+            _packageInstalledContainerId = UI.CreateVStack(packageTabContent, 3f);
+            _packageLockLabelId = UI.CreateLabel(packageTabContent, 680f, 22f,
+                "lock: packages/lock.json");
+            RefreshPackageTab();
+
             _assetTabWidget.AddTab("模型", modelTabContent, false);
             _assetTabWidget.AddTab("材质", materialTabContent, false);
             if (!_textureDockedRight)
@@ -451,6 +466,7 @@ namespace Hezhou
             _assetTabWidget.AddTab("Profiler", _profilerTabContentId, false);
             _assetTabWidget.AddTab("Build", buildSettingsTabContent, false);
             _assetTabWidget.AddTab("动画", animationTabContent, false);
+            _assetTabWidget.AddTab("包", packageTabContent, false);
             _assetTabWidget.SetReorderable(true);
 
             // === Properties Panel: 5-tab TabWidget ===

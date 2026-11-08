@@ -3146,6 +3146,11 @@ UI.SetText(_runButtonId, "运行");
             {
                 LoadBuildSettingsIntoFields();
             }
+            // 0.4 包管理器：工程加载后刷新已安装列表。
+            if (_packageRegistryContainerId != 0)
+            {
+                RefreshPackageTab();
+            }
 
             _gameScene.ClearSelection();
             _selectedEntityId = 0;

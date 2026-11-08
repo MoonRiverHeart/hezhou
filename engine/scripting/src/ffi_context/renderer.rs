@@ -127,3 +127,26 @@ pub type TemplateListJsonFn = extern "C" fn(*mut std::ffi::c_char, usize) -> usi
 /// 从模板创建工程（0=成功，-1 参数/模板无效，-2 目标非空，-3 IO 失败）。
 pub type TemplateCreateFn =
     extern "C" fn(*const std::ffi::c_char, *const std::ffi::c_char, *const std::ffi::c_char) -> i32;
+
+// === 0.4 包管理器（task-52） ===
+
+/// 列出本地 registry 包 + 已安装状态（JSON）。
+pub type PackageRegistryListJsonFn =
+    extern "C" fn(*const std::ffi::c_char, *mut std::ffi::c_char, usize) -> usize;
+
+/// 安装包（含依赖闭包）并写 lockfile；返回 0=成功，-1=失败（JSON 写入 buffer）。
+pub type PackageInstallJsonFn = extern "C" fn(
+    *const std::ffi::c_char,
+    *const std::ffi::c_char,
+    *const std::ffi::c_char,
+    *mut std::ffi::c_char,
+    usize,
+) -> i32;
+
+/// 读取已安装列表（lockfile JSON）。
+pub type PackageInstalledJsonFn =
+    extern "C" fn(*const std::ffi::c_char, *mut std::ffi::c_char, usize) -> usize;
+
+/// 卸载包；0=成功，-1=失败。
+pub type PackageUninstallFn =
+    extern "C" fn(*const std::ffi::c_char, *const std::ffi::c_char) -> i32;

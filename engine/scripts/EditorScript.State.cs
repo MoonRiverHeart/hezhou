@@ -320,6 +320,23 @@ namespace Hezhou
         private static string[] _newProjectTemplateIds = new string[0];
         private static string[] _newProjectTemplateNames = new string[0];
 
+        // === 0.4 包管理器（task-52） ===
+        private static ulong _packageRegistryContainerId;
+        private static ulong _packageInstalledContainerId;
+        private static ulong _packageStatusLabelId;
+        private static ulong _packageLockLabelId;
+        private static UI.WidgetCallbackDelegate _packageRefreshCallback;
+        private static UI.WidgetCallbackDelegate _packageInstallCallback;
+        private static UI.WidgetCallbackDelegate _packageUninstallCallback;
+        private static readonly System.Collections.Generic.List<ulong> _packageRegistryButtonIds =
+            new System.Collections.Generic.List<ulong>();
+        private static readonly System.Collections.Generic.List<ulong> _packageInstalledButtonIds =
+            new System.Collections.Generic.List<ulong>();
+        private static readonly System.Collections.Generic.Dictionary<ulong, string> _packageRegistryButtonNames =
+            new System.Collections.Generic.Dictionary<ulong, string>();
+        private static readonly System.Collections.Generic.Dictionary<ulong, string> _packageInstalledButtonNames =
+            new System.Collections.Generic.Dictionary<ulong, string>();
+
         // === Dock / Layout State ===
         private static ulong _rightMaxButtonId;
         private static UI.WidgetCallbackDelegate _rightMaxClickCallback;

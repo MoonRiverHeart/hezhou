@@ -82,6 +82,9 @@ namespace Hezhou
             _animFreeGraphCallback = OnAnimationFreeGraphClick;
             _newProjectOpenCallback = OnNewProjectClick;
             _newProjectDialogResultCallback = OnNewProjectDialogResult;
+            _packageRefreshCallback = OnPackageRefreshClick;
+            _packageInstallCallback = OnPackageInstallClick;
+            _packageUninstallCallback = OnPackageUninstallClick;
             _textureAssetClickCallback = OnTextureAssetClick;
             _textureRefreshCallback = OnTextureRefreshClick;
             _textureClearCallback = OnTextureClearClick;
@@ -2205,6 +2208,172 @@ _bindScriptClickCallback = OnBindScriptClick;
             }
             ids = idList.ToArray();
             names = nameList.ToArray();
+        }
+
+        // === 0.4 包管理器（task-52） ===
+
+        private static void OnPackageRefreshClick(ulong widgetId)
+        {
+            RefreshPackageTab();
+            Log.Info("Package", "包列表已刷新");
+        }
+
+        /// <summary>重建「包」Tab：registry 可安装列表 + 已安装列表。</summary>
+        private static void RefreshPackageTab()
+        {
+            if (_packageRegistryContainerId == 0) return;
+
+            for (int i = 0; i < _packageRegistryButtonIds.Count; i++)
+            {
+                UI.RemoveWidget(_packageRegistryButtonIds[i]);
+            }
+            for (int i = 0; i < _packageInstalledButtonIds.Count; i++)
+            {
+                UI.RemoveWidget(_packageInstalledButtonIds[i]);
+            }
+            _packageRegistryButtonIds.Clear();
+            _packageInstalledButtonIds.Clear();
+            _packageRegistryButtonNames.Clear();
+            _packageInstalledButtonNames.Clear();
+
+            string root = System.IO.Directory.GetCurrentDirectory();
+            string registryJson = UI.PackageRegistryListJson("");
+            string registryError = ParsePbrString(registryJson, "error");
+
+            string[] registryNames;
+            string[] registryLabels;
+            ParsePackageEntries(registryJson, "packages", out registryNames, out registryLabels);
+            for (int i = 0; i < registryNames.Length; i++)
+            {
+                ulong button = UI.CreateButton(_packageRegistryContainerId, 460f, 26f,
+                    "安装  " + registryLabels[i]);
+                UI.SetOnClick(button, _packageInstallCallback);
+                _packageRegistryButtonIds.Add(button);
+                _packageRegistryButtonNames[button] = registryNames[i];
+            }
+            if (registryNames.Length == 0)
+            {
+                ulong placeholder = UI.CreateButton(_packageRegistryContainerId, 460f, 26f,
+                    registryError.Length > 0
+                        ? "（registry 错误: " + registryError + "）"
+                        : "（registry 为空）");
+                _packageRegistryButtonIds.Add(placeholder);
+            }
+
+            string installedJson = UI.PackageInstalledJson(root);
+            string[] installedNames;
+            string[] installedLabels;
+            ParsePackageEntries(installedJson, "packages", out installedNames, out installedLabels);
+            for (int i = 0; i < installedNames.Length; i++)
+            {
+                ulong button = UI.CreateButton(_packageInstalledContainerId, 460f, 26f,
+                    "卸载  " + installedLabels[i]);
+                UI.SetOnClick(button, _packageUninstallCallback);
+                _packageInstalledButtonIds.Add(button);
+                _packageInstalledButtonNames[button] = installedNames[i];
+            }
+            if (installedNames.Length == 0)
+            {
+                ulong placeholder = UI.CreateButton(_packageInstalledContainerId, 460f, 26f,
+                    "（未安装任何包）");
+                _packageInstalledButtonIds.Add(placeholder);
+            }
+
+            SetPackageStatus("包: registry " + registryNames.Length + " 个，已安装 "
+                + installedNames.Length + " 个"
+                + (registryError.Length > 0 ? "（registry 错误）" : ""));
+            if (_packageLockLabelId != 0)
+            {
+                UI.SetText(_packageLockLabelId,
+                    "lock: " + System.IO.Path.Combine(root, "packages", "lock.json")
+                    + "（已安装 " + installedNames.Length + "）");
+            }
+        }
+
+        /// <summary>解析 JSON 中 packages[] 的 name/version/display_name。</summary>
+        private static void ParsePackageEntries(
+            string json, string arrayKey, out string[] names, out string[] labels)
+        {
+            System.Collections.Generic.List<string> nameList =
+                new System.Collections.Generic.List<string>();
+            System.Collections.Generic.List<string> labelList =
+                new System.Collections.Generic.List<string>();
+            int start = json.IndexOf("\"" + arrayKey + "\":[");
+            if (start >= 0)
+            {
+                int pos = start + arrayKey.Length + 4;
+                while (pos < json.Length)
+                {
+                    int open = json.IndexOf('{', pos);
+                    if (open < 0) break;
+                    int close = json.IndexOf('}', open + 1);
+                    if (close < 0) break;
+                    string segment = json.Substring(open, close - open + 1);
+                    string name = ParsePbrString(segment, "name");
+                    string version = ParsePbrString(segment, "version");
+                    string display = ParsePbrString(segment, "display_name");
+                    if (name.Length > 0)
+                    {
+                        nameList.Add(name);
+                        string label = display.Length > 0 ? display : name;
+                        labelList.Add(version.Length > 0
+                            ? label + "  (" + name + "@" + version + ")"
+                            : label + "  (" + name + ")");
+                    }
+                    int nextOpen = json.IndexOf('{', close + 1);
+                    if (nextOpen < 0) break;
+                    pos = nextOpen;
+                }
+            }
+            names = nameList.ToArray();
+            labels = labelList.ToArray();
+        }
+
+        private static void OnPackageInstallClick(ulong widgetId)
+        {
+            string name;
+            if (!_packageRegistryButtonNames.TryGetValue(widgetId, out name)) return;
+            string root = System.IO.Directory.GetCurrentDirectory();
+            string report;
+            int rc = UI.PackageInstallJson(root, "", name, out report);
+            if (rc == 0)
+            {
+                SetPackageStatus("包: 已安装 " + name + "（含依赖闭包）");
+                Log.Info("Package", "安装成功: " + name + " => " + report);
+            }
+            else
+            {
+                SetPackageStatus("包: 安装 " + name + " 失败（详见 Console）");
+                Log.Warn("Package", "安装失败: " + name + " => " + report);
+            }
+            RefreshPackageTab();
+        }
+
+        private static void OnPackageUninstallClick(ulong widgetId)
+        {
+            string name;
+            if (!_packageInstalledButtonNames.TryGetValue(widgetId, out name)) return;
+            string root = System.IO.Directory.GetCurrentDirectory();
+            int rc = UI.PackageUninstall(root, name);
+            if (rc == 0)
+            {
+                SetPackageStatus("包: 已卸载 " + name);
+                Log.Info("Package", "卸载成功: " + name);
+            }
+            else
+            {
+                SetPackageStatus("包: 卸载 " + name + " 失败（被依赖/未安装，详见 Console）");
+                Log.Warn("Package", "卸载失败: " + name);
+            }
+            RefreshPackageTab();
+        }
+
+        private static void SetPackageStatus(string text)
+        {
+            if (_packageStatusLabelId != 0)
+            {
+                UI.SetText(_packageStatusLabelId, text);
+            }
         }
 
         // === 自检用只读辅助（TestRunner 调用） ===

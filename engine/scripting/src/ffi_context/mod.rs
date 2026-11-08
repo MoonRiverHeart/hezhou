@@ -378,6 +378,11 @@ pub project_add_entity: ProjectAddEntityFn,
         // 0.4 项目模板 FFI（tail）
         pub template_list_json: TemplateListJsonFn,
         pub template_create: TemplateCreateFn,
+        // 0.4 包管理器 FFI（tail）
+        pub package_registry_list_json: PackageRegistryListJsonFn,
+        pub package_install_json: PackageInstallJsonFn,
+        pub package_installed_json: PackageInstalledJsonFn,
+        pub package_uninstall: PackageUninstallFn,
     }
 
 static mut FFI_CONTEXT: Option<Box<FfiContext>> = None;
@@ -397,6 +402,7 @@ pub fn get_ffi_context_ptr() -> *const FfiContext {
         }
     }
 }
+
 
 
 

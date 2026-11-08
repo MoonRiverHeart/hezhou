@@ -8,6 +8,7 @@ members = [
     "platform",
     "dfx",
     "examples",
+    "package",
     "geometry",
     "rhi",
     "rhi-vulkan",

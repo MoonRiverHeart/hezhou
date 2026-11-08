@@ -73,6 +73,9 @@ namespace Hezhou
             try { TestProjectTemplatesFfi(); }
             catch (Exception ex) { Log.Error("TestRunner", "TestProjectTemplatesFfi异常: " + ex.Message); }
 
+            try { TestPackageManagerFfi(); }
+            catch (Exception ex) { Log.Error("TestRunner", "TestPackageManagerFfi异常: " + ex.Message); }
+
             Log.Info("TestRunner", "===== 测试完成: PASS=" + _passCount + ", FAIL=" + _failCount + " =====");
         }
 
@@ -1030,6 +1033,61 @@ namespace Hezhou
                     + (loaded ? Project.GetName() : "") + ")");
 
             try { if (System.IO.Directory.Exists(dest)) System.IO.Directory.Delete(dest, true); } catch (Exception) { }
+        }
+
+
+        /// <summary>
+        /// 0.4 包管理器自检（task-52）：
+        /// registry 列表、安装依赖闭包+lockfile、重复安装幂等、依赖保护、卸载。
+        /// </summary>
+        private static void TestPackageManagerFfi()
+        {
+            string registryJson = UI.PackageRegistryListJson("");
+            bool hasPackages = registryJson.IndexOf("hezhou-hello") >= 0
+                && registryJson.IndexOf("hezhou-mathx") >= 0
+                && registryJson.IndexOf("hezhou-gameplay-kit") >= 0;
+            AssertTrue("Package", hasPackages,
+                "registry 列表包含示例包 (len=" + registryJson.Length + ")");
+
+            string root = System.IO.Directory.GetCurrentDirectory();
+            string project = System.IO.Path.Combine(root, "logs", "package_selftest_project");
+            try { if (System.IO.Directory.Exists(project)) System.IO.Directory.Delete(project, true); } catch (Exception) { }
+
+            string report;
+            int installRc = UI.PackageInstallJson(project, "", "hezhou-gameplay-kit", out report);
+            bool installedOk = installRc == 0
+                && System.IO.File.Exists(System.IO.Path.Combine(
+                    project, "packages", "hezhou-gameplay-kit", "package.json"))
+                && System.IO.File.Exists(System.IO.Path.Combine(
+                    project, "packages", "hezhou-mathx", "package.json"))
+                && System.IO.File.Exists(System.IO.Path.Combine(project, "packages", "lock.json"));
+            AssertTrue("Package", installedOk,
+                "安装依赖闭包+lockfile (rc=" + installRc + ")");
+
+            string installedJson = UI.PackageInstalledJson(project);
+            bool lockOk = installedJson.IndexOf("hezhou-gameplay-kit") >= 0
+                && installedJson.IndexOf("hezhou-mathx") >= 0
+                && installedJson.IndexOf("fnv1a64:") >= 0;
+            AssertTrue("Package", lockOk,
+                "lockfile 含 name/version/hash/dependencies");
+
+            string duplicateReport;
+            int duplicateRc = UI.PackageInstallJson(
+                project, "", "hezhou-gameplay-kit", out duplicateReport);
+            AssertTrue("Package",
+                duplicateRc == 0 && duplicateReport.IndexOf("\"noop\":true") >= 0,
+                "重复安装幂等（noop）");
+
+            int blockedRc = UI.PackageUninstall(project, "hezhou-mathx");
+            AssertTrue("Package", blockedRc != 0,
+                "被依赖的包拒绝卸载 (rc=" + blockedRc + ")");
+
+            int uninstallGameplay = UI.PackageUninstall(project, "hezhou-gameplay-kit");
+            int uninstallMath = UI.PackageUninstall(project, "hezhou-mathx");
+            AssertTrue("Package", uninstallGameplay == 0 && uninstallMath == 0,
+                "卸载依赖方后卸载依赖成功");
+
+            try { if (System.IO.Directory.Exists(project)) System.IO.Directory.Delete(project, true); } catch (Exception) { }
         }
 
         // 内存保存值结构（模拟SavedScriptPropertyValue，用于测试）
