@@ -28,7 +28,7 @@ if command -v mcs >/dev/null 2>&1; then
     scripts/UITestRunner.cs scripts/UITestRunner.Report.cs
     scripts/IntentTestRunner.cs scripts/TestTelemetry.cs
     scripts/ExposeAttribute.cs scripts/IScriptEntity.cs
-    scripts/RotatingEntity.cs scripts/TestRunner.cs scripts/PlayerGame.cs
+    scripts/RotatingEntity.cs scripts/TestRunner.cs scripts/PlayerGame.cs scripts/EngineApi.cs
   )
   mcs -target:library -out:scripts/bin/Mono/EditorScript.dll "${SOURCES[@]}"
 else
