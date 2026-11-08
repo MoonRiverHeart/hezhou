@@ -485,7 +485,7 @@ jobs:
           $config.product_name = "Hezhou Capability Demo"
           $config.executable_name = "hezhou-capability-demo"
           $config.window.title = "Hezhou Capability Demo"
-          $config.version = "0.3.0"
+          $config.version = "0.4.0"
           $config | ConvertTo-Json -Depth 8 | Set-Content "build-temp/player-demo-config.json" -Encoding utf8
           & "engine/target/release/hezhou-player-build$suffix" `
             --config "build-temp/player-demo-config.json" `
