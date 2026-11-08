@@ -24,7 +24,7 @@ hezhou-render-pipeline = { path = "../render-pipeline" }
 hezhou-animation = { path = "../animation" }
 ash = "0.38"
 bytemuck = "1.14"
-glfw = { version = "0.62", default-features = false, features = ["src-build", "vulkan", "raw-window-handle-v0-6", "native-handles"] }
+glfw = { version = "0.62", default-features = false, features = ["src-build", "vulkan"] }
 libloading = "0.8"
 parking_lot = "0.12"
 image = "0.25"
