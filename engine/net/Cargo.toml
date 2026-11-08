@@ -1,0 +1,12 @@
+[package]
+name = "hezhou-net"
+version.workspace = true
+edition.workspace = true
+description = "Hezhou 0.4 网络传输层与会话（std-only UDP/TCP/framing/session/room）"
+
+[lib]
+name = "hezhou_net"
+path = "src/lib.rs"
+
+# 0.4 网络第一批刻意保持 std-only：离线可测、无第三方依赖、便于后续同步层组合。
+[dependencies]
