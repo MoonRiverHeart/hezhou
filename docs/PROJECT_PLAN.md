@@ -34,6 +34,7 @@
 - ✅ Player 发布链路：新增双平台 `package-player` CI（window-host demo zip/tar），Windows 本地包 validate + 5 帧窗口运行通过。
 - ✅ CI 全绿（run 42461149553）：rust-tests、csharp-build、package-windows/linux、player-build、player-window-host、package-player 全成功；Windows Player zip 51.6MB / Linux tar.gz 25.4MB。
 - ✅ CI 产物实测：下载 Windows Player zip，包内 Mono 运行时被检测并使用，C# PlayerGame 运行 5 帧 exit 0。
+- ✅ 0.2.0 版本号已同步（Cargo/DEB/MSIX/Player demo），发布说明定稿；tag `v0.2.0` 待推送后触发 Release。
 - ✅ 本地 CI `ci_local.ps1 -Offline` 通过（默认测试 + feature 测试 + FFI 契约 + C# 编译 + 图标一致性）。
 - ✅ 验证证据：capability_demo 14/14 项通过；Player 72 tests；Core 43 tests；编辑器启动自检 PASS=57、FAIL=0；FFI 301/301/301。
 - ⏳ 未完成（0.2 验收尚未达成）：
