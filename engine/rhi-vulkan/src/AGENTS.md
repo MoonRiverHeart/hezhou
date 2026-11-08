@@ -199,6 +199,7 @@ has_texture_f, specular, ambient, shininess,  // offsets 120-132
 | `shadow_map.rs` | `ShadowMapResources::create/destroy`：真实创建 depth image(array)/views/sampler/render pass/framebuffer。GPU 测试 `create_shadow_map_on_gpu` 标 `#[ignore]`。 |
 | `skinning_plan.rs` | 蒙皮 pipeline 接入计划（契约来自 `hezhou-animation`）：`SkinnedVertexInput`（stride 64 + location 3/4）、joint palette set0/binding1 descriptor binding、palette 字节数、`skinning.vert/frag.spv` 有效性。 |
 | `skinned_mesh.rs` | **真实蒙皮网格上传**（task-28）：`SkinnedMeshUpload`（entity_id/vertices/indices/material/texture_path）、`SkinnedMeshRegistry`（EntityId 映射/替换/移除）、`skinned_vertex_bytes`、`validate_palette_bytes`、上限常量。 |
+| `key_state.rs` | **Player 持续按键状态**（task-58）：`KeyState`（HashSet<u32>，press/release/apply/clear/pressed_keys，无窗口可单测）、`keycode_to_u32`、键码常量（A=1,D=4,S=19,W=23,Space=37,Escape=39）。 |
 | `pbr_forward.rs` | **PBR/Shadow/Post 实际 draw path**：`PbrForwardPass`（HDR 目标 + PBR/Shadow/Bloom/Tonemap + 天空盒 + outline/Gizmo pipeline + `begin_scene/record_sky/record_scene_draws(_with_materials)/record_outline/record_gizmo/end_scene/record_post`）、`PbrDrawItem`+`PbrTextureBinding`（每实体材质 push constant + 每实体纹理 descriptor 缓存）、`SkinnedPipelineState`（蒙皮 pipeline + 合成 skinned mesh + `record_mesh` 真实网格绘制 + 每实体 palette descriptor 缓存）、`camera_view_matrix/projection_matrix`、SRGB gamma 处理。 |
 | `tests/pbr_forward_gpu.rs` | `#[ignore]` GPU 冒烟：High/Low 完整视觉（天空盒/outline/Gizmo/合成蒙皮）+ **2 个真实蒙皮网格** + resize 重建，真实录制提交。 |
 | `ui_vulkan_renderer.rs` | 新增字段 `render_settings`（默认 legacy 兼容）+ `set_render_quality_preset` / `set_render_settings` / `render_plan` / `render_quality_summary`；两个 `RenderContext` 构造点透传设置。 |
@@ -221,6 +222,11 @@ has_texture_f, specular, ambient, shininess,  // offsets 120-132
   `upload_skinned_mesh(SkinnedMeshUpload)` / `remove_skinned_mesh(entity_id)` /
   `skinned_mesh_count()` / `upload_skin_palette(entity_id, bytes)`；
   `SkinnedMeshUpload` 字段 = entity_id/vertices/indices/material/texture_path（不含 palette）。
+- Player 键盘 API（task-58）：`UIVulkanRenderer::is_key_down(keycode: u32)` /
+  `clear_key_state()` / `pressed_keys()`；`process_events()` 的 Key Press/Repeat/Release
+  维护 `key_state`（不改变现有 UI 输入处理）。键码使用
+  `hezhou_platform::KeyCode as u32`（A=1, D=4, S=19, W=23, Space=37, Escape=39），
+  未知键 0 永远返回 false；窗口失焦不自动清空，宿主可调用 `clear_key_state()`。
 - 每实体 host-visible vertex/index buffer + 固定 16KB palette buffer；替换网格复用 palette buffer，
   旧 buffer 延迟到 cleanup 销毁；PBR draw 用真实网格，**有真实上传时不画 synthetic**，
   `skinned_mesh_count()==0` 时保留合成 cube fallback；remove 后不绘制/不接受 palette。

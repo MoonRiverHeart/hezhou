@@ -152,6 +152,8 @@ pub struct UIVulkanRenderer {
     space_pressed: bool,
     s_pressed: bool,
     p_pressed: bool,  // P键 — 截取预览窗画面
+    // Player 键盘持续按键状态（process_events 中维护，Player host 每帧查询）
+    key_state: crate::key_state::KeyState,
     glyph_cache: GlyphCache,
     button_clicked: Arc<AtomicBool>,
     needs_resize: bool,
@@ -1746,6 +1748,7 @@ p_multisample_state: &vk::PipelineMultisampleStateCreateInfo {
                 space_pressed: false,
             s_pressed: false,
             p_pressed: false,
+                key_state: crate::key_state::KeyState::new(),
                 glyph_cache: GlyphCache::new(),
                 button_clicked: Arc::new(AtomicBool::new(false)),
                 needs_resize: false,
@@ -3731,6 +3734,31 @@ let mut font_atlas_guard = ui.get_font_atlas().lock();
     pub fn consume_p_press(&mut self) {
         self.p_pressed = false;
     }
+
+    // === Player 键盘持续按键状态（task-58） ===
+
+    /// 查询按键是否持续按下（Player host 每帧调用）
+    ///
+    /// `keycode` 为 `hezhou_platform::KeyCode as u32`
+    /// （A=1, D=4, S=19, W=23, Space=37, Escape=39）；未知键（0）始终返回 false。
+    pub fn is_key_down(&self, keycode: u32) -> bool {
+        self.key_state.is_down(keycode)
+    }
+
+    /// 清空按键状态（窗口失焦/切场景时由宿主调用）
+    pub fn clear_key_state(&mut self) {
+        self.key_state.clear();
+    }
+
+    /// 当前按下的键码列表（升序，供测试/调试）
+    pub fn pressed_keys(&self) -> Vec<u32> {
+        self.key_state.pressed_keys()
+    }
+
+    /// 只读 KeyState（纯逻辑结构，可在无窗口测试中直接复用）
+    pub fn key_state(&self) -> &crate::key_state::KeyState {
+        &self.key_state
+    }
     
 unsafe fn recreate_swapchain(&mut self) -> Result<(), String> {
         self.dfx.lock().get_logger().lock().log(LogLevel::Info, "Vulkan", "recreate_swapchain: calling device_wait_idle...", file!(), line!());
@@ -5685,6 +5713,9 @@ pub fn process_events(&mut self) {
                             keycode,
                             modifiers: key_modifiers,
                         }, self.frame_count);
+                        // 维护持续按键状态（Press/Repeat 置位，Release 清位）
+                        self.key_state
+                            .apply(crate::key_state::keycode_to_u32(keycode), key_action);
                     }
                 }
                 WindowEvent::Char(codepoint) => {

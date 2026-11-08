@@ -22,6 +22,8 @@ pub mod pbr_forward;
 pub mod skinning_plan;
 // 0.2 真实蒙皮网格上传（SkinnedMeshUpload / EntityId 注册表）
 pub mod skinned_mesh;
+// Player 键盘持续按键状态（task-58）
+pub mod key_state;
 
 #[cfg(feature = "mono")]
 pub mod mono_rotation_renderer;
@@ -66,4 +68,8 @@ pub use skinned_mesh::{
     SkinnedMeshUpload, SkinnedMeshRegistry, SkinnedMeshUploadError,
     skinned_vertex_bytes, skinned_vertex_stride, identity_palette_bytes,
     MAX_PALETTE_JOINTS, MAX_PALETTE_BYTES, MAX_SKINNED_VERTICES, MAX_SKINNED_INDICES,
+};
+pub use key_state::{
+    KeyState, keycode_to_u32,
+    KEY_A, KEY_D, KEY_S, KEY_W, KEY_SPACE, KEY_ESCAPE,
 };
