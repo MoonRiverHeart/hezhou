@@ -20,7 +20,9 @@
 - ✅ Player：Project JSON 场景、cook imported 资产、真实蒙皮、9 状态动画、C# ABI v6（Scene/Transform/动画/资产/音频/角色）。
 - ✅ 编辑器：Prefab/SceneManager、Player 真实构建、PBR Inspector、音频/资产面板。
 - ✅ 内置 Mono 运行时、C# PlayerGame、双平台 Capability Demo。
-- ⏳ 下一阶段：0.3 编辑器工具链 + 自研物理进阶 + Profiler + C# 稳定 API。
+- ✅ 0.3 第一批：编辑器 Profiler Tab（CPU 帧/FPS/启动/实体/PBR/蒙皮/资产/音频/内存，FFI 319）；启动自检 **PASS=80**。
+- ✅ 0.3 第一批：自研物理动态刚体（质量/阻尼/冲量）、Plane/AABB 碰撞响应、CCD、距离关节；physics **43 tests**。
+- ⏳ 下一批 0.3：动画时间轴/材质编辑器/构建设置、C# 稳定 API、性能门禁、物理旋转/固定关节/空间索引。
 - 0.2 已知限制（详见 RELEASE_NOTES_0.2.0.md）：不是完整可玩垂直切片；蒙皮着色为 Blinn-Phong 回退；单 mesh/状态机无混合树；无完整战斗 API。
 
 ## 1. 执行摘要
