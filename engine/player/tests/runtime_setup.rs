@@ -73,11 +73,13 @@ fn missing_runtime_is_noop() {
 }
 
 #[test]
-fn found_runtime_prepends_env_and_is_idempotent() {
+fn found_runtime_prepends_native_and_appends_managed_idempotently() {
     with_env_guard(|| {
         let temp = TempDir::new("runtime-setup-found");
         temp.write("runtime/mono/bin/mono.exe", b"fake-mono");
         temp.write("runtime/mono/lib/libmono-2.0.so", b"fake-libmono");
+        temp.write("runtime/mono/lib/mono/4.5/mscorlib.dll", b"fake-mscorlib");
+        temp.write("runtime/mono/lib/mono/4.5-api/mscorlib.dll", b"fake-api");
         let platform = TargetPlatform::host();
         let setup = setup_mono_runtime(temp.path());
         assert!(setup.found, "应检测到 runtime/mono");
@@ -86,18 +88,27 @@ fn found_runtime_prepends_env_and_is_idempotent() {
             setup.native_dir.as_deref(),
             Some(temp.join("runtime/mono/bin").as_path())
         );
+        let managed = temp.join("runtime/mono/lib/mono/4.5");
+        let managed_api = temp.join("runtime/mono/lib/mono/4.5-api");
         assert_eq!(
-            setup.managed_dir.as_deref(),
-            Some(temp.join("runtime/mono/lib").as_path())
+            setup.managed_dirs,
+            vec![managed.clone(), managed_api.clone()]
         );
         assert!(setup.summary().contains("内置 Mono 运行时：已找到"));
         assert_eq!(
             first_entry(native_env(platform), platform).as_deref(),
             temp.join("runtime/mono/bin").to_str()
         );
-        assert_eq!(
-            first_entry(MONO_PATH_ENV, platform).as_deref(),
-            temp.join("runtime/mono/lib").to_str()
+        // MONO_PATH 追加（不覆盖已有条目），包含 4.5 与 4.5-api。
+        let mono_path = std::env::var(MONO_PATH_ENV).unwrap();
+        let entries: Vec<&str> = mono_path.split(separator(platform)).collect();
+        assert!(
+            entries.iter().any(|entry| Path::new(entry) == managed),
+            "MONO_PATH={mono_path} managed={managed:?}"
+        );
+        assert!(
+            entries.iter().any(|entry| Path::new(entry) == managed_api),
+            "MONO_PATH={mono_path} managed_api={managed_api:?}"
         );
 
         let path_after_first = std::env::var(native_env(platform)).unwrap();
@@ -121,10 +132,18 @@ fn missing_bin_or_lib_falls_back_to_mono_root() {
         assert!(setup.found);
         let mono_root = temp.join("runtime/mono");
         assert_eq!(setup.native_dir.as_deref(), Some(mono_root.as_path()));
-        assert_eq!(setup.managed_dir.as_deref(), Some(mono_root.as_path()));
+        assert_eq!(setup.managed_dirs, vec![mono_root.clone()]);
         assert_eq!(
             first_entry(native_env(platform), platform).as_deref(),
             mono_root.to_str()
+        );
+        // MONO_PATH 追加 mono 根。
+        let mono_path = std::env::var(MONO_PATH_ENV).unwrap();
+        assert!(
+            mono_path
+                .split(separator(platform))
+                .any(|entry| entry == mono_root.to_str().unwrap()),
+            "MONO_PATH={mono_path}"
         );
     });
 }
@@ -135,6 +154,7 @@ fn explicit_platform_env_names_are_correct() {
         let temp = TempDir::new("runtime-setup-platform");
         temp.write("runtime/mono/bin/mono.exe", b"fake");
         temp.write("runtime/mono/lib/libmono.so", b"fake");
+        temp.write("runtime/mono/lib/mono/4.5/mscorlib.dll", b"fake");
 
         let windows = setup_mono_runtime_for(temp.path(), TargetPlatform::Windows);
         assert!(windows.found);
@@ -150,10 +170,16 @@ fn explicit_platform_env_names_are_correct() {
         let linux = setup_mono_runtime_for(temp.path(), TargetPlatform::Linux);
         assert!(linux.found);
         assert!(linux.modified.contains(&"LD_LIBRARY_PATH"));
+        let ld_path = std::env::var("LD_LIBRARY_PATH").unwrap();
+        assert!(
+            ld_path.starts_with(temp.join("runtime/mono/lib").to_str().unwrap()),
+            "LD_LIBRARY_PATH 应以 mono/lib 开头：{ld_path}"
+        );
+        // MONO_PATH 为追加；Windows 首次已加入 4.5，Linux 再调用不重复。
         let mono_path = std::env::var(MONO_PATH_ENV).unwrap();
         assert!(
-            mono_path.starts_with(temp.join("runtime/mono/lib").to_str().unwrap()),
-            "MONO_PATH 应以 mono/lib 开头：{mono_path}"
+            mono_path.contains("4.5"),
+            "MONO_PATH 应含 4.5：{mono_path}"
         );
         let ld_path = std::env::var("LD_LIBRARY_PATH").unwrap();
         assert!(

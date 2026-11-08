@@ -145,7 +145,21 @@ pub fn setup_mono_runtime_for(
             }
         }
     };
-    let managed_dir = if lib.is_dir() { lib } else { mono_root.clone() };
+    let managed_dirs = {
+        let mut dirs = Vec::new();
+        for candidate in [
+            lib.join("mono").join("4.5"),
+            lib.join("mono").join("4.5-api"),
+        ] {
+            if candidate.is_dir() {
+                dirs.push(candidate);
+            }
+        }
+        if dirs.is_empty() {
+            dirs.push(if lib.is_dir() { lib } else { mono_root.clone() });
+        }
+        dirs
+    };
 
     let mut modified = Vec::new();
     let native_env = match platform {
@@ -155,8 +169,10 @@ pub fn setup_mono_runtime_for(
     if prepend_env_path(native_env, &native_dir, platform) {
         modified.push(native_env);
     }
-    if prepend_env_path(MONO_PATH_ENV, &managed_dir, platform) {
-        modified.push(MONO_PATH_ENV);
+    for dir in &managed_dirs {
+        if append_env_path(MONO_PATH_ENV, dir, platform) {
+            modified.push(MONO_PATH_ENV);
+        }
     }
     modified.sort_unstable();
     modified.dedup();
@@ -165,7 +181,8 @@ pub fn setup_mono_runtime_for(
         found: true,
         root: Some(mono_root),
         native_dir: Some(native_dir),
-        managed_dir: Some(managed_dir),
+        managed_dir: managed_dirs.first().cloned(),
+        managed_dirs,
         modified,
         platform,
     }
@@ -194,4 +211,33 @@ fn prepend_env_path(name: &str, path: &Path, platform: TargetPlatform) -> bool {
     };
     std::env::set_var(name, new_value);
     true
+}
+
+/// 把 `path` 追加到环境变量 `name`（平台对应分隔符）；已存在时返回 false。
+///
+/// 只修改环境变量，不 panic；路径无法转字符串时返回 false。
+fn append_env_path(name: &str, path: &Path, platform: TargetPlatform) -> bool {
+    let Some(text) = path.to_str() else {
+        return false;
+    };
+    let separator = match platform {
+        TargetPlatform::Windows => ';',
+        TargetPlatform::Linux => ':',
+    };
+    let current = std::env::var(name).unwrap_or_default();
+    if current.split(separator).any(|entry| entry == text) {
+        return false;
+    }
+    let new_value = if current.is_empty() {
+        text.to_string()
+    } else {
+        format!("{current}{separator}{text}")
+    };
+    std::env::set_var(name, new_value);
+    true
+}
+
+/// 兼容任务契约命名：检测并准备包内 `runtime/mono`（等同 [`setup_mono_runtime`]）。
+pub fn setup_bundled_runtime(player_root: &Path) -> MonoRuntimeSetup {
+    setup_mono_runtime(player_root)
 }

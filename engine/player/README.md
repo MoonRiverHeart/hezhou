@@ -817,19 +817,20 @@ script.shutdown();                                           // C# Shutdown + Mo
 Player 包可选携带 Mono 运行时（task-38）：`runtime_setup` 在**加载 C# DLL 之前**检测
 `<PlayerRoot>/runtime/mono`，找到后把 Mono 目录前置到进程环境变量：
 
-| 平台 | 环境变量 | 前置目录 |
+| 平台 | 环境变量 | 操作 |
 |---|---|---|
-| Windows | `PATH` | `runtime/mono/bin`（无 bin 时 mono 根） |
-| Windows | `MONO_PATH` | `runtime/mono/lib`（无 lib 时 mono 根） |
-| Linux | `LD_LIBRARY_PATH` | `runtime/mono/lib`（无 lib 时 mono 根） |
-| Linux | `MONO_PATH` | `runtime/mono/lib` |
+| Windows | `PATH` | **前置** `runtime/mono/bin`（无 bin 时 mono 根） |
+| Windows | `MONO_PATH` | **追加** `runtime/mono/lib/mono/4.5`（存在 4.5-api 时一并追加） |
+| Linux | `LD_LIBRARY_PATH` | **前置** `runtime/mono/lib`（无 lib 时 mono 根） |
+| Linux | `MONO_PATH` | **追加** `runtime/mono/lib/mono/4.5`（存在 4.5-api 时一并追加） |
 
 - **no-op**：没有 `runtime/mono` → 不改任何环境变量（报告 `found=false`，继续使用
   系统 Mono/其它搜索路径）；
-- **幂等**：目标目录已在变量首位时不重复追加；重复调用无副作用；
-- 不删除用户已有的 `PATH`/`LD_LIBRARY_PATH`/`MONO_PATH` 条目，只前置；
+- **幂等**：目标目录已在变量首位/列表中时不重复追加；重复调用无副作用；
+- 不删除用户已有的 `PATH`/`LD_LIBRARY_PATH`/`MONO_PATH` 条目，只前置/追加；
 - 调用点：`runtime::run`（`--validate`/启动流程）与 `WindowPlayerHost`（mono-host
-  加载 C# DLL 前，幂等兜底）；日志 `内置 Mono 运行时：已找到/未发现 …`；
+  加载 C# DLL 前，幂等兜底；兼容命名 `setup_bundled_runtime`）；日志
+  `内置 Mono 运行时：已找到/未发现 …`；
 - 包布局：`runtime/mono/{bin,lib,etc}`（把安装的 Mono 目录整体复制/安装到该位置即可）；
 - 注意：C# `ScriptManager` 的 `mono_set_dirs` 仍优先使用 exe 旁 `lib/` 或系统 Mono；
   `runtime_setup` 负责原生 DLL/托管程序集的搜索路径前置，两者可共同使用。
@@ -840,7 +841,7 @@ Player 包可选携带 Mono 运行时（task-38）：`runtime_setup` 在**加载
 # Windows：可用目录联接避免复制大文件（发布包请真实复制）
 New-Item -ItemType Junction -Path <package>/runtime/mono -Target 'C:\Program Files\Mono'
 <package>/<exe>.exe --validate --manifest <package>/manifest.json --log-dir <tmp>
-# 日志：内置 Mono 运行时：已找到 ...（native=.../runtime/mono/bin managed=.../runtime/mono/lib；前置环境变量 MONO_PATH,PATH）
+# 日志：内置 Mono 运行时：已找到 ...（native=.../runtime/mono/bin managed=.../runtime/mono/lib/mono/4.5;.../4.5-api；前置/追加环境变量 MONO_PATH,PATH）
 ```
 
 ## 7. 测试

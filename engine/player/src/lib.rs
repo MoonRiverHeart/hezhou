@@ -120,8 +120,8 @@ pub use runtime::{
     RuntimeOptions, RuntimeReport,
 };
 pub use runtime_setup::{
-    setup_mono_runtime, setup_mono_runtime_for, MonoRuntimeSetup, MONO_PATH_ENV,
-    MONO_RUNTIME_DIR,
+    setup_bundled_runtime, setup_mono_runtime, setup_mono_runtime_for, MonoRuntimeSetup,
+    MONO_PATH_ENV, MONO_RUNTIME_DIR,
 };
 pub use version::{SemVer, VersionError};
 
