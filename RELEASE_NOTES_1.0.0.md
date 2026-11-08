@@ -1,6 +1,6 @@
 # Hezhou 1.0.0 发布说明
 
-> 状态：1.0 Release / 双平台 CI + release-check 全绿。基线：0.4.0。
+> 状态：已发布（2026-11-08）。Release: https://github.com/MoonRiverHeart/hezhou/releases/tag/v1.0.0
 
 ## 1.0 交付
 

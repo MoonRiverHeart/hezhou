@@ -14,14 +14,14 @@
 - ✅ **0.2.0 已发布**：https://github.com/MoonRiverHeart/hezhou/releases/tag/v0.2.0
 - ✅ **0.3.0 已发布**：https://github.com/MoonRiverHeart/hezhou/releases/tag/v0.3.0
 - ✅ **0.4.0 已发布**：https://github.com/MoonRiverHeart/hezhou/releases/tag/v0.4.0
+- ✅ **1.0.0 已发布**：https://github.com/MoonRiverHeart/hezhou/releases/tag/v1.0.0
   - Windows：MSI / MSIX / .cer / Capability Player zip
   - Linux：DEB / Capability Player tar.gz
-- ✅ CI 全绿：rust、C#、双平台安装包、Player 构建/窗口、package-player、perf-baseline、soak-quick、diagnostics-smoke、publish-release。
-- ✅ 0.4 生态：项目模板、最小包管理器、声明式插件 API。
-- ✅ 0.4 网络：UDP/TCP 传输、会话/房间、服务器权威快照（全量/Delta/ack）、客户端插值、RPC。
-- ✅ 1.0 稳定性：60s soak CI、30 分钟 soak、诊断包、性能基线。
-- ✅ 1.0 文档：Getting Started、平台矩阵、API 稳定性、1.0 Release Checklist。
-- ⏳ 1.0 剩余：平台扩展（macOS/Android/Web）、非团队开发者验证、30min 内存趋势、1.0 API/发布验收。
+- ✅ CI 全绿：rust-tests、csharp-build、package-windows/linux、player-build、player-window-host、package-player、perf-baseline、soak-quick、diagnostics-smoke、release-check、publish-release。
+- ✅ release-check：13 项自动检查通过，10 项人工项在 RELEASE_CHECK_1_0.md 记录。
+- ✅ 1.0 能力：编辑器工具链、C# API、PBR/骨骼动画/物理、Player 双平台、包/插件/模板、网络传输/快照/RPC、soak/诊断/性能基线。
+- ✅ 文档：Getting Started、平台矩阵、API 稳定性、Release Checklist、诊断/soak/性能。
+- ⚠️ 平台承诺：Windows x64 / Linux x64 支持；macOS/Android/Web 未实现（路线见 PLATFORM_SUPPORT_1_0.md）；非团队开发者实际验收需外部执行。
 
 ## 1. 执行摘要
 
