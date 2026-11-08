@@ -55,6 +55,9 @@ namespace Hezhou
             try { TestProfilerFfi(); }
             catch (Exception ex) { Log.Error("TestRunner", "TestProfilerFfi异常: " + ex.Message); }
 
+            try { TestBuildSettingsFfi(); }
+            catch (Exception ex) { Log.Error("TestRunner", "TestBuildSettingsFfi异常: " + ex.Message); }
+
             Log.Info("TestRunner", "===== 测试完成: PASS=" + _passCount + ", FAIL=" + _failCount + " =====");
         }
 
@@ -686,6 +689,108 @@ namespace Hezhou
             int framesAfterReset = UI.ProfilerFrameCount();
             AssertTrue("Profiler", framesAfterReset == 0,
                 "重置后帧计数为 0 (frames=" + framesAfterReset + ")");
+        }
+
+        /// <summary>
+        /// 0.3 Build Settings 自检（task-41）：
+        /// 快照字段 → 校验有效设置 → 保存 build.settings.json → Player dry-run 使用设置；
+        /// 结束后恢复原设置文件/清理导出产物。
+        /// </summary>
+        private static void TestBuildSettingsFfi()
+        {
+            string root = System.IO.Directory.GetCurrentDirectory();
+            string settingsPath = System.IO.Path.Combine(root, "build.settings.json");
+            bool existed = System.IO.File.Exists(settingsPath);
+            string original = existed ? System.IO.File.ReadAllText(settingsPath) : null;
+            string outputDir = System.IO.Path.Combine(root, "logs", "build_settings_selftest");
+            try
+            {
+                string snapshot = UI.BuildSettingsSnapshotJson();
+                bool hasFields = snapshot.IndexOf("\"product_name\"") >= 0
+                    && snapshot.IndexOf("\"start_scene\"") >= 0
+                    && snapshot.IndexOf("\"quality\"") >= 0
+                    && snapshot.IndexOf("\"targets\"") >= 0
+                    && snapshot.IndexOf("\"window\"") >= 0;
+                AssertTrue("BuildSettings", hasFields,
+                    "Build Settings 快照包含必要字段（len=" + snapshot.Length + "）");
+
+                // 用工程内第一个真实资产作为 start_scene（满足“存在”校验）。
+                string firstAsset = "";
+                string assetsDir = System.IO.Path.Combine(root, "assets");
+                if (System.IO.Directory.Exists(assetsDir))
+                {
+                    string[] files = System.IO.Directory.GetFiles(
+                        assetsDir, "*", System.IO.SearchOption.AllDirectories);
+                    for (int i = 0; i < files.Length; i++)
+                    {
+                        if (!files[i].EndsWith(".meta"))
+                        {
+                            firstAsset = files[i].Substring(assetsDir.Length)
+                                .TrimStart('\\', '/')
+                                .Replace('\\', '/');
+                            break;
+                        }
+                    }
+                }
+                if (firstAsset.Length == 0) firstAsset = "scenes/main.scene.json";
+
+                string settingsJson = "{"
+                    + "\"product_name\":\"HezhouSettingsSelfTest\","
+                    + "\"executable_name\":\"hezhousettingstest\","
+                    + "\"start_scene\":\"" + firstAsset.Replace("\\", "\\\\") + "\","
+                    + "\"quality\":\"high\","
+                    + "\"window\":{\"width\":1280,\"height\":720,\"mode\":\"windowed\"},"
+                    + "\"targets\":[\"windows\",\"linux\"],"
+                    + "\"version\":\"1.2.3\","
+                    + "\"log_dir\":\"logs\","
+                    + "\"required_font\":null"
+                    + "}";
+                string errors;
+                int validateRc = UI.BuildSettingsValidateJson(settingsJson, out errors);
+                AssertTrue("BuildSettings", validateRc == 0,
+                    "校验有效设置返回 0 (rc=" + validateRc + ", errors=" + errors + ")");
+
+                int saveRc = UI.BuildSettingsSaveJson(settingsJson);
+                AssertTrue("BuildSettings",
+                    saveRc == 0 && System.IO.File.Exists(settingsPath),
+                    "保存 build.settings.json 成功 (rc=" + saveRc + ")");
+
+                // request 中产品/版本/启动场景/字体留空 → 由 Build Settings 补齐。
+                string request = "{"
+                    + "\"project_root\":\"" + root.Replace("\\", "\\\\") + "\","
+                    + "\"output_dir\":\"" + outputDir.Replace("\\", "\\\\") + "\","
+                    + "\"product_name\":\"\",\"version\":\"\",\"start_scene\":\"\","
+                    + "\"scripts_dir\":\"\",\"runtime_dir\":\"\","
+                    + "\"required_font\":\"\",\"executable_path\":\"\""
+                    + "}";
+                int exportRc = UI.PlayerExportDryRun(request);
+                string summary = UI.PlayerExportSummary();
+                bool usedSettings = exportRc == 0
+                    && summary.IndexOf("HezhouSettingsSelfTest") >= 0
+                    && summary.IndexOf("1.2.3") >= 0
+                    && summary.IndexOf(firstAsset) >= 0;
+                AssertTrue("BuildSettings", usedSettings,
+                    "Player dry-run 使用 Build Settings (rc=" + exportRc + ", start_scene=" + firstAsset + ")");
+                Log.Info("BuildSettings", "自检 export summary: "
+                    + (summary.Length > 500 ? summary.Substring(0, 500) + "..." : summary));
+            }
+            finally
+            {
+                try
+                {
+                    if (System.IO.Directory.Exists(outputDir))
+                    {
+                        System.IO.Directory.Delete(outputDir, true);
+                    }
+                }
+                catch (Exception) { }
+                try
+                {
+                    if (existed) System.IO.File.WriteAllText(settingsPath, original);
+                    else if (System.IO.File.Exists(settingsPath)) System.IO.File.Delete(settingsPath);
+                }
+                catch (Exception) { }
+            }
         }
 
         // 内存保存值结构（模拟SavedScriptPropertyValue，用于测试）

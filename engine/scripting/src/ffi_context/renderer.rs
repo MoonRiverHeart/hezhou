@@ -62,3 +62,19 @@ pub type ProfilerResetFn = extern "C" fn() -> i32;
 ///
 /// FFI 契约: `profiler_frame_count()` → i32
 pub type ProfilerFrameCountFn = extern "C" fn() -> i32;
+
+// === 0.3 Build Settings（task-41） ===
+
+/// 读取当前工程 Build Settings JSON（缺失时返回推断默认值）。
+///
+/// FFI 契约: `build_settings_snapshot_json(buffer, buffer_size)` → usize
+pub type BuildSettingsSnapshotJsonFn =
+    extern "C" fn(*mut std::ffi::c_char, usize) -> usize;
+
+/// 保存 Build Settings JSON（0=成功，-1=解析失败，-2=校验失败，-3=写盘失败）。
+pub type BuildSettingsSaveJsonFn = extern "C" fn(*const std::ffi::c_char) -> i32;
+
+/// 校验 Build Settings JSON（0=通过，-1=解析失败，-2=校验失败；错误文本写入 buffer）。
+pub type BuildSettingsValidateJsonFn =
+    extern "C" fn(*const std::ffi::c_char, *mut std::ffi::c_char, usize) -> i32;
+

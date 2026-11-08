@@ -993,5 +993,77 @@ UI.SceneSelectEntity(_scenePtr, entityId);
                 _ffi.profiler_frame_count);
             return func();
         }
+
+        // === 0.3 Build Settings（task-41） ===
+
+        /// <summary>读取当前工程 Build Settings JSON（缺失时返回推断默认值）。</summary>
+        public static string BuildSettingsSnapshotJson()
+        {
+            if (_ffi.build_settings_snapshot_json == IntPtr.Zero)
+            {
+                return "";
+            }
+            const int bufferSize = 8192;
+            IntPtr buffer = Marshal.AllocHGlobal(bufferSize);
+            try
+            {
+                Marshal.WriteByte(buffer, 0, 0);
+                var func = Marshal.GetDelegateForFunctionPointer<BuildSettingsSnapshotJsonDelegate>(
+                    _ffi.build_settings_snapshot_json);
+                ulong written = func(buffer, (ulong)bufferSize);
+                return written == 0UL ? "" : (Marshal.PtrToStringAnsi(buffer, (int)written) ?? "");
+            }
+            finally
+            {
+                Marshal.FreeHGlobal(buffer);
+            }
+        }
+
+        /// <summary>保存 Build Settings JSON；0=成功。</summary>
+        public static int BuildSettingsSaveJson(string json)
+        {
+            if (_ffi.build_settings_save_json == IntPtr.Zero)
+            {
+                return -1;
+            }
+            IntPtr jsonPtr = Marshal.StringToHGlobalAnsi(json ?? "");
+            try
+            {
+                var func = Marshal.GetDelegateForFunctionPointer<BuildSettingsSaveJsonDelegate>(
+                    _ffi.build_settings_save_json);
+                return func(jsonPtr);
+            }
+            finally
+            {
+                Marshal.FreeHGlobal(jsonPtr);
+            }
+        }
+
+        /// <summary>校验 Build Settings JSON；返回 0=通过，错误文本写入 errors。</summary>
+        public static int BuildSettingsValidateJson(string json, out string errors)
+        {
+            errors = "";
+            if (_ffi.build_settings_validate_json == IntPtr.Zero)
+            {
+                return -1;
+            }
+            IntPtr jsonPtr = Marshal.StringToHGlobalAnsi(json ?? "");
+            const int bufferSize = 4096;
+            IntPtr buffer = Marshal.AllocHGlobal(bufferSize);
+            try
+            {
+                Marshal.WriteByte(buffer, 0, 0);
+                var func = Marshal.GetDelegateForFunctionPointer<BuildSettingsValidateJsonDelegate>(
+                    _ffi.build_settings_validate_json);
+                int rc = func(jsonPtr, buffer, (ulong)bufferSize);
+                errors = Marshal.PtrToStringAnsi(buffer) ?? "";
+                return rc;
+            }
+            finally
+            {
+                Marshal.FreeHGlobal(buffer);
+                Marshal.FreeHGlobal(jsonPtr);
+            }
+        }
     }
 }

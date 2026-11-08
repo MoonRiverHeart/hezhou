@@ -25,10 +25,12 @@ use hezhou_core::{
 use hezhou_dfx::*;
 use hezhou_player::{
     BuildSources, CookManifest as PlayerCookManifest, CookedAssets, ManifestAsset,
-    PlayerBuildConfig, PlayerBuildInput, PlayerBuilder, RuntimePayload, ScriptAssembly,
-    TargetPlatform,
+    PlayerBuildConfig, PlayerBuildInput, PlayerBuilder, QualityTier, RuntimePayload,
+    ScriptAssembly, TargetPlatform, WindowConfig, WindowMode,
 };
 use serde::Deserialize;
+
+use super::build_settings::{self, BuildSettings};
 
 /// 单线程编辑器全局：SceneManager（内部 Scene 含非 Send/Sync 组件，用 UnsafeCell 包装）。
 struct SceneManagerSlot(UnsafeCell<Option<Box<SceneManager>>>);
@@ -371,7 +373,7 @@ struct PlayerExportRequest {
     executable_path: String,
 }
 
-/// 请求中的路径默认值解析（dry-run 与真实构建共用）。
+/// 请求中的路径默认值解析（dry-run 与真实构建共用；Build Settings 优先）。
 struct ResolvedExportPaths {
     project_root: PathBuf,
     output_dir: PathBuf,
@@ -380,6 +382,55 @@ struct ResolvedExportPaths {
     start_scene: String,
     scripts_dir: PathBuf,
     runtime_dir: PathBuf,
+    /// 最终必检字体（请求显式值优先，否则 Build Settings）。
+    required_font: Option<String>,
+    /// 已加载的 Build Settings（quality/window/targets/log_dir 映射用）。
+    settings: BuildSettings,
+}
+
+fn quality_tier(quality: &str) -> QualityTier {
+    match quality.trim().to_ascii_lowercase().as_str() {
+        "low" => QualityTier::Low,
+        "medium" => QualityTier::Medium,
+        "ultra" => QualityTier::Ultra,
+        _ => QualityTier::High,
+    }
+}
+
+fn window_mode(mode: &str) -> WindowMode {
+    match mode.trim().to_ascii_lowercase().as_str() {
+        "borderless_fullscreen" => WindowMode::BorderlessFullscreen,
+        "fullscreen" => WindowMode::Fullscreen,
+        _ => WindowMode::Windowed,
+    }
+}
+
+fn window_config(settings: &BuildSettings, title: &str) -> WindowConfig {
+    WindowConfig::new(title)
+        .with_size(settings.window.width.max(1), settings.window.height.max(1))
+        .with_mode(window_mode(&settings.window.mode))
+}
+
+/// 把 Build Settings 映射到 PlayerBuildConfig（quality/window/executable/log_dir）。
+fn apply_build_settings(
+    config: PlayerBuildConfig,
+    settings: &BuildSettings,
+    product_name: &str,
+) -> PlayerBuildConfig {
+    let mut config = config
+        .with_executable_name(settings.sanitized_executable_name())
+        .with_quality(quality_tier(&settings.quality))
+        .with_window(window_config(settings, product_name));
+    config.log_dir = settings.log_dir.clone();
+    config
+}
+
+/// Build Settings 的 targets 是否包含当前平台。
+fn target_allowed(settings: &BuildSettings, target: TargetPlatform) -> bool {
+    settings
+        .targets
+        .iter()
+        .any(|candidate| candidate.trim().eq_ignore_ascii_case(target.as_str()))
 }
 
 fn resolve_export_paths(request: &PlayerExportRequest) -> Result<ResolvedExportPaths, String> {
@@ -389,23 +440,39 @@ fn resolve_export_paths(request: &PlayerExportRequest) -> Result<ResolvedExportP
     } else {
         PathBuf::from(&request.project_root)
     };
-    let output_dir = if request.output_dir.trim().is_empty() {
-        project_root.join("build").join("player_dry_run")
-    } else {
-        PathBuf::from(&request.output_dir)
-    };
+    // Build Settings 优先：缺失字段从设置取；无文件时从工程推断默认值。
+    let settings = super::build_settings::load_or_default(&project_root);
+
     let product_name = if request.product_name.trim().is_empty() {
-        "HezhouGame".to_string()
+        if settings.product_name.trim().is_empty() {
+            "HezhouGame".to_string()
+        } else {
+            settings.product_name.trim().to_string()
+        }
     } else {
         request.product_name.clone()
     };
+    // 默认输出到 <project>/exports/<product>/<platform>。
+    let output_dir = if request.output_dir.trim().is_empty() {
+        project_root.join("exports").join(&product_name)
+    } else {
+        PathBuf::from(&request.output_dir)
+    };
     let version = if request.version.trim().is_empty() {
-        env!("CARGO_PKG_VERSION").to_string()
+        if settings.version.trim().is_empty() {
+            env!("CARGO_PKG_VERSION").to_string()
+        } else {
+            settings.version.trim().to_string()
+        }
     } else {
         request.version.clone()
     };
     let start_scene = if request.start_scene.trim().is_empty() {
-        "scenes/main.scene.json".to_string()
+        if settings.start_scene.trim().is_empty() {
+            "scenes/main.scene.json".to_string()
+        } else {
+            settings.start_scene.trim().to_string()
+        }
     } else {
         request.start_scene.clone()
     };
@@ -419,6 +486,16 @@ fn resolve_export_paths(request: &PlayerExportRequest) -> Result<ResolvedExportP
     } else {
         PathBuf::from(&request.runtime_dir)
     };
+    let required_font = request
+        .required_font
+        .clone()
+        .filter(|font| !font.trim().is_empty())
+        .or_else(|| {
+            settings
+                .required_font
+                .clone()
+                .filter(|font| !font.trim().is_empty())
+        });
     Ok(ResolvedExportPaths {
         project_root,
         output_dir,
@@ -427,6 +504,8 @@ fn resolve_export_paths(request: &PlayerExportRequest) -> Result<ResolvedExportP
         start_scene,
         scripts_dir,
         runtime_dir,
+        required_font,
+        settings,
     })
 }
 
@@ -435,6 +514,8 @@ fn player_export_impl(request_json: &str) -> Result<String, String> {
         serde_json::from_str(request_json).map_err(|error| format!("请求 JSON 解析失败: {error}"))?;
 
     let resolved = resolve_export_paths(&request)?;
+    let required_font = resolved.required_font.clone();
+    let settings = resolved.settings.clone();
     let project_root = resolved.project_root;
     let output_dir = resolved.output_dir;
     let product_name = resolved.product_name;
@@ -465,7 +546,7 @@ fn player_export_impl(request_json: &str) -> Result<String, String> {
         assets.push(asset);
         synthetic_count += 1;
     }
-    if let Some(font) = request.required_font.as_deref() {
+    if let Some(font) = required_font.as_deref() {
         if !font.trim().is_empty() && !has_asset(&assets, font) {
             assets.push(ManifestAsset::new(font.to_string(), "font"));
             synthetic_count += 1;
@@ -480,7 +561,8 @@ fn player_export_impl(request_json: &str) -> Result<String, String> {
         start_scene.clone(),
         TargetPlatform::Windows,
     );
-    config = config.with_required_font(request.required_font.clone());
+    config = config.with_required_font(required_font.clone());
+    config = apply_build_settings(config, &settings, &product_name);
 
     let scripts = match ScriptAssembly::from_dir(&scripts_dir) {
         Ok(scripts) => scripts,
@@ -520,6 +602,16 @@ fn player_export_impl(request_json: &str) -> Result<String, String> {
     summary.push_str(&format!("  输出目录: {}\n", output_dir.display()));
     summary.push_str(&format!("  产品: {}  版本: {}\n", product_name, version));
     summary.push_str(&format!("  启动场景: assets/{}\n", start_scene));
+    summary.push_str(&format!(
+        "  Build Settings: executable={} quality={} window={}x{} {} targets=[{}] mode={}\n",
+        settings.sanitized_executable_name(),
+        settings.quality,
+        settings.window.width,
+        settings.window.height,
+        settings.window.mode,
+        settings.targets.join(","),
+        settings.window.mode
+    ));
     summary.push_str(&format!(
         "  资产: {}（合成条目 {}）  脚本: {}  运行时: {}\n",
         rows.len() + synthetic_count,
@@ -663,7 +755,7 @@ fn player_export_build_inner(
     }
 
     // 3) 字体：请求配置但资产不存在时关闭必检并告警（避免无字体工程无法构建）。
-    let mut required_font = request.required_font.clone();
+    let mut required_font = parsed.required_font.clone();
     if let Some(font) = required_font.clone() {
         let font_locator = LogicalPath::new(format!("assets/{font}"))
             .map_err(|error| format!("字体路径非法（{font}）: {error}"))?;
@@ -709,6 +801,14 @@ fn player_export_build_inner(
         target,
     );
     config = config.with_required_font(required_font.clone());
+    config = apply_build_settings(config, &parsed.settings, &parsed.product_name);
+    if !target_allowed(&parsed.settings, target) {
+        return Err(format!(
+            "Build Settings targets 不包含当前平台 {}（targets: {}）",
+            target.as_str(),
+            parsed.settings.targets.join(",")
+        ));
+    }
     config
         .validate()
         .map_err(|errors| format!("Player 构建配置校验失败: {}", errors.summary()))?;
@@ -980,3 +1080,4 @@ mod tests {
         assert_eq!(buffer[7], 0);
     }
 }
+

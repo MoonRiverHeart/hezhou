@@ -357,6 +357,10 @@ pub project_add_entity: ProjectAddEntityFn,
         pub profiler_snapshot_json: ProfilerSnapshotJsonFn,
         pub profiler_reset: ProfilerResetFn,
         pub profiler_frame_count: ProfilerFrameCountFn,
+        // 0.3 Build Settings FFI（tail；必须与 C# FfiContext 字段顺序一致）
+        pub build_settings_snapshot_json: BuildSettingsSnapshotJsonFn,
+        pub build_settings_save_json: BuildSettingsSaveJsonFn,
+        pub build_settings_validate_json: BuildSettingsValidateJsonFn,
     }
 
 static mut FFI_CONTEXT: Option<Box<FfiContext>> = None;

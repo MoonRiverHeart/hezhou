@@ -1001,6 +1001,14 @@ namespace Hezhou
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public delegate int ProfilerFrameCountDelegate();
 
+        // 0.3 Build Settings FFI（task-41）
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate ulong BuildSettingsSnapshotJsonDelegate(IntPtr buffer, ulong bufferSize);
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate int BuildSettingsSaveJsonDelegate(IntPtr json);
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate int BuildSettingsValidateJsonDelegate(IntPtr json, IntPtr errors, ulong errorsSize);
+
 [StructLayout(LayoutKind.Sequential)]
         public struct FfiContext
         {
@@ -1336,6 +1344,10 @@ namespace Hezhou
             public IntPtr profiler_snapshot_json;
             public IntPtr profiler_reset;
             public IntPtr profiler_frame_count;
+            // 0.3 Build Settings FFI（tail）
+            public IntPtr build_settings_snapshot_json;
+            public IntPtr build_settings_save_json;
+            public IntPtr build_settings_validate_json;
         }
 
         public static void InitFromContext(IntPtr contextPtr)

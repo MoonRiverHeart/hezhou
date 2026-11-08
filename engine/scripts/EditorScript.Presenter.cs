@@ -3141,6 +3141,11 @@ UI.SetText(_runButtonId, "运行");
         private static void RefreshSceneTreeAfterLoad()
         {
             if (_gameScene == null) return;
+            // 0.3 Build Settings：工程/场景加载后自动重新读取项目级设置。
+            if (_buildSettingFieldIds[0] != 0)
+            {
+                LoadBuildSettingsIntoFields();
+            }
 
             _gameScene.ClearSelection();
             _selectedEntityId = 0;

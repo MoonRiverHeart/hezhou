@@ -13,6 +13,7 @@ pub mod audio_asset_ffi;
 pub mod prefab_scene_player_ffi;
 pub mod pbr_sync;
 pub mod profiler_ffi;
+pub mod build_settings;
 pub mod hot_reload;
 pub mod dfx_init;
 #[cfg(feature = "mcp")]
@@ -476,6 +477,9 @@ ui_tree_view_set_on_select_thunk_ptr: unsafe { std::mem::transmute(ui_ffi::ui_tr
         profiler_snapshot_json: profiler_ffi::profiler_snapshot_json,
         profiler_reset: profiler_ffi::profiler_reset,
         profiler_frame_count: profiler_ffi::profiler_frame_count,
+        build_settings_snapshot_json: build_settings::build_settings_snapshot_json,
+        build_settings_save_json: build_settings::build_settings_save_json,
+        build_settings_validate_json: build_settings::build_settings_validate_json,
         on_hot_reload_complete: ffi_impl::on_hot_reload_complete_placeholder,
         register_hot_reload_complete_callback: unsafe { std::mem::transmute(hot_reload::register_hot_reload_complete_callback as *const std::ffi::c_void) },
         ui_debug_print_widget_tree: unsafe { std::mem::transmute(ui_ffi::ui_debug_print_widget_tree as *const std::ffi::c_void) },
@@ -822,4 +826,5 @@ dfx_trace_begin!("ProcessEvents", "ui");
     let exit_code = if auto_test_mode && auto_test_status != "pass" { 2 } else { 0 };
     std::process::exit(exit_code);
 }
+
 

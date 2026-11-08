@@ -66,6 +66,9 @@ namespace Hezhou
             _pbrClearCallback = OnPbrClearClick;
             _profilerPauseCallback = OnProfilerPauseClick;
             _profilerResetCallback = OnProfilerResetClick;
+            _buildSettingsLoadCallback = OnBuildSettingsLoadClick;
+            _buildSettingsSaveCallback = OnBuildSettingsSaveClick;
+            _buildSettingsValidateCallback = OnBuildSettingsValidateClick;
             _sceneFileDialogResultCallback = OnSceneFileDialogResult;
             _rightMaxClickCallback = OnRightMaxClick;
             _consoleDialogResultCallback = OnConsoleDialogResult;
@@ -937,11 +940,8 @@ _bindScriptClickCallback = OnBindScriptClick;
 
         private static void RunPlayerExport(bool realBuild)
         {
-            string root = System.IO.Directory.GetCurrentDirectory();
-            string outputDir = realBuild
-                ? System.IO.Path.Combine(root, "exports", "player")
-                : System.IO.Path.Combine(root, "logs", "player_dry_run");
-            string json = BuildPlayerExportRequestJson(outputDir);
+            // 输出目录留空：Rust 侧优先使用 Build Settings，默认 exports/<product>/<platform>。
+            string json = BuildPlayerExportRequestJson();
             int rc = realBuild ? UI.PlayerExportBuild(json) : UI.PlayerExportDryRun(json);
             _lastPlayerExportSummary = UI.PlayerExportSummary();
             string action = realBuild ? "Player 真实构建" : "Player dry-run";
@@ -1362,6 +1362,225 @@ _bindScriptClickCallback = OnBindScriptClick;
             {
                 Log.Warn("Profiler", "重置失败 rc=" + rc);
             }
+        }
+
+        /// <summary>构造 Player 导出请求 JSON（dry-run/真实构建共用；未填字段由 Build Settings 补齐）。</summary>
+        private static string BuildPlayerExportRequestJson()
+        {
+            EnsureBuildSettingsLoaded();
+            string root = System.IO.Directory.GetCurrentDirectory();
+            string product = GetBuildSettingField(0).Trim();
+            string version = GetBuildSettingField(2).Trim();
+            string startScene = GetBuildSettingField(3).Trim();
+            string font = GetBuildSettingField(10).Trim();
+            string fontJson = font.Length == 0 ? "\"\"" : "\"" + EscapeJsonPath(font) + "\"";
+            return "{"
+                + "\"project_root\":\"" + EscapeJsonPath(root) + "\","
+                + "\"output_dir\":\"\","
+                + "\"product_name\":\"" + EscapeJsonPath(product) + "\","
+                + "\"version\":\"" + EscapeJsonPath(version) + "\","
+                + "\"start_scene\":\"" + EscapeJsonPath(startScene) + "\","
+                + "\"scripts_dir\":\"" + EscapeJsonPath(System.IO.Path.Combine(root, "scripts", "bin", "Mono")) + "\","
+                + "\"runtime_dir\":\"" + EscapeJsonPath(System.IO.Path.Combine(root, "runtime", "mono")) + "\","
+                + "\"required_font\":" + fontJson + ","
+                + "\"executable_path\":\"\""
+                + "}";
+        }
+
+        // === 0.3 Build Settings（task-41） ===
+
+        /// <summary>读取工程 build.settings.json 并回填面板字段。</summary>
+        private static void LoadBuildSettingsIntoFields()
+        {
+            if (_buildSettingFieldIds == null || _buildSettingFieldIds[0] == 0)
+            {
+                return;
+            }
+            string json = UI.BuildSettingsSnapshotJson();
+            if (string.IsNullOrEmpty(json))
+            {
+                if (_buildSettingsStatusLabelId != 0)
+                {
+                    UI.SetText(_buildSettingsStatusLabelId, "Build Settings: 读取失败（snapshot 为空）");
+                }
+                return;
+            }
+            SetBuildSettingField(0, ParsePbrString(json, "product_name"));
+            SetBuildSettingField(1, ParsePbrString(json, "executable_name"));
+            SetBuildSettingField(2, ParsePbrString(json, "version"));
+            SetBuildSettingField(3, ParsePbrString(json, "start_scene"));
+            SetBuildSettingField(4, ParsePbrString(json, "quality"));
+            SetBuildSettingField(5, ((long)PbrJsonFloat(json, "width", 1280f)).ToString());
+            SetBuildSettingField(6, ((long)PbrJsonFloat(json, "height", 720f)).ToString());
+            SetBuildSettingField(7, ParsePbrString(json, "mode"));
+            SetBuildSettingField(8, ParsePbrStringArray(json, "targets"));
+            SetBuildSettingField(9, ParsePbrString(json, "log_dir"));
+            SetBuildSettingField(10, ParsePbrString(json, "required_font"));
+            _buildSettingsLoaded = true;
+            if (_buildSettingsStatusLabelId != 0)
+            {
+                UI.SetText(_buildSettingsStatusLabelId,
+                    "Build Settings: 已读取（修改后点“保存设置”；导出优先使用该配置）");
+            }
+        }
+
+        private static void SetBuildSettingField(int index, string text)
+        {
+            if (index >= 0 && index < _buildSettingFieldIds.Length && _buildSettingFieldIds[index] != 0)
+            {
+                UI.InputFieldSetText(_buildSettingFieldIds[index], text ?? "");
+            }
+        }
+
+        private static string GetBuildSettingField(int index)
+        {
+            if (index < 0 || index >= _buildSettingFieldIds.Length || _buildSettingFieldIds[index] == 0)
+            {
+                return "";
+            }
+            return UI.InputFieldGetText(_buildSettingFieldIds[index]) ?? "";
+        }
+
+        private static void EnsureBuildSettingsLoaded()
+        {
+            if (!_buildSettingsLoaded && _buildSettingFieldIds[0] != 0)
+            {
+                LoadBuildSettingsIntoFields();
+            }
+        }
+
+        /// <summary>由面板字段构造 build.settings.json 内容。</summary>
+        private static string BuildBuildSettingsJson()
+        {
+            string product = GetBuildSettingField(0).Trim();
+            string executable = GetBuildSettingField(1).Trim();
+            string version = GetBuildSettingField(2).Trim();
+            string startScene = GetBuildSettingField(3).Trim();
+            string quality = GetBuildSettingField(4).Trim();
+            long width = (long)ParsePbrFloat(GetBuildSettingField(5), 1280f);
+            long height = (long)ParsePbrFloat(GetBuildSettingField(6), 720f);
+            string mode = GetBuildSettingField(7).Trim();
+            string targets = GetBuildSettingField(8).Trim();
+            string logDir = GetBuildSettingField(9).Trim();
+            string font = GetBuildSettingField(10).Trim();
+
+            string[] targetParts = targets.Split(new char[] { ',', ';', ' ' },
+                System.StringSplitOptions.RemoveEmptyEntries);
+            string targetsJson = "";
+            for (int i = 0; i < targetParts.Length; i++)
+            {
+                if (targetsJson.Length > 0) targetsJson += ",";
+                targetsJson += "\"" + EscapeJsonPath(targetParts[i].Trim().ToLower()) + "\"";
+            }
+            string fontJson = font.Length == 0 ? "null" : "\"" + EscapeJsonPath(font) + "\"";
+
+            return "{"
+                + "\"product_name\":\"" + EscapeJsonPath(product) + "\","
+                + "\"executable_name\":\"" + EscapeJsonPath(executable) + "\","
+                + "\"start_scene\":\"" + EscapeJsonPath(startScene) + "\","
+                + "\"quality\":\"" + EscapeJsonPath(quality) + "\","
+                + "\"window\":{\"width\":" + width + ",\"height\":" + height
+                + ",\"mode\":\"" + EscapeJsonPath(mode) + "\"},"
+                + "\"targets\":[" + targetsJson + "],"
+                + "\"version\":\"" + EscapeJsonPath(version) + "\","
+                + "\"log_dir\":\"" + EscapeJsonPath(logDir) + "\","
+                + "\"required_font\":" + fontJson
+                + "}";
+        }
+
+        private static void OnBuildSettingsLoadClick(ulong widgetId)
+        {
+            LoadBuildSettingsIntoFields();
+            Log.Info("BuildSettings", "已重新读取 build.settings.json");
+            if (_buildSettingsStatusLabelId != 0)
+            {
+                UI.SetText(_buildSettingsStatusLabelId, "Build Settings: 已重新读取");
+            }
+        }
+
+        private static void OnBuildSettingsValidateClick(ulong widgetId)
+        {
+            string json = BuildBuildSettingsJson();
+            string errors;
+            int rc = UI.BuildSettingsValidateJson(json, out errors);
+            if (rc == 0)
+            {
+                Log.Info("BuildSettings", "校验通过");
+                if (_buildSettingsStatusLabelId != 0)
+                {
+                    UI.SetText(_buildSettingsStatusLabelId, "Build Settings: 校验通过");
+                }
+            }
+            else
+            {
+                Log.Warn("BuildSettings", "校验失败: " + errors);
+                if (_buildSettingsStatusLabelId != 0)
+                {
+                    UI.SetText(_buildSettingsStatusLabelId,
+                        "Build Settings: 校验失败（详见 Console）");
+                }
+            }
+        }
+
+        private static void OnBuildSettingsSaveClick(ulong widgetId)
+        {
+            string json = BuildBuildSettingsJson();
+            string errors;
+            int validateRc = UI.BuildSettingsValidateJson(json, out errors);
+            if (validateRc != 0)
+            {
+                Log.Warn("BuildSettings", "保存前校验失败: " + errors);
+                if (_buildSettingsStatusLabelId != 0)
+                {
+                    UI.SetText(_buildSettingsStatusLabelId,
+                        "Build Settings: 校验失败，未保存（详见 Console）");
+                }
+                return;
+            }
+            int saveRc = UI.BuildSettingsSaveJson(json);
+            if (saveRc == 0)
+            {
+                _buildSettingsLoaded = true;
+                Log.Info("BuildSettings", "已保存 build.settings.json");
+                if (_buildSettingsStatusLabelId != 0)
+                {
+                    UI.SetText(_buildSettingsStatusLabelId,
+                        "Build Settings: 已保存（导出将使用该配置）");
+                }
+            }
+            else
+            {
+                Log.Warn("BuildSettings", "保存失败 rc=" + saveRc);
+                if (_buildSettingsStatusLabelId != 0)
+                {
+                    UI.SetText(_buildSettingsStatusLabelId,
+                        "Build Settings: 保存失败 rc=" + saveRc);
+                }
+            }
+        }
+
+        /// <summary>解析 JSON 字符串数组字段（如 targets）。</summary>
+        private static string ParsePbrStringArray(string json, string key)
+        {
+            if (string.IsNullOrEmpty(json)) return "";
+            int keyIndex = json.IndexOf("\"" + key + "\":");
+            if (keyIndex < 0) return "";
+            int start = json.IndexOf('[', keyIndex);
+            int end = json.IndexOf(']', start + 1);
+            if (start < 0 || end < 0) return "";
+            string body = json.Substring(start + 1, end - start - 1);
+            string[] parts = body.Split(',');
+            string result = "";
+            for (int i = 0; i < parts.Length; i++)
+            {
+                string part = parts[i].Trim();
+                if (part.StartsWith("\"") && part.EndsWith("\"") && part.Length >= 2)
+                {
+                    if (result.Length > 0) result += ",";
+                    result += part.Substring(1, part.Length - 2);
+                }
+            }
+            return result;
         }
 
         // === 自检用只读辅助（TestRunner 调用） ===

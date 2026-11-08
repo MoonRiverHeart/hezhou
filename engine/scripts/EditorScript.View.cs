@@ -345,6 +345,33 @@ namespace Hezhou
             _profilerStatusLabelId = UI.CreateLabel(_profilerTabContentId, 640f, 22f,
                 "Profiler: 等待数据（每 30 帧刷新）");
 
+            // 0.3 Build Settings（task-41）：项目级 build.settings.json 读取/编辑/保存/校验
+            ulong buildSettingsTabContent = UI.CreateVStack(_assetTabWidget.Id, 5f);
+            UI.CreateLabel(buildSettingsTabContent, 460f, 24f, "Build Settings（build.settings.json）");
+            string[] buildSettingLabels = new string[] {
+                "产品名", "可执行名", "版本", "启动场景", "质量档",
+                "窗口宽", "窗口高", "窗口模式", "目标平台", "日志目录", "必检字体"
+            };
+            for (int i = 0; i < buildSettingLabels.Length; i++)
+            {
+                ulong settingRow = UI.CreateHStack(buildSettingsTabContent, 5f);
+                UI.CreateLabel(settingRow, 100f, 22f, buildSettingLabels[i]);
+                _buildSettingFieldIds[i] = UI.CreateInputField(settingRow, 220f, 22f);
+            }
+            ulong buildSettingsButtonRow = UI.CreateHStack(buildSettingsTabContent, 6f);
+            ulong buildSettingsLoadButton = UI.CreateButton(buildSettingsButtonRow, 100f, 26f, "重新读取");
+            UI.SetOnClick(buildSettingsLoadButton, _buildSettingsLoadCallback);
+            ulong buildSettingsSaveButton = UI.CreateButton(buildSettingsButtonRow, 100f, 26f, "保存设置");
+            UI.SetOnClick(buildSettingsSaveButton, _buildSettingsSaveCallback);
+            ulong buildSettingsValidateButton = UI.CreateButton(buildSettingsButtonRow, 100f, 26f, "校验");
+            UI.SetOnClick(buildSettingsValidateButton, _buildSettingsValidateCallback);
+            _buildSettingsPathLabelId = UI.CreateLabel(buildSettingsTabContent, 660f, 22f,
+                "文件: build.settings.json（工程根目录；缺失时自动推断默认值）");
+            _buildSettingsStatusLabelId = UI.CreateLabel(buildSettingsTabContent, 660f, 22f,
+                "Build Settings: 未加载");
+            // 启动时自动读取（新建/加载工程时 RefreshSceneTreeAfterLoad 也会刷新）。
+            LoadBuildSettingsIntoFields();
+
             _assetTabWidget.AddTab("模型", modelTabContent, false);
             _assetTabWidget.AddTab("材质", materialTabContent, false);
             if (!_textureDockedRight)
@@ -355,6 +382,7 @@ namespace Hezhou
             _assetTabWidget.AddTab("场景", sceneTabContent, false);
             _assetTabWidget.AddTab("工程", projectAssetTabContent, false);
             _assetTabWidget.AddTab("Profiler", _profilerTabContentId, false);
+            _assetTabWidget.AddTab("Build", buildSettingsTabContent, false);
             _assetTabWidget.SetReorderable(true);
 
             // === Properties Panel: 5-tab TabWidget ===

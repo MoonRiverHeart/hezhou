@@ -249,6 +249,17 @@ namespace Hezhou
         private static bool _profilerLoggedOnce;
         private static int _profilerTickCounter;
 
+        // === 0.3 Build Settings（task-41） ===
+        // 字段顺序：product_name、executable_name、version、start_scene、quality、
+        //          width、height、mode、targets、log_dir、required_font
+        private static readonly ulong[] _buildSettingFieldIds = new ulong[11];
+        private static ulong _buildSettingsStatusLabelId;
+        private static ulong _buildSettingsPathLabelId;
+        private static UI.WidgetCallbackDelegate _buildSettingsLoadCallback;
+        private static UI.WidgetCallbackDelegate _buildSettingsSaveCallback;
+        private static UI.WidgetCallbackDelegate _buildSettingsValidateCallback;
+        private static bool _buildSettingsLoaded;
+
         // === Dock / Layout State ===
         private static ulong _rightMaxButtonId;
         private static UI.WidgetCallbackDelegate _rightMaxClickCallback;
