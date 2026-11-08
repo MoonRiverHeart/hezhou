@@ -43,3 +43,22 @@ pub type SceneGetEntityPbrMaterialJsonFn =
 ///
 /// FFI 契约: `editor_sync_pbr_materials_now()` → i32
 pub type EditorSyncPbrMaterialsNowFn = extern "C" fn() -> i32;
+
+// === 0.3 编辑器 Profiler（task-39） ===
+
+/// 写入 Profiler 快照 JSON（帧时间 ring buffer/FPS/启动耗时/场景与资产统计）。
+///
+/// FFI 契约: `profiler_snapshot_json(buffer, buffer_size)` → usize
+/// 返回写入字节数（0=失败/空缓冲区）。
+pub type ProfilerSnapshotJsonFn =
+    extern "C" fn(*mut std::ffi::c_char, usize) -> usize;
+
+/// 重置帧统计（保留启动耗时）。
+///
+/// FFI 契约: `profiler_reset()` → i32（0=成功）
+pub type ProfilerResetFn = extern "C" fn() -> i32;
+
+/// 累计记录帧数。
+///
+/// FFI 契约: `profiler_frame_count()` → i32
+pub type ProfilerFrameCountFn = extern "C" fn() -> i32;

@@ -52,6 +52,9 @@ namespace Hezhou
             try { TestPbrMaterialFfi(); }
             catch (Exception ex) { Log.Error("TestRunner", "TestPbrMaterialFfi异常: " + ex.Message); }
 
+            try { TestProfilerFfi(); }
+            catch (Exception ex) { Log.Error("TestRunner", "TestProfilerFfi异常: " + ex.Message); }
+
             Log.Info("TestRunner", "===== 测试完成: PASS=" + _passCount + ", FAIL=" + _failCount + " =====");
         }
 
@@ -656,6 +659,33 @@ namespace Hezhou
             UI.EditorSyncPbrMaterialsNow();
             EditorScript.TestRemoveEntity(cube);
             AssertTrue("PbrMaterial", true, "PBR 材质自检实体已清理");
+        }
+
+        /// <summary>
+        /// 0.3 Profiler 自检（task-39）：快照 JSON 必要字段、reset 返回 0、重置后帧计数归零。
+        /// </summary>
+        private static void TestProfilerFfi()
+        {
+            string snapshot = UI.ProfilerSnapshotJson();
+            bool hasFields = snapshot.IndexOf("\"fps\"") >= 0
+                && snapshot.IndexOf("\"frame_ms_avg\"") >= 0
+                && snapshot.IndexOf("\"frame_ms_p95\"") >= 0
+                && snapshot.IndexOf("\"startup_ms\"") >= 0
+                && snapshot.IndexOf("\"entity_count\"") >= 0
+                && snapshot.IndexOf("\"pbr_entity_count\"") >= 0
+                && snapshot.IndexOf("\"skinned_mesh_count\"") >= 0
+                && snapshot.IndexOf("\"asset_count\"") >= 0;
+            AssertTrue("Profiler", hasFields,
+                "ProfilerSnapshotJson 包含必要字段（len=" + snapshot.Length + "）");
+            Log.Info("Profiler", "自检 snapshot: "
+                + (snapshot.Length > 400 ? snapshot.Substring(0, 400) + "..." : snapshot));
+
+            int resetRc = UI.ProfilerReset();
+            AssertTrue("Profiler", resetRc == 0,
+                "ProfilerReset 返回 0 (rc=" + resetRc + ")");
+            int framesAfterReset = UI.ProfilerFrameCount();
+            AssertTrue("Profiler", framesAfterReset == 0,
+                "重置后帧计数为 0 (frames=" + framesAfterReset + ")");
         }
 
         // 内存保存值结构（模拟SavedScriptPropertyValue，用于测试）

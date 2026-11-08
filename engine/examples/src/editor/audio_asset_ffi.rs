@@ -236,6 +236,26 @@ fn audio_summary() -> String {
     }
 }
 
+// === Profiler 只读指标（task-39） ===
+
+/// Profiler：资产统计（文件资产数, 全部条目数）；数据库未初始化返回 `None`。
+#[allow(static_mut_refs)]
+pub(crate) fn asset_stats() -> Option<(usize, usize)> {
+    let db = db_ref()?;
+    let total = db.entries().count();
+    let files = db.entries().filter(|entry| !entry.is_sub_asset()).count();
+    Some((files, total))
+}
+
+/// Profiler：音频后端名（未初始化返回 `off`）。
+#[allow(static_mut_refs)]
+pub(crate) fn audio_backend_name() -> String {
+    match audio_ref() {
+        None => "off".to_string(),
+        Some(engine) => engine.status().backend().to_string(),
+    }
+}
+
 // === 资产实现 ===
 
 fn init_asset_db(root: Option<&Path>) -> i32 {

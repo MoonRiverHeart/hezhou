@@ -944,5 +944,54 @@ UI.SceneSelectEntity(_scenePtr, entityId);
                 _ffi.editor_sync_pbr_materials_now);
             return func();
         }
+
+        // === 0.3 编辑器 Profiler（task-39） ===
+
+        /// <summary>读取 Profiler 快照 JSON（失败返回空串）。</summary>
+        public static string ProfilerSnapshotJson()
+        {
+            if (_ffi.profiler_snapshot_json == IntPtr.Zero)
+            {
+                return "";
+            }
+            const int bufferSize = 16384;
+            IntPtr buffer = Marshal.AllocHGlobal(bufferSize);
+            try
+            {
+                Marshal.WriteByte(buffer, 0, 0);
+                var func = Marshal.GetDelegateForFunctionPointer<ProfilerSnapshotJsonDelegate>(
+                    _ffi.profiler_snapshot_json);
+                ulong written = func(buffer, (ulong)bufferSize);
+                return written == 0UL ? "" : (Marshal.PtrToStringAnsi(buffer, (int)written) ?? "");
+            }
+            finally
+            {
+                Marshal.FreeHGlobal(buffer);
+            }
+        }
+
+        /// <summary>重置 Profiler 帧统计（启动耗时保留）；返回 0=成功。</summary>
+        public static int ProfilerReset()
+        {
+            if (_ffi.profiler_reset == IntPtr.Zero)
+            {
+                return -1;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<ProfilerResetDelegate>(
+                _ffi.profiler_reset);
+            return func();
+        }
+
+        /// <summary>累计记录的帧数。</summary>
+        public static int ProfilerFrameCount()
+        {
+            if (_ffi.profiler_frame_count == IntPtr.Zero)
+            {
+                return 0;
+            }
+            var func = Marshal.GetDelegateForFunctionPointer<ProfilerFrameCountDelegate>(
+                _ffi.profiler_frame_count);
+            return func();
+        }
     }
 }

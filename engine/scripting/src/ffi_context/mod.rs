@@ -353,6 +353,10 @@ pub project_add_entity: ProjectAddEntityFn,
         pub scene_set_entity_pbr_material_json: SceneSetEntityPbrMaterialJsonFn,
         pub scene_get_entity_pbr_material_json: SceneGetEntityPbrMaterialJsonFn,
         pub editor_sync_pbr_materials_now: EditorSyncPbrMaterialsNowFn,
+        // 0.3 编辑器 Profiler FFI（tail；必须与 C# FfiContext 字段顺序一致）
+        pub profiler_snapshot_json: ProfilerSnapshotJsonFn,
+        pub profiler_reset: ProfilerResetFn,
+        pub profiler_frame_count: ProfilerFrameCountFn,
     }
 
 static mut FFI_CONTEXT: Option<Box<FfiContext>> = None;

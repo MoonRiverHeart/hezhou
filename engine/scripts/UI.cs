@@ -993,6 +993,14 @@ namespace Hezhou
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public delegate int EditorSyncPbrMaterialsNowDelegate();
 
+        // 0.3 编辑器 Profiler FFI（task-39）
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate ulong ProfilerSnapshotJsonDelegate(IntPtr buffer, ulong bufferSize);
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate int ProfilerResetDelegate();
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate int ProfilerFrameCountDelegate();
+
 [StructLayout(LayoutKind.Sequential)]
         public struct FfiContext
         {
@@ -1324,6 +1332,10 @@ namespace Hezhou
             public IntPtr scene_set_entity_pbr_material_json;
             public IntPtr scene_get_entity_pbr_material_json;
             public IntPtr editor_sync_pbr_materials_now;
+            // 0.3 编辑器 Profiler FFI（tail）
+            public IntPtr profiler_snapshot_json;
+            public IntPtr profiler_reset;
+            public IntPtr profiler_frame_count;
         }
 
         public static void InitFromContext(IntPtr contextPtr)

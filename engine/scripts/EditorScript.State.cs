@@ -237,6 +237,18 @@ namespace Hezhou
         private static UI.WidgetCallbackDelegate _pbrClearCallback;
         private static bool _pbrPanelBuilt;
 
+        // === 0.3 Profiler 面板（task-39） ===
+        private static ulong _profilerTabContentId;
+        private static ulong _profilerListId;
+        private static readonly ulong[] _profilerItemIds = new ulong[5];
+        private static ulong _profilerStatusLabelId;
+        private static ulong _profilerPauseButtonId;
+        private static UI.WidgetCallbackDelegate _profilerPauseCallback;
+        private static UI.WidgetCallbackDelegate _profilerResetCallback;
+        private static bool _profilerPaused;
+        private static bool _profilerLoggedOnce;
+        private static int _profilerTickCounter;
+
         // === Dock / Layout State ===
         private static ulong _rightMaxButtonId;
         private static UI.WidgetCallbackDelegate _rightMaxClickCallback;

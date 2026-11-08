@@ -329,6 +329,22 @@ namespace Hezhou
             _exportInfoLabelId = UI.CreateLabel(projectAssetTabContent, 720f, 24f, "Player 导出: 未执行");
             UI.CreateLabel(projectAssetTabContent, 720f, 22f, "Dry-run 输出到 logs/player_dry_run（双平台 manifest/plan/file-list）");
 
+            // 0.3 Profiler 面板（task-39）：CPU 帧时间 ring buffer/FPS/启动耗时/场景与资产统计
+            _profilerTabContentId = UI.CreateVStack(_assetTabWidget.Id, 5f);
+            UI.CreateLabel(_profilerTabContentId, 460f, 24f, "Profiler（CPU 帧，最近 120 帧）");
+            _profilerListId = UI.CreateList(_profilerTabContentId, 4f, 1u);
+            for (int i = 0; i < _profilerItemIds.Length; i++)
+            {
+                _profilerItemIds[i] = UI.CreateListItem(_profilerListId, "...", false);
+            }
+            ulong profilerButtonRow = UI.CreateHStack(_profilerTabContentId, 6f);
+            _profilerPauseButtonId = UI.CreateButton(profilerButtonRow, 110f, 26f, "暂停刷新");
+            UI.SetOnClick(_profilerPauseButtonId, _profilerPauseCallback);
+            ulong profilerResetButton = UI.CreateButton(profilerButtonRow, 110f, 26f, "重置统计");
+            UI.SetOnClick(profilerResetButton, _profilerResetCallback);
+            _profilerStatusLabelId = UI.CreateLabel(_profilerTabContentId, 640f, 22f,
+                "Profiler: 等待数据（每 30 帧刷新）");
+
             _assetTabWidget.AddTab("模型", modelTabContent, false);
             _assetTabWidget.AddTab("材质", materialTabContent, false);
             if (!_textureDockedRight)
@@ -338,6 +354,7 @@ namespace Hezhou
             _assetTabWidget.AddTab("脚本", scriptTabContent, false);
             _assetTabWidget.AddTab("场景", sceneTabContent, false);
             _assetTabWidget.AddTab("工程", projectAssetTabContent, false);
+            _assetTabWidget.AddTab("Profiler", _profilerTabContentId, false);
             _assetTabWidget.SetReorderable(true);
 
             // === Properties Panel: 5-tab TabWidget ===

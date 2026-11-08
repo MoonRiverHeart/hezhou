@@ -12,6 +12,7 @@ pub mod scene_ffi_impl;
 pub mod audio_asset_ffi;
 pub mod prefab_scene_player_ffi;
 pub mod pbr_sync;
+pub mod profiler_ffi;
 pub mod hot_reload;
 pub mod dfx_init;
 #[cfg(feature = "mcp")]
@@ -142,6 +143,8 @@ fn copy_dir_recursive(src: &std::path::Path, dst: &std::path::Path) -> std::io::
 }
 
 pub fn run() {
+    // 0.3 Profiler：启动耗时起点（含运行时准备与 C# 初始化）。
+    let profiler_start = Instant::now();
     prepare_runtime_dir();
     setup_bundled_runtime();
     let args: Vec<String> = std::env::args().collect();
@@ -470,6 +473,9 @@ ui_tree_view_set_on_select_thunk_ptr: unsafe { std::mem::transmute(ui_ffi::ui_tr
             std::mem::transmute(hezhou_core::scene_ffi::scene_get_entity_pbr_material_json as *const std::ffi::c_void)
         },
         editor_sync_pbr_materials_now: pbr_sync::editor_sync_pbr_materials_now,
+        profiler_snapshot_json: profiler_ffi::profiler_snapshot_json,
+        profiler_reset: profiler_ffi::profiler_reset,
+        profiler_frame_count: profiler_ffi::profiler_frame_count,
         on_hot_reload_complete: ffi_impl::on_hot_reload_complete_placeholder,
         register_hot_reload_complete_callback: unsafe { std::mem::transmute(hot_reload::register_hot_reload_complete_callback as *const std::ffi::c_void) },
         ui_debug_print_widget_tree: unsafe { std::mem::transmute(ui_ffi::ui_debug_print_widget_tree as *const std::ffi::c_void) },
@@ -585,6 +591,8 @@ ui_widget_get_layout: unsafe { std::mem::transmute(ui_ffi::ui_widget_get_layout 
     }
     dfx_trace_end!("Mono", "initialize");
     dfx_trace_end!("Startup", "editor");
+    // 0.3 Profiler：C# 初始化完成后记录启动耗时。
+    profiler_ffi::set_startup_ms(profiler_start.elapsed().as_secs_f64() * 1000.0);
     
     // Scene will be created by C# when user clicks dialog button
 
@@ -605,6 +613,7 @@ ui_widget_get_layout: unsafe { std::mem::transmute(ui_ffi::ui_widget_get_layout 
     let mut frame_count = 0u64;
     let mut start_time = Instant::now();
     let mut last_audio_tick = Instant::now();
+    let mut profiler_frame_clock = Instant::now();
     let mut screenshot_taken = false;
     let mut dialog_auto_clicked = false;
     
@@ -713,6 +722,12 @@ dfx_trace_begin!("ProcessEvents", "ui");
                     drop(perf); // Release perf lock before acquiring trace lock
                     
                     if let Some(snapshot) = snapshot_opt {
+                        profiler_ffi::record_dfx(
+                            snapshot.fps,
+                            snapshot.cpu_usage_percent,
+                            snapshot.memory_used_mb,
+                            snapshot.memory_available_mb,
+                        );
                         let trace_analyzer = dfx_guard.get_trace_analyzer();
                         let mut trace = trace_analyzer.lock();
                         trace.set_counter("FPS", "perf", snapshot.fps as i64);
@@ -723,6 +738,10 @@ dfx_trace_begin!("ProcessEvents", "ui");
                     }
                 }
                 
+                // 0.3 Profiler：记录本帧 CPU 耗时（墙钟，含 UI/渲染提交）。
+                let frame_ms = profiler_frame_clock.elapsed().as_secs_f64() * 1000.0;
+                profiler_frame_clock = Instant::now();
+                profiler_ffi::record_frame(frame_ms);
                 if !running {
                     break;
                 }
@@ -803,3 +822,4 @@ dfx_trace_begin!("ProcessEvents", "ui");
     let exit_code = if auto_test_mode && auto_test_status != "pass" { 2 } else { 0 };
     std::process::exit(exit_code);
 }
+

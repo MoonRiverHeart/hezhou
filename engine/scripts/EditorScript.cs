@@ -64,6 +64,8 @@ namespace Hezhou
             _playerBuildCallback = OnPlayerBuildClick;
             _pbrFieldChangeCallback = OnPbrFieldChanged;
             _pbrClearCallback = OnPbrClearClick;
+            _profilerPauseCallback = OnProfilerPauseClick;
+            _profilerResetCallback = OnProfilerResetClick;
             _sceneFileDialogResultCallback = OnSceneFileDialogResult;
             _rightMaxClickCallback = OnRightMaxClick;
             _consoleDialogResultCallback = OnConsoleDialogResult;
@@ -225,6 +227,14 @@ _bindScriptClickCallback = OnBindScriptClick;
             }
 
             RefreshConsoleIfOpen();
+
+            // 0.3 Profiler：每 30 帧刷新面板（暂停时跳过）。
+            _profilerTickCounter++;
+            if (_profilerTickCounter >= 30)
+            {
+                _profilerTickCounter = 0;
+                if (!_profilerPaused) RefreshProfilerPanel();
+            }
 
             if (deltaTime > 0 && _fpsItem != null)
             {
@@ -1248,6 +1258,110 @@ _bindScriptClickCallback = OnBindScriptClick;
             int end = json.IndexOf('"', start + 1);
             if (end < 0) return "";
             return json.Substring(start + 1, end - start - 1);
+        }
+
+        // === 0.3 Profiler 面板（task-39） ===
+
+        /// <summary>刷新 Profiler 面板（每 30 帧调用；暂停时跳过）。</summary>
+        private static void RefreshProfilerPanel()
+        {
+            if (_profilerListId == 0 || _profilerItemIds[0] == 0) return;
+            string json = UI.ProfilerSnapshotJson();
+            if (string.IsNullOrEmpty(json))
+            {
+                SetProfilerItem(0, "Profiler: 暂无数据（snapshot 为空）");
+                return;
+            }
+
+            float fps = PbrJsonFloat(json, "fps", 0f);
+            float dfxFps = PbrJsonFloat(json, "dfx_fps", 0f);
+            float avg = PbrJsonFloat(json, "frame_ms_avg", 0f);
+            float p95 = PbrJsonFloat(json, "frame_ms_p95", 0f);
+            float max = PbrJsonFloat(json, "frame_ms_max", 0f);
+            float startup = PbrJsonFloat(json, "startup_ms", 0f);
+            long frames = (long)PbrJsonFloat(json, "frame_count", 0f);
+            long samples = (long)PbrJsonFloat(json, "sample_count", 0f);
+            long capacity = (long)PbrJsonFloat(json, "ring_capacity", 120f);
+            long entities = (long)PbrJsonFloat(json, "entity_count", 0f);
+            long pbr = (long)PbrJsonFloat(json, "pbr_entity_count", 0f);
+            long skinned = (long)PbrJsonFloat(json, "skinned_mesh_count", 0f);
+            long assetCount = (long)PbrJsonFloat(json, "asset_count", 0f);
+            long assetTotal = (long)PbrJsonFloat(json, "asset_total_count", 0f);
+            float memUsed = PbrJsonFloat(json, "memory_used_mb", 0f);
+            float memAvailable = PbrJsonFloat(json, "memory_available_mb", 0f);
+            float cpu = PbrJsonFloat(json, "cpu_percent", 0f);
+            string audioBackend = ParsePbrString(json, "audio_backend");
+            if (string.IsNullOrEmpty(audioBackend)) audioBackend = "off";
+
+            SetProfilerItem(0, "FPS: " + FormatPbrFloat(fps) + "（DFX " + FormatPbrFloat(dfxFps) + "）"
+                + "  帧 ms: 平均 " + FormatPbrFloat(avg) + " / p95 " + FormatPbrFloat(p95)
+                + " / max " + FormatPbrFloat(max));
+            SetProfilerItem(1, "启动耗时: " + FormatPbrFloat(startup) + " ms"
+                + "  采样: " + samples + "/" + capacity + "  累计帧: " + frames);
+            SetProfilerItem(2, "实体: " + entities + "  PBR 材质: " + pbr
+                + "  蒙皮网格: " + skinned);
+            SetProfilerItem(3, "资产: " + assetCount + "/" + assetTotal
+                + "  音频: " + audioBackend);
+            SetProfilerItem(4, "内存: " + FormatPbrFloat(memUsed) + " MB（可用 "
+                + FormatPbrFloat(memAvailable) + " MB）  CPU: " + FormatPbrFloat(cpu) + "%");
+
+            if (_profilerStatusLabelId != 0)
+            {
+                UI.SetText(_profilerStatusLabelId,
+                    _profilerPaused ? "Profiler: 已暂停（数据保留）" : "Profiler: 刷新中（每 30 帧）");
+            }
+            if (!_profilerLoggedOnce && frames > 0)
+            {
+                _profilerLoggedOnce = true;
+                Log.Info("Profiler", "snapshot: frames=" + frames + " samples=" + samples
+                    + " fps=" + FormatPbrFloat(fps) + " avg_ms=" + FormatPbrFloat(avg)
+                    + " startup_ms=" + FormatPbrFloat(startup)
+                    + " entities=" + entities + " pbr=" + pbr + " skinned=" + skinned
+                    + " assets=" + assetCount + "/" + assetTotal
+                    + " audio=" + audioBackend);
+            }
+        }
+
+        private static void SetProfilerItem(int index, string text)
+        {
+            if (index >= 0 && index < _profilerItemIds.Length && _profilerItemIds[index] != 0)
+            {
+                UI.SetListItemText(_profilerItemIds[index], text);
+            }
+        }
+
+        private static void OnProfilerPauseClick(ulong widgetId)
+        {
+            _profilerPaused = !_profilerPaused;
+            if (_profilerPauseButtonId != 0)
+            {
+                UI.SetText(_profilerPauseButtonId, _profilerPaused ? "继续刷新" : "暂停刷新");
+            }
+            if (_profilerStatusLabelId != 0)
+            {
+                UI.SetText(_profilerStatusLabelId,
+                    _profilerPaused ? "Profiler: 已暂停（数据保留）" : "Profiler: 刷新中（每 30 帧）");
+            }
+            Log.Info("Profiler", _profilerPaused ? "面板已暂停" : "面板已恢复");
+        }
+
+        private static void OnProfilerResetClick(ulong widgetId)
+        {
+            int rc = UI.ProfilerReset();
+            _profilerLoggedOnce = false;
+            if (rc == 0)
+            {
+                RefreshProfilerPanel();
+                Log.Info("Profiler", "帧统计已重置（启动耗时保留）");
+                if (_profilerStatusLabelId != 0)
+                {
+                    UI.SetText(_profilerStatusLabelId, "Profiler: 统计已重置（每 30 帧刷新）");
+                }
+            }
+            else
+            {
+                Log.Warn("Profiler", "重置失败 rc=" + rc);
+            }
         }
 
         // === 自检用只读辅助（TestRunner 调用） ===
