@@ -67,6 +67,9 @@ namespace Hezhou
             try { TestAnimationStateMachineFfi(); }
             catch (Exception ex) { Log.Error("TestRunner", "TestAnimationStateMachineFfi异常: " + ex.Message); }
 
+            try { TestEngineApiFacade(); }
+            catch (Exception ex) { Log.Error("TestRunner", "TestEngineApiFacade异常: " + ex.Message); }
+
             Log.Info("TestRunner", "===== 测试完成: PASS=" + _passCount + ", FAIL=" + _failCount + " =====");
         }
 
@@ -930,6 +933,60 @@ namespace Hezhou
                 try { if (System.IO.File.Exists(fixturePath + ".meta")) System.IO.File.Delete(fixturePath + ".meta"); } catch (Exception) { }
                 try { UI.AssetScan(); } catch (Exception) { }
             }
+        }
+
+
+        /// <summary>
+        /// 0.3 稳定 C# 引擎 API 外观自检（task-48）：
+        /// Engine.Initialize、Scene.CreateCube、Transform/FindByName、Time.Tick、Audio/Animation 状态、DestroyEntity。
+        /// </summary>
+        private static void TestEngineApiFacade()
+        {
+            if (EditorScript.TestGetScenePtr() == IntPtr.Zero)
+            {
+                AssertTrue("EngineApi", true, "场景未初始化，跳过 Engine API 自检");
+                return;
+            }
+
+            Hezhou.Engine.Engine.Initialize();
+            AssertTrue("EngineApi", Hezhou.Engine.Engine.IsInitialized,
+                "Engine.Initialize/IsInitialized (Version=" + Hezhou.Engine.Engine.Version + ")");
+
+            int before = Hezhou.Engine.Scene.EntityCount;
+            Hezhou.Engine.Entity cube = Hezhou.Engine.Scene.CreateCube();
+            AssertTrue("EngineApi",
+                cube != null && cube.Id != 0 && Hezhou.Engine.Scene.EntityCount == before + 1,
+                "Scene.CreateCube 实体数 +1 (id=" + (cube == null ? 0UL : cube.Id) + ")");
+
+            cube.Name = "EngineApiCube";
+            cube.Position = new Hezhou.Engine.Vector3(2f, 3f, 4f);
+            cube.Scale = new Hezhou.Engine.Vector3(1.5f, 1.5f, 1.5f);
+            Hezhou.Engine.Entity found = Hezhou.Engine.Scene.FindByName("EngineApiCube");
+            bool transformOk = found != null && found.Id == cube.Id
+                && System.Math.Abs(found.Position.X - 2f) < 1e-4f
+                && System.Math.Abs(found.Position.Y - 3f) < 1e-4f
+                && System.Math.Abs(found.Scale.X - 1.5f) < 1e-4f;
+            AssertTrue("EngineApi", transformOk,
+                "Name/Position/Scale + FindByName roundtrip");
+
+            Hezhou.Engine.Time.Tick(0.016f);
+            bool timeOk = System.Math.Abs(Hezhou.Engine.Time.DeltaTime - 0.016f) < 1e-4f
+                && Hezhou.Engine.Time.FrameCount > 0
+                && Hezhou.Engine.Time.ElapsedTime > 0.0;
+            AssertTrue("EngineApi", timeOk,
+                "Time.Tick 更新 DeltaTime/FrameCount/ElapsedTime");
+
+            string backend = Hezhou.Engine.Audio.Backend;
+            float alpha = Hezhou.Engine.Animation.TransitionAlpha;
+            Hezhou.Engine.Debug.Log("EngineApi self-test log");
+            Hezhou.Engine.Debug.LogWarning("EngineApi self-test warn");
+            AssertTrue("EngineApi", backend.Length > 0 && alpha >= 0f,
+                "Audio.Backend 非空且 Animation.TransitionAlpha 安全 (backend=" + backend
+                    + ", alpha=" + alpha + ")");
+
+            Hezhou.Engine.Scene.DestroyEntity(cube);
+            AssertTrue("EngineApi", !Hezhou.Engine.Scene.EntityExists(cube.Id),
+                "DestroyEntity 后 EntityExists=false");
         }
 
         // 内存保存值结构（模拟SavedScriptPropertyValue，用于测试）

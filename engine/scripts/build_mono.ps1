@@ -90,6 +90,8 @@ $AllSourceFiles = @(
     "$ScriptsDir/IScriptEntity.cs",
     "$ScriptsDir/RotatingEntity.cs",
     "$ScriptsDir/TestRunner.cs",
+    # 稳定 C# 引擎 API 外观（task-48）
+    "$ScriptsDir/EngineApi.cs",
     # Player C# 入口（task-30）：不依赖 UI/FfiContext，供 Player host 静态调用
     "$ScriptsDir/PlayerGame.cs"
 )
@@ -106,7 +108,8 @@ $UiSourceFiles = @(
     "$ScriptsDir/UI.Pipeline.cs",
     "$ScriptsDir/UI.AssetProject.cs",
     "$ScriptsDir/DFX.cs",
-    "$ScriptsDir/TestTelemetry.cs"
+    "$ScriptsDir/TestTelemetry.cs",
+    "$ScriptsDir/EngineApi.cs"
 )
 
 # ============================================================
