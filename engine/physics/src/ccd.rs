@@ -85,11 +85,17 @@ impl PhysicsWorld {
             if !layers_interact(layer, mask, entry.collider.layer(), entry.collider.mask()) {
                 return;
             }
-            let Some(target) = TargetShape::from_collider(
-                entry.collider.shape(),
-                entry.position,
-                entry.plane_normal,
-            ) else {
+            let Some(target) = (match entry.collider.shape() {
+                // 旋转盒：CCD 用保守 AABB（与接触检测一致）。
+                crate::ColliderShape::Box { half_extents } => Some(TargetShape::Box {
+                    center: entry.position,
+                    half_extents: crate::intersect::rotated_aabb_half_extents(
+                        entry.body.rotation(),
+                        *half_extents,
+                    ),
+                }),
+                shape => TargetShape::from_collider(shape, entry.position, entry.plane_normal),
+            }) else {
                 return;
             };
 

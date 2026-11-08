@@ -167,7 +167,11 @@ fn debug_shape_of(entry: &ColliderEntry<'_>) -> DebugShape {
         },
         ColliderShape::Box { half_extents } => DebugShape::Box {
             center: entry.position,
-            half_extents: *half_extents,
+            // 旋转盒显示保守 AABB，与接触检测保持一致。
+            half_extents: crate::intersect::rotated_aabb_half_extents(
+                entry.body.rotation(),
+                *half_extents,
+            ),
             color,
         },
         ColliderShape::Capsule {

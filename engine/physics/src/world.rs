@@ -36,6 +36,17 @@ pub struct TriggerEvent {
     pub other_collider: u64,
 }
 
+/// 最近一次宽相执行的统计信息（用于调试与性能对比）。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct BroadphaseStats {
+    /// 是否使用空间索引宽相。
+    pub spatial_index: bool,
+    /// 参与的碰撞体数量。
+    pub body_count: usize,
+    /// 候选对数量（空间索引应显著小于 brute force 的 `n*(n-1)/2`）。
+    pub candidate_pairs: usize,
+}
+
 /// 物理世界内部：碰撞体在世界空间的可查询视图。
 pub(crate) struct ColliderEntry<'a> {
     pub body_id: u64,
@@ -103,6 +114,12 @@ pub struct PhysicsWorld {
     pub(crate) solver_config: SolverConfig,
     pub(crate) ccd_enabled: bool,
     pub(crate) auto_sleep: bool,
+    /// 空间索引宽相开关（默认启用；可切回 brute force 用于对比/调试）。
+    pub(crate) spatial_index_enabled: bool,
+    /// 空间索引格子尺寸（米）。
+    pub(crate) spatial_cell_size: f32,
+    last_broadphase_body_count: usize,
+    last_broadphase_candidate_pairs: usize,
 }
 
 impl PhysicsWorld {
@@ -123,6 +140,10 @@ impl PhysicsWorld {
             solver_config: SolverConfig::default(),
             ccd_enabled: false,
             auto_sleep: false,
+            spatial_index_enabled: true,
+            spatial_cell_size: 2.0,
+            last_broadphase_body_count: 0,
+            last_broadphase_candidate_pairs: 0,
         }
     }
 
@@ -169,6 +190,36 @@ impl PhysicsWorld {
 
     pub fn set_auto_sleep(&mut self, enabled: bool) {
         self.auto_sleep = enabled;
+    }
+
+    /// 是否使用空间索引宽相（uniform grid）。
+    pub fn spatial_index_enabled(&self) -> bool {
+        self.spatial_index_enabled
+    }
+
+    /// 打开/关闭空间索引宽相（关闭后回退到 brute force O(n²) 两两检测）。
+    pub fn set_spatial_index_enabled(&mut self, enabled: bool) {
+        self.spatial_index_enabled = enabled;
+    }
+
+    /// 空间索引格子尺寸（米）。
+    pub fn spatial_cell_size(&self) -> f32 {
+        self.spatial_cell_size
+    }
+
+    pub fn set_spatial_cell_size(&mut self, size: f32) {
+        if size.is_finite() && size > 0.0 {
+            self.spatial_cell_size = size;
+        }
+    }
+
+    /// 最近一次宽相的统计信息（候选对数量、参与刚体数、是否空间索引）。
+    pub fn broadphase_stats(&self) -> BroadphaseStats {
+        BroadphaseStats {
+            spatial_index: self.spatial_index_enabled,
+            body_count: self.last_broadphase_body_count,
+            candidate_pairs: self.last_broadphase_candidate_pairs,
+        }
     }
 
     pub fn create_body(&mut self) -> u64 {
@@ -355,8 +406,18 @@ impl PhysicsWorld {
                     friction: collider.friction(),
                 }),
                 _ => {
-                    let Some(half) = collider.shape().aabb_half_extents() else {
-                        continue;
+                    // 旋转盒用保守 AABB（把局部半尺寸按旋转矩阵绝对值扩张）。
+                    let half = match collider.shape() {
+                        crate::ColliderShape::Box { half_extents } => {
+                            crate::intersect::rotated_aabb_half_extents(
+                                body.rotation(),
+                                *half_extents,
+                            )
+                        }
+                        other => match other.aabb_half_extents() {
+                            Some(half) => half,
+                            None => continue,
+                        },
                     };
                     bodies.push(BodyBroadphase {
                         body_id,
@@ -376,42 +437,134 @@ impl PhysicsWorld {
         (bodies, planes)
     }
 
-    /// 只做纯几何接触检测（供位置修正迭代复用，不修改事件状态）。
-    fn detect_contacts(&self) -> Vec<Contact> {
-        let (bodies, planes) = self.collect_broadphase();
-        let mut out = Vec::new();
+    /// 宽相候选对：空间索引或 brute force。
+    ///
+    /// 两种模式返回同一批候选对（空间索引保证覆盖所有 AABB 重叠对），
+    /// 并按 body id 排序，使接触求解顺序确定、两种模式结果一致。
+    fn candidate_pairs(&self, bodies: &[BodyBroadphase]) -> Vec<(usize, usize)> {
+        let mut pairs = if self.spatial_index_enabled {
+            self.spatial_index_pairs(bodies)
+        } else {
+            let capacity = bodies.len().saturating_mul(bodies.len().saturating_sub(1)) / 2;
+            let mut all = Vec::with_capacity(capacity);
+            for i in 0..bodies.len() {
+                for j in (i + 1)..bodies.len() {
+                    all.push((i, j));
+                }
+            }
+            all
+        };
+        pairs.sort_by_key(|(i, j)| {
+            let a = bodies[*i].body_id;
+            let b = bodies[*j].body_id;
+            if a <= b {
+                (a, b)
+            } else {
+                (b, a)
+            }
+        });
+        pairs
+    }
 
-        for i in 0..bodies.len() {
-            for j in (i + 1)..bodies.len() {
-                let a = &bodies[i];
-                let b = &bodies[j];
-                if a.is_sensor || b.is_sensor {
-                    continue;
-                }
-                if !layers_interact(a.layer, a.mask, b.layer, b.mask) {
-                    continue;
-                }
-                // 双方都不可推动时不需要求解接触（静态-静态留作事件即可）。
-                if a.inv_mass <= 0.0 && b.inv_mass <= 0.0 {
-                    continue;
-                }
-                if let Some(contact) = contact_from_aabb(a, b) {
-                    out.push(contact);
+    /// uniform grid（哈希网格）空间索引候选对。
+    fn spatial_index_pairs(&self, bodies: &[BodyBroadphase]) -> Vec<(usize, usize)> {
+        let cell = self.spatial_cell_size.max(0.1);
+        // 单轴跨度超过该格数视为“大物体”，直接与所有物体配对，避免插入海量格子。
+        const MAX_CELL_SPAN: i32 = 32;
+        let mut grid: HashMap<(i32, i32, i32), Vec<usize>> = HashMap::new();
+        let mut large: Vec<usize> = Vec::new();
+
+        for (index, body) in bodies.iter().enumerate() {
+            let min_cell = cell_coord(body.min, cell);
+            let max_cell = cell_coord(body.max, cell);
+            let span_x = max_cell.0 - min_cell.0 + 1;
+            let span_y = max_cell.1 - min_cell.1 + 1;
+            let span_z = max_cell.2 - min_cell.2 + 1;
+            if span_x > MAX_CELL_SPAN || span_y > MAX_CELL_SPAN || span_z > MAX_CELL_SPAN {
+                large.push(index);
+                continue;
+            }
+            for x in min_cell.0..=max_cell.0 {
+                for y in min_cell.1..=max_cell.1 {
+                    for z in min_cell.2..=max_cell.2 {
+                        grid.entry((x, y, z)).or_default().push(index);
+                    }
                 }
             }
         }
 
-        for body in &bodies {
-            if body.is_sensor || body.inv_mass <= 0.0 {
+        let mut set: HashSet<(usize, usize)> = HashSet::new();
+        for entries in grid.values() {
+            for a in 0..entries.len() {
+                for b in (a + 1)..entries.len() {
+                    set.insert(canonical_index_pair(entries[a], entries[b]));
+                }
+            }
+        }
+        for &large_index in &large {
+            for index in 0..bodies.len() {
+                if index != large_index {
+                    set.insert(canonical_index_pair(large_index, index));
+                }
+            }
+        }
+        set.into_iter().collect()
+    }
+
+    /// 平面接触候选（按 body id / plane id 排序，保证确定性）。
+    fn plane_candidates(
+        bodies: &[BodyBroadphase],
+        planes: &[PlaneBroadphase],
+    ) -> Vec<(usize, usize)> {
+        let mut pairs = Vec::new();
+        for (body_index, body) in bodies.iter().enumerate() {
+            if body.is_sensor {
                 continue;
             }
-            for plane in &planes {
+            for (plane_index, plane) in planes.iter().enumerate() {
                 if !layers_interact(body.layer, body.mask, plane.layer, plane.mask) {
                     continue;
                 }
-                if let Some(contact) = contact_from_plane(body, plane) {
-                    out.push(contact);
-                }
+                pairs.push((body_index, plane_index));
+            }
+        }
+        pairs.sort_by_key(|(bi, pi)| (bodies[*bi].body_id, planes[*pi].body_id));
+        pairs
+    }
+
+    /// 只做纯几何接触检测（供位置修正迭代复用，不修改事件状态）。
+    fn detect_contacts(&mut self) -> Vec<Contact> {
+        let (bodies, planes) = self.collect_broadphase();
+        let pairs = self.candidate_pairs(&bodies);
+        self.last_broadphase_body_count = bodies.len();
+        self.last_broadphase_candidate_pairs = pairs.len();
+        let mut out = Vec::new();
+
+        for (i, j) in &pairs {
+            let a = &bodies[*i];
+            let b = &bodies[*j];
+            if a.is_sensor || b.is_sensor {
+                continue;
+            }
+            if !layers_interact(a.layer, a.mask, b.layer, b.mask) {
+                continue;
+            }
+            // 双方都不可推动时不需要求解接触（静态-静态留作事件即可）。
+            if a.inv_mass <= 0.0 && b.inv_mass <= 0.0 {
+                continue;
+            }
+            if let Some(contact) = contact_from_aabb(a, b) {
+                out.push(contact);
+            }
+        }
+
+        for (body_index, plane_index) in Self::plane_candidates(&bodies, &planes) {
+            let body = &bodies[body_index];
+            if body.inv_mass <= 0.0 {
+                continue;
+            }
+            if let Some(contact) = contact_from_plane(body, &planes[plane_index]) {
+                out.push(contact);
             }
         }
 
@@ -424,70 +577,68 @@ impl PhysicsWorld {
         self.trigger_events.clear();
 
         let (bodies, planes) = self.collect_broadphase();
+        let pairs = self.candidate_pairs(&bodies);
+        self.last_broadphase_body_count = bodies.len();
+        self.last_broadphase_candidate_pairs = pairs.len();
         let mut current_solid: HashSet<(u64, u64)> = HashSet::new();
         let mut current_triggers: HashSet<(u64, u64)> = HashSet::new();
 
-        for i in 0..bodies.len() {
-            for j in (i + 1)..bodies.len() {
-                let a = &bodies[i];
-                let b = &bodies[j];
-                if !aabb_overlap(a.min, a.max, b.min, b.max) {
-                    continue;
-                }
-                if !layers_interact(a.layer, a.mask, b.layer, b.mask) {
-                    continue;
-                }
-                let pair = (a.body_id.min(b.body_id), a.body_id.max(b.body_id));
+        for (i, j) in &pairs {
+            let a = &bodies[*i];
+            let b = &bodies[*j];
+            if !aabb_overlap(a.min, a.max, b.min, b.max) {
+                continue;
+            }
+            if !layers_interact(a.layer, a.mask, b.layer, b.mask) {
+                continue;
+            }
+            let pair = (a.body_id.min(b.body_id), a.body_id.max(b.body_id));
 
-                if a.is_sensor || b.is_sensor {
-                    // 触发器只报告重叠，不参与位置分离。
-                    current_triggers.insert(pair);
-                    if !self.active_triggers.contains(&pair) {
-                        let (trigger, other) = if a.is_sensor { (a, b) } else { (b, a) };
-                        self.trigger_events.push(TriggerEvent {
-                            kind: TriggerEventKind::Enter,
-                            trigger_body: trigger.body_id,
-                            trigger_collider: trigger.collider_id,
-                            other_body: other.body_id,
-                            other_collider: other.collider_id,
-                        });
-                    }
-                    continue;
-                }
-
-                current_solid.insert(pair);
-                if !self.active_collisions.contains(&pair) {
-                    self.collision_events.push(CollisionEvent {
-                        body_a: pair.0,
-                        body_b: pair.1,
+            if a.is_sensor || b.is_sensor {
+                // 触发器只报告重叠，不参与位置分离。
+                current_triggers.insert(pair);
+                if !self.active_triggers.contains(&pair) {
+                    let (trigger, other) = if a.is_sensor { (a, b) } else { (b, a) };
+                    self.trigger_events.push(TriggerEvent {
+                        kind: TriggerEventKind::Enter,
+                        trigger_body: trigger.body_id,
+                        trigger_collider: trigger.collider_id,
+                        other_body: other.body_id,
+                        other_collider: other.collider_id,
                     });
                 }
+                continue;
+            }
+
+            current_solid.insert(pair);
+            if !self.active_collisions.contains(&pair) {
+                self.collision_events.push(CollisionEvent {
+                    body_a: pair.0,
+                    body_b: pair.1,
+                });
             }
         }
 
         // 动态刚体 vs 无限平面：接触 + 碰撞事件。
-        for body in &bodies {
-            if body.is_sensor || body.inv_mass <= 0.0 {
+        for (body_index, plane_index) in Self::plane_candidates(&bodies, &planes) {
+            let body = &bodies[body_index];
+            if body.inv_mass <= 0.0 {
                 continue;
             }
-            for plane in &planes {
-                if !layers_interact(body.layer, body.mask, plane.layer, plane.mask) {
-                    continue;
-                }
-                let Some(_contact) = contact_from_plane(body, plane) else {
-                    continue;
-                };
-                let pair = (
-                    body.body_id.min(plane.body_id),
-                    body.body_id.max(plane.body_id),
-                );
-                current_solid.insert(pair);
-                if !self.active_collisions.contains(&pair) {
-                    self.collision_events.push(CollisionEvent {
-                        body_a: pair.0,
-                        body_b: pair.1,
-                    });
-                }
+            let plane = &planes[plane_index];
+            let Some(_contact) = contact_from_plane(body, plane) else {
+                continue;
+            };
+            let pair = (
+                body.body_id.min(plane.body_id),
+                body.body_id.max(plane.body_id),
+            );
+            current_solid.insert(pair);
+            if !self.active_collisions.contains(&pair) {
+                self.collision_events.push(CollisionEvent {
+                    body_a: pair.0,
+                    body_b: pair.1,
+                });
             }
         }
 
@@ -525,6 +676,24 @@ impl PhysicsWorld {
         self.active_triggers = current_triggers;
 
         self.detect_contacts()
+    }
+}
+
+/// 世界坐标 → 空间索引格坐标。
+fn cell_coord(v: Vec3, cell: f32) -> (i32, i32, i32) {
+    (
+        (v.x / cell).floor() as i32,
+        (v.y / cell).floor() as i32,
+        (v.z / cell).floor() as i32,
+    )
+}
+
+/// 无向的索引对（小的在前），用于网格候选去重。
+fn canonical_index_pair(a: usize, b: usize) -> (usize, usize) {
+    if a <= b {
+        (a, b)
+    } else {
+        (b, a)
     }
 }
 

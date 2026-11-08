@@ -36,6 +36,22 @@
   建议双方都启用 CCD 以获得双向防护；
 - 距离关节与固定关节共享 `clear_joints` / `joint_count`。
 
+### 0.3 第三批（空间索引 + 旋转盒）
+- **空间索引宽相**：uniform grid（哈希网格）候选对生成，默认启用，
+  `set_spatial_index_enabled(false)` 可切回 brute force；格子尺寸 `set_spatial_cell_size`
+  可调；两种模式的候选对按 body id 规范化排序，因此接触求解顺序一致、物理结果一致；
+- `broadphase_stats() -> BroadphaseStats` 暴露最近一次宽相的 `body_count` /
+  `candidate_pairs` / `spatial_index`，便于调试与性能对比；
+- **旋转盒保守接触**：`Box` 使用 `|R| * half_extents` 得到保守 AABB
+  （接触检测、查询、CCD、调试绘制统一使用），旋转盒不会明显穿透；代价是
+  可能产生少量假阳性（保守）；
+- 大物体（单轴跨度超过 32 格，例如大面积地面）自动退化为“与所有物体配对”，
+  避免向网格插入海量格子。
+
+**200 体性能对比（debug build，200 动态盒 + 1 地面，60 步）**：
+brute force ≈ 2.38 s / 20100 候选对；空间索引 ≈ 0.31 s / 200 候选对
+（本机实测，约 7.7× 加速，候选对减少约 100×；release 下基数更小但趋势一致）。
+
 ## 关键 API
 
 ```rust
@@ -44,6 +60,9 @@ world.set_gravity(Vec3::new(0.0, -9.81, 0.0));
 world.set_solver_config(SolverConfig { velocity_iterations: 6, ..Default::default() });
 world.set_ccd_enabled(true);          // CCD 全局开关
 world.set_auto_sleep(true);           // 自动睡眠（可选）
+world.set_spatial_index_enabled(true); // 空间索引宽相（默认开启，可关）
+world.set_spatial_cell_size(2.0);      // 哈希网格格子尺寸
+let stats = world.broadphase_stats();  // 候选对统计
 
 // 动态刚体
 let body = world.create_body();
@@ -78,19 +97,19 @@ world.advance_fixed(&mut FixedTimestep::new(60.0), frame_dt);
 7. 自动睡眠更新（可选）。
 
 ## 已知限制
-- **碰撞形状仍是轴对齐近似**：`Box` 用 AABB 参与检测，忽略刚体旋转；
+- **碰撞形状近似**：`Box` 为轴对齐盒，或旋转时用保守 AABB（`|R| * half_extents`，
+  可能产生少量假阳性、不会漏检），不是精确 OBB/分离轴；
   `Capsule`/`Cylinder` 轴固定世界 Y 轴；`Cylinder` 的精确求交未实现（查询会跳过）。
 - **线性动力学**：接触响应不产生角冲量，没有惯性张量计算；旋转仅一阶积分。
-  旋转盒/旋转胶囊碰撞视觉上仍按 AABB 处理。
 - **CCD**：只支持动态球/胶囊作为运动形状；动态-动态为“相对位移 + 顺序求解”近似，
   建议双方都启用；不支持旋转盒 CCD 与子步进；命中不额外产生碰撞事件
   （由下一帧离散接触补上）。
 - **关节**：只有距离约束与固定平移约束；锚点偏移不随刚体旋转，固定关节不约束
   相对旋转；无铰链/弹簧/角度限制/完整约束矩阵求解。
-- **宽相为 O(n²)**：逐个 AABB 两两检测（带 AABB 粗筛），空间索引（uniform grid/BVH）
-  留后续；当前规模下测试与示例场景无压力。
-- **布娃娃、旋转碰撞响应、任意朝向碰撞体、空间索引宽相** 仍为后续版本
-  （见 `future` 模块）。
+- **空间索引**：uniform grid 哈希网格；大物体走“与所有配对”回退；候选对生成与
+  brute force 结果一致，但顺序经过规范化（事件顺序可能与旧 HashMap 顺序不同）；
+  多级/动态 BVH、并行宽相留后续。
+- **布娃娃、旋转碰撞响应、精确 OBB、旋转盒 CCD** 仍为后续版本（见 `future` 模块）。
 
 ## 测试
 
@@ -104,4 +123,5 @@ cargo test -p hezhou-core --offline
 
 覆盖：固定步/扫掠/斜坡台阶/层掩码/触发器/raycast/overlap/调试数据（0.2），
 自由落体落地、两球弹性/非弹性碰撞动量、动态堆叠、CCD 防穿透（静态与动态-动态）、
-距离关节/固定关节、阻尼、自动睡眠（0.3）。
+距离关节/固定关节、阻尼、自动睡眠（0.3 前两批），空间索引与 brute force 一致性、
+旋转盒保守接触/落地、200 体宽相性能对比（0.3 第三批）。

@@ -13,14 +13,18 @@
 //! - 动态 vs 静态/动态接触响应：法向冲量 + 库仑摩擦 + 位置修正（线性）；
 //! - CCD 基础：动态球/胶囊对静态目标的扫掠检测（第一批）+ 动态-动态 CCD（第二批），
 //!   默认关闭，可按世界/刚体配置；
-//! - 关节：距离关节 `DistanceJoint`（第一批）+ 固定关节 `FixedJoint`（第二批）。
+//! - 关节：距离关节 `DistanceJoint`（第一批）+ 固定关节 `FixedJoint`（第二批）；
+//! - 空间索引宽相（第三批）：uniform grid 哈希网格，默认启用，可切回 brute force，
+//!   两种模式结果一致；`broadphase_stats()` 可读取候选对数量；
+//! - 旋转盒保守接触（第三批）：`Box` 按旋转矩阵绝对值扩张为保守 AABB，
+//!   接触/查询/CCD/调试绘制统一使用该保守范围。
 //!
 //! ## 约定与限制（详见 README）
-//! - `Box` 为轴对齐盒，碰撞用 AABB 近似（忽略刚体旋转）；
+//! - `Box` 为轴对齐盒或保守 AABB 旋转近似（非精确 OBB），可能产生少量假阳性；
 //! - `Capsule` 轴固定世界 Y 轴；`Plane` 法线由刚体旋转作用于 +Y；
 //! - 接触响应只含线性冲量，无角冲量/惯性张量；固定关节不约束相对旋转；
-//! - 铰链/弹簧/角度限制/完整约束求解、布娃娃、旋转盒 CCD/旋转碰撞响应、
-//!   任意朝向碰撞体与空间索引仍留后续版本。
+//! - 铰链/弹簧/角度限制/完整约束求解、布娃娃、精确 OBB 分离轴、旋转盒 CCD、
+//!   多级 BVH/并行宽相仍留后续版本。
 //!
 //! 坐标约定：`Box` 轴对齐；`Capsule` 轴固定为世界 Y 轴。
 
@@ -55,4 +59,4 @@ pub use motor::{CharacterMotor, MoveResult};
 pub use query::{Hit, OverlapHit, QueryFilter};
 pub use raycast::{Ray, RaycastResult};
 pub use rigid_body::{RigidBody, RigidBodyType};
-pub use world::{CollisionEvent, PhysicsWorld, TriggerEvent, TriggerEventKind};
+pub use world::{BroadphaseStats, CollisionEvent, PhysicsWorld, TriggerEvent, TriggerEventKind};

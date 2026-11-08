@@ -17,6 +17,30 @@ use hezhou_core::math::Vec3;
 /// 数值容差。
 pub(crate) const EPS: f32 = 1e-5;
 
+/// 旋转盒的**保守 AABB 半尺寸**：把局部半尺寸按旋转矩阵的绝对值扩张。
+///
+/// 这是 OBB 的包围盒近似：结果永远不会小于真实 OBB 的投影范围，
+/// 因此接触检测是保守的（可能产生少量假阳性，但不会漏检）。
+/// 完整 OBB/分离轴精确接触留后续版本。
+pub(crate) fn rotated_aabb_half_extents(
+    rotation: &nalgebra::UnitQuaternion<f32>,
+    half_extents: Vec3,
+) -> Vec3 {
+    let matrix = rotation.to_rotation_matrix();
+    let m = matrix.matrix();
+    Vec3::new(
+        m[(0, 0)].abs() * half_extents.x
+            + m[(0, 1)].abs() * half_extents.y
+            + m[(0, 2)].abs() * half_extents.z,
+        m[(1, 0)].abs() * half_extents.x
+            + m[(1, 1)].abs() * half_extents.y
+            + m[(1, 2)].abs() * half_extents.z,
+        m[(2, 0)].abs() * half_extents.x
+            + m[(2, 1)].abs() * half_extents.y
+            + m[(2, 2)].abs() * half_extents.z,
+    )
+}
+
 /// 目标静态形状（世界空间）。
 #[derive(Clone, Copy, Debug)]
 pub(crate) enum TargetShape {

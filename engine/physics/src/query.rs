@@ -219,7 +219,17 @@ impl OverlapHit {
 }
 
 fn target_of(entry: &ColliderEntry<'_>) -> Option<TargetShape> {
-    TargetShape::from_collider(entry.collider.shape(), entry.position, entry.plane_normal)
+    match entry.collider.shape() {
+        // 旋转盒：查询用保守 AABB（与接触检测一致，宁可多报不漏报）。
+        ColliderShape::Box { half_extents } => Some(TargetShape::Box {
+            center: entry.position,
+            half_extents: crate::intersect::rotated_aabb_half_extents(
+                entry.body.rotation(),
+                *half_extents,
+            ),
+        }),
+        shape => TargetShape::from_collider(shape, entry.position, entry.plane_normal),
+    }
 }
 
 impl PhysicsWorld {
