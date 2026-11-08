@@ -150,3 +150,17 @@ pub type PackageInstalledJsonFn =
 /// 卸载包；0=成功，-1=失败。
 pub type PackageUninstallFn =
     extern "C" fn(*const std::ffi::c_char, *const std::ffi::c_char) -> i32;
+
+// === 0.4 声明式插件（task-55） ===
+
+/// 插件列表 JSON（含启用状态/命令数）。
+pub type PluginListJsonFn =
+    extern "C" fn(*const std::ffi::c_char, *mut std::ffi::c_char, usize) -> usize;
+
+/// 启用/禁用插件（enabled=0/1）；0=成功。
+pub type PluginSetEnabledFn =
+    extern "C" fn(*const std::ffi::c_char, *const std::ffi::c_char, i32) -> i32;
+
+/// 启用插件的命令 JSON。
+pub type PluginCommandsJsonFn =
+    extern "C" fn(*const std::ffi::c_char, *mut std::ffi::c_char, usize) -> usize;

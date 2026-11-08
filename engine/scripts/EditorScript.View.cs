@@ -454,6 +454,18 @@ namespace Hezhou
                 "lock: packages/lock.json");
             RefreshPackageTab();
 
+            // 0.4 声明式插件（task-55）：plugins/<id>/plugin.json + enabled.json
+            ulong pluginTabContent = UI.CreateVStack(_assetTabWidget.Id, 5f);
+            UI.CreateLabel(pluginTabContent, 460f, 24f, "声明式插件（plugins/）");
+            ulong pluginControlRow = UI.CreateHStack(pluginTabContent, 6f);
+            ulong pluginRefreshButton = UI.CreateButton(pluginControlRow, 130f, 26f, "刷新插件");
+            UI.SetOnClick(pluginRefreshButton, _pluginRefreshCallback);
+            _pluginStatusLabelId = UI.CreateLabel(pluginTabContent, 680f, 22f, "插件: 未加载");
+            _pluginListContainerId = UI.CreateVStack(pluginTabContent, 3f);
+            _pluginCommandsLabelId = UI.CreateLabel(pluginTabContent, 680f, 22f,
+                "命令: 启用后出现在 Command Palette（Ctrl+Shift+P）");
+            RefreshPluginTab();
+
             _assetTabWidget.AddTab("模型", modelTabContent, false);
             _assetTabWidget.AddTab("材质", materialTabContent, false);
             if (!_textureDockedRight)
@@ -467,6 +479,7 @@ namespace Hezhou
             _assetTabWidget.AddTab("Build", buildSettingsTabContent, false);
             _assetTabWidget.AddTab("动画", animationTabContent, false);
             _assetTabWidget.AddTab("包", packageTabContent, false);
+            _assetTabWidget.AddTab("插件", pluginTabContent, false);
             _assetTabWidget.SetReorderable(true);
 
             // === Properties Panel: 5-tab TabWidget ===

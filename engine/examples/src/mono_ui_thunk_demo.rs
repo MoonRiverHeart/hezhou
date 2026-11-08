@@ -497,6 +497,9 @@ fn main() {
         package_install_json: stub_package_install_json,
         package_installed_json: stub_package_installed_json,
         package_uninstall: stub_package_uninstall,
+        plugin_list_json: stub_plugin_list_json,
+        plugin_set_enabled: stub_plugin_set_enabled,
+        plugin_commands_json: stub_plugin_commands_json,
     };
     hezhou_scripting::ffi_context::set_ffi_context(ffi_ctx);
     let ffi_ptr = hezhou_scripting::ffi_context::get_ffi_context_ptr();
@@ -768,6 +771,9 @@ extern "C" fn stub_package_install_json(
 ) -> i32 { -1 }
 extern "C" fn stub_package_installed_json(_: *const std::ffi::c_char, _: *mut std::ffi::c_char, _: usize) -> usize { 0 }
 extern "C" fn stub_package_uninstall(_: *const std::ffi::c_char, _: *const std::ffi::c_char) -> i32 { -1 }
+extern "C" fn stub_plugin_list_json(_: *const std::ffi::c_char, _: *mut std::ffi::c_char, _: usize) -> usize { 0 }
+extern "C" fn stub_plugin_set_enabled(_: *const std::ffi::c_char, _: *const std::ffi::c_char, _: i32) -> i32 { -1 }
+extern "C" fn stub_plugin_commands_json(_: *const std::ffi::c_char, _: *mut std::ffi::c_char, _: usize) -> usize { 0 }
 extern "C" fn stub_template_create(
     _: *const std::ffi::c_char,
     _: *const std::ffi::c_char,
@@ -812,6 +818,7 @@ fn compile_csharp_script() {
         }
     }
 }
+
 
 
 

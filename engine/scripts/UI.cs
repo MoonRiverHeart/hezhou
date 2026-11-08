@@ -1053,6 +1053,14 @@ namespace Hezhou
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public delegate int PackageUninstallDelegate(IntPtr projectRoot, IntPtr name);
 
+        // 0.4 声明式插件 FFI（task-55）
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate ulong PluginListJsonDelegate(IntPtr projectRoot, IntPtr buffer, ulong bufferSize);
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate int PluginSetEnabledDelegate(IntPtr projectRoot, IntPtr id, int enabled);
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate ulong PluginCommandsJsonDelegate(IntPtr projectRoot, IntPtr buffer, ulong bufferSize);
+
 [StructLayout(LayoutKind.Sequential)]
         public struct FfiContext
         {
@@ -1413,6 +1421,10 @@ namespace Hezhou
             public IntPtr package_install_json;
             public IntPtr package_installed_json;
             public IntPtr package_uninstall;
+            // 0.4 声明式插件 FFI（tail）
+            public IntPtr plugin_list_json;
+            public IntPtr plugin_set_enabled;
+            public IntPtr plugin_commands_json;
         }
 
         public static void InitFromContext(IntPtr contextPtr)
@@ -2215,5 +2227,6 @@ public static void RegisterResizeCallback(ResizeCallbackDelegate callback)
         }
     }
 }
+
 
 

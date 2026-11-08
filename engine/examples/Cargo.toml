@@ -27,6 +27,7 @@ hezhou-asset = { path = "../asset" }
 hezhou-audio = { path = "../audio", features = ["cpal-backend", "ogg"] }
 hezhou-player = { path = "../player" }
 hezhou-package = { path = "../package" }
+hezhou-plugin = { path = "../plugin" }
 tokio = { version = "1", features = ["rt-multi-thread", "macros"], optional = true }
 glfw = "0.62"
 ash = "0.38"

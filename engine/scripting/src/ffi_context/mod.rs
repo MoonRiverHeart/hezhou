@@ -383,6 +383,10 @@ pub project_add_entity: ProjectAddEntityFn,
         pub package_install_json: PackageInstallJsonFn,
         pub package_installed_json: PackageInstalledJsonFn,
         pub package_uninstall: PackageUninstallFn,
+        // 0.4 声明式插件 FFI（tail）
+        pub plugin_list_json: PluginListJsonFn,
+        pub plugin_set_enabled: PluginSetEnabledFn,
+        pub plugin_commands_json: PluginCommandsJsonFn,
     }
 
 static mut FFI_CONTEXT: Option<Box<FfiContext>> = None;
@@ -402,6 +406,7 @@ pub fn get_ffi_context_ptr() -> *const FfiContext {
         }
     }
 }
+
 
 
 

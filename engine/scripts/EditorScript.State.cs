@@ -337,6 +337,20 @@ namespace Hezhou
         private static readonly System.Collections.Generic.Dictionary<ulong, string> _packageInstalledButtonNames =
             new System.Collections.Generic.Dictionary<ulong, string>();
 
+        // === 0.4 声明式插件（task-55） ===
+        private static ulong _pluginTabContentId;
+        private static ulong _pluginListContainerId;
+        private static ulong _pluginStatusLabelId;
+        private static ulong _pluginCommandsLabelId;
+        private static UI.WidgetCallbackDelegate _pluginRefreshCallback;
+        private static UI.WidgetCallbackDelegate _pluginToggleCallback;
+        private static readonly System.Collections.Generic.List<ulong> _pluginListButtonIds =
+            new System.Collections.Generic.List<ulong>();
+        private static readonly System.Collections.Generic.Dictionary<ulong, string> _pluginButtonIds =
+            new System.Collections.Generic.Dictionary<ulong, string>();
+        private static readonly System.Collections.Generic.Dictionary<ulong, bool> _pluginButtonEnabledState =
+            new System.Collections.Generic.Dictionary<ulong, bool>();
+
         // === Dock / Layout State ===
         private static ulong _rightMaxButtonId;
         private static UI.WidgetCallbackDelegate _rightMaxClickCallback;

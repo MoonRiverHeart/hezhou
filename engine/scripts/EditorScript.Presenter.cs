@@ -3151,6 +3151,11 @@ UI.SetText(_runButtonId, "运行");
             {
                 RefreshPackageTab();
             }
+            // 0.4 声明式插件：工程加载后刷新插件启用状态。
+            if (_pluginListContainerId != 0)
+            {
+                RefreshPluginTab();
+            }
 
             _gameScene.ClearSelection();
             _selectedEntityId = 0;

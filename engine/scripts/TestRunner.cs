@@ -76,6 +76,9 @@ namespace Hezhou
             try { TestPackageManagerFfi(); }
             catch (Exception ex) { Log.Error("TestRunner", "TestPackageManagerFfi异常: " + ex.Message); }
 
+            try { TestPluginFfi(); }
+            catch (Exception ex) { Log.Error("TestRunner", "TestPluginFfi异常: " + ex.Message); }
+
             Log.Info("TestRunner", "===== 测试完成: PASS=" + _passCount + ", FAIL=" + _failCount + " =====");
         }
 
@@ -1088,6 +1091,61 @@ namespace Hezhou
                 "卸载依赖方后卸载依赖成功");
 
             try { if (System.IO.Directory.Exists(project)) System.IO.Directory.Delete(project, true); } catch (Exception) { }
+        }
+
+
+        /// <summary>
+        /// 0.4 声明式插件自检（task-55）：
+        /// 扫描示例插件、启用/禁用持久化、启用命令 JSON、白名单 action 执行。
+        /// </summary>
+        private static void TestPluginFfi()
+        {
+            string root = System.IO.Directory.GetCurrentDirectory();
+            string enabledFile = System.IO.Path.Combine(root, "plugins", "enabled.json");
+            bool hadState = System.IO.File.Exists(enabledFile);
+            string originalState = hadState ? System.IO.File.ReadAllText(enabledFile) : null;
+            try
+            {
+                string list = UI.PluginListJson(root);
+                bool listed = list.IndexOf("sample-tools") >= 0
+                    && list.IndexOf("scene-tools") >= 0
+                    && list.IndexOf("\"enabled\":true") >= 0;
+                AssertTrue("Plugin", listed,
+                    "插件列表包含 sample-tools/scene-tools (len=" + list.Length + ")");
+
+                int enableRc = UI.PluginSetEnabled(root, "scene-tools", true);
+                string listAfter = UI.PluginListJson(root);
+                AssertTrue("Plugin", enableRc == 0 && listAfter.IndexOf("\"enabled\":true") >= 0
+                    && System.IO.File.Exists(enabledFile),
+                    "启用 scene-tools 并写 enabled.json (rc=" + enableRc + ")");
+
+                string commands = UI.PluginCommandsJson(root);
+                bool hasCommands = commands.IndexOf("toggle_theme") >= 0
+                    && commands.IndexOf("console") >= 0
+                    && commands.IndexOf("profiler_tab") >= 0;
+                AssertTrue("Plugin", hasCommands,
+                    "启用插件的命令 JSON 含白名单 action");
+
+                bool knownAction = EditorScript.TestExecutePluginAction("console");
+                bool unknownAction = EditorScript.TestExecutePluginAction("exec_shell");
+                AssertTrue("Plugin", knownAction && !unknownAction,
+                    "action 白名单执行（console=true, exec_shell=false）");
+
+                int disableRc = UI.PluginSetEnabled(root, "scene-tools", false);
+                string commandsAfter = UI.PluginCommandsJson(root);
+                AssertTrue("Plugin", disableRc == 0
+                    && commandsAfter.IndexOf("profiler_tab") < 0,
+                    "禁用后命令不再暴露");
+            }
+            finally
+            {
+                try
+                {
+                    if (hadState) System.IO.File.WriteAllText(enabledFile, originalState);
+                    else if (System.IO.File.Exists(enabledFile)) System.IO.File.Delete(enabledFile);
+                }
+                catch (Exception) { }
+            }
         }
 
         // 内存保存值结构（模拟SavedScriptPropertyValue，用于测试）

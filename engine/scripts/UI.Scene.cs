@@ -1365,7 +1365,70 @@ UI.SceneSelectEntity(_scenePtr, entityId);
                 Marshal.FreeHGlobal(namePtr);
             }
         }
+
+        // === 0.4 声明式插件（task-55） ===
+
+        /// <summary>插件列表 JSON（含启用状态）。</summary>
+        public static string PluginListJson(string projectRoot)
+        {
+            if (_ffi.plugin_list_json == IntPtr.Zero) return "";
+            IntPtr rootPtr = Marshal.StringToHGlobalAnsi(projectRoot ?? "");
+            const int bufferSize = 16384;
+            IntPtr buffer = Marshal.AllocHGlobal(bufferSize);
+            try
+            {
+                Marshal.WriteByte(buffer, 0, 0);
+                var func = Marshal.GetDelegateForFunctionPointer<PluginListJsonDelegate>(_ffi.plugin_list_json);
+                ulong written = func(rootPtr, buffer, (ulong)bufferSize);
+                return written == 0UL ? "" : (Marshal.PtrToStringAnsi(buffer, (int)written) ?? "");
+            }
+            finally
+            {
+                Marshal.FreeHGlobal(buffer);
+                Marshal.FreeHGlobal(rootPtr);
+            }
+        }
+
+        /// <summary>启用/禁用插件；0=成功。</summary>
+        public static int PluginSetEnabled(string projectRoot, string id, bool enabled)
+        {
+            if (_ffi.plugin_set_enabled == IntPtr.Zero) return -1;
+            IntPtr rootPtr = Marshal.StringToHGlobalAnsi(projectRoot ?? "");
+            IntPtr idPtr = Marshal.StringToHGlobalAnsi(id ?? "");
+            try
+            {
+                var func = Marshal.GetDelegateForFunctionPointer<PluginSetEnabledDelegate>(_ffi.plugin_set_enabled);
+                return func(rootPtr, idPtr, enabled ? 1 : 0);
+            }
+            finally
+            {
+                Marshal.FreeHGlobal(rootPtr);
+                Marshal.FreeHGlobal(idPtr);
+            }
+        }
+
+        /// <summary>启用插件的命令 JSON。</summary>
+        public static string PluginCommandsJson(string projectRoot)
+        {
+            if (_ffi.plugin_commands_json == IntPtr.Zero) return "";
+            IntPtr rootPtr = Marshal.StringToHGlobalAnsi(projectRoot ?? "");
+            const int bufferSize = 16384;
+            IntPtr buffer = Marshal.AllocHGlobal(bufferSize);
+            try
+            {
+                Marshal.WriteByte(buffer, 0, 0);
+                var func = Marshal.GetDelegateForFunctionPointer<PluginCommandsJsonDelegate>(_ffi.plugin_commands_json);
+                ulong written = func(rootPtr, buffer, (ulong)bufferSize);
+                return written == 0UL ? "" : (Marshal.PtrToStringAnsi(buffer, (int)written) ?? "");
+            }
+            finally
+            {
+                Marshal.FreeHGlobal(buffer);
+                Marshal.FreeHGlobal(rootPtr);
+            }
+        }
     }
 }
+
 
 

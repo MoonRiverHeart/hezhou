@@ -17,6 +17,7 @@ pub mod build_settings;
 pub mod animation_ffi;
 pub mod project_templates;
 pub mod package_ffi;
+pub mod plugin_ffi;
 pub mod hot_reload;
 pub mod dfx_init;
 #[cfg(feature = "mcp")]
@@ -501,6 +502,9 @@ ui_tree_view_set_on_select_thunk_ptr: unsafe { std::mem::transmute(ui_ffi::ui_tr
         package_install_json: package_ffi::package_install_json,
         package_installed_json: package_ffi::package_installed_json,
         package_uninstall: package_ffi::package_uninstall,
+        plugin_list_json: plugin_ffi::plugin_list_json,
+        plugin_set_enabled: plugin_ffi::plugin_set_enabled,
+        plugin_commands_json: plugin_ffi::plugin_commands_json,
         on_hot_reload_complete: ffi_impl::on_hot_reload_complete_placeholder,
         register_hot_reload_complete_callback: unsafe { std::mem::transmute(hot_reload::register_hot_reload_complete_callback as *const std::ffi::c_void) },
         ui_debug_print_widget_tree: unsafe { std::mem::transmute(ui_ffi::ui_debug_print_widget_tree as *const std::ffi::c_void) },
@@ -847,6 +851,7 @@ dfx_trace_begin!("ProcessEvents", "ui");
     let exit_code = if auto_test_mode && auto_test_status != "pass" { 2 } else { 0 };
     std::process::exit(exit_code);
 }
+
 
 
 

@@ -9,6 +9,7 @@ members = [
     "dfx",
     "examples",
     "package",
+    "plugin",
     "geometry",
     "rhi",
     "rhi-vulkan",

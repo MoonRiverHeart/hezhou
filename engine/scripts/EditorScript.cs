@@ -85,6 +85,8 @@ namespace Hezhou
             _packageRefreshCallback = OnPackageRefreshClick;
             _packageInstallCallback = OnPackageInstallClick;
             _packageUninstallCallback = OnPackageUninstallClick;
+            _pluginRefreshCallback = OnPluginRefreshClick;
+            _pluginToggleCallback = OnPluginToggleClick;
             _textureAssetClickCallback = OnTextureAssetClick;
             _textureRefreshCallback = OnTextureRefreshClick;
             _textureClearCallback = OnTextureClearClick;
@@ -2373,6 +2375,133 @@ _bindScriptClickCallback = OnBindScriptClick;
             if (_packageStatusLabelId != 0)
             {
                 UI.SetText(_packageStatusLabelId, text);
+            }
+        }
+
+        // === 0.4 声明式插件（task-55） ===
+
+        private static void OnPluginRefreshClick(ulong widgetId)
+        {
+            RefreshPluginTab();
+            Log.Info("Plugin", "插件列表已刷新");
+        }
+
+        /// <summary>重建「插件」Tab：plugins/<id>/plugin.json 列表 + 启用/禁用。</summary>
+        private static void RefreshPluginTab()
+        {
+            if (_pluginListContainerId == 0) return;
+            for (int i = 0; i < _pluginListButtonIds.Count; i++)
+            {
+                UI.RemoveWidget(_pluginListButtonIds[i]);
+            }
+            _pluginListButtonIds.Clear();
+            _pluginButtonIds.Clear();
+            _pluginButtonEnabledState.Clear();
+
+            string root = System.IO.Directory.GetCurrentDirectory();
+            string json = UI.PluginListJson(root);
+            string error = ParsePbrString(json, "error");
+            string[] ids;
+            string[] labels;
+            bool[] enabled;
+            ParsePlugins(json, out ids, out labels, out enabled);
+            int enabledCount = 0;
+            for (int i = 0; i < ids.Length; i++)
+            {
+                if (enabled[i]) enabledCount++;
+                string prefix = enabled[i] ? "禁用  " : "启用  ";
+                ulong button = UI.CreateButton(_pluginListContainerId, 500f, 26f, prefix + labels[i]);
+                UI.SetOnClick(button, _pluginToggleCallback);
+                _pluginListButtonIds.Add(button);
+                _pluginButtonIds[button] = ids[i];
+                _pluginButtonEnabledState[button] = enabled[i];
+            }
+            if (ids.Length == 0)
+            {
+                ulong placeholder = UI.CreateButton(_pluginListContainerId, 500f, 26f,
+                    error.Length > 0 ? "（插件错误: " + error + "）" : "（plugins/ 下无插件）");
+                _pluginListButtonIds.Add(placeholder);
+            }
+
+            string commandJson = UI.PluginCommandsJson(root);
+            int commandCount = (int)PbrJsonFloat(commandJson, "count", 0f);
+            SetPluginStatus("插件: " + ids.Length + " 个（启用 " + enabledCount + "）"
+                + (error.Length > 0 ? "（扫描错误）" : ""));
+            if (_pluginCommandsLabelId != 0)
+            {
+                UI.SetText(_pluginCommandsLabelId,
+                    "命令: " + commandCount + " 条已加入 Command Palette（Ctrl+Shift+P）");
+            }
+        }
+
+        /// <summary>解析插件列表 JSON 中 plugins[] 的 id/name/version/author/enabled。</summary>
+        private static void ParsePlugins(
+            string json, out string[] ids, out string[] labels, out bool[] enabled)
+        {
+            System.Collections.Generic.List<string> idList =
+                new System.Collections.Generic.List<string>();
+            System.Collections.Generic.List<string> labelList =
+                new System.Collections.Generic.List<string>();
+            System.Collections.Generic.List<bool> enabledList =
+                new System.Collections.Generic.List<bool>();
+            int start = json.IndexOf("\"plugins\":[");
+            if (start >= 0)
+            {
+                int pos = start + "\"plugins\":[".Length;
+                while (pos < json.Length)
+                {
+                    int open = json.IndexOf('{', pos);
+                    if (open < 0) break;
+                    int close = json.IndexOf('}', open + 1);
+                    if (close < 0) break;
+                    string segment = json.Substring(open, close - open + 1);
+                    string id = ParsePbrString(segment, "id");
+                    string name = ParsePbrString(segment, "name");
+                    string version = ParsePbrString(segment, "version");
+                    string author = ParsePbrString(segment, "author");
+                    bool isEnabled = segment.IndexOf("\"enabled\":true") >= 0;
+                    if (id.Length > 0)
+                    {
+                        idList.Add(id);
+                        labelList.Add((name.Length > 0 ? name : id)
+                            + "  " + version + "  · " + (author.Length > 0 ? author : "-"));
+                        enabledList.Add(isEnabled);
+                    }
+                    int nextOpen = json.IndexOf('{', close + 1);
+                    if (nextOpen < 0) break;
+                    pos = nextOpen;
+                }
+            }
+            ids = idList.ToArray();
+            labels = labelList.ToArray();
+            enabled = enabledList.ToArray();
+        }
+
+        private static void OnPluginToggleClick(ulong widgetId)
+        {
+            string id;
+            bool wasEnabled;
+            if (!_pluginButtonIds.TryGetValue(widgetId, out id)) return;
+            if (!_pluginButtonEnabledState.TryGetValue(widgetId, out wasEnabled)) return;
+            string root = System.IO.Directory.GetCurrentDirectory();
+            int rc = UI.PluginSetEnabled(root, id, !wasEnabled);
+            if (rc == 0)
+            {
+                Log.Info("Plugin", (wasEnabled ? "禁用" : "启用") + "插件: " + id);
+                RefreshPluginTab();
+            }
+            else
+            {
+                Log.Warn("Plugin", "设置插件状态失败: " + id);
+                SetPluginStatus("插件: 设置 " + id + " 状态失败（详见 Console）");
+            }
+        }
+
+        private static void SetPluginStatus(string text)
+        {
+            if (_pluginStatusLabelId != 0)
+            {
+                UI.SetText(_pluginStatusLabelId, text);
             }
         }
 
