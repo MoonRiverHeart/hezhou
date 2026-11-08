@@ -28,6 +28,7 @@
 - ✅ 30 分钟 soak：1800s、107999 ticks、0 overruns、RESULT PASS；RSS 5.78→7.55MB（+1.77MB / 30.5%，绝对增长在阈值内，低基数导致百分比偏高，需 0.4 继续观察）。
 - ✅ 0.4 网络第一批：std-only hezhou-net（Transport/UDP/TCP/framing/Session/Room/NetServer/NetClient），39 tests；loopback 3 客户端/心跳/超时/房间广播通过。
 - ✅ 0.4 网络第二批：WorldSnapshot 全量/delta、baseline ack、ReplicationServer/Client、SnapshotBuffer 插值、RpcRegistry；58 tests；CI run 42480451129 全绿。
+- ✅ 0.4 插件 API：hezhou-plugin（manifest/registry/启用/action 白名单）+ 编辑器插件 Tab/Command Palette；FFI 343，启动自检 **PASS=117**。
 - ⏳ 下一阶段：0.4 平台扩展、网络、插件/包管理器、稳定性 30min+；0.3 已知限制见 RELEASE_NOTES_0.3.0.md。
 
 ## 1. 执行摘要
