@@ -1,0 +1,4 @@
+{
+  "package": "hezhou-mathx",
+  "ops": ["clamp", "lerp", "smoothstep"]
+}

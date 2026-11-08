@@ -1,0 +1,5 @@
+{
+  "package": "hezhou-gameplay-kit",
+  "depends": ["hezhou-mathx"],
+  "features": ["health", "movement"]
+}
