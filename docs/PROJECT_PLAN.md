@@ -30,10 +30,11 @@
 - ✅ Player C# 动画 API v3：C# 枚举/播放/设置 clip 时间/速度，palette 由 C# 驱动；真实 skinned fixture 30 帧 exit 0；mono-host 119 tests。
 - ✅ Player C# 资产/音频 API v4：C# 枚举 6 个资产、加载 WAV、play/pause/resume/volume/stop；真实窗口 30 帧 exit 0；mono-host 123 tests。
 - ✅ Player C# 角色控制 API v5：PhysicsWorld 地面 + 每实体 CharacterMotor；C# 创建角色、每帧 step，30 帧位移 +0.669m、grounded；mono-host 129 tests。
+- ✅ Player AnimationStateMachine v6：9 状态机 + clip 名称映射 + 0.2s 过渡；C# 触发 Run/Attack，真实窗口 30 帧 palette 状态驱动；mono-host 134 tests。
 - ✅ 本地 CI `ci_local.ps1 -Offline` 通过（默认测试 + feature 测试 + FFI 契约 + C# 编译 + 图标一致性）。
 - ✅ 验证证据：capability_demo 14/14 项通过；Player 72 tests；Core 43 tests；编辑器启动自检 PASS=57、FAIL=0；FFI 301/301/301。
 - ⏳ 未完成（0.2 验收尚未达成）：
-  1. Player 发布附件 / 0.2 Release（C# Scene/Transform/动画/资产/音频/角色控制已接入）；
+  1. Player 发布附件 / 0.2 Release（C# Scene/Transform/动画状态机/资产/音频/角色控制已接入）；
   2. Player 发布附件、真实 cooker 端到端、双平台 release 验证；
   3. 0.2 最终测试/文档收尾与 Release。
 - 0.2 仍处于进行中，不满足发布 Definition of Done。
