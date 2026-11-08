@@ -1229,5 +1229,49 @@ UI.SceneSelectEntity(_scenePtr, entityId);
                 Marshal.FreeHGlobal(buffer);
             }
         }
+
+        // === 0.4 项目模板（task-49） ===
+
+        /// <summary>列出可用项目模板（JSON：count/templates[]）。</summary>
+        public static string TemplateListJson()
+        {
+            if (_ffi.template_list_json == IntPtr.Zero) return "";
+            const int bufferSize = 16384;
+            IntPtr buffer = Marshal.AllocHGlobal(bufferSize);
+            try
+            {
+                Marshal.WriteByte(buffer, 0, 0);
+                var func = Marshal.GetDelegateForFunctionPointer<TemplateListJsonDelegate>(
+                    _ffi.template_list_json);
+                ulong written = func(buffer, (ulong)bufferSize);
+                return written == 0UL ? "" : (Marshal.PtrToStringAnsi(buffer, (int)written) ?? "");
+            }
+            finally
+            {
+                Marshal.FreeHGlobal(buffer);
+            }
+        }
+
+        /// <summary>从模板创建工程；0=成功，-1=参数/模板无效，-2=目标非空，-3=IO 失败。</summary>
+        public static int TemplateCreate(string templateId, string destDir, string projectName)
+        {
+            if (_ffi.template_create == IntPtr.Zero) return -1;
+            IntPtr idPtr = Marshal.StringToHGlobalAnsi(templateId ?? "");
+            IntPtr destPtr = Marshal.StringToHGlobalAnsi(destDir ?? "");
+            IntPtr namePtr = Marshal.StringToHGlobalAnsi(projectName ?? "");
+            try
+            {
+                var func = Marshal.GetDelegateForFunctionPointer<TemplateCreateDelegate>(
+                    _ffi.template_create);
+                return func(idPtr, destPtr, namePtr);
+            }
+            finally
+            {
+                Marshal.FreeHGlobal(idPtr);
+                Marshal.FreeHGlobal(destPtr);
+                Marshal.FreeHGlobal(namePtr);
+            }
+        }
     }
 }
+

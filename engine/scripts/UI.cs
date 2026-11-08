@@ -1037,6 +1037,12 @@ namespace Hezhou
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public delegate int AnimationPreviewGraphFreeDelegate();
 
+        // 0.4 项目模板 FFI（task-49）
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate ulong TemplateListJsonDelegate(IntPtr buffer, ulong bufferSize);
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate int TemplateCreateDelegate(IntPtr templateId, IntPtr destDir, IntPtr projectName);
+
 [StructLayout(LayoutKind.Sequential)]
         public struct FfiContext
         {
@@ -1389,6 +1395,9 @@ namespace Hezhou
             public IntPtr animation_preview_set_state;
             public IntPtr animation_preview_state_snapshot;
             public IntPtr animation_preview_graph_free;
+            // 0.4 项目模板 FFI（tail）
+            public IntPtr template_list_json;
+            public IntPtr template_create;
         }
 
         public static void InitFromContext(IntPtr contextPtr)
@@ -2191,3 +2200,4 @@ public static void RegisterResizeCallback(ResizeCallbackDelegate callback)
         }
     }
 }
+

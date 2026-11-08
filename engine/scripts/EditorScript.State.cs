@@ -309,6 +309,17 @@ namespace Hezhou
         private static ulong _animGraphStatusLabelId;
         private static bool _animGraphInitialized;
 
+        // === 0.4 项目模板/新建工程（task-49） ===
+        private static ulong _newProjectDialogId;
+        private static ulong _newProjectTemplateDropdownId;
+        private static ulong _newProjectNameFieldId;
+        private static ulong _newProjectDestFieldId;
+        private static ulong _newProjectStatusLabelId;
+        private static UI.WidgetCallbackDelegate _newProjectOpenCallback;
+        private static UI.DialogResultCallbackDelegate _newProjectDialogResultCallback;
+        private static string[] _newProjectTemplateIds = new string[0];
+        private static string[] _newProjectTemplateNames = new string[0];
+
         // === Dock / Layout State ===
         private static ulong _rightMaxButtonId;
         private static UI.WidgetCallbackDelegate _rightMaxClickCallback;

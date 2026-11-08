@@ -375,6 +375,9 @@ pub project_add_entity: ProjectAddEntityFn,
         pub animation_preview_set_state: AnimationPreviewSetStateFn,
         pub animation_preview_state_snapshot: AnimationPreviewStateSnapshotFn,
         pub animation_preview_graph_free: AnimationPreviewGraphFreeFn,
+        // 0.4 项目模板 FFI（tail）
+        pub template_list_json: TemplateListJsonFn,
+        pub template_create: TemplateCreateFn,
     }
 
 static mut FFI_CONTEXT: Option<Box<FfiContext>> = None;
@@ -394,6 +397,7 @@ pub fn get_ffi_context_ptr() -> *const FfiContext {
         }
     }
 }
+
 
 
 

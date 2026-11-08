@@ -70,6 +70,9 @@ namespace Hezhou
             try { TestEngineApiFacade(); }
             catch (Exception ex) { Log.Error("TestRunner", "TestEngineApiFacade异常: " + ex.Message); }
 
+            try { TestProjectTemplatesFfi(); }
+            catch (Exception ex) { Log.Error("TestRunner", "TestProjectTemplatesFfi异常: " + ex.Message); }
+
             Log.Info("TestRunner", "===== 测试完成: PASS=" + _passCount + ", FAIL=" + _failCount + " =====");
         }
 
@@ -987,6 +990,46 @@ namespace Hezhou
             Hezhou.Engine.Scene.DestroyEntity(cube);
             AssertTrue("EngineApi", !Hezhou.Engine.Scene.EntityExists(cube.Id),
                 "DestroyEntity 后 EntityExists=false");
+        }
+
+
+        /// <summary>
+        /// 0.4 项目模板自检（task-49）：扫描模板、创建工程+占位替换、目标已存在拒绝、加载工程。
+        /// </summary>
+        private static void TestProjectTemplatesFfi()
+        {
+            string listJson = UI.TemplateListJson();
+            bool listed = listJson.IndexOf("\"empty-3d\"") >= 0
+                && listJson.IndexOf("\"action-sandbox\"") >= 0;
+            AssertTrue("Templates", listed,
+                "模板列表包含 empty-3d/action-sandbox (len=" + listJson.Length + ")");
+
+            string root = System.IO.Directory.GetCurrentDirectory();
+            string dest = System.IO.Path.Combine(root, "logs", "template_selftest_project");
+            try { if (System.IO.Directory.Exists(dest)) System.IO.Directory.Delete(dest, true); } catch (Exception) { }
+
+            int createRc = UI.TemplateCreate("empty-3d", dest, "TemplateSelfTest");
+            string projectPath = System.IO.Path.Combine(dest, "project.json");
+            string settingsPath = System.IO.Path.Combine(dest, "build.settings.json");
+            string projectJson = System.IO.File.Exists(projectPath)
+                ? System.IO.File.ReadAllText(projectPath) : "";
+            bool filesOk = createRc == 0
+                && System.IO.File.Exists(settingsPath)
+                && projectJson.IndexOf("TemplateSelfTest") >= 0
+                && projectJson.IndexOf("{{PROJECT_NAME}}") < 0;
+            AssertTrue("Templates", filesOk,
+                "创建模板工程+占位替换 (rc=" + createRc + ")");
+
+            int duplicateRc = UI.TemplateCreate("empty-3d", dest, "TemplateSelfTest2");
+            AssertTrue("Templates", duplicateRc == -2,
+                "目标已存在非空被拒绝 (rc=" + duplicateRc + ")");
+
+            bool loaded = Project.Load(dest);
+            AssertTrue("Templates", loaded && Project.GetName() == "TemplateSelfTest",
+                "加载模板工程 (loaded=" + loaded + ", name="
+                    + (loaded ? Project.GetName() : "") + ")");
+
+            try { if (System.IO.Directory.Exists(dest)) System.IO.Directory.Delete(dest, true); } catch (Exception) { }
         }
 
         // 内存保存值结构（模拟SavedScriptPropertyValue，用于测试）

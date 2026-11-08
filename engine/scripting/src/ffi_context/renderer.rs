@@ -118,3 +118,12 @@ pub type AnimationPreviewStateSnapshotFn =
 /// 释放状态图。
 pub type AnimationPreviewGraphFreeFn = extern "C" fn() -> i32;
 
+
+// === 0.4 项目模板（task-49） ===
+
+/// 列出可用项目模板（JSON：count/templates[]）。
+pub type TemplateListJsonFn = extern "C" fn(*mut std::ffi::c_char, usize) -> usize;
+
+/// 从模板创建工程（0=成功，-1 参数/模板无效，-2 目标非空，-3 IO 失败）。
+pub type TemplateCreateFn =
+    extern "C" fn(*const std::ffi::c_char, *const std::ffi::c_char, *const std::ffi::c_char) -> i32;

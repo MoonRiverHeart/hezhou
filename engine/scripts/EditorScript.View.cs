@@ -320,8 +320,7 @@ namespace Hezhou
             UI.CreateLabel(projectAssetTabContent, 640f, 22f, "扫描结果同时输出到 Console；AssetId 可用 UI.AssetGetAsset(index) 查询");
 
             // 0.2 场景 / Prefab / Player 导出（task-21）
-            UI.CreateLabel(projectAssetTabContent, 520f, 24f, "场景 / Prefab / Player 导出（task-21）");
-            ulong sceneSaveButton = UI.CreateButton(projectAssetTabContent, 150f, 26f, "保存当前场景");
+            UI.CreateLabel(projectAssetTabContent, 520f, 24f, "场景 / Prefab / Player 导出（task-21）");            ulong sceneSaveButton = UI.CreateButton(projectAssetTabContent, 150f, 26f, "保存当前场景");
             UI.SetOnClick(sceneSaveButton, _sceneSaveCallback);
             ulong sceneSwitchButton = UI.CreateButton(projectAssetTabContent, 130f, 26f, "切换场景");
             UI.SetOnClick(sceneSwitchButton, _sceneSwitchCallback);
@@ -340,6 +339,13 @@ namespace Hezhou
             _sceneInfoLabelId = UI.CreateLabel(projectAssetTabContent, 720f, 24f, "场景: 未保存（槽 0）");
             _exportInfoLabelId = UI.CreateLabel(projectAssetTabContent, 720f, 24f, "Player 导出: 未执行");
             UI.CreateLabel(projectAssetTabContent, 720f, 22f, "Dry-run 输出到 logs/player_dry_run（双平台 manifest/plan/file-list）");
+
+            // 0.4 项目模板 / 新建工程（task-49）
+            UI.CreateLabel(projectAssetTabContent, 520f, 24f, "项目模板（0.4）");
+            ulong newProjectButton = UI.CreateButton(projectAssetTabContent, 180f, 26f, "新建项目（模板）");
+            UI.SetOnClick(newProjectButton, _newProjectOpenCallback);
+            UI.CreateLabel(projectAssetTabContent, 720f, 22f,
+                "模板目录: engine/templates（empty-3d / action-sandbox）");
 
             // 0.3 Profiler 面板（task-39）：CPU 帧时间 ring buffer/FPS/启动耗时/场景与资产统计
             _profilerTabContentId = UI.CreateVStack(_assetTabWidget.Id, 5f);

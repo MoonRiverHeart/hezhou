@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using HezhouScripts;
@@ -80,6 +80,8 @@ namespace Hezhou
             _animStateButtonCallback = OnAnimationStateButtonClick;
             _animInitGraphCallback = OnAnimationInitGraphClick;
             _animFreeGraphCallback = OnAnimationFreeGraphClick;
+            _newProjectOpenCallback = OnNewProjectClick;
+            _newProjectDialogResultCallback = OnNewProjectDialogResult;
             _textureAssetClickCallback = OnTextureAssetClick;
             _textureRefreshCallback = OnTextureRefreshClick;
             _textureClearCallback = OnTextureClearClick;
@@ -2077,6 +2079,132 @@ _bindScriptClickCallback = OnBindScriptClick;
             {
                 UI.SetText(_animGraphStatusLabelId, text);
             }
+        }
+
+        // === 0.4 项目模板/新建工程（task-49） ===
+
+        private static void OnNewProjectClick(ulong widgetId)
+        {
+            ShowNewProjectDialog();
+        }
+
+        /// <summary>「新建项目」对话框：模板下拉 + 项目名 + 目标目录。</summary>
+        private static void ShowNewProjectDialog()
+        {
+            string json = UI.TemplateListJson();
+            ParseTemplates(json, out _newProjectTemplateIds, out _newProjectTemplateNames);
+            if (_newProjectTemplateIds.Length == 0)
+            {
+                if (_statusItem != null) _statusItem.Text = "未找到项目模板（engine/templates）";
+                Log.Warn("Template", "模板列表为空: " + json);
+                return;
+            }
+
+            ulong rootId = UI.GetRootId();
+            _newProjectDialogId = UI.CreateDialog(rootId, "新建项目（模板）", 640f, 360f);
+            UI.DialogSetOnResult(_newProjectDialogId, _newProjectDialogResultCallback);
+            ulong contentId = UI.CreateVStack(_newProjectDialogId, 8f);
+            UI.CreateLabel(contentId, 600f, 24f, "从模板创建新工程:");
+            _newProjectTemplateDropdownId = UI.CreateDropdown(contentId, 360f, 26f);
+            UI.DropdownSetOptions(_newProjectTemplateDropdownId, _newProjectTemplateNames);
+            UI.DropdownSetSelected(_newProjectTemplateDropdownId, 0);
+            UI.CreateLabel(contentId, 600f, 22f, "项目名:");
+            _newProjectNameFieldId = UI.CreateInputField(contentId, 360f, 24f);
+            UI.InputFieldSetText(_newProjectNameFieldId, "MyGame");
+            UI.CreateLabel(contentId, 600f, 22f, "目标目录（不存在或空目录）:");
+            _newProjectDestFieldId = UI.CreateInputField(contentId, 520f, 24f);
+            UI.InputFieldSetText(_newProjectDestFieldId,
+                System.IO.Path.Combine(System.IO.Directory.GetCurrentDirectory(), "MyGame"));
+            _newProjectStatusLabelId = UI.CreateLabel(contentId, 600f, 22f,
+                "模板: " + _newProjectTemplateIds.Length + " 个可用");
+            UI.DialogSetContent(_newProjectDialogId, contentId);
+            UI.DialogAddButton(_newProjectDialogId, "创建", 1);
+            UI.DialogAddButton(_newProjectDialogId, "取消", 0);
+            UI.DialogShow(_newProjectDialogId);
+        }
+
+        private static void OnNewProjectDialogResult(ulong dialogId, int result)
+        {
+            if (result != 1)
+            {
+                UI.DialogHide(_newProjectDialogId);
+                return;
+            }
+
+            ulong selectedIndex = UI.DropdownGetSelected(_newProjectTemplateDropdownId);
+            string templateId = selectedIndex < (ulong)_newProjectTemplateIds.Length
+                ? _newProjectTemplateIds[(int)selectedIndex] : "";
+            string projectName = UI.InputFieldGetText(_newProjectNameFieldId).Trim();
+            string destDir = UI.InputFieldGetText(_newProjectDestFieldId).Trim();
+            int rc = UI.TemplateCreate(templateId, destDir, projectName);
+            if (rc != 0)
+            {
+                string reason = rc == -1 ? "模板/项目名/目录参数无效"
+                    : rc == -2 ? "目标目录已存在且非空"
+                    : "IO 失败（详见 Console）";
+                if (_newProjectStatusLabelId != 0)
+                {
+                    UI.SetText(_newProjectStatusLabelId, "创建失败: " + reason);
+                }
+                Log.Warn("Template", "创建项目失败 rc=" + rc + " template=" + templateId
+                    + " dest=" + destDir + " name=" + projectName);
+                return;
+            }
+
+            UI.DialogHide(_newProjectDialogId);
+            Log.Info("Template", "已从模板创建工程: " + destDir + "（" + templateId + "）");
+            bool loaded = Project.Load(destDir);
+            if (loaded)
+            {
+                CleanupScriptInstancesBeforeSceneReplace();
+                Project.SyncToScene(_gameScene.ScenePtr);
+                RefreshSceneTreeAfterLoad();
+                ResetUndoHistory();
+                UI.AssetOpenProject(destDir);
+                UI.AssetScan();
+                LoadBuildSettingsIntoFields();
+                if (_statusItem != null) _statusItem.Text = "新工程已创建并加载: " + Project.GetName();
+                Log.Info("Editor", "新建工程加载成功: " + destDir);
+            }
+            else
+            {
+                if (_statusItem != null) _statusItem.Text = "新工程已创建，但加载失败: " + destDir;
+                Log.Error("Template", "模板工程创建后加载失败: " + destDir);
+            }
+        }
+
+        /// <summary>解析模板列表 JSON 中 templates[] 的 id/name。</summary>
+        private static void ParseTemplates(string json, out string[] ids, out string[] names)
+        {
+            System.Collections.Generic.List<string> idList =
+                new System.Collections.Generic.List<string>();
+            System.Collections.Generic.List<string> nameList =
+                new System.Collections.Generic.List<string>();
+            int templatesIndex = json.IndexOf("\"templates\":[");
+            if (templatesIndex >= 0)
+            {
+                int pos = templatesIndex + "\"templates\":[".Length;
+                while (pos < json.Length)
+                {
+                    int open = json.IndexOf('{', pos);
+                    if (open < 0) break;
+                    int close = json.IndexOf('}', open + 1);
+                    if (close < 0) break;
+                    string segment = json.Substring(open, close - open + 1);
+                    string id = ParsePbrString(segment, "id");
+                    string name = ParsePbrString(segment, "name");
+                    if (id.Length > 0)
+                    {
+                        idList.Add(id);
+                        nameList.Add(name.Length > 0 ? (name + "  [" + id + "]") : id);
+                    }
+                    int nextOpen = json.IndexOf('{', close + 1);
+                    if (nextOpen < 0) break;
+                    pos = nextOpen;
+                }
+            }
+            ids = idList.ToArray();
+            names = nameList.ToArray();
         }
 
         // === 自检用只读辅助（TestRunner 调用） ===
