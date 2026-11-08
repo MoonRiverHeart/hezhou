@@ -1,0 +1,11 @@
+{
+  "product_name": "Third Person Demo",
+  "executable_name": "third-person-demo",
+  "start_scene": "scenes/main.scene",
+  "quality": "high",
+  "window": { "width": 1280, "height": 720, "mode": "windowed" },
+  "targets": ["windows", "linux"],
+  "version": "1.0.0",
+  "log_dir": "logs",
+  "required_font": null
+}

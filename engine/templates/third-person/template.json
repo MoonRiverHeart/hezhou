@@ -1,0 +1,15 @@
+{
+  "id": "third-person",
+  "name": "Third Person",
+  "version": "1.0.0",
+  "description": "第三人称模板：20x20 地面、方向光、Player 角色占位、障碍/台阶、第三人称相机构图与 Build Settings；适合物理/相机/输入接入。",
+  "min_engine_version": "1.0.0",
+  "files": [
+    "project.json",
+    "build.settings.json",
+    "README.md",
+    "assets/scenes/main.scene",
+    "assets/README.md",
+    "scripts/README.md"
+  ]
+}
