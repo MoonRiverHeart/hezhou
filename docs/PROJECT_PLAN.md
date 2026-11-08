@@ -22,6 +22,7 @@
 - ✅ 0.3 性能：headless `perf_smoke` + CI `perf-baseline` 门禁。
 - ✅ 0.4 第一批：项目模板（empty-3d/action-sandbox）+ 编辑器新建工程；FFI 336，启动自检 **PASS=106**。
 - ✅ 1.0 稳定性第一批：headless `soak_smoke`（ECS/物理/动画/角色循环、RSS/帧时间 JSON、60s quick CI `soak-quick`）；本机 60s release PASS，内存增长 0.39MB / 6.71%。
+- ✅ 1.0 诊断包：`diagnostics.ps1` 自检 PASS，脱敏/排除敏感文件/限制大小；CI `diagnostics-smoke` 双平台 job。
 - ⏳ 下一阶段：0.4 平台扩展、网络、插件/包管理器、稳定性 30min+；0.3 已知限制见 RELEASE_NOTES_0.3.0.md。
 
 ## 1. 执行摘要
