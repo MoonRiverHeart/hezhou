@@ -52,6 +52,44 @@ jobs:
         shell: pwsh
         run: ./scripts/ci_local.ps1 -SkipBuild
 
+  perf-baseline:
+    # 0.3 性能门禁：headless 基准（ECS/物理/动画/音频/资产），release 构建。
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ env.RUST_VERSION }}
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: engine
+
+      - name: Install Linux build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential cmake ninja-build pkg-config python3 \
+            libvulkan-dev libglfw3-dev libx11-dev libxrandr-dev \
+            libxi-dev libxcursor-dev libxinerama-dev libxkbcommon-dev \
+            libxkbcommon-x11-dev libwayland-dev wayland-protocols libdecor-0-dev \
+            libx11-xcb-dev libxcb1-dev libxcb-randr0-dev libxcb-xinerama0-dev \
+            libxcb-xkb-dev libxcb-shape0-dev libxcb-xfixes0-dev libasound2-dev
+
+      - name: Run perf baseline gate (release)
+        shell: pwsh
+        run: pwsh -File engine/scripts/perf_baseline.ps1 -Profile release
+
+      - name: Upload perf baseline report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: perf-baseline-report
+          path: test-results/perf-baseline/**
+          if-no-files-found: warn
+
   csharp-build:
     runs-on: windows-latest
     timeout-minutes: 30

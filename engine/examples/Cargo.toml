@@ -110,3 +110,7 @@ path = "src/screenshot_demo.rs"
 [[bin]]
 name = "capability_demo"
 path = "src/capability_demo.rs"
+
+[[bin]]
+name = "perf_smoke"
+path = "src/bin/perf_smoke.rs"

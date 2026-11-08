@@ -33,6 +33,9 @@ oh_modules/
 # C# 编译产物
 bin/
 obj/
+# Rust 示例的 src/bin 是源码目录（如 perf_smoke 基准），不是 C# 构建产物
+!engine/examples/src/bin/
+!engine/examples/src/bin/perf_smoke.rs
 
 # Release packages (large zip files)
 release/*.zip
