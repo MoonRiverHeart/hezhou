@@ -24,6 +24,8 @@
 - ✅ 1.0 稳定性第一批：headless `soak_smoke`（ECS/物理/动画/角色循环、RSS/帧时间 JSON、60s quick CI `soak-quick`）；本机 60s release PASS，内存增长 0.39MB / 6.71%。
 - ✅ 1.0 诊断包：`diagnostics.ps1` 自检 PASS，脱敏/排除敏感文件/限制大小；CI `diagnostics-smoke` 双平台 job。
 - ✅ CI run 42476382740 全绿：rust/csharp/package-windows/linux/player-build/window-host/package-player/perf-baseline/soak-quick/diagnostics-smoke。
+- ✅ 0.4 包管理器：hezhou-package（manifest/registry/依赖拓扑/installer/lockfile）+ 编辑器 Packages Tab；FFI 340，启动自检 **PASS=112**；CI run 42477811833 全绿。
+- ✅ 30 分钟 soak：1800s、107999 ticks、0 overruns、RESULT PASS；RSS 5.78→7.55MB（+1.77MB / 30.5%，绝对增长在阈值内，低基数导致百分比偏高，需 0.4 继续观察）。
 - ⏳ 下一阶段：0.4 平台扩展、网络、插件/包管理器、稳定性 30min+；0.3 已知限制见 RELEASE_NOTES_0.3.0.md。
 
 ## 1. 执行摘要
