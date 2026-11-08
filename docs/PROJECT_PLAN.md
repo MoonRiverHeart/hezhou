@@ -31,6 +31,7 @@
 - ✅ Player C# 资产/音频 API v4：C# 枚举 6 个资产、加载 WAV、play/pause/resume/volume/stop；真实窗口 30 帧 exit 0；mono-host 123 tests。
 - ✅ Player C# 角色控制 API v5：PhysicsWorld 地面 + 每实体 CharacterMotor；C# 创建角色、每帧 step，30 帧位移 +0.669m、grounded；mono-host 129 tests。
 - ✅ Player AnimationStateMachine v6：9 状态机 + clip 名称映射 + 0.2s 过渡；C# 触发 Run/Attack，真实窗口 30 帧 palette 状态驱动；mono-host 134 tests。
+- ✅ Player 发布链路：新增双平台 `package-player` CI（window-host demo zip/tar），Windows 本地包 validate + 5 帧窗口运行通过。
 - ✅ 本地 CI `ci_local.ps1 -Offline` 通过（默认测试 + feature 测试 + FFI 契约 + C# 编译 + 图标一致性）。
 - ✅ 验证证据：capability_demo 14/14 项通过；Player 72 tests；Core 43 tests；编辑器启动自检 PASS=57、FAIL=0；FFI 301/301/301。
 - ⏳ 未完成（0.2 验收尚未达成）：
