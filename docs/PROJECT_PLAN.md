@@ -22,6 +22,8 @@
 - ✅ 内置 Mono 运行时、C# PlayerGame、双平台 Capability Demo。
 - ✅ 0.3 第一批：编辑器 Profiler Tab（CPU 帧/FPS/启动/实体/PBR/蒙皮/资产/音频/内存，FFI 319）；启动自检 **PASS=80**。
 - ✅ 0.3 第一批：自研物理动态刚体（质量/阻尼/冲量）、Plane/AABB 碰撞响应、CCD、距离关节；physics **43 tests**。
+- ✅ 0.3 第二批：编辑器 Build Settings（build.settings.json + Build Tab + Player 导出读取，FFI 322，启动自检 **PASS=84**）；physics 固定关节 + 动态-动态 CCD，**48 tests**。
+- ✅ 本地 `ci_local.ps1 -Offline` 全绿（TMP/TEMP 指向可写目录）。
 - ⏳ 下一批 0.3：动画时间轴/材质编辑器/构建设置、C# 稳定 API、性能门禁、物理旋转/固定关节/空间索引。
 - 0.2 已知限制（详见 RELEASE_NOTES_0.2.0.md）：不是完整可玩垂直切片；蒙皮着色为 Blinn-Phong 回退；单 mesh/状态机无混合树；无完整战斗 API。
 
