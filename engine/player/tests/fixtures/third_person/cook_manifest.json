@@ -1,0 +1,27 @@
+{
+  "format_version": 1,
+  "roots": [
+    "55555555-5555-4555-8555-555555555555",
+    "66666666-6666-4666-8666-666666666666"
+  ],
+  "entries": [
+    {
+      "id": "66666666-6666-4666-8666-666666666666",
+      "kind": "font",
+      "locator": "assets/fonts/HarmonyOS_Sans_SC.ttf",
+      "output": "assets/66666666666646668666666666666666.ttf",
+      "dependencies": [],
+      "source_size": 12,
+      "source_hash": "a85ba37ce8e752d8"
+    },
+    {
+      "id": "55555555-5555-4555-8555-555555555555",
+      "kind": "scene",
+      "locator": "assets/scenes/third_person.scene",
+      "output": "assets/55555555555545558555555555555555.scene",
+      "dependencies": [],
+      "source_size": 1623,
+      "source_hash": "ba044ba1bc8b90f2"
+    }
+  ]
+}

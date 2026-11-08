@@ -1,6 +1,7 @@
 //! Player C# Scene Context ABI（task-32 v1 / task-33 v2 / task-34 v3 / task-35 v4 /
-//! task-36 v5 / task-37 v6）：把 Scene、动画运行时/状态图、资产目录、音频运行时与
-//! 角色控制运行时以 `#[repr(C)]` 函数指针表暴露给 C# `Hezhou.PlayerGame`。
+//! task-36 v5 / task-37 v6 / task-59 v7）：把 Scene、动画运行时/状态图、资产目录、
+//! 音频运行时、角色控制、输入快照与第三人称相机以 `#[repr(C)]` 函数指针表暴露给
+//! C# `Hezhou.PlayerGame`。
 //!
 //! # ABI 契约（C# `[StructLayout(LayoutKind.Sequential)]` 必须一致）
 //!
@@ -128,10 +129,12 @@ use crate::animation_control::PlayerAnimationState;
 use crate::animation_graph::PlayerAnimationGraph;
 use crate::asset_catalog::{PlayerAssetCatalog, PlayerAssetEntry};
 use crate::audio_runtime::PlayerAudioRuntime;
+use crate::camera_state::PlayerCameraState;
 use crate::gameplay_runtime::PlayerGameplayRuntime;
+use crate::input_state::PlayerInputState;
 
 /// 当前 Player C# Context ABI 版本。
-pub const PLAYER_CSHARP_CONTEXT_VERSION: u32 = 6;
+pub const PLAYER_CSHARP_CONTEXT_VERSION: u32 = 7;
 
 /// C# 侧函数指针：`scene_entity_count(scene) -> u32`。
 pub type SceneEntityCountFn = unsafe extern "C" fn(*mut Scene) -> u32;
@@ -238,6 +241,19 @@ pub type AnimationCurrentStateFn =
 pub type AnimationIsTransitioningFn = unsafe extern "C" fn(*mut PlayerAnimationGraph) -> i32;
 /// C# 侧函数指针：`animation_transition_alpha(graph) -> f32`（失败 NaN）。
 pub type AnimationTransitionAlphaFn = unsafe extern "C" fn(*mut PlayerAnimationGraph) -> f32;
+
+// ==== v7：输入快照 + 第三人称相机（task-59）====
+/// C# 侧函数指针：`input_axis_x(input) -> f32`。
+pub type InputAxisXFn = unsafe extern "C" fn(*mut PlayerInputState) -> f32;
+/// C# 侧函数指针：`input_axis_z(input) -> f32`。
+pub type InputAxisZFn = unsafe extern "C" fn(*mut PlayerInputState) -> f32;
+/// C# 侧函数指针：`input_jump_pressed(input) -> 1/0`。
+pub type InputJumpPressedFn = unsafe extern "C" fn(*mut PlayerInputState) -> i32;
+/// C# 侧函数指针：`camera_follow(camera, entity, distance, height, yaw, pitch) -> 0/-1`。
+pub type CameraFollowFn =
+    unsafe extern "C" fn(*mut PlayerCameraState, u64, f32, f32, f32, f32) -> i32;
+/// C# 侧函数指针：`camera_clear(camera) -> 0/-1`。
+pub type CameraClearFn = unsafe extern "C" fn(*mut PlayerCameraState) -> i32;
 
 /// `#[repr(C)]` Player C# Context：版本 + Scene 指针 + 6 个函数指针。
 #[repr(C)]
@@ -349,6 +365,21 @@ pub struct PlayerCSharpContext {
     pub animation_is_transitioning: Option<AnimationIsTransitioningFn>,
     /// 过渡 alpha。
     pub animation_transition_alpha: Option<AnimationTransitionAlphaFn>,
+    // ==== v7 tail 追加（task-59）：输入快照 + 第三人称相机 ====
+    /// 输入快照指针（host 每帧更新；可空）。
+    pub input_state: *mut PlayerInputState,
+    /// 水平 X 轴（右 +）。
+    pub input_axis_x: Option<InputAxisXFn>,
+    /// 水平 Z 轴（前 +）。
+    pub input_axis_z: Option<InputAxisZFn>,
+    /// Space 按下沿。
+    pub input_jump_pressed: Option<InputJumpPressedFn>,
+    /// 相机状态指针（host 读取并应用；可空）。
+    pub camera_state: *mut PlayerCameraState,
+    /// 设置第三人称跟随目标/参数。
+    pub camera_follow: Option<CameraFollowFn>,
+    /// 清除跟随目标。
+    pub camera_clear: Option<CameraClearFn>,
 }
 
 impl PlayerCSharpContext {
@@ -434,7 +465,38 @@ impl PlayerCSharpContext {
             animation_current_state: Some(animation_current_state),
             animation_is_transitioning: Some(animation_is_transitioning),
             animation_transition_alpha: Some(animation_transition_alpha),
+            input_state: std::ptr::null_mut(),
+            input_axis_x: Some(input_axis_x),
+            input_axis_z: Some(input_axis_z),
+            input_jump_pressed: Some(input_jump_pressed),
+            camera_state: std::ptr::null_mut(),
+            camera_follow: Some(camera_follow),
+            camera_clear: Some(camera_clear),
         }
+    }
+
+    /// 为场景 + 动画 + 资产 + 音频 + 角色 + 状态图 + 输入/相机创建 context（v7）。
+    pub fn new_with_player_states(
+        scene: *mut Scene,
+        animation_state: *mut PlayerAnimationState,
+        assets: *mut PlayerAssetCatalog,
+        audio: *mut PlayerAudioRuntime,
+        gameplay: *mut PlayerGameplayRuntime,
+        graph: *mut PlayerAnimationGraph,
+        input: *mut PlayerInputState,
+        camera: *mut PlayerCameraState,
+    ) -> Self {
+        let mut context = Self::new_with_animation_graph(
+            scene,
+            animation_state,
+            assets,
+            audio,
+            gameplay,
+            graph,
+        );
+        context.input_state = input;
+        context.camera_state = camera;
+        context
     }
 
     /// 为场景 + 动画 + 资产 + 音频 + 角色 + 9 状态动画图创建 context（v6）。
@@ -1138,6 +1200,80 @@ pub unsafe extern "C" fn animation_transition_alpha(graph: *mut PlayerAnimationG
     with_graph(graph, f32::NAN, |graph| graph.transition_alpha())
 }
 
+/// 在 `catch_unwind` + 空指针保护下访问输入快照。
+fn with_input<R>(
+    input: *mut PlayerInputState,
+    default: R,
+    f: impl FnOnce(&PlayerInputState) -> R,
+) -> R {
+    if input.is_null() {
+        return default;
+    }
+    match catch_unwind(AssertUnwindSafe(|| f(unsafe { &*input }))) {
+        Ok(value) => value,
+        Err(_) => default,
+    }
+}
+
+/// 在 `catch_unwind` + 空指针保护下访问相机状态。
+fn with_camera<R>(
+    camera: *mut PlayerCameraState,
+    default: R,
+    f: impl FnOnce(&mut PlayerCameraState) -> R,
+) -> R {
+    if camera.is_null() {
+        return default;
+    }
+    match catch_unwind(AssertUnwindSafe(|| f(unsafe { &mut *camera }))) {
+        Ok(value) => value,
+        Err(_) => default,
+    }
+}
+
+/// `input_axis_x(input)`：水平 X 轴；空指针 0。
+pub unsafe extern "C" fn input_axis_x(input: *mut PlayerInputState) -> f32 {
+    with_input(input, 0.0, |input| input.axis_x())
+}
+
+/// `input_axis_z(input)`：水平 Z 轴；空指针 0。
+pub unsafe extern "C" fn input_axis_z(input: *mut PlayerInputState) -> f32 {
+    with_input(input, 0.0, |input| input.axis_z())
+}
+
+/// `input_jump_pressed(input)`：1/0；空指针 0。
+pub unsafe extern "C" fn input_jump_pressed(input: *mut PlayerInputState) -> i32 {
+    with_input(input, 0, |input| i32::from(input.jump_pressed()))
+}
+
+/// `camera_follow(camera, entity, distance, height, yaw, pitch)`：0 成功 / -1 失败。
+pub unsafe extern "C" fn camera_follow(
+    camera: *mut PlayerCameraState,
+    entity: u64,
+    distance: f32,
+    height: f32,
+    yaw: f32,
+    pitch: f32,
+) -> i32 {
+    with_camera(camera, -1, |camera| {
+        if camera
+            .follow(entity, distance, height, yaw, pitch)
+            .is_ok()
+        {
+            0
+        } else {
+            -1
+        }
+    })
+}
+
+/// `camera_clear(camera)`：0 成功 / -1 空指针。
+pub unsafe extern "C" fn camera_clear(camera: *mut PlayerCameraState) -> i32 {
+    with_camera(camera, -1, |camera| {
+        camera.clear();
+        0
+    })
+}
+
 /// `log(ptr)`：把 C 字符串写到 stderr（Player 日志/控制台）；空指针/panic 安全。
 ///
 /// 该函数仅用于 C# 侧需要把消息回传 Rust 日志时；C# 也可以直接 Console.Error。
@@ -1189,11 +1325,11 @@ mod tests {
 
     #[test]
     fn context_layout_matches_csharp_contract() {
-        assert_eq!(PLAYER_CSHARP_CONTEXT_VERSION, 6);
-        // 8 + scene 指针 + v1 6 + v2 6 + v3 11 + v4 13 + v5 6 + v6 6 = 49 个槽。
+        assert_eq!(PLAYER_CSHARP_CONTEXT_VERSION, 7);
+        // 8 + scene 指针 + v1 6 + v2 6 + v3 11 + v4 13 + v5 6 + v6 6 + v7 7 = 56 个槽。
         assert_eq!(
             std::mem::size_of::<PlayerCSharpContext>(),
-            8 + std::mem::size_of::<usize>() * 49
+            8 + std::mem::size_of::<usize>() * 56
         );
         assert_eq!(std::mem::align_of::<PlayerCSharpContext>(), 8);
         let scene = Scene::new();
@@ -1252,6 +1388,14 @@ mod tests {
         assert!(context.animation_current_state.is_some());
         assert!(context.animation_is_transitioning.is_some());
         assert!(context.animation_transition_alpha.is_some());
+        // v7 tail：默认无 input/camera 状态指针。
+        assert!(context.input_state.is_null());
+        assert!(context.input_axis_x.is_some());
+        assert!(context.input_axis_z.is_some());
+        assert!(context.input_jump_pressed.is_some());
+        assert!(context.camera_state.is_null());
+        assert!(context.camera_follow.is_some());
+        assert!(context.camera_clear.is_some());
         // 通过 context 里的函数指针调用，验证 ABI 字段可执行。
         let scene_ptr = context.scene;
         let count = unsafe { context.scene_entity_count.unwrap()(scene_ptr) };
@@ -1493,6 +1637,63 @@ mod tests {
     }
 
     #[test]
+    fn v7_input_and_camera_api() {
+        let mut scene = Scene::new();
+        let cube = scene.create_cube();
+        let mut input = PlayerInputState::new();
+        input.set(0.5, -1.0, true);
+        let mut camera = PlayerCameraState::new();
+        let context = PlayerCSharpContext::new_with_player_states(
+            &mut scene as *mut Scene,
+            std::ptr::null_mut(),
+            std::ptr::null_mut(),
+            std::ptr::null_mut(),
+            std::ptr::null_mut(),
+            std::ptr::null_mut(),
+            &mut input as *mut PlayerInputState,
+            &mut camera as *mut PlayerCameraState,
+        );
+        assert!(!context.input_state.is_null());
+        assert!(!context.camera_state.is_null());
+        assert_eq!(unsafe { input_axis_x(context.input_state) }, 0.5);
+        assert_eq!(unsafe { input_axis_z(context.input_state) }, -1.0);
+        assert_eq!(unsafe { input_jump_pressed(context.input_state) }, 1);
+        assert_eq!(
+            unsafe {
+                camera_follow(
+                    context.camera_state,
+                    cube.id,
+                    5.0,
+                    2.5,
+                    0.0,
+                    -0.261_799_39,
+                )
+            },
+            0
+        );
+        assert_eq!(camera.target(), Some(cube.id));
+        let pose = camera.pose_for(&scene).expect("pose");
+        assert!((pose.z - 5.0).abs() < 1e-5);
+        assert!((pose.y - 2.5).abs() < 1e-5);
+        assert_eq!(unsafe { camera_clear(context.camera_state) }, 0);
+        assert!(camera.target().is_none());
+        // 非法参数安全失败。
+        assert_eq!(
+            unsafe {
+                camera_follow(
+                    context.camera_state,
+                    cube.id,
+                    -1.0,
+                    2.5,
+                    0.0,
+                    -0.2,
+                )
+            },
+            -1
+        );
+    }
+
+    #[test]
     fn null_scene_functions_are_safe() {
         unsafe {
             assert_eq!(scene_entity_count(std::ptr::null_mut()), 0);
@@ -1632,6 +1833,22 @@ mod tests {
             );
             assert_eq!(animation_is_transitioning(std::ptr::null_mut()), 0);
             assert!(animation_transition_alpha(std::ptr::null_mut()).is_nan());
+            // v7：空输入/相机安全返回。
+            assert_eq!(input_axis_x(std::ptr::null_mut()), 0.0);
+            assert_eq!(input_axis_z(std::ptr::null_mut()), 0.0);
+            assert_eq!(input_jump_pressed(std::ptr::null_mut()), 0);
+            assert_eq!(
+                camera_follow(
+                    std::ptr::null_mut(),
+                    1,
+                    5.0,
+                    2.5,
+                    0.0,
+                    -0.2
+                ),
+                -1
+            );
+            assert_eq!(camera_clear(std::ptr::null_mut()), -1);
             player_context_log(std::ptr::null());
         }
     }

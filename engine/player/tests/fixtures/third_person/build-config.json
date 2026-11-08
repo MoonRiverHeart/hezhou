@@ -1,0 +1,16 @@
+{
+  "product_name": "Third Person Demo",
+  "executable_name": "third-person-demo",
+  "start_scene": "scenes/third_person.scene",
+  "version": "0.1.0",
+  "target": "windows",
+  "quality": "low",
+  "window": {
+    "title": "Hezhou Third Person Demo",
+    "width": 960,
+    "height": 540,
+    "mode": "windowed"
+  },
+  "log_dir": "logs",
+  "required_font": "fonts/HarmonyOS_Sans_SC.ttf"
+}

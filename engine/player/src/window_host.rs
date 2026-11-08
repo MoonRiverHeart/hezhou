@@ -38,7 +38,9 @@ use crate::animation_control::PlayerAnimationState;
 use crate::animation_graph::PlayerAnimationGraph;
 use crate::asset_catalog::PlayerAssetCatalog;
 use crate::audio_runtime::PlayerAudioRuntime;
+use crate::camera_state::PlayerCameraState;
 use crate::gameplay_runtime::PlayerGameplayRuntime;
+use crate::input_state::PlayerInputState;
 #[cfg(feature = "mono-host")]
 use crate::mono_host::{find_player_game_script, PlayerGameScript};
 use crate::skinned_asset::{select_first_skinned_asset, SelectedSkinnedAsset};
@@ -56,6 +58,30 @@ pub const MAX_FRAME_LIMIT: u32 = 100_000;
 const CAMERA: (f32, f32, f32, f32, f32) = (45.0, -30.0, 0.0, 1.5, 5.0);
 /// 每帧休眠（约 60fps）。
 const FRAME_SLEEP: Duration = Duration::from_millis(16);
+
+/// 从 renderer 持续按键状态生成输入快照：WASD/方向键 + Space 按下沿。
+fn sample_keyboard_input(
+    renderer: &UIVulkanRenderer,
+    previous_space: &mut bool,
+) -> (f32, f32, bool) {
+    use hezhou_platform::KeyCode;
+    let down = |key: KeyCode| renderer.is_key_down(key as u32);
+    let right = down(KeyCode::D) || down(KeyCode::Right);
+    let left = down(KeyCode::A) || down(KeyCode::Left);
+    let forward = down(KeyCode::W) || down(KeyCode::Up);
+    let backward = down(KeyCode::S) || down(KeyCode::Down);
+    let axis_x = i32::from(right) as f32 - i32::from(left) as f32;
+    let axis_z = i32::from(forward) as f32 - i32::from(backward) as f32;
+    let space = down(KeyCode::Space);
+    let jump_pressed = space && !*previous_space;
+    *previous_space = space;
+    (axis_x, axis_z, jump_pressed)
+}
+
+/// 第三人称 demo 包识别（build-config/product_name 含 `Third Person`）。
+fn is_third_person_demo(product_name: &str) -> bool {
+    product_name.to_ascii_lowercase().contains("third person")
+}
 
 /// 真实窗口 + Vulkan 渲染 host。
 #[derive(Clone, Copy, Debug)]
@@ -324,6 +350,19 @@ impl PlayerHost for WindowPlayerHost {
             &format!("{}", gameplay_runtime.summary()),
         );
 
+        // 输入/第三人称相机状态（task-59）：每帧更新，ABI v7 传给 C#。
+        let mut input_state = PlayerInputState::new();
+        let mut camera_state = PlayerCameraState::new();
+        let third_person_demo = is_third_person_demo(&context.manifest.product_name);
+        if third_person_demo {
+            // C# 读取该环境变量进入第三人称 demo 分支（默认 legacy capability 探测）。
+            std::env::set_var("HEZHOU_PLAYER_DEMO", "third_person");
+            context.log.host_log(
+                LogLevel::Info,
+                "第三人称 demo：启用 WASD/方向键 + Space 输入、相机跟随 ABI v7",
+            );
+        }
+
         // ---- 可选 C# PlayerGame 入口（feature = mono-host）----
         #[cfg(feature = "mono-host")]
         let mut mono_state: Option<MonoHostState> = None;
@@ -335,7 +374,7 @@ impl PlayerHost for WindowPlayerHost {
         }
         // PlayerCSharpContext 必须覆盖整个帧循环（C# 只在 Initialize/Update/Shutdown 内调用）。
         #[cfg(feature = "mono-host")]
-        let csharp_context = crate::csharp_context::PlayerCSharpContext::new_with_animation_graph(
+        let csharp_context = crate::csharp_context::PlayerCSharpContext::new_with_player_states(
             context.start_scene as *mut Scene,
             &mut animation_state as *mut PlayerAnimationState,
             &asset_catalog as *const PlayerAssetCatalog as *mut PlayerAssetCatalog,
@@ -345,6 +384,8 @@ impl PlayerHost for WindowPlayerHost {
                 .as_mut()
                 .map(|graph| graph as *mut PlayerAnimationGraph)
                 .unwrap_or(std::ptr::null_mut()),
+            &mut input_state as *mut PlayerInputState,
+            &mut camera_state as *mut PlayerCameraState,
         );
         #[cfg(feature = "mono-host")]
         match find_player_game_script(context.manifest, context.root) {
@@ -429,9 +470,16 @@ impl PlayerHost for WindowPlayerHost {
         let started = Instant::now();
         let mut frames: u32 = 0;
         let mut closed_by_user = false;
+        let mut previous_space = false;
+        let mut camera_missing_warned = false;
+        let mut camera_pose_logged = false;
         while frames < self.frame_limit {
             let keep_running = match catch_unwind(AssertUnwindSafe(|| {
                 renderer.process_events();
+                // process_events 之后生成本帧输入快照（WASD/方向键 + Space 按下沿）。
+                let (axis_x, axis_z, jump_pressed) =
+                    sample_keyboard_input(&renderer, &mut previous_space);
+                input_state.set(axis_x, axis_z, jump_pressed);
                 renderer.draw_frame()
             })) {
                 Ok(Ok(running)) => running,
@@ -527,6 +575,49 @@ impl PlayerHost for WindowPlayerHost {
                         ),
                     );
                     mono_state = None;
+                }
+            }
+
+            // 第三人称相机（task-59）：C# Update 后读取 camera_follow 目标并应用。
+            if third_person_demo && camera_state.target().is_some() {
+                let scene_ref = &*context.start_scene;
+                match camera_state.pose_for(scene_ref) {
+                    Some(pose) => {
+                        renderer.set_camera_params(
+                            pose.yaw,
+                            pose.pitch,
+                            pose.x,
+                            pose.y,
+                            pose.z,
+                        );
+                        if !camera_pose_logged {
+                            camera_pose_logged = true;
+                            context.log.host_log(
+                                LogLevel::Info,
+                                &format!(
+                                    "相机跟随：entity={:?} pose=({:.2},{:.2},{:.2}) yaw={:.2} pitch={:.2}",
+                                    camera_state.target(),
+                                    pose.x,
+                                    pose.y,
+                                    pose.z,
+                                    pose.yaw,
+                                    pose.pitch
+                                ),
+                            );
+                        }
+                    }
+                    None => {
+                        if !camera_missing_warned {
+                            camera_missing_warned = true;
+                            context.log.host_log(
+                                LogLevel::Warn,
+                                &format!(
+                                    "相机跟随目标实体不存在（entity={:?}）；保持上一帧相机",
+                                    camera_state.target()
+                                ),
+                            );
+                        }
+                    }
                 }
             }
 

@@ -12,7 +12,7 @@ use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use common::{cooked_fixture_dir, skinned_fixture_dir, TempDir};
+use common::{cooked_fixture_dir, skinned_fixture_dir, third_person_fixture_dir, TempDir};
 use hezhou_player::builder::{
     BuildSources, CookManifest, PlayerBuildInput, PlayerBuilder, RuntimePayload, ScriptAssembly,
 };
@@ -266,7 +266,7 @@ fn actual_window_host_calls_csharp_scene_context() {
 
     let log = std::fs::read_to_string(log_dir.join("player.log")).expect("读取 player.log");
     assert!(
-        log.contains("mono-host：Scene context 已提供（初始 3 实体，ABI v6"),
+        log.contains("mono-host：Scene context 已提供（初始 3 实体，ABI v7"),
         "日志：{log}"
     );
     assert!(
@@ -449,6 +449,72 @@ fn actual_window_host_calls_csharp_assets_and_audio() {
         csharp_log.contains("Audio: Shutdown isPlaying=1 stopResult=0 isPlayingAfterStop=0"),
         "C# 日志：{csharp_log}"
     );
+}
+
+/// 从 C# 日志行 `position=(x,y,z)` 解析 X。
+fn parse_position_x(line: &str) -> Option<f32> {
+    let start = line.find("position=(")? + "position=(".len();
+    let rest = &line[start..];
+    rest.split(',').next()?.trim().parse::<f32>().ok()
+}
+
+/// 真实窗口第三人称 demo（task-59）：third_person fixture + 真实 PlayerGame.cs，
+/// autopilot 向 +X 移动、第 20 帧跳跃；断言角色位移/跳跃/相机跟随/渲染 30 帧。
+#[cfg(feature = "mono-host")]
+#[ignore = "需要显示环境 + Vulkan GPU + Mono；CI 默认跳过，本机手工验证"]
+#[test]
+fn actual_window_host_renders_third_person_demo() {
+    use common::compile_engine_player_game;
+
+    let temp = TempDir::new("window-host-third-person");
+    let fixture = third_person_fixture_dir();
+    let Some(dll) = compile_engine_player_game(&temp) else {
+        return;
+    };
+    let scripts = vec![ScriptAssembly::with_source("PlayerGame.dll", &dll)];
+    let (package, stem) = build_fixture_package_with_scripts(&temp, &fixture, Some(scripts));
+    let log_dir = temp.join("logs");
+    let mono_log = temp.join("mono-third-person.log");
+
+    let result = run_window_host_with_env(
+        &package,
+        &stem,
+        "30",
+        &log_dir,
+        &[
+            ("HEZHOU_PLAYER_MONO_LOG", mono_log.to_str().unwrap()),
+            ("HEZHOU_PLAYER_DEMO_AUTOPILOT", "1"),
+        ],
+    );
+    assert!(
+        result.status.success(),
+        "第三人称窗口 host 失败\nstdout: {}\nstderr: {}",
+        String::from_utf8_lossy(&result.stdout),
+        String::from_utf8_lossy(&result.stderr)
+    );
+    assert_eq!(result.status.code(), Some(0));
+
+    let log = std::fs::read_to_string(log_dir.join("player.log")).expect("读取 player.log");
+    assert!(log.contains("第三人称 demo：启用"), "日志：{log}");
+    assert!(log.contains("相机跟随：entity="), "日志：{log}");
+    assert!(log.contains("窗口 host 结束：30 帧"), "日志：{log}");
+
+    let csharp_log = std::fs::read_to_string(&mono_log).expect("读取 C# 调用日志");
+    assert!(csharp_log.contains("ThirdPerson: ground="), "C# 日志：{csharp_log}");
+    assert!(csharp_log.contains("ThirdPerson: frame=1"), "C# 日志：{csharp_log}");
+    assert!(csharp_log.contains("ThirdPerson: jump frame=20"), "C# 日志：{csharp_log}");
+    let frame30 = csharp_log
+        .lines()
+        .find(|line| line.contains("ThirdPerson: frame=30"))
+        .expect("应有 frame=30 日志");
+    let moved_x = parse_position_x(frame30).expect("解析 frame30 位置");
+    assert!(moved_x > 0.5, "30 帧应向前移动：{frame30}");
+    let shutdown = csharp_log
+        .lines()
+        .find(|line| line.contains("ThirdPerson: Shutdown position="))
+        .expect("应有 Shutdown 位置日志");
+    let final_x = parse_position_x(shutdown).expect("解析 Shutdown 位置");
+    assert!(final_x > moved_x - 0.2, "Shutdown 位置应保持位移：{shutdown}");
 }
 
 /// 真实窗口 + C# 角色控制（feature = mono-host，task-36）：C# 对 cube 建立胶囊角色，

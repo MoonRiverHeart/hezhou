@@ -22,6 +22,8 @@ pub mod animation_control;
 pub mod asset_catalog;
 pub mod animation_graph;
 pub mod audio_runtime;
+pub mod camera_state;
+pub mod input_state;
 pub mod builder;
 pub mod gameplay_runtime;
 pub mod config;
@@ -52,7 +54,11 @@ pub use mono_host::{
 };
 
 pub use asset_index::{AssetIndexEntry, AssetIndexError, PlayerAssetIndex};
-pub use asset_catalog::{PlayerAssetCatalog, PlayerAssetEntry};
+pub use camera_state::{
+    CameraPose, CameraStateError, PlayerCameraState, DEFAULT_CAMERA_DISTANCE,
+    DEFAULT_CAMERA_HEIGHT, DEFAULT_CAMERA_PITCH,
+};
+pub use input_state::PlayerInputState;
 pub use animation_graph::{
     AnimationGraphClip, AnimationGraphError, PlayerAnimationGraph,
 };

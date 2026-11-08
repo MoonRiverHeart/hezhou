@@ -1,0 +1,97 @@
+{
+  "version": "1.0",
+  "name": "third-person-demo",
+  "path": "",
+  "created_at": "2026-11-08T00:00:00Z",
+  "modified_at": "2026-11-08T00:00:00Z",
+  "settings": {
+    "game_width": 960,
+    "game_height": 540,
+    "fps": 60
+  },
+  "entities": [
+    {
+      "id": 1,
+      "name": "Ground",
+      "transform": {
+        "position": [
+          0.0,
+          -0.6,
+          0.0
+        ],
+        "rotation": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          30.0,
+          0.5,
+          30.0
+        ]
+      },
+      "mesh_type": "Cube",
+      "scripts": [],
+      "components": {},
+      "visible": true,
+      "parent_id": null,
+      "material": null
+    },
+    {
+      "id": 2,
+      "name": "Sun",
+      "transform": {
+        "position": [
+          4.0,
+          8.0,
+          4.0
+        ],
+        "rotation": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ]
+      },
+      "mesh_type": "DirectionalLight",
+      "scripts": [],
+      "components": {},
+      "visible": true,
+      "parent_id": null,
+      "material": null,
+      "light": {
+        "direction": [
+          -0.5,
+          -1.0,
+          -0.3
+        ],
+        "color": [
+          1.0,
+          0.98,
+          0.92
+        ],
+        "intensity": 1.2
+      }
+    }
+  ],
+  "assets": [],
+  "scripts": [],
+  "current_state": {
+    "selected_entity_id": null,
+    "camera_position": [
+      0.0,
+      5.0,
+      8.0
+    ],
+    "camera_rotation": [
+      -15.0,
+      0.0,
+      0.0
+    ],
+    "game_state": "Editing"
+  }
+}

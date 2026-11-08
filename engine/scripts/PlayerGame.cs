@@ -28,7 +28,7 @@ namespace Hezhou
     /// <summary>Player C# 游戏入口（Rust Player host 静态调用）。</summary>
     public static class PlayerGame
     {
-        private const uint PlayerContextVersion = 6;
+        private const uint PlayerContextVersion = 7;
         private const float CubeX = 2.5f;
         private const float CubeY = 0.5f;
         private const float CubeZ = -1.5f;
@@ -36,6 +36,8 @@ namespace Hezhou
         private const float CubeScale = 1.5f;
         private const float InitialAnimationTime = 0.25f;
         private const float InitialAnimationSpeed = 1.5f;
+        /// <summary>第三人称相机俯仰（弧度，约 -15°）。</summary>
+        private const float DemoCameraPitch = -0.26179939f;
 
         private static bool _initialized;
         private static ContextApi _sceneContext;
@@ -56,6 +58,23 @@ namespace Hezhou
         private static bool _characterCreated;
         private static string _lastGraphState = "";
         private static long _frameCount;
+        // v7 第三人称 demo 状态（task-59）。
+        private static bool _demoMode;
+        private static bool _demoCharacterCreated;
+        private static ulong _demoController = 0;
+        private static ulong _demoGround = 0;
+        private static ulong _demoBody = 0;
+        private static ulong _demoHead = 0;
+        private static ulong _demoLeftArm = 0;
+        private static ulong _demoRightArm = 0;
+        private static ulong _demoLeftLeg = 0;
+        private static ulong _demoRightLeg = 0;
+        private static float _demoYaw;
+        private static float _demoWalkPhase;
+        private static float _demoLastX;
+        private static float _demoLastY;
+        private static float _demoLastZ;
+        private static bool _demoAutopilot;
         private static double _elapsedSeconds;
         private static long _lastLogFrame = -1;
 
@@ -134,6 +153,16 @@ namespace Hezhou
                     return;
                 }
                 _sceneContext = api;
+
+                // v7 第三人称 demo：仅当 host 提供 input/camera 且设置 HEZHOU_PLAYER_DEMO=third_person。
+                string demoEnv = Environment.GetEnvironmentVariable("HEZHOU_PLAYER_DEMO");
+                _demoMode = api.HasInput && api.HasCamera
+                    && string.Equals(demoEnv, "third_person", StringComparison.OrdinalIgnoreCase);
+                if (_demoMode)
+                {
+                    InitializeThirdPersonDemo(api);
+                    return;
+                }
 
                 uint before = api.EntityCount();
                 _createdEntityId = api.CreateCube();
@@ -335,6 +364,12 @@ namespace Hezhou
             _frameCount++;
             _elapsedSeconds += dt;
 
+            if (_demoMode)
+            {
+                UpdateThirdPersonDemo(dt);
+                return;
+            }
+
             if (_sceneContext != null)
             {
                 try
@@ -474,6 +509,12 @@ namespace Hezhou
                 return;
             }
 
+            if (_demoMode)
+            {
+                ShutdownThirdPersonDemo();
+                return;
+            }
+
             if (_sceneContext != null && _sceneContext.HasAnimationGraph)
             {
                 try
@@ -578,6 +619,196 @@ namespace Hezhou
             _frameCount = 0;
             _elapsedSeconds = 0.0;
             _lastLogFrame = -1;
+        }
+
+        private static void InitializeThirdPersonDemo(ContextApi api)
+        {
+            _demoCharacterCreated = false;
+            _demoYaw = 0.0f;
+            _demoWalkPhase = 0.0f;
+            _demoLastX = 0.0f;
+            _demoLastY = 0.0f;
+            _demoLastZ = 0.0f;
+            _demoAutopilot = string.Equals(
+                Environment.GetEnvironmentVariable("HEZHOU_PLAYER_DEMO_AUTOPILOT"),
+                "1",
+                StringComparison.OrdinalIgnoreCase);
+
+            // 地面 + 可见方块角色（身体/头/双臂/双腿）；胶囊由 CharacterMotor 驱动。
+            _demoGround = api.CreateCube();
+            api.SetPosition(_demoGround, 0.0f, -0.1f, 0.0f);
+            api.SetScale(_demoGround, 20.0f, 0.2f, 20.0f);
+            _demoController = api.CreateCube();
+            api.SetPosition(_demoController, 0.0f, 0.0f, 0.0f);
+            api.SetScale(_demoController, 0.18f, 0.18f, 0.18f);
+            _demoBody = api.CreateCube();
+            api.SetScale(_demoBody, 0.6f, 0.9f, 0.4f);
+            _demoHead = api.CreateCube();
+            api.SetScale(_demoHead, 0.45f, 0.45f, 0.45f);
+            _demoLeftArm = api.CreateCube();
+            api.SetScale(_demoLeftArm, 0.18f, 0.7f, 0.18f);
+            _demoRightArm = api.CreateCube();
+            api.SetScale(_demoRightArm, 0.18f, 0.7f, 0.18f);
+            _demoLeftLeg = api.CreateCube();
+            api.SetScale(_demoLeftLeg, 0.2f, 0.8f, 0.2f);
+            _demoRightLeg = api.CreateCube();
+            api.SetScale(_demoRightLeg, 0.2f, 0.8f, 0.2f);
+            UpdateDemoParts(0.0f, 0.0f, 0);
+
+            if (api.HasGameplay)
+            {
+                int characterResult = api.CharacterCreate(_demoController, 0.3f, 1.8f);
+                _demoCharacterCreated = characterResult == 0;
+            }
+            int followResult = api.CameraFollow(
+                _demoController, 5.0f, 2.5f, _demoYaw, DemoCameraPitch);
+            SafeLog("ThirdPerson: ground="
+                + _demoGround.ToString(CultureInfo.InvariantCulture)
+                + " controller=" + _demoController.ToString(CultureInfo.InvariantCulture)
+                + " body=" + _demoBody.ToString(CultureInfo.InvariantCulture)
+                + " head=" + _demoHead.ToString(CultureInfo.InvariantCulture)
+                + " character=" + BoolText(_demoCharacterCreated)
+                + " cameraFollow=" + followResult.ToString(CultureInfo.InvariantCulture)
+                + " autopilot=" + BoolText(_demoAutopilot)
+                + "（WASD/方向键移动，Space 跳跃）");
+        }
+
+        private static void UpdateThirdPersonDemo(float dt)
+        {
+            ContextApi api = _sceneContext;
+            if (api == null)
+            {
+                return;
+            }
+            float axisX = api.InputAxisX();
+            float axisZ = api.InputAxisZ();
+            bool jump = api.InputJumpPressed() != 0;
+            if (_demoAutopilot)
+            {
+                // 自动化 demo：向 +X 移动，第 20 帧跳跃（默认关闭，仅测试/演示用）。
+                axisX = 1.0f;
+                axisZ = 0.0f;
+                jump = _frameCount == 20;
+            }
+            bool moving = Math.Abs(axisX) + Math.Abs(axisZ) > 0.01f;
+            if (moving)
+            {
+                _demoYaw = (float)Math.Atan2(axisX, axisZ);
+            }
+            const float moveSpeed = 4.5f;
+            int stepResult = -1;
+            float x = _demoLastX;
+            float y = _demoLastY;
+            float z = _demoLastZ;
+            int grounded = 0;
+            if (_demoCharacterCreated)
+            {
+                stepResult = api.CharacterStep(
+                    _demoController, axisX * moveSpeed, axisZ * moveSpeed, jump, dt);
+                int positionResult = api.CharacterPosition(
+                    _demoController, out x, out y, out z);
+                if (positionResult != 0)
+                {
+                    x = _demoLastX;
+                    y = _demoLastY;
+                    z = _demoLastZ;
+                }
+                grounded = api.CharacterGrounded(_demoController);
+            }
+            _demoLastX = x;
+            _demoLastY = y;
+            _demoLastZ = z;
+
+            _demoWalkPhase += moving ? dt * 9.0f : 0.0f;
+            UpdateDemoParts(x, y, grounded);
+
+            if (api.HasCamera)
+            {
+                api.CameraFollow(
+                    _demoController, 5.0f, 2.5f, _demoYaw, DemoCameraPitch);
+            }
+            if (_frameCount == 1 || _frameCount % 30 == 0)
+            {
+                SafeLog("ThirdPerson: frame="
+                    + _frameCount.ToString(CultureInfo.InvariantCulture)
+                    + " input=(" + Fmt(axisX) + "," + Fmt(axisZ) + ")"
+                    + " jump=" + BoolText(jump)
+                    + " stepResult=" + stepResult.ToString(CultureInfo.InvariantCulture)
+                    + " position=(" + Fmt(x) + "," + Fmt(y) + "," + Fmt(z) + ")"
+                    + " grounded=" + grounded.ToString(CultureInfo.InvariantCulture)
+                    + " yaw=" + Fmt(_demoYaw * 57.29578f)
+                    + " swing=" + Fmt((float)Math.Sin(_demoWalkPhase) * 28.0f));
+            }
+            if (jump)
+            {
+                SafeLog("ThirdPerson: jump frame="
+                    + _frameCount.ToString(CultureInfo.InvariantCulture)
+                    + " position=(" + Fmt(x) + "," + Fmt(y) + "," + Fmt(z) + ")"
+                    + " grounded=" + grounded.ToString(CultureInfo.InvariantCulture));
+            }
+        }
+
+        private static void UpdateDemoParts(float x, float y, int grounded)
+        {
+            ContextApi api = _sceneContext;
+            if (api == null)
+            {
+                return;
+            }
+            float yawDeg = _demoYaw * 57.29578f;
+            float swing = (float)Math.Sin(_demoWalkPhase) * 28.0f;
+            api.SetPosition(_demoBody, x, y + 0.9f, 0.0f);
+            api.SetPosition(_demoHead, x, y + 1.55f, 0.0f);
+            api.SetPosition(_demoLeftArm, x - 0.45f, y + 0.95f, 0.0f);
+            api.SetPosition(_demoRightArm, x + 0.45f, y + 0.95f, 0.0f);
+            api.SetPosition(_demoLeftLeg, x - 0.18f, y + 0.45f, 0.0f);
+            api.SetPosition(_demoRightLeg, x + 0.18f, y + 0.45f, 0.0f);
+            api.SetRotation(_demoBody, 0.0f, yawDeg, 0.0f);
+            api.SetRotation(_demoHead, 0.0f, yawDeg, 0.0f);
+            api.SetRotation(_demoLeftArm, swing, yawDeg, 0.0f);
+            api.SetRotation(_demoRightArm, -swing, yawDeg, 0.0f);
+            api.SetRotation(_demoLeftLeg, -swing, yawDeg, 0.0f);
+            api.SetRotation(_demoRightLeg, swing, yawDeg, 0.0f);
+            if (!_demoCharacterCreated || grounded == 0)
+            {
+                // 离地/无角色时保持视觉件随控制器位置（由调用方 y 提供）。
+            }
+        }
+
+        private static void ShutdownThirdPersonDemo()
+        {
+            ContextApi api = _sceneContext;
+            if (api != null)
+            {
+                if (_demoCharacterCreated)
+                {
+                    api.CharacterRemove(_demoController);
+                }
+                if (api.HasCamera)
+                {
+                    api.CameraClear();
+                }
+                SafeLog("ThirdPerson: Shutdown position=("
+                    + Fmt(_demoLastX) + "," + Fmt(_demoLastY) + "," + Fmt(_demoLastZ)
+                    + ") grounded=" + api.CharacterGrounded(_demoController).ToString(CultureInfo.InvariantCulture)
+                    + " frames=" + _frameCount.ToString(CultureInfo.InvariantCulture));
+                ulong[] parts = new ulong[] {
+                    _demoBody, _demoHead, _demoLeftArm, _demoRightArm,
+                    _demoLeftLeg, _demoRightLeg, _demoGround, _demoController
+                };
+                for (int index = 0; index < parts.Length; index++)
+                {
+                    if (parts[index] != 0)
+                    {
+                        api.DestroyEntity(parts[index]);
+                    }
+                }
+            }
+            _demoMode = false;
+            _demoCharacterCreated = false;
+            _sceneContext = null;
+            _initialized = false;
+            SafeLog("ThirdPerson: demo 结束");
         }
 
         private static string Fmt(float value)
@@ -701,6 +932,14 @@ namespace Hezhou
             public IntPtr AnimationCurrentState;
             public IntPtr AnimationIsTransitioning;
             public IntPtr AnimationTransitionAlpha;
+            // v7 tail（task-59）：输入快照 + 第三人称相机。
+            public IntPtr InputState;
+            public IntPtr InputAxisX;
+            public IntPtr InputAxisZ;
+            public IntPtr InputJumpPressed;
+            public IntPtr CameraState;
+            public IntPtr CameraFollow;
+            public IntPtr CameraClear;
         }
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
@@ -840,6 +1079,23 @@ namespace Hezhou
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         private delegate float AnimationTransitionAlphaDelegate(IntPtr graph);
 
+        // v7：输入快照 + 第三人称相机（task-59）。
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        private delegate float InputAxisXDelegate(IntPtr input);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        private delegate float InputAxisZDelegate(IntPtr input);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        private delegate int InputJumpPressedDelegate(IntPtr input);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        private delegate int CameraFollowDelegate(
+            IntPtr camera, ulong entityId, float distance, float height, float yaw, float pitch);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        private delegate int CameraClearDelegate(IntPtr camera);
+
         /// <summary>已解析的 PlayerContext（函数指针 + scene）；GC 期间保持委托存活。</summary>
         private sealed class ContextApi
         {
@@ -901,6 +1157,16 @@ namespace Hezhou
             public AnimationCurrentStateDelegate AnimationCurrentStateFn;
             public AnimationIsTransitioningDelegate AnimationIsTransitioningFn;
             public AnimationTransitionAlphaDelegate AnimationTransitionAlphaFn;
+            // v7 输入/相机。
+            public bool HasInput;
+            public bool HasCamera;
+            public IntPtr InputState;
+            public IntPtr CameraState;
+            public InputAxisXDelegate InputAxisXFn;
+            public InputAxisZDelegate InputAxisZFn;
+            public InputJumpPressedDelegate InputJumpPressedFn;
+            public CameraFollowDelegate CameraFollowFn;
+            public CameraClearDelegate CameraClearFn;
 
             public uint EntityCount()
             {
@@ -1085,6 +1351,32 @@ namespace Hezhou
                 return CharacterRemoveFn(GameplayWorld, entityId);
             }
 
+            public float InputAxisX()
+            {
+                return InputAxisXFn(InputState);
+            }
+
+            public float InputAxisZ()
+            {
+                return InputAxisZFn(InputState);
+            }
+
+            public int InputJumpPressed()
+            {
+                return InputJumpPressedFn(InputState);
+            }
+
+            public int CameraFollow(
+                ulong entityId, float distance, float height, float yaw, float pitch)
+            {
+                return CameraFollowFn(CameraState, entityId, distance, height, yaw, pitch);
+            }
+
+            public int CameraClear()
+            {
+                return CameraClearFn(CameraState);
+            }
+
             public int SetAnimationState(string stateName)
             {
                 return CallWithAnsiString(AnimationSetStateFn, stateName);
@@ -1240,6 +1532,8 @@ namespace Hezhou
                 bool hasGameplay = native.Version >= 5 && native.GameplayWorld != IntPtr.Zero;
                 bool hasAnimationGraph =
                     native.Version >= 6 && native.AnimationStateMachine != IntPtr.Zero;
+                bool hasInput = native.Version >= 7 && native.InputState != IntPtr.Zero;
+                bool hasCamera = native.Version >= 7 && native.CameraState != IntPtr.Zero;
                 if (native.Scene == IntPtr.Zero)
                 {
                     error = "scene 指针为 0";
@@ -1319,6 +1613,21 @@ namespace Hezhou
                         || native.AnimationTransitionAlpha == IntPtr.Zero))
                 {
                     error = "v6 动画状态机函数指针缺失";
+                    return null;
+                }
+                if (hasInput
+                    && (native.InputAxisX == IntPtr.Zero
+                        || native.InputAxisZ == IntPtr.Zero
+                        || native.InputJumpPressed == IntPtr.Zero))
+                {
+                    error = "v7 输入函数指针缺失";
+                    return null;
+                }
+                if (hasCamera
+                    && (native.CameraFollow == IntPtr.Zero
+                        || native.CameraClear == IntPtr.Zero))
+                {
+                    error = "v7 相机函数指针缺失";
                     return null;
                 }
 
@@ -1440,6 +1749,26 @@ namespace Hezhou
                             native.AnimationIsTransitioning);
                         api.AnimationTransitionAlphaFn = Marshal.GetDelegateForFunctionPointer<AnimationTransitionAlphaDelegate>(
                             native.AnimationTransitionAlpha);
+                    }
+                    if (hasInput)
+                    {
+                        api.HasInput = true;
+                        api.InputState = native.InputState;
+                        api.InputAxisXFn = Marshal.GetDelegateForFunctionPointer<InputAxisXDelegate>(
+                            native.InputAxisX);
+                        api.InputAxisZFn = Marshal.GetDelegateForFunctionPointer<InputAxisZDelegate>(
+                            native.InputAxisZ);
+                        api.InputJumpPressedFn = Marshal.GetDelegateForFunctionPointer<InputJumpPressedDelegate>(
+                            native.InputJumpPressed);
+                    }
+                    if (hasCamera)
+                    {
+                        api.HasCamera = true;
+                        api.CameraState = native.CameraState;
+                        api.CameraFollowFn = Marshal.GetDelegateForFunctionPointer<CameraFollowDelegate>(
+                            native.CameraFollow);
+                        api.CameraClearFn = Marshal.GetDelegateForFunctionPointer<CameraClearDelegate>(
+                            native.CameraClear);
                     }
                     return api;
                 }

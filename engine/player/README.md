@@ -38,9 +38,11 @@ Hezhou 0.2 **Player 导出构建器 + 最小运行时**（Windows / Linux）。
     v4 tail：assets/audio 指针 + 资产枚举与音频控制；
     v5 tail：gameplay_world + character_create/step/grounded/position/remove；
     v6 tail：animation_state_machine + set_state/trigger/current_state/is_transitioning/
-    transition_alpha；catch_unwind 安全），window host 传给 C#；C# 通过 context
-    创建/摆放/销毁实体、控制蒙皮动画/9 状态机、枚举资产/控制音频、驱动胶囊角色
-    在地面移动，`context=0` 安全空转；v1..v5 布局只追加不改，兼容旧 DLL。
+    transition_alpha；v7 tail：input_state + input_axis_x/z/jump_pressed、camera_state +
+    camera_follow/camera_clear；catch_unwind 安全），window host 传给 C#；C# 通过 context
+    创建/摆放/销毁实体、控制蒙皮动画/9 状态机、枚举资产/控制音频、驱动胶囊角色、
+    读取 WASD/Space 输入并设置第三人称相机，`context=0` 安全空转；v1..v6 布局只追加
+    不改，兼容旧 DLL。
 
 不绑定具体游戏内容；真实 cooker 产物可原样替换测试 fixture。
 
@@ -62,6 +64,8 @@ engine/player/
 │   ├── audio_runtime.rs# 音频运行时：默认 null backend/可选 cpal、首个音频加载与 play/pause/volume
 │   ├── gameplay_runtime.rs# 角色控制：y=0 地面 Plane + 每实体 CharacterMotor（create/step/grounded）
 │   ├── animation_graph.rs# 9 状态动画图：ImportedScene→Skeleton/Clip、状态映射/过渡/palette
+│   ├── input_state.rs# 输入快照：WASD/方向键轴 + Space 按下沿（ABI v7）
+│   ├── camera_state.rs# 第三人称跟随相机：目标/距离/高/pitch → set_camera_params 位姿
 │   ├── scene_loader.rs# 起始场景：Project JSON → Scene（失败回退内置 cube+light）
 │   ├── host.rs       # PlayerHost trait / HostOutcome / DefaultPlayerHost
 │   ├── window_host.rs# （feature window-host）WindowPlayerHost：窗口+Vulkan 固定帧渲染
@@ -75,7 +79,7 @@ engine/player/
 └── tests/
     ├── fixtures/minimal/  # 最小 fixture（legacy assets[]，空场景 + 占位 DLL/runtime）
     ├── fixtures/cooked/   # hezhou-asset 真实 cook 输出布局 fixture
-    └── *.rs               # 默认 127；window-host 共 130；mono-host 共 138（+8 ignored 真窗口 smoke）
+    └── *.rs               # 默认 132；window-host 共 135；mono-host 共 144（+9 ignored 真窗口 smoke）
 ```
 
 > 硬性边界：本 crate 只改 `engine/player/**`。installer、CI、examples、editor
@@ -672,17 +676,19 @@ script.update(dt)?;                                          // 每帧；C# 通�
 script.shutdown();                                           // C# Shutdown + Mono shutdown
 ```
 
-- **PlayerCSharpContext ABI（v6）**：`#[repr(C)]` = `version(u32) + reserved(u32) +
+- **PlayerCSharpContext ABI（v7）**：`#[repr(C)]` = `version(u32) + reserved(u32) +
   scene(IntPtr) + animation_state(IntPtr) + assets(IntPtr) + audio(IntPtr) +
-  gameplay_world(IntPtr) + animation_state_machine(IntPtr) + 43 个函数指针`。
+  gameplay_world(IntPtr) + animation_state_machine(IntPtr) + input_state(IntPtr) +
+  camera_state(IntPtr) + 48 个函数指针`。
   v1 基础场景操作；v2 Transform/生命周期；v3 动画 clip 枚举/play/time/speed/playing；
   v4 资产枚举（count/id/kind/path）+ 音频控制；v5 角色控制（create/step/grounded/
   position/remove）；v6 9 状态机（set_state/trigger/current_state/is_transitioning/
-  transition_alpha）。Rust 函数全部 `extern "C"` + `catch_unwind`；空 scene/动画/
-  资产/音频/角色/状态图、实体不存在、输出指针为空 → 返回 0/-1/NaN、不 panic。
-  C# 用 `StructLayout(Sequential)` + `Cdecl` delegates +
-  `Marshal.GetDelegateForFunctionPointer` 解析；`context == 0` 时 C# 安全空转；
-  `version < 6` 时跳过状态机（v5 再跳、v4 跳角色/状态机、…、v1 只 position）；
+  transition_alpha）；v7 输入快照（input_axis_x/input_axis_z/input_jump_pressed）+
+  第三人称相机（camera_follow/camera_clear）。Rust 函数全部 `extern "C"` +
+  `catch_unwind`；空 scene/动画/资产/音频/角色/状态图/输入/相机、实体不存在、输出
+  指针为空 → 返回 0/-1/NaN、不 panic。C# 用 `StructLayout(Sequential)` + `Cdecl`
+  delegates + `Marshal.GetDelegateForFunctionPointer` 解析；`context == 0` 时 C#
+  安全空转；`version < 7` 时跳过输入/相机（v6 再跳状态机，…，v1 只 position）；
   旧 DLL 遇到更高 version 会日志 + 纯 Rust 安全回退。
   完整 ABI 表/C# 用法/扩展点见 [`engine/scripts/PLAYER_GAME_0_2.md`](../../scripts/PLAYER_GAME_0_2.md)。
 - **加载**：`manifest.scripts` 中第一个 `.dll`，路径 `<root>/scripts/<name>`；
@@ -844,14 +850,39 @@ New-Item -ItemType Junction -Path <package>/runtime/mono -Target 'C:\Program Fil
 # 日志：内置 Mono 运行时：已找到 ...（native=.../runtime/mono/bin managed=.../runtime/mono/lib/mono/4.5;.../4.5-api；前置/追加环境变量 MONO_PATH,PATH）
 ```
 
+### 6.9 第三人称 demo（task-59）
+
+`third_person` fixture 把 capability demo 升级为可玩场景：
+
+- **操作**：`W`/`↑` 前、`S`/`↓` 后、`A`/`←` 左、`D`/`→` 右、`Space` 跳跃；
+  window host 每帧 `process_events()` 后通过 `UIVulkanRenderer::is_key_down`
+  生成 `PlayerInputState`（轴 + Space 按下沿），C# Update 前更新 ABI v7。
+- **角色**：C# 创建地面（20×0.2×20 cube）、控制器 + 身体/头/双臂/双腿方块；
+  `CharacterMotor` 胶囊（radius 0.3 / total height 1.8）驱动移动/重力/跳跃，
+  四肢随移动摆动、角色朝移动方向转向。
+- **相机**：C# 每帧 `camera_follow(controller, 5.0, 2.5, yaw, -15°)`；
+  host 读取 Scene 脚底位置，按 `yaw` 计算角色后上方位姿并 `set_camera_params`；
+  目标实体不存在时保持上一帧相机 + WARN 一次。
+- **启用方式**：Player 包 `product_name` 含 `Third Person`（如 third_person fixture
+  `"Third Person Demo"`）时 host 设置 `HEZHOU_PLAYER_DEMO=third_person`；也可手工设置
+  该环境变量。C# 未检测到 v7 input/camera 或未设置该变量时保持旧 capability 探测。
+- **自动测试模式**：`HEZHOU_PLAYER_DEMO_AUTOPILOT=1` 时 C# 向 +X 移动且第 20 帧跳跃
+  （仅 CI/无键盘冒烟用，默认关闭）。
+- **实测**：真实窗口 30 帧（Intel Arc B370）日志 `ThirdPerson: frame=30` 角色移动到
+  x>0.5、`ThirdPerson: jump frame=20`、`相机跟随 entity=…`、exit 0；
+  e2e 测试断言位移/跳跃 grounded=false/相机高度=脚底+2.5/Shutdown 清理。
+- **限制**：无鼠标视角控制（yaw 跟随移动方向）；方块角色无材质/颜色（统一默认）；
+  无动画状态机骨骼（方块四肢程序摆动）；地面为单平面 + 可见 cube；
+  `camera_follow` 每帧覆盖、无平滑插值；输入只支持键鼠键位表中 WASD/方向键/Space。
+
 ## 7. 测试
 
 ```bash
 cd engine
-cargo test -p hezhou-player                        # 默认 127 个测试
+cargo test -p hezhou-player                        # 默认 132 个测试
 cargo build -p hezhou-player                       # 构建两个二进制 + 库
-cargo test -p hezhou-player --features window-host # 130 个（含 window-host 单元/契约测试）
-cargo test -p hezhou-player --features mono-host   # 138 个（含 C# context/动画/状态机/资产/音频/角色/runtime setup；需 Mono/mcs）
+cargo test -p hezhou-player --features window-host # 135 个（含 window-host 单元/契约测试）
+cargo test -p hezhou-player --features mono-host   # 144 个（含 C# context/动画/状态机/资产/音频/角色/输入相机/runtime setup；需 Mono/mcs）
 # 可选真实音频输出后端（默认 null，无需声卡；失败自动降级）
 cargo test -p hezhou-player --features mono-host --features audio-cpal
 # 真实窗口 smoke：需显示环境 + Vulkan GPU，CI 跳过；本机已实测通过（30 帧，exit 0）
@@ -882,7 +913,7 @@ kind/index/数量严格校验、坏 JSON/越界/数量不匹配错误、未引�
 cooked 与 skinned 两个 fixture）、**mono-host feature**（manifest scripts 首个 DLL 定位/
 非法路径/缺失 DLL 错误安全、无效 DLL 加载失败不 panic、mcs 编译 C# fixture 后真实
 Initialize/Update(dt)/Shutdown 调用、真窗口 5 帧 C# 日志断言；Mono 缺失时安全跳过/
-回退）、**Player C# Scene Context v6**（repr(C) 布局/空指针安全、count/create/position/
+回退）、**Player C# Scene Context v7**（repr(C) 布局/空指针安全、count/create/position/
 rotation（欧拉角）/scale/exists/destroy 真实修改 Scene、真实 PlayerGame.cs context
 创建 cube + 设置 position/rotation/scale（Scene 2→3）、Shutdown destroy 后 exists=false、
 context=0 空转、**动画运行时**（clip 列表/时间/速度、palette）、**资产目录/音频**
@@ -891,10 +922,13 @@ Rust 断言音频状态、真窗口日志）、**角色控制**（y=0 地面 Pla
 CharacterMotor：落地/前进/跳跃 grounded 变化、C# character_create + 每帧 step(+X)、
 Rust 断言 Scene 位移+grounded、Shutdown remove、真窗口 30 帧位置位移）、**9 状态机**
 （animation-bridge → Skeleton/Clip、clip 名称映射 9 状态、C# set_state/trigger
-Run→Attack、状态图 current/transition/palette 真窗口 30 帧）、**内置 Mono runtime
-setup**（runtime/mono 探测、Windows PATH/MONO_PATH、Linux LD_LIBRARY_PATH/MONO_PATH
-前置、无 runtime no-op、重复调用幂等、显式平台环境名、临时目录验证）、真窗口
-Scene 实体 3→4→3、日志时间戳。
+Run→Attack、状态图 current/transition/palette 真窗口 30 帧）、**输入/相机 v7**
+（input_axis_x/z/jump 按下沿、camera_follow/clear 位姿计算、空指针安全）、**内置
+Mono runtime setup**（runtime/mono 探测、Windows PATH/MONO_PATH、Linux
+LD_LIBRARY_PATH/MONO_PATH 前置、无 runtime no-op、重复调用幂等、显式平台环境名、
+临时目录验证）、**第三人称 demo**（C# 地面+方块角色、WASD/方向键移动、Space 跳跃、
+四肢摆动、相机跟随；e2e 断言位移/离地/相机高度；真窗口 30 帧 autopilot 冒烟）、
+真窗口 Scene 实体 3→4→3、日志时间戳。
 
 最小 fixture（`tests/fixtures/minimal/`）依赖零外部资产：空场景 3 字节、字体占位
 12 字节、假 C# 程序集 21 字节、占位 runtime 库 19 字节，用于无真实 cook 数据时
@@ -924,6 +958,11 @@ Scene 实体 3→4→3、日志时间戳。
 skinned fixture（`tests/fixtures/skinned/`）额外包含 1s PCM WAV
 （`assets/audio/test.wav` + cook manifest `kind: audio` 条目），用于 task-35
 资产枚举/音频控制实测。
+
+third_person fixture（`tests/fixtures/third_person/`）：Project JSON 场景
+（Ground cube + DirectionalLight）、build-config（`product_name = "Third Person Demo"`）、
+cook_manifest（scene + font）与 scripts/runtime 占位，用于 task-59 第三人称 demo
+的 C# e2e / 真实窗口 30 帧渲染/移动/跳跃/相机测试。
 
 ## 8. 与其它模块 / CI / installer 的集成点
 
@@ -1101,6 +1140,10 @@ skinned fixture（`tests/fixtures/skinned/`）额外包含 1s PCM WAV
 - [x] 9 状态动画状态机（`PlayerAnimationGraph`）：animation-bridge → Skeleton/Clip、
   clip 名称映射 Idle/Run/Jump/Attack/Hit/Death/Land/Dodge/Block、每帧 update/
   sample/palette、C# v6 set_state/trigger/current/transition；
+- [x] 输入/相机 ABI v7（input_axis_x/z/jump 按下沿、camera_follow/clear）+
+  第三人称 demo（C# 地面/方块角色/WASD/方向键/Space/四肢摆动/相机跟随）；
+- [ ] 鼠标视角控制/相机平滑插值/材质颜色（当前 yaw 跟随移动方向、相机每帧覆盖）；
+- [ ] WindowPlayerHost Esc 退出与输入暂停（当前 WASD/Space 已接入，Esc 仅 UI 层）；
 - [ ] 动画事件消费/自定义混合树/遮罩/IK/根运动（当前状态机仅切换+过渡）；
 - [ ] 动画扩展：多 clip 混合/遮罩（当前单状态采样+过渡）；
 - [ ] context 扩展：材质/组件/层级/父子、gameplay 其余 API（按 ABI 尾部追加 +
@@ -1110,8 +1153,8 @@ skinned fixture（`tests/fixtures/skinned/`）额外包含 1s PCM WAV
 - [ ] C# 侧 FFI context 接入（Initialize 当前传 0）、gameplay/animation/physics/audio
   API 暴露，C# host 消费 bundle；
 - [ ] 纹理/音频原始字节加载（`assets/*`，非 imported JSON）；
-- [ ] WindowPlayerHost 的 Esc/输入接线与显式 cleanup（上游修复后）；
-- [ ] Esc 退出接线（`UIVulkanRenderer` 未把 ESC 暴露给 host；当前用固定帧数/窗口关闭）；
+- [ ] WindowPlayerHost 的显式 cleanup（上游修复后）；Esc 退出接线（当前用固定帧数/
+  窗口关闭）；
 - [ ] 上游修复 `UIVulkanRenderer::cleanup()` 堆损坏后恢复窗口 host 显式清理；
 - [ ] `window-host` / `mono-host` release 构建与 CI（编译冒烟；真实开窗需显示环境，
   本地/自托管；mono-host job 需安装 Mono/mcs）；

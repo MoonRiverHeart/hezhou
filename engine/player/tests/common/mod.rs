@@ -164,6 +164,14 @@ pub fn skinned_fixture_dir() -> PathBuf {
         .join("skinned")
 }
 
+/// 第三人称 demo fixture 目录（`tests/fixtures/third_person`）。
+pub fn third_person_fixture_dir() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("tests")
+        .join("fixtures")
+        .join("third_person")
+}
+
 /// 生成最小 PCM16 单声道 WAV（0.2s @ 44100Hz）并写入临时目录，返回路径。
 pub fn write_test_wav(temp: &TempDir, relative: &str) -> PathBuf {
     let sample_rate: u32 = 44_100;
