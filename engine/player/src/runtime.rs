@@ -24,6 +24,7 @@ use crate::logging::{format_timestamp_utc, FileLogger, STARTUP_ERROR_LOG};
 use crate::manifest::{ManifestError, PlayerManifest};
 use crate::paths::to_native_path;
 use crate::platform::TargetPlatform;
+use crate::runtime_setup::setup_mono_runtime;
 use crate::scene_loader::{load_start_scene, StartSceneSummary};
 use crate::RUNTIME_ENGINE_VERSION;
 
@@ -74,6 +75,8 @@ pub struct RuntimeReport {
     pub index: PlayerAssetIndex,
     /// cook 导入资产（`imported/*.json`）加载摘要。
     pub imported_assets: ImportedAssetSummary,
+    /// 内置 Mono 运行时探测/环境准备结果（runtime/mono）。
+    pub mono_runtime: crate::runtime_setup::MonoRuntimeSetup,
     /// 起始场景摘要（Project JSON 恢复或内置回退）。
     pub start_scene: StartSceneSummary,
     /// `--run`/`--host` 模式下的 host 结果（`--validate`/默认模式为 `None`）。
@@ -96,6 +99,7 @@ impl RuntimeReport {
             self.start_scene.source.summary(),
             self.log_path.display(),
         );
+        text.push_str(&format!("；{}", self.mono_runtime.summary()));
         if let Some(host) = &self.host {
             match &host.outcome {
                 HostOutcome::Pending { reason } => {
@@ -286,6 +290,9 @@ pub fn run(options: RuntimeOptions) -> Result<RuntimeReport, RuntimeError> {
 
     // 3) 动态库查找：把 runtime/ 注入平台搜索路径（必须在加载 Mono/Vulkan 之前）。
     let (library_env, library_value) = apply_runtime_library_search(&manifest, &layout.runtime_dir);
+    // 3b) 内置 Mono 运行时（runtime/mono）：前置 PATH/LD_LIBRARY_PATH/MONO_PATH；
+    //     必须在加载 C# DLL 之前，且必须在 apply_runtime_library_search 之后执行。
+    let mono_setup = setup_mono_runtime(&root);
 
     // 4) 打开日志：优先用户数据目录，失败回退包内 logs/。
     let preferred_log_dir = options
@@ -305,6 +312,7 @@ pub fn run(options: RuntimeOptions) -> Result<RuntimeReport, RuntimeError> {
     if let Some(note) = log_fallback_note {
         log_warn(&mut logger, &note)?;
     }
+    log_info(&mut logger, &mono_setup.summary())?;
     log_info(
         &mut logger,
         &format!(
@@ -457,6 +465,7 @@ pub fn run(options: RuntimeOptions) -> Result<RuntimeReport, RuntimeError> {
         log_path,
         index,
         imported_assets: imported_assets.summary_data(),
+        mono_runtime: mono_setup,
         start_scene: start_scene_summary,
         host: host_report,
     })

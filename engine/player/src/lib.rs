@@ -36,6 +36,7 @@ pub mod mono_host;
 pub mod paths;
 pub mod platform;
 pub mod runtime;
+pub mod runtime_setup;
 pub mod scene_loader;
 pub mod skinned_asset;
 pub mod version;
@@ -117,6 +118,10 @@ pub use platform::TargetPlatform;
 pub use runtime::{
     resolve_layout, resolve_player_root, HostRunReport, RuntimeError, RuntimeLayout,
     RuntimeOptions, RuntimeReport,
+};
+pub use runtime_setup::{
+    setup_mono_runtime, setup_mono_runtime_for, MonoRuntimeSetup, MONO_PATH_ENV,
+    MONO_RUNTIME_DIR,
 };
 pub use version::{SemVer, VersionError};
 

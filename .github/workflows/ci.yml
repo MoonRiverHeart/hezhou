@@ -338,11 +338,16 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends mono-devel libmono-2.0-dev
 
+      - name: Build C# Player scripts
+        working-directory: engine
+        shell: pwsh
+        run: powershell -ExecutionPolicy Bypass -File scripts/build_mono.ps1
+
       - name: Build Player runtime and builder
         working-directory: engine
         shell: pwsh
         run: |
-          cargo build -p hezhou-player --release --features window-host
+          cargo build -p hezhou-player --release --features window-host,mono-host
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           cargo build -p hezhou-player --release --bin hezhou-player-build
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
@@ -354,6 +359,22 @@ jobs:
           $suffix = if ($IsWindows) { ".exe" } else { "" }
           $fixture = "engine/player/tests/fixtures/skinned"
           New-Item -ItemType Directory -Force build-temp | Out-Null
+          $stage = "build-temp/player-stage"
+          Remove-Item $stage -Recurse -Force -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory -Force "$stage/scripts" | Out-Null
+          Copy-Item "engine/scripts/bin/Mono/EditorScript.dll" "$stage/scripts/EditorScript.dll" -Force
+          $monoStage = "$stage/runtime/mono"
+          New-Item -ItemType Directory -Force "$monoStage/bin","$monoStage/lib","$monoStage/etc" | Out-Null
+          if ($IsWindows) {
+            Copy-Item "C:\Program Files\Mono\bin\*" "$monoStage/bin" -Recurse -Force -ErrorAction SilentlyContinue
+            Copy-Item "C:\Program Files\Mono\etc\*" "$monoStage/etc" -Recurse -Force -ErrorAction SilentlyContinue
+            Copy-Item "C:\Program Files\Mono\lib\mono\4.5" "$monoStage/lib/mono/4.5" -Recurse -Force -ErrorAction SilentlyContinue
+            Copy-Item "C:\Program Files\Mono\lib\mono\4.5-api" "$monoStage/lib/mono/4.5-api" -Recurse -Force -ErrorAction SilentlyContinue
+          } else {
+            Copy-Item "/usr/lib/mono/4.5" "$monoStage/lib/mono/4.5" -Recurse -Force -ErrorAction SilentlyContinue
+            Copy-Item "/usr/lib/x86_64-linux-gnu/libmono-2.0.so*" "$monoStage/lib/" -Force -ErrorAction SilentlyContinue
+            Copy-Item "/etc/mono/*" "$monoStage/etc" -Recurse -Force -ErrorAction SilentlyContinue
+          }
           $config = Get-Content "$fixture/build-config.json" -Raw | ConvertFrom-Json
           $config.target = $target
           $config.product_name = "Hezhou Capability Demo"
@@ -364,8 +385,8 @@ jobs:
             --config "build-temp/player-demo-config.json" `
             --cook "$fixture/cook_manifest.json" `
             --assets-dir "$fixture/assets" `
-            --scripts-dir "$fixture/scripts" `
-            --runtime-dir "$fixture/runtime" `
+            --scripts-dir "$stage/scripts" `
+            --runtime-dir "$stage/runtime" `
             --exe "engine/target/release/hezhou-player$suffix" `
             --build-out "dist/player-demo"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

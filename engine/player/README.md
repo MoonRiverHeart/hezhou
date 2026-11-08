@@ -75,7 +75,7 @@ engine/player/
 └── tests/
     ├── fixtures/minimal/  # 最小 fixture（legacy assets[]，空场景 + 占位 DLL/runtime）
     ├── fixtures/cooked/   # hezhou-asset 真实 cook 输出布局 fixture
-    └── *.rs               # 默认 123；window-host 共 126；mono-host 共 134（+8 ignored 真窗口 smoke）
+    └── *.rs               # 默认 127；window-host 共 130；mono-host 共 138（+8 ignored 真窗口 smoke）
 ```
 
 > 硬性边界：本 crate 只改 `engine/player/**`。installer、CI、examples、editor
@@ -102,6 +102,10 @@ engine/player/
 └── runtime/                 # 内置运行时，不依赖系统 Mono / 系统库
     ├── libmono.so (Linux) / mono-2.0-sgen.dll (Windows)
     ├── libvulkan.so.1 / vulkan-1.dll
+    ├── mono/                 # 可选内置 Mono 运行时（task-38；有则自动前置搜索路径）
+    │   ├── bin/             # mono.exe、libmono-2.0.dll 等
+    │   ├── lib/             # Mono 库/托管程序集
+    │   └── etc/             # mono 配置（可选）
     └── ...
 ```
 
@@ -808,14 +812,45 @@ script.shutdown();                                           // C# Shutdown + Mo
   指针仅覆盖 Player 帧循环，C# 不得在 `Shutdown()` 后使用；无热重载/脚本热更新；
   旧包无 `PlayerGame` 时安全回退；材质/组件/动画事件/多地形 API 留待后续。
 
+### 6.8 内置 Mono 运行时（`runtime/mono`）
+
+Player 包可选携带 Mono 运行时（task-38）：`runtime_setup` 在**加载 C# DLL 之前**检测
+`<PlayerRoot>/runtime/mono`，找到后把 Mono 目录前置到进程环境变量：
+
+| 平台 | 环境变量 | 前置目录 |
+|---|---|---|
+| Windows | `PATH` | `runtime/mono/bin`（无 bin 时 mono 根） |
+| Windows | `MONO_PATH` | `runtime/mono/lib`（无 lib 时 mono 根） |
+| Linux | `LD_LIBRARY_PATH` | `runtime/mono/lib`（无 lib 时 mono 根） |
+| Linux | `MONO_PATH` | `runtime/mono/lib` |
+
+- **no-op**：没有 `runtime/mono` → 不改任何环境变量（报告 `found=false`，继续使用
+  系统 Mono/其它搜索路径）；
+- **幂等**：目标目录已在变量首位时不重复追加；重复调用无副作用；
+- 不删除用户已有的 `PATH`/`LD_LIBRARY_PATH`/`MONO_PATH` 条目，只前置；
+- 调用点：`runtime::run`（`--validate`/启动流程）与 `WindowPlayerHost`（mono-host
+  加载 C# DLL 前，幂等兜底）；日志 `内置 Mono 运行时：已找到/未发现 …`；
+- 包布局：`runtime/mono/{bin,lib,etc}`（把安装的 Mono 目录整体复制/安装到该位置即可）；
+- 注意：C# `ScriptManager` 的 `mono_set_dirs` 仍优先使用 exe 旁 `lib/` 或系统 Mono；
+  `runtime_setup` 负责原生 DLL/托管程序集的搜索路径前置，两者可共同使用。
+
+本机验证（把 Mono 安装目录放到包的 `runtime/mono`）：
+
+```powershell
+# Windows：可用目录联接避免复制大文件（发布包请真实复制）
+New-Item -ItemType Junction -Path <package>/runtime/mono -Target 'C:\Program Files\Mono'
+<package>/<exe>.exe --validate --manifest <package>/manifest.json --log-dir <tmp>
+# 日志：内置 Mono 运行时：已找到 ...（native=.../runtime/mono/bin managed=.../runtime/mono/lib；前置环境变量 MONO_PATH,PATH）
+```
+
 ## 7. 测试
 
 ```bash
 cd engine
-cargo test -p hezhou-player                        # 默认 123 个测试
+cargo test -p hezhou-player                        # 默认 127 个测试
 cargo build -p hezhou-player                       # 构建两个二进制 + 库
-cargo test -p hezhou-player --features window-host # 126 个（含 window-host 单元/契约测试）
-cargo test -p hezhou-player --features mono-host   # 134 个（含 C# context/动画/状态机/资产/音频/角色；需 Mono/mcs）
+cargo test -p hezhou-player --features window-host # 130 个（含 window-host 单元/契约测试）
+cargo test -p hezhou-player --features mono-host   # 138 个（含 C# context/动画/状态机/资产/音频/角色/runtime setup；需 Mono/mcs）
 # 可选真实音频输出后端（默认 null，无需声卡；失败自动降级）
 cargo test -p hezhou-player --features mono-host --features audio-cpal
 # 真实窗口 smoke：需显示环境 + Vulkan GPU，CI 跳过；本机已实测通过（30 帧，exit 0）
@@ -855,8 +890,10 @@ Rust 断言音频状态、真窗口日志）、**角色控制**（y=0 地面 Pla
 CharacterMotor：落地/前进/跳跃 grounded 变化、C# character_create + 每帧 step(+X)、
 Rust 断言 Scene 位移+grounded、Shutdown remove、真窗口 30 帧位置位移）、**9 状态机**
 （animation-bridge → Skeleton/Clip、clip 名称映射 9 状态、C# set_state/trigger
-Run→Attack、状态图 current/transition/palette 真窗口 30 帧）、真窗口 Scene 实体
-3→4→3、日志时间戳。
+Run→Attack、状态图 current/transition/palette 真窗口 30 帧）、**内置 Mono runtime
+setup**（runtime/mono 探测、Windows PATH/MONO_PATH、Linux LD_LIBRARY_PATH/MONO_PATH
+前置、无 runtime no-op、重复调用幂等、显式平台环境名、临时目录验证）、真窗口
+Scene 实体 3→4→3、日志时间戳。
 
 最小 fixture（`tests/fixtures/minimal/`）依赖零外部资产：空场景 3 字节、字体占位
 12 字节、假 C# 程序集 21 字节、占位 runtime 库 19 字节，用于无真实 cook 数据时
@@ -985,9 +1022,10 @@ skinned fixture（`tests/fixtures/skinned/`）额外包含 1s PCM WAV
   角色 create/step/grounded/position/remove 函数指针），C# 可真实创建/摆放/销毁
   Scene 实体、控制蒙皮动画、枚举资产/控制音频、驱动胶囊角色在地面移动；
   gameplay 其余/材质组件 API 后续按 `scripts/PLAYER_GAME_0_2.md` 扩展点追加。
-- 部署要求：mono-host 的 Player 包运行机器需安装 Mono，或随包 `runtime/` 提供
-  Mono 运行时（`--runtime-dir` 复制；`lib/`、`etc/`、`libmono` 等）；CI/安装包
-  需把 Mono 运行时纳入 Player 附件。
+- 部署要求：mono-host 的 Player 包运行机器需安装 Mono，或随包 `runtime/mono/`
+  提供 Mono 运行时（task-38：`runtime_setup` 启动/窗口 host 加载 C# 前自动前置
+  Windows `PATH`/`MONO_PATH`、Linux `LD_LIBRARY_PATH`/`MONO_PATH`；无 runtime 则
+  no-op 用系统 Mono）；CI/安装包需把 Mono 运行时纳入 Player 附件，并评估体积/许可。
 
 ### CI（需要 Lead 新增两个 job：`player-build-windows` / `player-build-linux`）
 
@@ -1076,7 +1114,11 @@ skinned fixture（`tests/fixtures/skinned/`）额外包含 1s PCM WAV
 - [ ] 上游修复 `UIVulkanRenderer::cleanup()` 堆损坏后恢复窗口 host 显式清理；
 - [ ] `window-host` / `mono-host` release 构建与 CI（编译冒烟；真实开窗需显示环境，
   本地/自托管；mono-host job 需安装 Mono/mcs）；
-- [ ] mono-host 包内 Mono 运行时打包/声明（`runtime/` 复制 lib/etc/libmono）；
+- [x] 内置 Mono 运行时启动准备（`runtime/mono` 检测；Windows PATH/MONO_PATH、
+  Linux LD_LIBRARY_PATH/MONO_PATH 前置；无 runtime no-op、幂等；启动/window host
+  加载 C# 前调用；临时目录/平台环境名测试）；
+- [ ] mono-host 包内 Mono 运行时实际打包/发布（把 Mono 目录放入 `runtime/mono`，
+  CI/安装包体积与许可评估）；
 - [ ] Linux rpath 链接参数固化到构建脚本/CI（需要在 Linux job 注入 `RUSTFLAGS`）；
 - [ ] 跨平台构建（在 Windows 上产出 Linux 包）——不计划支持，由 CI 双平台分别执行；
 - [ ] 资产 pack/压缩格式（当前按 loose files 计划）；

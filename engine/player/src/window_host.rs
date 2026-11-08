@@ -327,6 +327,12 @@ impl PlayerHost for WindowPlayerHost {
         // ---- 可选 C# PlayerGame 入口（feature = mono-host）----
         #[cfg(feature = "mono-host")]
         let mut mono_state: Option<MonoHostState> = None;
+        // 内置 Mono 运行时（runtime/mono）必须在加载 C# DLL / Mono 之前准备；幂等兜底。
+        #[cfg(feature = "mono-host")]
+        {
+            let setup = crate::runtime_setup::setup_mono_runtime(context.root);
+            context.log.host_log(LogLevel::Info, &setup.summary());
+        }
         // PlayerCSharpContext 必须覆盖整个帧循环（C# 只在 Initialize/Update/Shutdown 内调用）。
         #[cfg(feature = "mono-host")]
         let csharp_context = crate::csharp_context::PlayerCSharpContext::new_with_animation_graph(
