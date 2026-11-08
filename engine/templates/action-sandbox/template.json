@@ -1,0 +1,16 @@
+{
+  "id": "action-sandbox",
+  "name": "Action Sandbox",
+  "version": "0.4.0",
+  "description": "动作沙盒模板：Cube + 方向光 + PBR 材质 + 内置 RotatingEntity 脚本绑定，可直接运行预览。",
+  "min_engine_version": "0.3.0",
+  "files": [
+    "project.json",
+    "build.settings.json",
+    "README.md",
+    "assets/scenes/main.scene",
+    "assets/README.md",
+    "scripts/Spin.cs",
+    "scripts/README.md"
+  ]
+}

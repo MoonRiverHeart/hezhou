@@ -1,0 +1,16 @@
+{
+  "id": "scene-tools",
+  "name": "Scene Tools",
+  "version": "0.1.0",
+  "api_version": "0.4",
+  "description": "示例插件：贡献「保存工程」「Profiler Tab」命令（默认禁用）。",
+  "author": "Hezhou",
+  "enabled_by_default": false,
+  "commands": [
+    { "id": "save-project", "title": "保存工程", "shortcut": "Ctrl+S", "action": "save" },
+    { "id": "profiler-tab", "title": "打开 Profiler Tab", "shortcut": "", "action": "profiler_tab" }
+  ],
+  "menus": [],
+  "assets": [],
+  "scripts": []
+}

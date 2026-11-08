@@ -1,0 +1,10 @@
+{
+  "name": "hezhou-hello",
+  "version": "0.1.0",
+  "display_name": "Hello Package",
+  "description": "最小示例包：无依赖，提供一段问候文本资产。",
+  "dependencies": {},
+  "assets": ["assets/hello.txt"],
+  "scripts": [],
+  "entry": null
+}

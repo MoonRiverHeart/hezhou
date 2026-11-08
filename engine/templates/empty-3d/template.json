@@ -1,0 +1,15 @@
+{
+  "id": "empty-3d",
+  "name": "Empty 3D",
+  "version": "0.4.0",
+  "description": "空 3D 工程模板：project.json + build.settings.json + assets/scripts 占位，适合从零开始。",
+  "min_engine_version": "0.3.0",
+  "files": [
+    "project.json",
+    "build.settings.json",
+    "README.md",
+    "assets/scenes/main.scene",
+    "assets/README.md",
+    "scripts/README.md"
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "name": "hezhou-gameplay-kit",
+  "version": "0.1.0",
+  "display_name": "Gameplay Kit",
+  "description": "示例玩法包：依赖 hezhou-mathx，提供数据/脚本占位。",
+  "dependencies": {
+    "hezhou-mathx": "^0.1.0"
+  },
+  "assets": ["assets/kit.json"],
+  "scripts": ["scripts/Kit.cs"],
+  "entry": "Kit"
+}

@@ -1,0 +1,54 @@
+{
+  "version": "1.0",
+  "name": "{{PROJECT_NAME}}",
+  "path": "",
+  "created_at": "2026-01-01T00:00:00Z",
+  "modified_at": "2026-01-01T00:00:00Z",
+  "settings": { "game_width": 1280, "game_height": 720, "fps": 60 },
+  "entities": [
+    {
+      "id": 1,
+      "name": "Cube",
+      "transform": { "position": [0.0, 1.0, 0.0], "rotation": [0.0, 0.0, 0.0], "scale": [1.0, 1.0, 1.0] },
+      "mesh_type": "Cube",
+      "scripts": [
+        { "script_path": "scripts/RotatingEntity.cs", "class_name": "RotatingEntity", "enabled": true }
+      ],
+      "components": {},
+      "visible": true,
+      "light": null,
+      "parent_id": null,
+      "material": null,
+      "pbr_material": {
+        "albedo": [0.85, 0.35, 0.2, 1.0],
+        "metallic": 0.25,
+        "roughness": 0.35,
+        "normal_scale": 1.0,
+        "ao": 1.0,
+        "emissive": [0.0, 0.0, 0.0],
+        "emissive_strength": 1.0,
+        "albedo_texture_path": null
+      }
+    },
+    {
+      "id": 2,
+      "name": "Sun",
+      "transform": { "position": [0.0, 5.0, 0.0], "rotation": [0.0, 0.0, 0.0], "scale": [1.0, 1.0, 1.0] },
+      "mesh_type": "DirectionalLight",
+      "scripts": [],
+      "components": {},
+      "visible": true,
+      "light": { "direction": [-0.5, -1.0, -0.5], "color": [1.0, 0.95, 0.85], "intensity": 1.2 },
+      "parent_id": null,
+      "material": null
+    }
+  ],
+  "assets": [],
+  "scripts": [],
+  "current_state": {
+    "selected_entity_id": 1,
+    "camera_position": [8.0, 6.0, 8.0],
+    "camera_rotation": [-25.0, 45.0, 0.0],
+    "game_state": "Editing"
+  }
+}

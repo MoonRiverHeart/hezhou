@@ -1,0 +1,10 @@
+{
+  "name": "hezhou-mathx",
+  "version": "0.1.0",
+  "display_name": "Math Extras",
+  "description": "示例依赖包：数学辅助函数资产（被 hezhou-gameplay-kit 依赖）。",
+  "dependencies": {},
+  "assets": ["assets/mathx.json"],
+  "scripts": ["scripts/MathX.cs"],
+  "entry": "MathX"
+}

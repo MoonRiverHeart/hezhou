@@ -1,0 +1,11 @@
+{
+  "product_name": "{{PROJECT_NAME}}",
+  "executable_name": "action-sandbox",
+  "start_scene": "scenes/main.scene",
+  "quality": "high",
+  "window": { "width": 1280, "height": 720, "mode": "windowed" },
+  "targets": ["windows", "linux"],
+  "version": "{{VERSION}}",
+  "log_dir": "logs",
+  "required_font": null
+}

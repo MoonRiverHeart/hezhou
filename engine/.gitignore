@@ -34,3 +34,11 @@ test-results/
 
 # Keep fuzz seed corpus in VCS (despite the broad *.json rule above)
 !fuzz/corpus/**/*.json
+
+# Tracked engine data (broad *.json rule must not hide templates/plugins/packages/fixtures)
+!templates/**/*.json
+!plugins/**/*.json
+!packages/**/*.json
+!player/tests/fixtures/**/*.json
+!asset/tests/fixtures/**/*.json
+!audio/tests/fixtures/**/*.json

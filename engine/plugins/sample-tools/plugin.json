@@ -1,0 +1,18 @@
+{
+  "id": "sample-tools",
+  "name": "Sample Tools",
+  "version": "0.1.0",
+  "api_version": "0.4",
+  "description": "示例插件：贡献「切换主题」「打开 Console」命令（纯声明式，不执行任意代码）。",
+  "author": "Hezhou",
+  "enabled_by_default": true,
+  "commands": [
+    { "id": "toggle-theme", "title": "切换深浅主题", "shortcut": "", "action": "toggle_theme" },
+    { "id": "console", "title": "打开 Console", "shortcut": "", "action": "console" }
+  ],
+  "menus": [
+    { "id": "sample-tools-menu", "title": "示例插件", "command": "console" }
+  ],
+  "assets": ["assets/readme.txt"],
+  "scripts": []
+}
