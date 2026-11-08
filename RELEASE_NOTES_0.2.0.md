@@ -1,6 +1,6 @@
 # Hezhou 0.2.0 发布说明（草稿）
 
-> 状态：0.2.0 Release Candidate / 双平台 CI 全绿。基线：0.1.0。
+> 状态：已发布（2026-11-08）。Release: https://github.com/MoonRiverHeart/hezhou/releases/tag/v0.2.0
 
 ## Highlights
 

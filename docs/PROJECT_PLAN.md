@@ -9,39 +9,19 @@
 
 ---
 
-## 0. 当前执行进度（2026-11-01）
+## 0. 当前执行进度（2026-11-08）
 
-- ✅ 决策冻结：3D 动作引擎能力、骨骼动画进 0.2、自研物理、Windows/Linux Player、AI 并行。
-- ✅ 能力模块完整第一轮：audio、asset、physics、gameplay、animation、render-pipeline/rhi-vulkan、player、integration。
-- ✅ 编辑器已接入：渲染质量/PBR 切换、音频播放、资产扫描/glTF 导入；启动自检 **PASS=57, FAIL=0**；FFI 契约 **301/301/301**。
-- ✅ 渲染：PBR + CSM 阴影 + Bloom/Tonemap、PBR 模式天空盒/outline/Gizmo、合成蒙皮 draw、质量档/resize；GPU 冒烟通过。
-- ✅ 能力演示工程：headless `capability_demo` 14 项能力全 pass，输出 report.json。
-- ✅ Player：真实构建、cook manifest 接入、包内资产索引、`--validate`/`--run`/`--host` 与 Host 契约。
-- ✅ Core：Prefab（一层嵌套/覆盖/循环检测）与 SceneManager。
-- ✅ 编辑器：Prefab 捕获/实例化、SceneManager 场景槽切换/卸载/加载、Player 导出 dry-run（双平台 plan/manifest）；启动自检 **PASS=68**。
-- ✅ 渲染：PBR 每实体材质/纹理链路 + 三实体不同材质 GPU 冒烟。
-- ✅ Player：可选 `window-host` feature 实际创建 960x540 窗口、Vulkan 渲染；已可从包内 Project JSON 加载起始场景（cooked fixture 3 实体，30/30 帧 exit 0）。
-- ✅ 编辑器：Player 真实构建（Cooker + PlayerBuilder + 产物内 validate）已通过 fixture；PBR 材质进入 core/Project/Inspector，启动自检 **PASS=77**。
-- ✅ Player：加载 cook imported 资产 bundle（mesh/material/skeleton/animation，严格校验）；真实窗口加载 3 实体场景 30 帧 exit 0。
-- ✅ 真实蒙皮：渲染器支持 SkinnedMeshUpload/每实体 palette；Player 从 imported 资产转换 SkinnedVertex、播放首个 clip，窗口 30 帧 exit 0。
-- ✅ Player C# 入口：PlayerGame.cs + mono-host；真实窗口加载 DLL 调用 Initialize/Update/Shutdown，5 帧 exit 0；mono-host 106 tests。
-- ✅ Player C# SceneContext v1：C# 可创建 cube/实体、设置/读取 position；真实窗口 C# 创建 cube，Scene 3→4，30 帧 exit 0；mono-host 111 tests。
-- ✅ Player C# SceneContext v2：rotation/scale/exists/destroy；C# 创建 cube 并设置完整 Transform，Shutdown 销毁，真实窗口 30 帧 exit 0；mono-host 112 tests。
-- ✅ Player C# 动画 API v3：C# 枚举/播放/设置 clip 时间/速度，palette 由 C# 驱动；真实 skinned fixture 30 帧 exit 0；mono-host 119 tests。
-- ✅ Player C# 资产/音频 API v4：C# 枚举 6 个资产、加载 WAV、play/pause/resume/volume/stop；真实窗口 30 帧 exit 0；mono-host 123 tests。
-- ✅ Player C# 角色控制 API v5：PhysicsWorld 地面 + 每实体 CharacterMotor；C# 创建角色、每帧 step，30 帧位移 +0.669m、grounded；mono-host 129 tests。
-- ✅ Player AnimationStateMachine v6：9 状态机 + clip 名称映射 + 0.2s 过渡；C# 触发 Run/Attack，真实窗口 30 帧 palette 状态驱动；mono-host 134 tests。
-- ✅ Player 发布链路：新增双平台 `package-player` CI（window-host demo zip/tar），Windows 本地包 validate + 5 帧窗口运行通过。
-- ✅ CI 全绿（run 42461149553）：rust-tests、csharp-build、package-windows/linux、player-build、player-window-host、package-player 全成功；Windows Player zip 51.6MB / Linux tar.gz 25.4MB。
-- ✅ CI 产物实测：下载 Windows Player zip，包内 Mono 运行时被检测并使用，C# PlayerGame 运行 5 帧 exit 0。
-- ✅ 0.2.0 版本号已同步（Cargo/DEB/MSIX/Player demo），发布说明定稿；tag `v0.2.0` 待推送后触发 Release。
-- ✅ 本地 CI `ci_local.ps1 -Offline` 通过（默认测试 + feature 测试 + FFI 契约 + C# 编译 + 图标一致性）。
-- ✅ 验证证据：capability_demo 14/14 项通过；Player 72 tests；Core 43 tests；编辑器启动自检 PASS=57、FAIL=0；FFI 301/301/301。
-- ⏳ 未完成（0.2 验收尚未达成）：
-  1. Player 发布附件 / 0.2 Release（C# Scene/Transform/动画状态机/资产/音频/角色控制已接入）；
-  2. Player 发布附件、真实 cooker 端到端、双平台 release 验证；
-  3. 0.2 最终测试/文档收尾与 Release。
-- 0.2 仍处于进行中，不满足发布 Definition of Done。
+- ✅ **0.2.0 已发布**：https://github.com/MoonRiverHeart/hezhou/releases/tag/v0.2.0
+  - Windows：MSI / MSIX / .cer / Capability Player zip
+  - Linux：DEB / Capability Player tar.gz
+- ✅ CI 全绿：rust-tests、csharp-build、package-windows/linux、player-build、player-window-host、package-player、publish-release。
+- ✅ 0.2 能力：audio / asset / physics / gameplay / animation / integration / player 全部模块。
+- ✅ PBR + CSM 阴影 + Bloom/Tonemap + 天空/outline/Gizmo；真实蒙皮网格上传/绘制。
+- ✅ Player：Project JSON 场景、cook imported 资产、真实蒙皮、9 状态动画、C# ABI v6（Scene/Transform/动画/资产/音频/角色）。
+- ✅ 编辑器：Prefab/SceneManager、Player 真实构建、PBR Inspector、音频/资产面板。
+- ✅ 内置 Mono 运行时、C# PlayerGame、双平台 Capability Demo。
+- ⏳ 下一阶段：0.3 编辑器工具链 + 自研物理进阶 + Profiler + C# 稳定 API。
+- 0.2 已知限制（详见 RELEASE_NOTES_0.2.0.md）：不是完整可玩垂直切片；蒙皮着色为 Blinn-Phong 回退；单 mesh/状态机无混合树；无完整战斗 API。
 
 ## 1. 执行摘要
 
