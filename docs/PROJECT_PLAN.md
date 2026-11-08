@@ -26,6 +26,7 @@
 - ✅ 0.3 第三批：编辑器动画 Tab（glTF clip/skeleton 查询、时间轴/播放/暂停/拖动，FFI 329，启动自检 **PASS=88**）；physics 空间索引宽相（200 体 7.7× 加速）+ 旋转盒保守接触，**52 tests**。
 - ✅ 0.3 第四批：材质 Tab albedo 纹理选择/清除/持久化（FFI 330，启动自检 **PASS=91**）；本地 ci_local 全绿。
 - ✅ 0.3 性能基线：headless `perf_smoke`（ECS 10k / 物理 200 体 / 动画 / 音频 / 资产）+ 阈值门禁 + CI `perf-baseline`；release 5/5 pass；CI run 42469477653 全绿（含 perf-baseline）。
+- ✅ 0.3 第五批：编辑器动画状态机预览（9 状态/过渡 alpha/共享时间轴，FFI 334，启动自检 **PASS=96**）；CI run 42470825264 全绿。
 - ✅ 本地 ci_local 全绿。
 - ✅ 本地 `ci_local.ps1 -Offline` 全绿（TMP/TEMP 指向可写目录）。
 - ⏳ 下一批 0.3：动画时间轴/材质编辑器/构建设置、C# 稳定 API、性能门禁、物理旋转/固定关节/空间索引。
