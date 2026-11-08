@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-VERSION="${VERSION:-0.2.0}"
+VERSION="${VERSION:-0.3.0}"
 SKIP_BUILD=0
 if [[ "${1:-}" == "--skip-build" ]]; then SKIP_BUILD=1; fi
 
