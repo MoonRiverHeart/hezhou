@@ -473,6 +473,9 @@ fn main() {
         scene_set_entity_pbr_material_json: stub_scene_set_pbr_material_json,
         scene_get_entity_pbr_material_json: stub_scene_get_pbr_material_json,
         editor_sync_pbr_materials_now: stub_editor_sync_pbr_materials_now,
+        profiler_snapshot_json: stub_profiler_snapshot_json,
+        profiler_reset: stub_profiler_reset,
+        profiler_frame_count: stub_profiler_frame_count,
     };
     hezhou_scripting::ffi_context::set_ffi_context(ffi_ctx);
     let ffi_ptr = hezhou_scripting::ffi_context::get_ffi_context_ptr();
@@ -716,6 +719,9 @@ extern "C" fn stub_scene_get_pbr_material_json(
     0
 }
 extern "C" fn stub_editor_sync_pbr_materials_now() -> i32 { 0 }
+extern "C" fn stub_profiler_snapshot_json(_: *mut std::ffi::c_char, _: usize) -> usize { 0 }
+extern "C" fn stub_profiler_reset() -> i32 { 0 }
+extern "C" fn stub_profiler_frame_count() -> i32 { 0 }
 
 // 新增stub函数 — Feature 1脚本绑定
 pub extern "C" fn scene_get_existing_ptr_stub() -> *mut std::ffi::c_void { std::ptr::null_mut() }
