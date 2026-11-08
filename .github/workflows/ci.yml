@@ -119,7 +119,8 @@ jobs:
             libxi-dev libxcursor-dev libxinerama-dev libxkbcommon-dev \
             libxkbcommon-x11-dev libwayland-dev wayland-protocols libdecor-0-dev \
             libx11-xcb-dev libxcb1-dev libxcb-randr0-dev libxcb-xinerama0-dev \
-            libxcb-xkb-dev libxcb-shape0-dev libxcb-xfixes0-dev libasound2-dev
+            libxcb-xkb-dev libxcb-shape0-dev libxcb-xfixes0-dev libasound2-dev \
+            mono-devel libmono-2.0-dev
 
       - name: Run quick soak gate (60s, release)
         shell: pwsh
