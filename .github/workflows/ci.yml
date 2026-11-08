@@ -268,9 +268,85 @@ jobs:
         shell: pwsh
         run: cargo test -p hezhou-player --features window-host
 
+  package-player:
+    if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/v')
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ env.RUST_VERSION }}
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: engine
+
+      - name: Install Linux dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends             build-essential cmake ninja-build pkg-config python3             libvulkan-dev libglfw3-dev libx11-dev libxrandr-dev             libxi-dev libxcursor-dev libxinerama-dev libxkbcommon-dev             libxkbcommon-x11-dev libwayland-dev wayland-protocols libdecor-0-dev             libx11-xcb-dev libxcb1-dev libxcb-randr0-dev libxcb-xinerama0-dev             libxcb-xkb-dev libxcb-shape0-dev libxcb-xfixes0-dev libasound2-dev
+
+      - name: Build Player runtime and builder
+        working-directory: engine
+        shell: pwsh
+        run: |
+          cargo build -p hezhou-player --release --features window-host
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          cargo build -p hezhou-player --release --bin hezhou-player-build
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Package capability demo Player
+        shell: pwsh
+        run: |
+          $target = if ($IsWindows) { "windows" } elseif ($IsLinux) { "linux" } else { throw "unsupported" }
+          $suffix = if ($IsWindows) { ".exe" } else { "" }
+          $fixture = "engine/player/tests/fixtures/skinned"
+          New-Item -ItemType Directory -Force build-temp | Out-Null
+          $config = Get-Content "$fixture/build-config.json" -Raw | ConvertFrom-Json
+          $config.target = $target
+          $config.product_name = "Hezhou Capability Demo"
+          $config.executable_name = "hezhou-capability-demo"
+          $config.window.title = "Hezhou Capability Demo"
+          $config | ConvertTo-Json -Depth 8 | Set-Content "build-temp/player-demo-config.json" -Encoding utf8
+          & "engine/target/release/hezhou-player-build$suffix" `
+            --config "build-temp/player-demo-config.json" `
+            --cook "$fixture/cook_manifest.json" `
+            --assets-dir "$fixture/assets" `
+            --scripts-dir "$fixture/scripts" `
+            --runtime-dir "$fixture/runtime" `
+            --exe "engine/target/release/hezhou-player$suffix" `
+            --build-out "dist/player-demo"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $pkg = "dist/player-demo/$target"
+          & "$pkg/hezhou-capability-demo$suffix" --validate --player-root $pkg --log-dir "$env:RUNNER_TEMP/hezhou-player-demo-logs"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Archive Windows Player
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: Compress-Archive -Path "dist/player-demo/windows/*" -DestinationPath "dist/hezhou-capability-player-windows.zip"
+
+      - name: Archive Linux Player
+        if: runner.os == 'Linux'
+        shell: bash
+        run: tar -C dist/player-demo/linux -czf dist/hezhou-capability-player-linux.tar.gz .
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hezhou-player-demo-${{ matrix.os }}
+          path: |
+            dist/hezhou-capability-player-*
+
   publish-release:
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: [package-windows, package-linux]
+    needs: [package-windows, package-linux, package-player]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -278,7 +354,7 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           path: artifacts
-          pattern: hezhou-editor-*
+          pattern: hezhou-*
 
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
@@ -289,3 +365,4 @@ jobs:
             artifacts/**/*.cer
             artifacts/**/*.msi
             artifacts/**/*.deb
+            artifacts/**/hezhou-capability-player-*
