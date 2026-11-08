@@ -13,6 +13,10 @@ pub struct RigidBody {
     gravity_scale: f32,
     can_sleep: bool,
     is_sleeping: bool,
+    /// 该刚体是否参与 CCD 扫掠（0.3 基础 CCD，默认关闭）。
+    ccd_enabled: bool,
+    /// 低速度持续计时（自动睡眠用，0.3 可选能力）。
+    sleep_timer: f32,
 }
 
 impl RigidBody {
@@ -29,6 +33,8 @@ impl RigidBody {
             gravity_scale: 1.0,
             can_sleep: true,
             is_sleeping: false,
+            ccd_enabled: false,
+            sleep_timer: 0.0,
         }
     }
 
@@ -132,7 +138,54 @@ impl RigidBody {
     }
 
     pub fn set_mass(&mut self, mass: f32) {
-        self.mass = mass;
+        self.mass = mass.max(0.0);
+    }
+
+    /// 逆质量：动态刚体返回 `1 / mass`（mass<=0 视为无限质量），其余类型返回 0。
+    ///
+    /// 冲量求解统一用逆质量：静态/运动学刚体天然不可推动。
+    pub fn inverse_mass(&self) -> f32 {
+        if self.body_type == RigidBodyType::Dynamic && self.mass > 0.0 {
+            1.0 / self.mass
+        } else {
+            0.0
+        }
+    }
+
+    /// 是否可被冲量/碰撞推动（动态且有质量且未睡眠）。
+    pub fn is_movable(&self) -> bool {
+        self.body_type == RigidBodyType::Dynamic && self.mass > 0.0 && !self.is_sleeping
+    }
+
+    /// 线速度大小的平方（用于睡眠阈值判断）。
+    pub fn speed_squared(&self) -> f32 {
+        let v = self.velocity;
+        v.x * v.x + v.y * v.y + v.z * v.z
+    }
+
+    /// 施加线冲量（世界空间，单位 N·s）：`Δv = impulse * 1/mass`，并唤醒刚体。
+    pub fn apply_impulse(&mut self, impulse: Vec3) {
+        let inv_mass = self.inverse_mass();
+        if inv_mass <= 0.0 {
+            return;
+        }
+        self.wake_up();
+        self.velocity = self.velocity + impulse * inv_mass;
+    }
+
+    /// 按角速度积分旋转（世界空间角速度，近似一阶积分，0.3 第一版）。
+    pub fn integrate_rotation(&mut self, dt: f32) {
+        let w = self.angular_velocity;
+        let angle = w.magnitude() * dt;
+        if angle <= 1e-6 {
+            return;
+        }
+        let axis = w.normalized();
+        let axis = nalgebra::Vector3::new(axis.x, axis.y, axis.z);
+        let delta =
+            nalgebra::UnitQuaternion::from_axis_angle(&nalgebra::Unit::new_normalize(axis), angle);
+        // 世界空间角速度：delta 左乘。
+        self.rotation = delta * self.rotation;
     }
 
     pub fn linear_damping(&self) -> f32 {
@@ -165,12 +218,42 @@ impl RigidBody {
 
     pub fn wake_up(&mut self) {
         self.is_sleeping = false;
+        self.sleep_timer = 0.0;
     }
 
     pub fn sleep(&mut self) {
         if self.can_sleep {
             self.is_sleeping = true;
         }
+    }
+
+    pub fn can_sleep(&self) -> bool {
+        self.can_sleep
+    }
+
+    pub fn set_can_sleep(&mut self, can_sleep: bool) {
+        self.can_sleep = can_sleep;
+    }
+
+    /// 是否启用 CCD（需要 `PhysicsWorld::set_ccd_enabled(true)` 全局开关同时打开）。
+    pub fn ccd_enabled(&self) -> bool {
+        self.ccd_enabled
+    }
+
+    pub fn set_ccd_enabled(&mut self, enabled: bool) {
+        self.ccd_enabled = enabled;
+    }
+
+    pub(crate) fn sleep_timer(&self) -> f32 {
+        self.sleep_timer
+    }
+
+    pub(crate) fn add_sleep_time(&mut self, dt: f32) {
+        self.sleep_timer += dt;
+    }
+
+    pub(crate) fn reset_sleep_timer(&mut self) {
+        self.sleep_timer = 0.0;
     }
 }
 
