@@ -133,6 +133,29 @@ jobs:
           path: test-results/soak/**
           if-no-files-found: warn
 
+  diagnostics-smoke:
+    # 1.0 诊断包冒烟：用 fixture 验证采集/脱敏/排除/zip，不接触真实用户数据。
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run diagnostics self-test (fixture)
+        shell: pwsh
+        run: pwsh -File engine/scripts/diagnostics.ps1 -SelfTest -OutDir test-results/diagnostics/selftest-${{ matrix.os }}
+
+      - name: Upload diagnostics self-test artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: diagnostics-selftest-${{ matrix.os }}
+          path: test-results/diagnostics/**
+          if-no-files-found: warn
+
   csharp-build:
     runs-on: windows-latest
     timeout-minutes: 30
