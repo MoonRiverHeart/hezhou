@@ -66,6 +66,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: engine
+          shared-key: hezhou-ci-rust
 
       - name: Install Linux build dependencies
         run: |
@@ -89,6 +90,47 @@ jobs:
         with:
           name: perf-baseline-report
           path: test-results/perf-baseline/**
+          if-no-files-found: warn
+
+  soak-quick:
+    # 1.0 稳定性门禁：60s headless quick soak（ECS/物理/动画/Player-ish + RSS 采样）。
+    # 复用 perf-baseline 构建出的依赖缓存（shared-key），只额外构建 soak_smoke。
+    needs: perf-baseline
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ env.RUST_VERSION }}
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: engine
+          shared-key: hezhou-ci-rust
+
+      - name: Install Linux build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential cmake ninja-build pkg-config python3 \
+            libvulkan-dev libglfw3-dev libx11-dev libxrandr-dev \
+            libxi-dev libxcursor-dev libxinerama-dev libxkbcommon-dev \
+            libxkbcommon-x11-dev libwayland-dev wayland-protocols libdecor-0-dev \
+            libx11-xcb-dev libxcb1-dev libxcb-randr0-dev libxcb-xinerama0-dev \
+            libxcb-xkb-dev libxcb-shape0-dev libxcb-xfixes0-dev libasound2-dev
+
+      - name: Run quick soak gate (60s, release)
+        shell: pwsh
+        run: pwsh -File engine/scripts/soak_test.ps1 -Mode smoke -Quick -Profile release
+
+      - name: Upload soak report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: soak-report
+          path: test-results/soak/**
           if-no-files-found: warn
 
   csharp-build:

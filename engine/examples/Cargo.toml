@@ -114,3 +114,7 @@ path = "src/capability_demo.rs"
 [[bin]]
 name = "perf_smoke"
 path = "src/bin/perf_smoke.rs"
+
+[[bin]]
+name = "soak_smoke"
+path = "src/bin/soak_smoke.rs"

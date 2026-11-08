@@ -156,6 +156,9 @@ if ($MaxRssMb -ge 0) { $runArgs += @('--max-rss-mb', "$MaxRssMb") }
 if ($MaxAvgFrameMs -ge 0) { $runArgs += @('--max-avg-frame-ms', "$MaxAvgFrameMs") }
 if ($MaxP95FrameMs -ge 0) { $runArgs += @('--max-p95-frame-ms', "$MaxP95FrameMs") }
 
+# 清理旧报告：避免超时/失败时误读上一次的 report.json。
+Remove-Item $reportPath -ErrorAction SilentlyContinue
+
 $quotedArgs = ($runArgs | ForEach-Object {
         if ($_ -match '\s') { '"{0}"' -f $_ } else { $_ }
     }) -join ' '

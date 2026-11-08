@@ -491,6 +491,8 @@ fn main() {
         animation_preview_set_state: stub_animation_preview_set_state,
         animation_preview_state_snapshot: stub_animation_preview_state_snapshot,
         animation_preview_graph_free: stub_animation_preview_graph_free,
+        template_list_json: stub_template_list_json,
+        template_create: stub_template_create,
     };
     hezhou_scripting::ffi_context::set_ffi_context(ffi_ctx);
     let ffi_ptr = hezhou_scripting::ffi_context::get_ffi_context_ptr();
@@ -751,6 +753,12 @@ extern "C" fn stub_animation_preview_init_graph(_: *const std::ffi::c_char, _: i
 extern "C" fn stub_animation_preview_set_state(_: *const std::ffi::c_char) -> i32 { -2 }
 extern "C" fn stub_animation_preview_state_snapshot(_: *mut std::ffi::c_char, _: usize) -> usize { 0 }
 extern "C" fn stub_animation_preview_graph_free() -> i32 { 0 }
+extern "C" fn stub_template_list_json(_: *mut std::ffi::c_char, _: usize) -> usize { 0 }
+extern "C" fn stub_template_create(
+    _: *const std::ffi::c_char,
+    _: *const std::ffi::c_char,
+    _: *const std::ffi::c_char,
+) -> i32 { -1 }
 extern "C" fn stub_build_settings_validate_json(
     _: *const std::ffi::c_char,
     _: *mut std::ffi::c_char,
@@ -790,6 +798,7 @@ fn compile_csharp_script() {
         }
     }
 }
+
 
 
 
