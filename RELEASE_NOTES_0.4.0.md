@@ -1,6 +1,6 @@
 # Hezhou 0.4.0 发布说明
 
-> 状态：Release Candidate / 待双平台 CI 验收。基线：0.3.0。
+> 状态：已发布（2026-11-08）。Release: https://github.com/MoonRiverHeart/hezhou/releases/tag/v0.4.0
 
 ## Highlights
 

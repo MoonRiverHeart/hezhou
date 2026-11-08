@@ -13,25 +13,15 @@
 
 - ✅ **0.2.0 已发布**：https://github.com/MoonRiverHeart/hezhou/releases/tag/v0.2.0
 - ✅ **0.3.0 已发布**：https://github.com/MoonRiverHeart/hezhou/releases/tag/v0.3.0
+- ✅ **0.4.0 已发布**：https://github.com/MoonRiverHeart/hezhou/releases/tag/v0.4.0
   - Windows：MSI / MSIX / .cer / Capability Player zip
   - Linux：DEB / Capability Player tar.gz
-- ✅ CI 全绿：rust-tests、csharp-build、package-windows/linux、player-build、player-window-host、package-player、perf-baseline、publish-release。
-- ✅ 0.3 编辑器工具链：Profiler、Build Settings、动画时间轴、9 状态动画预览、材质 albedo 纹理编辑。
-- ✅ 0.3 C# API：`Hezhou.Engine`（Scene/Entity/Time/Audio/Animation/Debug）。
-- ✅ 0.3 物理：动态刚体、冲量/摩擦、CCD、距离/固定关节、空间索引宽相、旋转盒保守接触。
-- ✅ 0.3 性能：headless `perf_smoke` + CI `perf-baseline` 门禁。
-- ✅ 0.4 第一批：项目模板（empty-3d/action-sandbox）+ 编辑器新建工程；FFI 336，启动自检 **PASS=106**。
-- ✅ 1.0 稳定性第一批：headless `soak_smoke`（ECS/物理/动画/角色循环、RSS/帧时间 JSON、60s quick CI `soak-quick`）；本机 60s release PASS，内存增长 0.39MB / 6.71%。
-- ✅ 1.0 诊断包：`diagnostics.ps1` 自检 PASS，脱敏/排除敏感文件/限制大小；CI `diagnostics-smoke` 双平台 job。
-- ✅ CI run 42476382740 全绿：rust/csharp/package-windows/linux/player-build/window-host/package-player/perf-baseline/soak-quick/diagnostics-smoke。
-- ✅ 0.4 包管理器：hezhou-package（manifest/registry/依赖拓扑/installer/lockfile）+ 编辑器 Packages Tab；FFI 340，启动自检 **PASS=112**；CI run 42477811833 全绿。
-- ✅ 30 分钟 soak：1800s、107999 ticks、0 overruns、RESULT PASS；RSS 5.78→7.55MB（+1.77MB / 30.5%，绝对增长在阈值内，低基数导致百分比偏高，需 0.4 继续观察）。
-- ✅ 0.4 网络第一批：std-only hezhou-net（Transport/UDP/TCP/framing/Session/Room/NetServer/NetClient），39 tests；loopback 3 客户端/心跳/超时/房间广播通过。
-- ✅ 0.4 网络第二批：WorldSnapshot 全量/delta、baseline ack、ReplicationServer/Client、SnapshotBuffer 插值、RpcRegistry；58 tests；CI run 42480451129 全绿。
-- ✅ 0.4 插件 API：hezhou-plugin（manifest/registry/启用/action 白名单）+ 编辑器插件 Tab/Command Palette；FFI 343，启动自检 **PASS=117**。
-- ✅ 1.0 文档第一批（2026-11-08）：`docs/GETTING_STARTED_1_0.md`（入门闭环、命令核对）、`docs/PLATFORM_SUPPORT_1_0.md`（平台矩阵/边界）、`docs/API_STABILITY_1_0.md`（稳定性等级/FfiContext 追加规则/格式版本）、`docs/1.0_RELEASE_CHECKLIST.md`（发版门禁）；README 增加文档入口。
-- ✅ 0.4.0 版本号/发布说明已准备（Cargo/DEB/MSIX/Player demo），待网络恢复推送、CI、tag v0.4.0。
-- ⏳ 下一阶段：0.4 平台扩展、网络、插件/包管理器、稳定性 30min+；0.3 已知限制见 RELEASE_NOTES_0.3.0.md。
+- ✅ CI 全绿：rust、C#、双平台安装包、Player 构建/窗口、package-player、perf-baseline、soak-quick、diagnostics-smoke、publish-release。
+- ✅ 0.4 生态：项目模板、最小包管理器、声明式插件 API。
+- ✅ 0.4 网络：UDP/TCP 传输、会话/房间、服务器权威快照（全量/Delta/ack）、客户端插值、RPC。
+- ✅ 1.0 稳定性：60s soak CI、30 分钟 soak、诊断包、性能基线。
+- ✅ 1.0 文档：Getting Started、平台矩阵、API 稳定性、1.0 Release Checklist。
+- ⏳ 1.0 剩余：平台扩展（macOS/Android/Web）、非团队开发者验证、30min 内存趋势、1.0 API/发布验收。
 
 ## 1. 执行摘要
 
