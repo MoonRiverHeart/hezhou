@@ -45,7 +45,10 @@ if ($monoRoot) {
     New-Item -ItemType Directory -Force (Join-Path $runtime "lib\mono") | Out-Null
     foreach ($asm in @("4.5","4.5-api","4.0-api")) { $src=Join-Path $monoRoot "lib\mono\$asm"; if (Test-Path $src) { Copy-Item $src (Join-Path $runtime "lib\mono\$asm") -Recurse } }
 }
-Copy-Item (Join-Path $PSScriptRoot "msix\AppxManifest.xml") $Stage
+$manifest = Get-Content (Join-Path $PSScriptRoot "msix\AppxManifest.xml") -Raw
+$msixVersion = if ($Version -match '^\d+\.\d+\.\d+') { "$Version.0" } else { "0.2.0.0" }
+$manifest = [regex]::Replace($manifest, '(<Identity[^>]*Version=")[^"]+(")', '${1}' + $msixVersion + '${2}')
+Set-Content (Join-Path $Stage "AppxManifest.xml") $manifest -Encoding UTF8
 Copy-Item (Join-Path $PSScriptRoot "msix\PackageAssets") $Stage -Recurse
 New-Item -ItemType Directory -Force $Dist | Out-Null
 $sdkRoot = Join-Path ${env:ProgramFiles(x86)} "Windows Kits\10\bin"

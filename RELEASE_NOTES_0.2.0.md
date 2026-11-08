@@ -1,6 +1,6 @@
 # Hezhou 0.2.0 发布说明（草稿）
 
-> 状态：候选/待双平台 CI 验收。基线：0.1.0。
+> 状态：0.2.0 Release Candidate / 双平台 CI 全绿。基线：0.1.0。
 
 ## Highlights
 
@@ -15,8 +15,8 @@
 
 ## Player
 
-- Windows: `hezhou-capability-player-windows.zip`
-- Linux: `hezhou-capability-player-linux.tar.gz`
+- Windows: `HezhouEditor-0.2.0.msix` / `.cer` / `.msi` + `hezhou-capability-player-windows.zip`
+- Linux: `hezhou-editor_0.2.0_amd64.deb` + `hezhou-capability-player-linux.tar.gz`
 - 需要 Vulkan 与（mono-host 构建时）Mono；默认 demo 为 window-host 构建
 - 场景：skinned fixture（Project JSON + imported mesh/skeleton/3 clips + WAV）
 
