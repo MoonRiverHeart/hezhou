@@ -12,25 +12,15 @@
 ## 0. 当前执行进度（2026-11-08）
 
 - ✅ **0.2.0 已发布**：https://github.com/MoonRiverHeart/hezhou/releases/tag/v0.2.0
+- ✅ **0.3.0 已发布**：https://github.com/MoonRiverHeart/hezhou/releases/tag/v0.3.0
   - Windows：MSI / MSIX / .cer / Capability Player zip
   - Linux：DEB / Capability Player tar.gz
-- ✅ CI 全绿：rust-tests、csharp-build、package-windows/linux、player-build、player-window-host、package-player、publish-release。
-- ✅ 0.2 能力：audio / asset / physics / gameplay / animation / integration / player 全部模块。
-- ✅ PBR + CSM 阴影 + Bloom/Tonemap + 天空/outline/Gizmo；真实蒙皮网格上传/绘制。
-- ✅ Player：Project JSON 场景、cook imported 资产、真实蒙皮、9 状态动画、C# ABI v6（Scene/Transform/动画/资产/音频/角色）。
-- ✅ 编辑器：Prefab/SceneManager、Player 真实构建、PBR Inspector、音频/资产面板。
-- ✅ 内置 Mono 运行时、C# PlayerGame、双平台 Capability Demo。
-- ✅ 0.3 第一批：编辑器 Profiler Tab（CPU 帧/FPS/启动/实体/PBR/蒙皮/资产/音频/内存，FFI 319）；启动自检 **PASS=80**。
-- ✅ 0.3 第一批：自研物理动态刚体（质量/阻尼/冲量）、Plane/AABB 碰撞响应、CCD、距离关节；physics **43 tests**。
-- ✅ 0.3 第二批：编辑器 Build Settings（build.settings.json + Build Tab + Player 导出读取，FFI 322，启动自检 **PASS=84**）；physics 固定关节 + 动态-动态 CCD，**48 tests**。
-- ✅ 0.3 第三批：编辑器动画 Tab（glTF clip/skeleton 查询、时间轴/播放/暂停/拖动，FFI 329，启动自检 **PASS=88**）；physics 空间索引宽相（200 体 7.7× 加速）+ 旋转盒保守接触，**52 tests**。
-- ✅ 0.3 第四批：材质 Tab albedo 纹理选择/清除/持久化（FFI 330，启动自检 **PASS=91**）；本地 ci_local 全绿。
-- ✅ 0.3 性能基线：headless `perf_smoke`（ECS 10k / 物理 200 体 / 动画 / 音频 / 资产）+ 阈值门禁 + CI `perf-baseline`；release 5/5 pass；CI run 42469477653 全绿（含 perf-baseline）。
-- ✅ 0.3 第五批：编辑器动画状态机预览（9 状态/过渡 alpha/共享时间轴，FFI 334，启动自检 **PASS=96**）；CI run 42470825264 全绿。
-- ✅ 本地 ci_local 全绿。
-- ✅ 本地 `ci_local.ps1 -Offline` 全绿（TMP/TEMP 指向可写目录）。
-- ⏳ 下一批 0.3：动画时间轴/材质编辑器/构建设置、C# 稳定 API、性能门禁、物理旋转/固定关节/空间索引。
-- 0.2 已知限制（详见 RELEASE_NOTES_0.2.0.md）：不是完整可玩垂直切片；蒙皮着色为 Blinn-Phong 回退；单 mesh/状态机无混合树；无完整战斗 API。
+- ✅ CI 全绿：rust-tests、csharp-build、package-windows/linux、player-build、player-window-host、package-player、perf-baseline、publish-release。
+- ✅ 0.3 编辑器工具链：Profiler、Build Settings、动画时间轴、9 状态动画预览、材质 albedo 纹理编辑。
+- ✅ 0.3 C# API：`Hezhou.Engine`（Scene/Entity/Time/Audio/Animation/Debug）。
+- ✅ 0.3 物理：动态刚体、冲量/摩擦、CCD、距离/固定关节、空间索引宽相、旋转盒保守接触。
+- ✅ 0.3 性能：headless `perf_smoke` + CI `perf-baseline` 门禁。
+- ⏳ 下一阶段：0.4/1.0 平台扩展、网络、生态、稳定性；0.3 已知限制见 RELEASE_NOTES_0.3.0.md。
 
 ## 1. 执行摘要
 
