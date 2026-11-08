@@ -195,7 +195,7 @@ CI 的第三人称 Player 包可直接运行：
 third-person-demo --run --host window --manifest <解压目录>/manifest.json --log-dir <日志目录>
 ```
 
-WASD/方向键移动，Space 跳跃，关闭窗口退出。默认 120 帧；设置 `HEZHOU_PLAYER_WINDOW_FRAMES=100000` 可保持更久。
+WASD/方向键移动，Space 跳跃，关闭窗口退出。默认运行到用户关闭窗口；CI/冒烟可用 `HEZHOU_PLAYER_WINDOW_FRAMES=30` 限帧。
 
 ---
 

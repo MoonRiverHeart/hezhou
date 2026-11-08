@@ -10,8 +10,8 @@
 //!   失败时由 `scene_loader` 回退到内置 cube + directional light）；
 //!   host 不再无条件自建 cube，只记录实体数/来源；
 //! - `set_game_state(1)`（Running）+ 固定相机 + 天空盒；
-//! - 运行固定帧数（默认 [`DEFAULT_FRAME_LIMIT`]，可用环境变量
-//!   [`FRAME_LIMIT_ENV`] 覆盖）或直到用户关闭窗口；
+//! - 默认运行到用户关闭窗口（[`DEFAULT_FRAME_LIMIT`]=0 表示无限）；
+//!   设置 [`FRAME_LIMIT_ENV`] 可限制帧数（CI/冒烟）；
 //! - 每帧写 `player.log`，返回 `HostOutcome::Running { frames }`（退出码 0）；
 //! - 窗口/Vulkan/GPU 不可用或渲染 panic 时返回可读 [`HostError`]，不 panic、不退出进程。
 //!
@@ -49,8 +49,8 @@ use crate::skinned_asset::PLAYER_SKINNED_ENTITY_ID;
 /// `--host window` 使用的 host 名称。
 pub const WINDOW_HOST_NAME: &str = "window";
 /// 默认渲染帧数（约 2 秒 @60fps）。
-pub const DEFAULT_FRAME_LIMIT: u32 = 120;
-/// 覆盖帧数的环境变量（例如 `HEZHOU_PLAYER_WINDOW_FRAMES=30`，便于手工/CI 冒烟）。
+pub const DEFAULT_FRAME_LIMIT: u32 = 0;
+/// 覆盖帧数的环境变量（例如 `HEZHOU_PLAYER_WINDOW_FRAMES=30`，便于手工/CI 冒烟；0=无限）。
 pub const FRAME_LIMIT_ENV: &str = "HEZHOU_PLAYER_WINDOW_FRAMES";
 /// 帧数上限（防止误传超大值导致长时间占用）。
 pub const MAX_FRAME_LIMIT: u32 = 100_000;
@@ -97,10 +97,10 @@ impl WindowPlayerHost {
         }
     }
 
-    /// 指定渲染帧数（clamp 到 `1..=MAX_FRAME_LIMIT`）。
+    /// 指定渲染帧数（0=无限；clamp 到 `0..=MAX_FRAME_LIMIT`）。
     pub fn with_frame_limit(frame_limit: u32) -> Self {
         Self {
-            frame_limit: frame_limit.clamp(1, MAX_FRAME_LIMIT),
+            frame_limit: frame_limit.min(MAX_FRAME_LIMIT),
         }
     }
 
@@ -473,7 +473,7 @@ impl PlayerHost for WindowPlayerHost {
         let mut previous_space = false;
         let mut camera_missing_warned = false;
         let mut camera_pose_logged = false;
-        while frames < self.frame_limit {
+        while self.frame_limit == 0 || frames < self.frame_limit {
             let keep_running = match catch_unwind(AssertUnwindSafe(|| {
                 renderer.process_events();
                 // process_events 之后生成本帧输入快照（WASD/方向键 + Space 按下沿）。
@@ -621,7 +621,7 @@ impl PlayerHost for WindowPlayerHost {
                 }
             }
 
-            if frames % 30 == 0 || frames == self.frame_limit {
+            if frames % 30 == 0 {
                 context.log.host_log(
                     LogLevel::Info,
                     &format!(
@@ -731,7 +731,7 @@ struct MonoHostState {
     last_update: Instant,
 }
 
-/// 从环境变量解析帧数；非法/缺省时用 [`DEFAULT_FRAME_LIMIT`]。
+/// 从环境变量解析帧数；非法/缺省时用 [`DEFAULT_FRAME_LIMIT`]（0=无限）。
 pub fn frame_limit_from_env() -> u32 {
     match std::env::var(FRAME_LIMIT_ENV) {
         Ok(value) => parse_frame_limit(&value).unwrap_or(DEFAULT_FRAME_LIMIT),
@@ -742,11 +742,7 @@ pub fn frame_limit_from_env() -> u32 {
 /// 解析帧数字符串（供环境变量与测试使用）。
 pub fn parse_frame_limit(value: &str) -> Option<u32> {
     let parsed = value.trim().parse::<u32>().ok()?;
-    if parsed == 0 {
-        None
-    } else {
-        Some(parsed.min(MAX_FRAME_LIMIT))
-    }
+    Some(parsed.min(MAX_FRAME_LIMIT))
 }
 
 #[cfg(test)]
@@ -757,7 +753,7 @@ mod tests {
     fn frame_limit_parsing_is_strict_and_clamped() {
         assert_eq!(parse_frame_limit("30"), Some(30));
         assert_eq!(parse_frame_limit("  1 "), Some(1));
-        assert_eq!(parse_frame_limit("0"), None);
+        assert_eq!(parse_frame_limit("0"), Some(0));
         assert_eq!(parse_frame_limit("-1"), None);
         assert_eq!(parse_frame_limit("abc"), None);
         assert_eq!(parse_frame_limit(""), None);
@@ -767,7 +763,7 @@ mod tests {
     #[test]
     fn with_frame_limit_clamps() {
         assert_eq!(WindowPlayerHost::with_frame_limit(5).frame_limit(), 5);
-        assert_eq!(WindowPlayerHost::with_frame_limit(0).frame_limit(), 1);
+        assert_eq!(WindowPlayerHost::with_frame_limit(0).frame_limit(), 0);
         assert_eq!(
             WindowPlayerHost::with_frame_limit(u32::MAX).frame_limit(),
             MAX_FRAME_LIMIT

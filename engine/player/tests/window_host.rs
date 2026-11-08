@@ -116,7 +116,7 @@ fn window_host_is_selected_by_default_and_explicitly() {
 #[test]
 fn frame_limit_contract() {
     assert_eq!(parse_frame_limit("5"), Some(5));
-    assert_eq!(parse_frame_limit("0"), None);
+    assert_eq!(parse_frame_limit("0"), Some(0));
     assert_eq!(parse_frame_limit("junk"), None);
     assert_eq!(parse_frame_limit("999999999"), Some(MAX_FRAME_LIMIT));
     assert_eq!(WindowPlayerHost::with_frame_limit(5).frame_limit(), 5);
@@ -685,3 +685,4 @@ fn actual_window_host_renders_real_skinned_asset() {
     );
     assert!(log.contains("窗口 host 结束：10 帧"), "日志：{log}");
 }
+

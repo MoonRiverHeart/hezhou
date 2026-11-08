@@ -532,7 +532,7 @@ jobs:
           $config.product_name = "Third Person Demo"
           $config.executable_name = "third-person-demo"
           $config.window.title = "Hezhou Third Person Demo"
-          $config.version = "1.0.1"
+          $config.version = "1.0.2"
           $config | ConvertTo-Json -Depth 8 | Set-Content "build-temp/player-demo-config.json" -Encoding utf8
           & "engine/target/release/hezhou-player-build$suffix" `
             --config "build-temp/player-demo-config.json" `
