@@ -199,6 +199,21 @@ jobs:
         with:
           workspaces: engine
 
+      - name: Install Mono 6.12
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $msi = Join-Path $env:TEMP "mono-6.12.0.199-x64.msi"
+          Invoke-WebRequest "https://download.mono-project.com/archive/6.12.0/windows-installer/mono-6.12.0.199-x64-0.msi" -OutFile $msi
+          Start-Process msiexec.exe -ArgumentList "/i `"$msi`" /qn /norestart" -Wait
+          & "C:\Program Files\Mono\bin\mono.exe" --version
+
+      - name: Install Mono (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends mono-devel libmono-2.0-dev
+
       - name: Player tests
         working-directory: engine
         shell: pwsh
@@ -252,6 +267,21 @@ jobs:
         with:
           workspaces: engine
 
+      - name: Install Mono 6.12
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $msi = Join-Path $env:TEMP "mono-6.12.0.199-x64.msi"
+          Invoke-WebRequest "https://download.mono-project.com/archive/6.12.0/windows-installer/mono-6.12.0.199-x64-0.msi" -OutFile $msi
+          Start-Process msiexec.exe -ArgumentList "/i `"$msi`" /qn /norestart" -Wait
+          & "C:\Program Files\Mono\bin\mono.exe" --version
+
+      - name: Install Mono (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends mono-devel libmono-2.0-dev
+
       - name: Install Linux window/Vulkan dependencies
         if: runner.os == 'Linux'
         run: |
@@ -292,6 +322,21 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends             build-essential cmake ninja-build pkg-config python3             libvulkan-dev libglfw3-dev libx11-dev libxrandr-dev             libxi-dev libxcursor-dev libxinerama-dev libxkbcommon-dev             libxkbcommon-x11-dev libwayland-dev wayland-protocols libdecor-0-dev             libx11-xcb-dev libxcb1-dev libxcb-randr0-dev libxcb-xinerama0-dev             libxcb-xkb-dev libxcb-shape0-dev libxcb-xfixes0-dev libasound2-dev
+
+      - name: Install Mono 6.12
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $msi = Join-Path $env:TEMP "mono-6.12.0.199-x64.msi"
+          Invoke-WebRequest "https://download.mono-project.com/archive/6.12.0/windows-installer/mono-6.12.0.199-x64-0.msi" -OutFile $msi
+          Start-Process msiexec.exe -ArgumentList "/i `"$msi`" /qn /norestart" -Wait
+          & "C:\Program Files\Mono\bin\mono.exe" --version
+
+      - name: Install Mono (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends mono-devel libmono-2.0-dev
 
       - name: Build Player runtime and builder
         working-directory: engine
