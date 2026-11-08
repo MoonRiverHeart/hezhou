@@ -26,7 +26,8 @@
 - Player tests: 默认 123 / window-host 126 / mono-host 134
 - 编辑器启动自检：PASS=77
 - Windows capability demo：validate OK，窗口 5 帧 exit 0
-- 双平台 CI：待 workflow 结果
+- 双平台 CI：**全绿**（run 42461149553）
+- CI Player 产物：Windows zip 51.6MB，Linux tar.gz 25.4MB；Windows 产物内含 Mono 运行时，validate + C# 5 帧运行通过
 
 ## Known Issues / 0.3
 
