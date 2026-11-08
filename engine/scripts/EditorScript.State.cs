@@ -294,6 +294,21 @@ namespace Hezhou
         private static UI.WidgetCallbackDelegate _textureRefreshCallback;
         private static UI.WidgetCallbackDelegate _textureClearCallback;
 
+        // === 0.3 动画状态机（task-47） ===
+        private static readonly string[] _animStateNames = new string[] {
+            "Idle", "Run", "Jump", "Attack", "Hit", "Death", "Land", "Dodge", "Block"
+        };
+        private static readonly ulong[] _animStateButtonIds = new ulong[9];
+        private static readonly System.Collections.Generic.Dictionary<ulong, string> _animStateButtonNames =
+            new System.Collections.Generic.Dictionary<ulong, string>();
+        private static UI.WidgetCallbackDelegate _animStateButtonCallback;
+        private static UI.WidgetCallbackDelegate _animInitGraphCallback;
+        private static UI.WidgetCallbackDelegate _animFreeGraphCallback;
+        private static ulong _animCurrentStateLabelId;
+        private static ulong _animTransitionLabelId;
+        private static ulong _animGraphStatusLabelId;
+        private static bool _animGraphInitialized;
+
         // === Dock / Layout State ===
         private static ulong _rightMaxButtonId;
         private static UI.WidgetCallbackDelegate _rightMaxClickCallback;

@@ -64,6 +64,9 @@ namespace Hezhou
             try { TestMaterialTextureFfi(); }
             catch (Exception ex) { Log.Error("TestRunner", "TestMaterialTextureFfi异常: " + ex.Message); }
 
+            try { TestAnimationStateMachineFfi(); }
+            catch (Exception ex) { Log.Error("TestRunner", "TestAnimationStateMachineFfi异常: " + ex.Message); }
+
             Log.Info("TestRunner", "===== 测试完成: PASS=" + _passCount + ", FAIL=" + _failCount + " =====");
         }
 
@@ -878,6 +881,54 @@ namespace Hezhou
                 try { if (System.IO.File.Exists(metaPath)) System.IO.File.Delete(metaPath); } catch (Exception) { }
                 try { UI.AssetScan(); } catch (Exception) { }
                 try { EditorScript.TestRefreshMaterialTextureList(); } catch (Exception) { }
+            }
+        }
+
+
+        /// <summary>0.3 动画状态机自检（task-47）：初始化/切换/过渡/释放。</summary>
+        private static void TestAnimationStateMachineFfi()
+        {
+            string root = System.IO.Directory.GetCurrentDirectory();
+            string fixturePath = System.IO.Path.Combine(root, "assets", "__ffi_anim_sm_selftest__.gltf");
+            try
+            {
+                string base64 = "eyJhc3NldCI6IHsidmVyc2lvbiI6ICIyLjAifSwgImJ1ZmZlcnMiOiBbeyJieXRlTGVuZ3RoIjogOTYsICJ1cmkiOiAiZGF0YTphcHBsaWNhdGlvbi9vY3RldC1zdHJlYW07YmFzZTY0LEFBQUFBQUFBZ0Q4QUFBQUFBQUFBQUFBQUFBQUFBSUEvQUFBQUFBQUFBQUFBQUlBL0FBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQWdEOEFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQ0FQd0FBQUFBQUFBQUFBQUFBQUFBQUFBQUFBSUEvIn1dLCAiYnVmZmVyVmlld3MiOiBbeyJidWZmZXIiOiAwLCAiYnl0ZU9mZnNldCI6IDAsICJieXRlTGVuZ3RoIjogOH0sIHsiYnVmZmVyIjogMCwgImJ5dGVPZmZzZXQiOiA4LCAiYnl0ZUxlbmd0aCI6IDI0fSwgeyJidWZmZXIiOiAwLCAiYnl0ZU9mZnNldCI6IDMyLCAiYnl0ZUxlbmd0aCI6IDY0fV0sICJhY2Nlc3NvcnMiOiBbeyJidWZmZXJWaWV3IjogMCwgImNvbXBvbmVudFR5cGUiOiA1MTI2LCAiY291bnQiOiAyLCAidHlwZSI6ICJTQ0FMQVIiLCAibWluIjogWzAuMF0sICJtYXgiOiBbMS4wXX0sIHsiYnVmZmVyVmlldyI6IDEsICJjb21wb25lbnRUeXBlIjogNTEyNiwgImNvdW50IjogMiwgInR5cGUiOiAiVkVDMyJ9LCB7ImJ1ZmZlclZpZXciOiAyLCAiY29tcG9uZW50VHlwZSI6IDUxMjYsICJjb3VudCI6IDEsICJ0eXBlIjogIk1BVDQifV0sICJub2RlcyI6IFt7Im5hbWUiOiAiSm9pbnQifV0sICJza2lucyI6IFt7ImpvaW50cyI6IFswXSwgImludmVyc2VCaW5kTWF0cmljZXMiOiAyfV0sICJhbmltYXRpb25zIjogW3sibmFtZSI6ICJJZGxlIiwgImNoYW5uZWxzIjogW3sic2FtcGxlciI6IDAsICJ0YXJnZXQiOiB7Im5vZGUiOiAwLCAicGF0aCI6ICJ0cmFuc2xhdGlvbiJ9fV0sICJzYW1wbGVycyI6IFt7ImlucHV0IjogMCwgIm91dHB1dCI6IDEsICJpbnRlcnBvbGF0aW9uIjogIkxJTkVBUiJ9XX1dfQo=";
+                System.IO.File.WriteAllBytes(fixturePath, Convert.FromBase64String(base64));
+                int initRc = UI.AnimationPreviewInitGraph(fixturePath, 0);
+                AssertTrue("AnimStateMachine", initRc == 0,
+                    "9 状态图初始化返回 0 (rc=" + initRc + ")");
+
+                string snapshot = UI.AnimationPreviewStateSnapshot();
+                bool hasGraph = snapshot.IndexOf("\"initialized\":true") >= 0
+                    && snapshot.IndexOf("\"Idle\"") >= 0
+                    && snapshot.IndexOf("\"Block\"") >= 0
+                    && snapshot.IndexOf("\"has_skeleton\":true") >= 0;
+                AssertTrue("AnimStateMachine", hasGraph,
+                    "快照包含 9 状态/current/skeleton (len=" + snapshot.Length + ")");
+
+                int setRc = UI.AnimationPreviewSetState("Run");
+                AssertTrue("AnimStateMachine", setRc == 0,
+                    "切换到 Run 返回 0 (rc=" + setRc + ")");
+
+                UI.AnimationPreviewTick(0.1f, 1);
+                string transitionSnapshot = UI.AnimationPreviewStateSnapshot();
+                AssertTrue("AnimStateMachine",
+                    transitionSnapshot.IndexOf("\"transitioning\":true") >= 0,
+                    "过渡中 snapshot transitioning=true");
+                Log.Info("AnimStateMachine", "snapshot: "
+                    + (snapshot.Length > 320 ? snapshot.Substring(0, 320) + "..." : snapshot));
+
+                int freeRc = UI.AnimationPreviewGraphFree();
+                string freedSnapshot = UI.AnimationPreviewStateSnapshot();
+                AssertTrue("AnimStateMachine",
+                    freeRc == 0 && freedSnapshot.IndexOf("\"initialized\":false") >= 0,
+                    "释放状态图后 snapshot initialized=false");
+            }
+            finally
+            {
+                try { if (System.IO.File.Exists(fixturePath)) System.IO.File.Delete(fixturePath); } catch (Exception) { }
+                try { if (System.IO.File.Exists(fixturePath + ".meta")) System.IO.File.Delete(fixturePath + ".meta"); } catch (Exception) { }
+                try { UI.AssetScan(); } catch (Exception) { }
             }
         }
 

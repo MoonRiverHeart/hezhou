@@ -16,10 +16,10 @@ RUST_CONTEXT = ROOT / "engine" / "scripting" / "src" / "ffi_context" / "mod.rs"
 CSHARP_CONTEXT = ROOT / "engine" / "scripts" / "UI.cs"
 EDITOR_CONTEXT = ROOT / "engine" / "examples" / "src" / "editor" / "mod.rs"
 
-# 当前 FfiContext 字段基线（0.3 task-45：329 + 纹理列表 1 = 330）。
+# 当前 FfiContext 字段基线（0.3 task-47：330 + 动画状态机 4 = 334）。
 # 新增/删除 FFI 字段时必须同步更新此常量：强制字段变更被显式评审，
 # 避免只改了 Rust 或只改了 C# 导致运行时函数指针错位。
-EXPECTED_FIELD_COUNT = 330
+EXPECTED_FIELD_COUNT = 334
 
 
 def fields_between(text: str, start_pattern: str, field_pattern: str) -> list[str]:
@@ -108,6 +108,7 @@ def main() -> int:
 
 if __name__ == "__main__":
     sys.exit(main())
+
 
 
 

@@ -370,6 +370,11 @@ pub project_add_entity: ProjectAddEntityFn,
         pub animation_preview_play: AnimationPreviewPlayFn,
         pub animation_preview_pause: AnimationPreviewPauseFn,
         pub animation_preview_snapshot: AnimationPreviewSnapshotFn,
+        // 0.3 动画状态机 FFI（tail）
+        pub animation_preview_init_graph: AnimationPreviewInitGraphFn,
+        pub animation_preview_set_state: AnimationPreviewSetStateFn,
+        pub animation_preview_state_snapshot: AnimationPreviewStateSnapshotFn,
+        pub animation_preview_graph_free: AnimationPreviewGraphFreeFn,
     }
 
 static mut FFI_CONTEXT: Option<Box<FfiContext>> = None;
@@ -389,5 +394,6 @@ pub fn get_ffi_context_ptr() -> *const FfiContext {
         }
     }
 }
+
 
 

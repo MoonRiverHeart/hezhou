@@ -103,3 +103,18 @@ pub type AnimationPreviewPauseFn = extern "C" fn() -> i32;
 pub type AnimationPreviewSnapshotFn =
     extern "C" fn(*mut std::ffi::c_char, usize) -> usize;
 
+// === 0.3 动画状态机（task-47） ===
+
+/// 从 glTF 初始化 9 状态图（clip_index>=0 作为 Idle 兜底）。
+pub type AnimationPreviewInitGraphFn = extern "C" fn(*const std::ffi::c_char, i32) -> i32;
+
+/// 请求切换状态（名称大小写不敏感）。
+pub type AnimationPreviewSetStateFn = extern "C" fn(*const std::ffi::c_char) -> i32;
+
+/// 状态机快照 JSON（current/transitioning/alpha/states[]/event_count）。
+pub type AnimationPreviewStateSnapshotFn =
+    extern "C" fn(*mut std::ffi::c_char, usize) -> usize;
+
+/// 释放状态图。
+pub type AnimationPreviewGraphFreeFn = extern "C" fn() -> i32;
+

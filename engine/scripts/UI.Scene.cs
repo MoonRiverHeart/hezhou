@@ -1153,6 +1153,60 @@ UI.SceneSelectEntity(_scenePtr, entityId);
             return func();
         }
 
+        /// <summary>从 glTF 初始化 9 状态图；返回 0 成功。</summary>
+        public static int AnimationPreviewInitGraph(string path, int clipIndex)
+        {
+            if (_ffi.animation_preview_init_graph == IntPtr.Zero) return -1;
+            IntPtr pathPtr = Marshal.StringToHGlobalAnsi(path ?? "");
+            try
+            {
+                var func = Marshal.GetDelegateForFunctionPointer<AnimationPreviewInitGraphDelegate>(
+                    _ffi.animation_preview_init_graph);
+                return func(pathPtr, clipIndex);
+            }
+            finally { Marshal.FreeHGlobal(pathPtr); }
+        }
+
+        /// <summary>请求切换状态（名称大小写不敏感）；返回 0 成功。</summary>
+        public static int AnimationPreviewSetState(string name)
+        {
+            if (_ffi.animation_preview_set_state == IntPtr.Zero) return -1;
+            IntPtr namePtr = Marshal.StringToHGlobalAnsi(name ?? "");
+            try
+            {
+                var func = Marshal.GetDelegateForFunctionPointer<AnimationPreviewSetStateDelegate>(
+                    _ffi.animation_preview_set_state);
+                return func(namePtr);
+            }
+            finally { Marshal.FreeHGlobal(namePtr); }
+        }
+
+        /// <summary>状态机快照 JSON。</summary>
+        public static string AnimationPreviewStateSnapshot()
+        {
+            if (_ffi.animation_preview_state_snapshot == IntPtr.Zero) return "";
+            const int bufferSize = 8192;
+            IntPtr buffer = Marshal.AllocHGlobal(bufferSize);
+            try
+            {
+                Marshal.WriteByte(buffer, 0, 0);
+                var func = Marshal.GetDelegateForFunctionPointer<AnimationPreviewStateSnapshotDelegate>(
+                    _ffi.animation_preview_state_snapshot);
+                ulong written = func(buffer, (ulong)bufferSize);
+                return written == 0UL ? "" : (Marshal.PtrToStringAnsi(buffer, (int)written) ?? "");
+            }
+            finally { Marshal.FreeHGlobal(buffer); }
+        }
+
+        /// <summary>释放状态图；返回 0。</summary>
+        public static int AnimationPreviewGraphFree()
+        {
+            if (_ffi.animation_preview_graph_free == IntPtr.Zero) return -1;
+            var func = Marshal.GetDelegateForFunctionPointer<AnimationPreviewGraphFreeDelegate>(
+                _ffi.animation_preview_graph_free);
+            return func();
+        }
+
         /// <summary>预览状态快照 JSON。</summary>
         public static string AnimationPreviewSnapshot()
         {

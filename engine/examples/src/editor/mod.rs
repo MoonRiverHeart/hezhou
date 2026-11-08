@@ -489,6 +489,10 @@ ui_tree_view_set_on_select_thunk_ptr: unsafe { std::mem::transmute(ui_ffi::ui_tr
         animation_preview_play: animation_ffi::animation_preview_play,
         animation_preview_pause: animation_ffi::animation_preview_pause,
         animation_preview_snapshot: animation_ffi::animation_preview_snapshot,
+        animation_preview_init_graph: animation_ffi::animation_preview_init_graph,
+        animation_preview_set_state: animation_ffi::animation_preview_set_state,
+        animation_preview_state_snapshot: animation_ffi::animation_preview_state_snapshot,
+        animation_preview_graph_free: animation_ffi::animation_preview_graph_free,
         on_hot_reload_complete: ffi_impl::on_hot_reload_complete_placeholder,
         register_hot_reload_complete_callback: unsafe { std::mem::transmute(hot_reload::register_hot_reload_complete_callback as *const std::ffi::c_void) },
         ui_debug_print_widget_tree: unsafe { std::mem::transmute(ui_ffi::ui_debug_print_widget_tree as *const std::ffi::c_void) },
@@ -835,6 +839,7 @@ dfx_trace_begin!("ProcessEvents", "ui");
     let exit_code = if auto_test_mode && auto_test_status != "pass" { 2 } else { 0 };
     std::process::exit(exit_code);
 }
+
 
 
 

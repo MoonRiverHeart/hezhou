@@ -13,6 +13,7 @@ use std::ffi::c_char;
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 
+use hezhou_animation::{AnimationClip, AnimationState, AnimationStateMachine};
 use hezhou_asset::import::gltf::import_gltf_file;
 use hezhou_asset::import::ImportedScene;
 use hezhou_asset::meta::GltfImportSettings;
@@ -58,6 +59,32 @@ impl PreviewState {
 }
 
 static mut PREVIEW: Option<PreviewState> = None;
+
+/// 9 状态动画状态机（与 clip 时间轴共享推进；不渲染角色）。
+static mut STATE_MACHINE: Option<AnimationStateMachine> = None;
+/// 初始化状态图时的资产路径（快照/错误提示用）。
+static mut GRAPH_PATH: Option<String> = None;
+/// 9 状态绑定信息：状态名、剪断索引、时长（秒）。
+static mut GRAPH_STATES: Vec<(String, Option<usize>, f32)> = Vec::new();
+/// 状态机是否检测到 skeleton（无骨骼也可预览状态/过渡，仅提示）。
+static mut GRAPH_HAS_SKELETON: bool = false;
+/// 累计状态机事件数（含过渡/进入/退出/clip 事件）。
+static mut GRAPH_EVENT_COUNT: u64 = 0;
+
+/// 9 个状态名（与 `hezhou_animation::AnimationState` 对应，大小写不敏感）。
+const STATE_NAMES: [&str; 9] = [
+    "Idle", "Run", "Jump", "Attack", "Hit", "Death", "Land", "Dodge", "Block",
+];
+
+#[allow(static_mut_refs)]
+fn state_machine_mut() -> Option<&'static mut AnimationStateMachine> {
+    unsafe { (*std::ptr::addr_of_mut!(STATE_MACHINE)).as_mut() }
+}
+
+#[allow(static_mut_refs)]
+fn graph_states() -> &'static mut Vec<(String, Option<usize>, f32)> {
+    unsafe { &mut *std::ptr::addr_of_mut!(GRAPH_STATES) }
+}
 
 #[allow(static_mut_refs)]
 fn preview() -> &'static mut PreviewState {
@@ -224,6 +251,76 @@ fn read_c_string(ptr: *const c_char) -> Option<String> {
     unsafe { std::ffi::CStr::from_ptr(ptr).to_str().ok().map(str::to_string) }
 }
 
+// === 9 状态状态机（task-47） ===
+
+/// 状态名（大小写不敏感）→ `AnimationState`。
+fn animation_state_from_name(name: &str) -> Option<AnimationState> {
+    let needle = name.trim().to_ascii_lowercase();
+    STATE_NAMES
+        .iter()
+        .find(|state| state.to_ascii_lowercase() == needle)
+        .and_then(|state| AnimationState::from_name(&state.to_ascii_lowercase()))
+}
+
+/// 场景中按 clip 名称（大小写不敏感）查找动画索引。
+fn find_animation_index(scene: &ImportedScene, name: &str) -> Option<usize> {
+    scene.animations.iter().position(|animation| {
+        animation
+            .name
+            .as_deref()
+            .map(|clip_name| clip_name.eq_ignore_ascii_case(name))
+            .unwrap_or(false)
+    })
+}
+
+/// 从 ImportedScene 构建 9 状态图：按 clip 名称映射，Idle 无匹配时用首个 clip/clip_index。
+fn build_state_machine(scene: &ImportedScene, clip_index_override: i32) -> AnimationStateMachine {
+    let mut machine = AnimationStateMachine::new();
+    let mut states: Vec<(String, Option<usize>, f32)> = Vec::new();
+    let override_index = if clip_index_override >= 0 {
+        Some(clip_index_override as usize)
+    } else {
+        None
+    };
+    let first_clip = if scene.animations.is_empty() {
+        None
+    } else {
+        Some(0)
+    };
+
+    for name in STATE_NAMES {
+        let Some(state) = animation_state_from_name(name) else {
+            continue;
+        };
+        let clip_index = if name == "Idle" {
+            find_animation_index(scene, name)
+                .or(override_index)
+                .or(first_clip)
+        } else {
+            find_animation_index(scene, name)
+        };
+        if let Some(index) = clip_index {
+            if let Some(animation) = scene.animations.get(index) {
+                let clip_name = animation
+                    .name
+                    .clone()
+                    .unwrap_or_else(|| format!("clip_{index}"));
+                let duration = animation.duration.max(0.0);
+                machine.set_clip(state, AnimationClip::new(clip_name, duration));
+                states.push((name.to_string(), Some(index), duration));
+                continue;
+            }
+        }
+        states.push((name.to_string(), None, 0.0));
+    }
+
+    unsafe {
+        *std::ptr::addr_of_mut!(GRAPH_STATES) = states;
+        GRAPH_HAS_SKELETON = !scene.skeletons.is_empty();
+    }
+    machine
+}
+
 // === FFI ===
 
 /// FFI：查询 glTF 资产的动画/骨骼摘要 JSON。
@@ -294,6 +391,22 @@ pub extern "C" fn animation_preview_tick(dt: f32, playing: i32) -> f64 {
             state.time = 0.0;
         }
     }
+    // 9 状态机与时间轴共享推进：仅在播放时 update(dt)，事件计数用于快照。
+    if state.playing {
+        let machine_dt = if dt.is_finite() && dt > 0.0 {
+            dt
+        } else {
+            0.0
+        };
+        if machine_dt > 0.0 {
+            if let Some(machine) = state_machine_mut() {
+                let events = machine.update(machine_dt);
+                unsafe {
+                    GRAPH_EVENT_COUNT = GRAPH_EVENT_COUNT.saturating_add(events.len() as u64);
+                }
+            }
+        }
+    }
     state.time
 }
 
@@ -351,6 +464,186 @@ pub extern "C" fn animation_preview_snapshot(buffer: *mut c_char, buffer_size: u
         "clip_name": clip_name,
     });
     write_c_string(buffer, buffer_size, &value.to_string())
+}
+
+// === 9 状态图 FFI（task-47） ===
+
+/// FFI：从 glTF 资产初始化 9 状态图（clip 名称映射；Idle 无匹配用首个 clip）。
+///
+/// `clip_index` >= 0 时作为 Idle 的兜底 clip 索引。返回 0=成功，-1=路径/导入失败。
+#[unsafe(no_mangle)]
+pub extern "C" fn animation_preview_init_graph(
+    path: *const c_char,
+    clip_index: i32,
+) -> i32 {
+    let Some(path_text) = read_c_string(path) else {
+        dfx_warn!("Animation", "状态图初始化失败: 资产路径为空");
+        return -1;
+    };
+    if path_text.trim().is_empty() {
+        return -1;
+    }
+    let resolved = match resolve_asset_path(&path_text) {
+        Ok(path) => path,
+        Err(error) => {
+            dfx_warn!("Animation", "状态图初始化失败: {}", error);
+            return -1;
+        }
+    };
+    let scene = match import_gltf_file(&resolved, &GltfImportSettings::default()) {
+        Ok(scene) => scene,
+        Err(error) => {
+            dfx_warn!(
+                "Animation",
+                "状态图初始化失败（{}）: {}",
+                resolved.display(),
+                error
+            );
+            return -1;
+        }
+    };
+
+    let machine = build_state_machine(&scene, clip_index);
+    // 与时间轴共享 clip 列表（reset 预览状态，播放时间从 0 开始）。
+    let (_, clips) = summary_from_scene(&resolved, &scene);
+    reset_preview_from_clips(clips);
+    let bound = graph_states().iter().filter(|(_, index, _)| index.is_some()).count();
+    unsafe {
+        STATE_MACHINE = Some(machine);
+        GRAPH_PATH = Some(resolved.to_string_lossy().to_string());
+        GRAPH_EVENT_COUNT = 0;
+    }
+    dfx_info!(
+        "Animation",
+        "9 状态图初始化: {}（绑定 clip {}/{}，skeleton={}）",
+        resolved.display(),
+        bound,
+        STATE_NAMES.len(),
+        unsafe { GRAPH_HAS_SKELETON }
+    );
+    0
+}
+
+/// FFI：请求切换状态（名称大小写不敏感）。返回 0=成功，-1=未知状态，-2=未初始化，-3=不允许切换。
+#[unsafe(no_mangle)]
+pub extern "C" fn animation_preview_set_state(name: *const c_char) -> i32 {
+    let Some(name_text) = read_c_string(name) else {
+        return -1;
+    };
+    let Some(state) = animation_state_from_name(&name_text) else {
+        dfx_warn!("Animation", "未知状态: {}", name_text);
+        return -1;
+    };
+    let Some(machine) = state_machine_mut() else {
+        dfx_warn!("Animation", "状态机未初始化，无法切换到 {}", name_text);
+        return -2;
+    };
+    let from = machine.current_state();
+    if machine.request_state(state) {
+        dfx_info!(
+            "Animation",
+            "状态切换: {} -> {}（过渡 {:?}）",
+            from.name(),
+            state.name(),
+            machine.is_transitioning()
+        );
+        0
+    } else {
+        dfx_warn!("Animation", "不允许切换到 {}（当前 {}）", state.name(), from.name());
+        -3
+    }
+}
+
+/// FFI：状态机快照 JSON（current/transitioning/alpha/states[]/event_count）。
+#[unsafe(no_mangle)]
+pub extern "C" fn animation_preview_state_snapshot(
+    buffer: *mut c_char,
+    buffer_size: usize,
+) -> usize {
+    if buffer.is_null() || buffer_size == 0 {
+        return 0;
+    }
+    let (initialized, path, has_skeleton, event_count) = unsafe {
+        (
+            STATE_MACHINE.is_some(),
+            GRAPH_PATH.clone(),
+            GRAPH_HAS_SKELETON,
+            GRAPH_EVENT_COUNT,
+        )
+    };
+
+    let Some(machine) = state_machine_mut() else {
+        let value = json!({
+            "initialized": false,
+            "path": path,
+            "has_skeleton": has_skeleton,
+            "current_state": null,
+            "transitioning": false,
+            "transition_alpha": 0.0,
+            "event_count": event_count,
+            "states": [],
+        });
+        return write_c_string(buffer, buffer_size, &value.to_string());
+    };
+
+    let current = machine.current_state();
+    let transition = machine.transition();
+    let (transitioning, alpha, from_state, to_state) = match transition {
+        Some(transition) => (
+            true,
+            (transition.alpha() as f64 * 1000.0).round() / 1000.0,
+            Some(transition.from.name()),
+            Some(transition.to.name()),
+        ),
+        None => (false, 1.0, None, None),
+    };
+
+    let states_json: Vec<serde_json::Value> = STATE_NAMES
+        .iter()
+        .filter_map(|name| animation_state_from_name(name).map(|state| (name, state)))
+        .map(|(name, state)| {
+            let entry = machine.entry(state);
+            json!({
+                "name": name,
+                "has_clip": entry.map(|entry| entry.clip.is_some()).unwrap_or(false),
+                "duration": entry
+                    .map(|entry| (entry.duration() as f64 * 1000.0).round() / 1000.0)
+                    .unwrap_or(0.0),
+            })
+        })
+        .collect();
+
+    let value = json!({
+        "initialized": initialized,
+        "path": path,
+        "has_skeleton": has_skeleton,
+        "current_state": current.name(),
+        "current_index": STATE_NAMES
+            .iter()
+            .position(|name| animation_state_from_name(name) == Some(current)),
+        "current_time": (machine.current_time() as f64 * 1000.0).round() / 1000.0,
+        "normalized_time": (machine.normalized_time() as f64 * 1000.0).round() / 1000.0,
+        "transitioning": transitioning,
+        "transition_alpha": alpha,
+        "from_state": from_state,
+        "to_state": to_state,
+        "event_count": event_count,
+        "states": states_json,
+    });
+    write_c_string(buffer, buffer_size, &value.to_string())
+}
+
+/// FFI：释放状态图（恢复单 clip 时间轴预览）。返回 0。
+#[unsafe(no_mangle)]
+pub extern "C" fn animation_preview_graph_free() -> i32 {
+    unsafe {
+        STATE_MACHINE = None;
+        GRAPH_PATH = None;
+        GRAPH_EVENT_COUNT = 0;
+        *std::ptr::addr_of_mut!(GRAPH_STATES) = Vec::new();
+    }
+    dfx_info!("Animation", "状态图已释放");
+    0
 }
 
 #[cfg(test)]
@@ -478,6 +771,66 @@ mod tests {
         assert_eq!(clips.len(), 1);
         assert_eq!(clips[0].name, "Idle");
         assert!(json_text.contains("\"joint_count\":1"));
+    }
+
+    #[test]
+    fn state_graph_mapping_transition_and_snapshot() {
+        // 9 状态映射：名称大小写不敏感；Idle 无匹配回退首个 clip；其他缺失为空。
+        let mut scene = build_scene();
+        scene.animations[1].name = Some("run".to_string());
+        let mut machine = build_state_machine(&scene, -1);
+        assert_eq!(machine.current_state(), AnimationState::Idle);
+        assert!(machine.clip(AnimationState::Idle).is_some());
+        assert!(machine.clip(AnimationState::Run).is_some(), "Run 应大小写不敏感匹配");
+        assert!(machine.clip(AnimationState::Attack).is_none());
+        assert_eq!(graph_states().len(), 9);
+        assert_eq!(
+            graph_states().iter().filter(|(_, index, _)| index.is_some()).count(),
+            2
+        );
+
+        let mut no_idle = build_scene();
+        no_idle.animations.truncate(1);
+        no_idle.animations[0].name = Some("WalkOnly".to_string());
+        let fallback = build_state_machine(&no_idle, -1);
+        assert!(fallback.clip(AnimationState::Idle).is_some(), "Idle 应回退首个 clip");
+
+        let mut empty = build_scene();
+        empty.animations.clear();
+        let empty_machine = build_state_machine(&empty, -1);
+        assert!(empty_machine.clip(AnimationState::Idle).is_none());
+
+        // 过渡 alpha：0 → (0,1) → 1，Death 终止状态不能切出。
+        assert!(machine.request_state(AnimationState::Run));
+        assert!(machine.is_transitioning());
+        assert!(machine.transition_alpha() < 0.5);
+        machine.update(0.1);
+        let mid = machine.transition_alpha();
+        assert!(mid > 0.0 && mid < 1.0, "mid alpha={mid}");
+        machine.update(1.0);
+        assert!(!machine.is_transitioning());
+        assert_eq!(machine.current_state(), AnimationState::Run);
+        assert!(machine.request_state(AnimationState::Death));
+        machine.update(1.0);
+        assert_eq!(machine.current_state(), AnimationState::Death);
+        assert!(!machine.request_state(AnimationState::Idle), "Death 终止状态不能切出");
+
+        // FFI 快照在未初始化时安全返回 initialized=false。
+        unsafe {
+            STATE_MACHINE = None;
+            GRAPH_PATH = None;
+            GRAPH_EVENT_COUNT = 0;
+        }
+        let mut buffer = [0i8; 512];
+        let written = animation_preview_state_snapshot(buffer.as_mut_ptr(), buffer.len());
+        assert!(written > 0);
+        let text = unsafe { std::ffi::CStr::from_ptr(buffer.as_ptr()) }
+            .to_string_lossy()
+            .to_string();
+        assert!(text.contains("\"initialized\":false"), "{text}");
+        let name = std::ffi::CString::new("Idle").unwrap();
+        assert_eq!(animation_preview_set_state(name.as_ptr()), -2);
+        assert_eq!(animation_preview_graph_free(), 0);
     }
 }
 

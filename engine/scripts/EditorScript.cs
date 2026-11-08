@@ -77,6 +77,9 @@ namespace Hezhou
             _animClipSelectCallback = OnAnimClipSelected;
             _animSliderChangeCallback = OnAnimSliderChanged;
             _animFileDialogResultCallback = OnAnimationFileDialogResult;
+            _animStateButtonCallback = OnAnimationStateButtonClick;
+            _animInitGraphCallback = OnAnimationInitGraphClick;
+            _animFreeGraphCallback = OnAnimationFreeGraphClick;
             _textureAssetClickCallback = OnTextureAssetClick;
             _textureRefreshCallback = OnTextureRefreshClick;
             _textureClearCallback = OnTextureClearClick;
@@ -262,6 +265,30 @@ _bindScriptClickCallback = OnBindScriptClick;
                         UI.SliderSetValue(_animSliderId, animTime);
                     }
                     UpdateAnimTimeLabel(animTime);
+                }
+            }
+
+            // 0.3 动画状态机：初始化后每帧同步当前状态/过渡 alpha。
+            if (_animGraphInitialized)
+            {
+                string stateSnapshot = UI.AnimationPreviewStateSnapshot();
+                if (stateSnapshot.Length > 0)
+                {
+                    string currentState = ParsePbrString(stateSnapshot, "current_state");
+                    bool transitioning = stateSnapshot.IndexOf("\"transitioning\":true") >= 0;
+                    float alpha = PbrJsonFloat(stateSnapshot, "transition_alpha", 1f);
+                    if (_animCurrentStateLabelId != 0)
+                    {
+                        UI.SetText(_animCurrentStateLabelId,
+                            "状态: " + (currentState.Length > 0 ? currentState : "-"));
+                    }
+                    if (_animTransitionLabelId != 0)
+                    {
+                        UI.SetText(_animTransitionLabelId,
+                            transitioning
+                                ? "过渡 alpha: " + FormatPbrFloat(alpha)
+                                : "过渡 alpha: 1（稳态）");
+                    }
                 }
             }
 
@@ -1966,6 +1993,89 @@ _bindScriptClickCallback = OnBindScriptClick;
             if (_textureAssignStatusLabelId != 0)
             {
                 UI.SetText(_textureAssignStatusLabelId, text);
+            }
+        }
+
+        // === 0.3 动画状态机（task-47） ===
+
+        private static void OnAnimationInitGraphClick(ulong widgetId)
+        {
+            if (_animPathFieldId == 0)
+            {
+                return;
+            }
+            string path = UI.InputFieldGetText(_animPathFieldId);
+            if (string.IsNullOrEmpty(path) || path.Trim().Length == 0)
+            {
+                SetGraphStatus("状态机: 请先输入 glTF/GLB 资产路径");
+                return;
+            }
+            int rc = UI.AnimationPreviewInitGraph(path.Trim(), 0);
+            if (rc == 0)
+            {
+                _animGraphInitialized = true;
+                string snapshot = UI.AnimationPreviewStateSnapshot();
+                string currentState = ParsePbrString(snapshot, "current_state");
+                bool hasSkeleton = snapshot.IndexOf("\"has_skeleton\":true") >= 0;
+                SetGraphStatus("状态机: 已初始化（当前 " +
+                    (currentState.Length > 0 ? currentState : "Idle") +
+                    "，skeleton=" + hasSkeleton + "）");
+                if (_animCurrentStateLabelId != 0)
+                {
+                    UI.SetText(_animCurrentStateLabelId,
+                        "状态: " + (currentState.Length > 0 ? currentState : "Idle"));
+                }
+                if (_animTransitionLabelId != 0)
+                {
+                    UI.SetText(_animTransitionLabelId, "过渡 alpha: 1（稳态）");
+                }
+                Log.Info("Animation", "9 状态图已初始化: " + path.Trim() + " skeleton=" + hasSkeleton);
+            }
+            else
+            {
+                _animGraphInitialized = false;
+                SetGraphStatus("状态机: 初始化失败 rc=" + rc + "（详见 Console）");
+                Log.Warn("Animation", "状态图初始化失败 rc=" + rc);
+            }
+        }
+
+        private static void OnAnimationFreeGraphClick(ulong widgetId)
+        {
+            UI.AnimationPreviewGraphFree();
+            _animGraphInitialized = false;
+            if (_animCurrentStateLabelId != 0) UI.SetText(_animCurrentStateLabelId, "状态: 未初始化");
+            if (_animTransitionLabelId != 0) UI.SetText(_animTransitionLabelId, "过渡 alpha: -");
+            SetGraphStatus("状态机: 已释放（时间轴仍可用）");
+            Log.Info("Animation", "状态图已释放");
+        }
+
+        private static void OnAnimationStateButtonClick(ulong widgetId)
+        {
+            string stateName;
+            if (!_animStateButtonNames.TryGetValue(widgetId, out stateName)) return;
+            if (!_animGraphInitialized)
+            {
+                SetGraphStatus("状态机: 请先点“初始化状态图”（当前 glTF 无 clip/骨架时仍可预览切换）");
+                return;
+            }
+            int rc = UI.AnimationPreviewSetState(stateName);
+            if (rc == 0)
+            {
+                SetGraphStatus("状态机: 请求切换到 " + stateName);
+                Log.Info("Animation", "状态请求: " + stateName);
+            }
+            else
+            {
+                SetGraphStatus("状态机: 切换到 " + stateName + " 失败 rc=" + rc);
+                Log.Warn("Animation", "状态切换失败: " + stateName + " rc=" + rc);
+            }
+        }
+
+        private static void SetGraphStatus(string text)
+        {
+            if (_animGraphStatusLabelId != 0)
+            {
+                UI.SetText(_animGraphStatusLabelId, text);
             }
         }
 

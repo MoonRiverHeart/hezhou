@@ -409,6 +409,30 @@ namespace Hezhou
             UI.SetOnClick(animResetButton, _animResetCallback);
             _animStatusLabelId = UI.CreateLabel(animationTabContent, 660f, 22f, "动画: 未加载");
 
+            // 0.3 9 状态机（task-47）：点击切换 + 当前状态/过渡 alpha
+            UI.CreateLabel(animationTabContent, 480f, 22f, "9 状态机（点击切换，需先初始化）:");
+            for (int stateRowIndex = 0; stateRowIndex < 3; stateRowIndex++)
+            {
+                ulong stateRow = UI.CreateHStack(animationTabContent, 4f);
+                for (int stateColIndex = 0; stateColIndex < 3; stateColIndex++)
+                {
+                    int stateIndex = stateRowIndex * 3 + stateColIndex;
+                    ulong stateButton = UI.CreateButton(stateRow, 100f, 26f, _animStateNames[stateIndex]);
+                    UI.SetOnClick(stateButton, _animStateButtonCallback);
+                    _animStateButtonIds[stateIndex] = stateButton;
+                    _animStateButtonNames[stateButton] = _animStateNames[stateIndex];
+                }
+            }
+            ulong animGraphButtonRow = UI.CreateHStack(animationTabContent, 6f);
+            ulong animInitGraphButton = UI.CreateButton(animGraphButtonRow, 130f, 26f, "初始化状态图");
+            UI.SetOnClick(animInitGraphButton, _animInitGraphCallback);
+            ulong animFreeGraphButton = UI.CreateButton(animGraphButtonRow, 130f, 26f, "释放状态图");
+            UI.SetOnClick(animFreeGraphButton, _animFreeGraphCallback);
+            _animCurrentStateLabelId = UI.CreateLabel(animationTabContent, 640f, 22f, "状态: 未初始化");
+            _animTransitionLabelId = UI.CreateLabel(animationTabContent, 640f, 22f, "过渡 alpha: -");
+            _animGraphStatusLabelId = UI.CreateLabel(animationTabContent, 660f, 22f,
+                "状态机: 选择 glTF 后点“初始化状态图”");
+
             _assetTabWidget.AddTab("模型", modelTabContent, false);
             _assetTabWidget.AddTab("材质", materialTabContent, false);
             if (!_textureDockedRight)
