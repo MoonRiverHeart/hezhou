@@ -509,7 +509,7 @@ jobs:
         run: |
           $target = if ($IsWindows) { "windows" } elseif ($IsLinux) { "linux" } else { throw "unsupported" }
           $suffix = if ($IsWindows) { ".exe" } else { "" }
-          $fixture = "engine/player/tests/fixtures/skinned"
+          $fixture = "engine/player/tests/fixtures/third_person"
           New-Item -ItemType Directory -Force build-temp | Out-Null
           $stage = "build-temp/player-stage"
           Remove-Item $stage -Recurse -Force -ErrorAction SilentlyContinue
@@ -529,9 +529,9 @@ jobs:
           }
           $config = Get-Content "$fixture/build-config.json" -Raw | ConvertFrom-Json
           $config.target = $target
-          $config.product_name = "Hezhou Capability Demo"
-          $config.executable_name = "hezhou-capability-demo"
-          $config.window.title = "Hezhou Capability Demo"
+          $config.product_name = "Third Person Demo"
+          $config.executable_name = "third-person-demo"
+          $config.window.title = "Hezhou Third Person Demo"
           $config.version = "1.0.0"
           $config | ConvertTo-Json -Depth 8 | Set-Content "build-temp/player-demo-config.json" -Encoding utf8
           & "engine/target/release/hezhou-player-build$suffix" `
@@ -544,24 +544,24 @@ jobs:
             --build-out "dist/player-demo"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           $pkg = "dist/player-demo/$target"
-          & "$pkg/hezhou-capability-demo$suffix" --validate --player-root $pkg --log-dir "$env:RUNNER_TEMP/hezhou-player-demo-logs"
+          & "$pkg/third-person-demo$suffix" --validate --player-root $pkg --log-dir "$env:RUNNER_TEMP/hezhou-player-demo-logs"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Archive Windows Player
         if: runner.os == 'Windows'
         shell: pwsh
-        run: Compress-Archive -Path "dist/player-demo/windows/*" -DestinationPath "dist/hezhou-capability-player-windows.zip"
+        run: Compress-Archive -Path "dist/player-demo/windows/*" -DestinationPath "dist/hezhou-third-person-player-windows.zip"
 
       - name: Archive Linux Player
         if: runner.os == 'Linux'
         shell: bash
-        run: tar -C dist/player-demo/linux -czf dist/hezhou-capability-player-linux.tar.gz .
+        run: tar -C dist/player-demo/linux -czf dist/hezhou-third-person-player-linux.tar.gz .
 
       - uses: actions/upload-artifact@v4
         with:
-          name: hezhou-player-demo-${{ matrix.os }}
+          name: hezhou-third-person-player-${{ matrix.os }}
           path: |
-            dist/hezhou-capability-player-*
+            dist/hezhou-third-person-player-*
 
   publish-release:
     if: startsWith(github.ref, 'refs/tags/v')
@@ -584,4 +584,4 @@ jobs:
             artifacts/**/*.cer
             artifacts/**/*.msi
             artifacts/**/*.deb
-            artifacts/**/hezhou-capability-player-*
+            artifacts/**/hezhou-third-person-player-*
