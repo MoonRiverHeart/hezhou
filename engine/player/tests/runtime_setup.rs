@@ -84,12 +84,13 @@ fn found_runtime_prepends_native_and_appends_managed_idempotently() {
         let setup = setup_mono_runtime(temp.path());
         assert!(setup.found, "应检测到 runtime/mono");
         assert_eq!(setup.root.as_deref(), Some(temp.join("runtime/mono").as_path()));
-        assert_eq!(
-            setup.native_dir.as_deref(),
-            Some(temp.join("runtime/mono/bin").as_path())
-        );
         let managed = temp.join("runtime/mono/lib/mono/4.5");
         let managed_api = temp.join("runtime/mono/lib/mono/4.5-api");
+        let expected_native = match platform {
+            TargetPlatform::Windows => temp.join("runtime/mono/bin"),
+            TargetPlatform::Linux => temp.join("runtime/mono/lib"),
+        };
+        assert_eq!(setup.native_dir.as_deref(), Some(expected_native.as_path()));
         assert_eq!(
             setup.managed_dirs,
             vec![managed.clone(), managed_api.clone()]
@@ -97,7 +98,7 @@ fn found_runtime_prepends_native_and_appends_managed_idempotently() {
         assert!(setup.summary().contains("内置 Mono 运行时：已找到"));
         assert_eq!(
             first_entry(native_env(platform), platform).as_deref(),
-            temp.join("runtime/mono/bin").to_str()
+            expected_native.to_str()
         );
         // MONO_PATH 追加（不覆盖已有条目），包含 4.5 与 4.5-api。
         let mono_path = std::env::var(MONO_PATH_ENV).unwrap();

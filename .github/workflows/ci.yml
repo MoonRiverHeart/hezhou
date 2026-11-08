@@ -341,7 +341,7 @@ jobs:
       - name: Build C# Player scripts
         working-directory: engine
         shell: pwsh
-        run: powershell -ExecutionPolicy Bypass -File scripts/build_mono.ps1
+        run: pwsh -File scripts/build_mono.ps1
 
       - name: Build Player runtime and builder
         working-directory: engine
