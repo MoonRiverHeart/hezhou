@@ -15,6 +15,7 @@
 - ✅ **0.3.0 已发布**：https://github.com/MoonRiverHeart/hezhou/releases/tag/v0.3.0
 - ✅ **0.4.0 已发布**：https://github.com/MoonRiverHeart/hezhou/releases/tag/v0.4.0
 - ✅ **1.0.0 已发布**：https://github.com/MoonRiverHeart/hezhou/releases/tag/v1.0.0
+- ✅ 1.0.1（第三人称 demo/模板）准备发布：WASD/Space、物理胶囊、第三人称相机、third-person 模板
   - Windows：MSI / MSIX / .cer / Capability Player zip
   - Linux：DEB / Capability Player tar.gz
 - ✅ CI 全绿：rust-tests、csharp-build、package-windows/linux、player-build、player-window-host、package-player、perf-baseline、soak-quick、diagnostics-smoke、release-check、publish-release。

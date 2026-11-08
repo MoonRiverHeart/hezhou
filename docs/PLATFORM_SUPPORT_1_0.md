@@ -31,11 +31,11 @@
 
 **Player 产物**
 - 编辑器内导出：`<工程>/exports/<product>/windows/`（exe/assets/scripts/runtime/manifest）。
-- CI 能力演示：`hezhou-capability-player-windows.zip`（含 Mono runtime、skinned fixture、`hezhou-capability-demo.exe`）。
+- CI 第三人称 demo：`hezhou-third-person-player-windows.zip`（含 Mono runtime、`third-person-demo.exe`、WASD/Space）。
 
 **已知限制**
 - 只构建当前平台；跨平台需在对应平台构建（PlayerBuilder 限制）。
-- 默认 Player host 尚未接入完整游戏循环（`--run` 报 pending，退出码 3）；普通项目导出的包以 `--validate` 为当前验收。
+- CI 第三人称 demo 使用 `window-host,mono-host` 构建，`--run --host window` 可运行；源码默认 feature 构建仍可能返回 host pending（退出码 3）。
 - 安装目录只读：运行态写 `%LOCALAPPDATA%\Hezhou\Editor`。
 
 ## 3. Linux（发布平台）
@@ -58,7 +58,7 @@ sudo apt-get install -y build-essential cmake ninja-build pkg-config python3 \
 
 **Player 产物**
 - 编辑器导出：`exports/<product>/linux/`（无后缀 exe、assets/scripts/runtime/manifest）。
-- CI：`hezhou-capability-player-linux.tar.gz`。
+- CI：`hezhou-third-person-player-linux.tar.gz`。
 
 **已知限制**
 - 只构建当前平台；Linux 产物需在 Linux 构建（CI ubuntu runner）。

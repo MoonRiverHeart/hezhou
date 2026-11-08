@@ -23,7 +23,7 @@
 
 发布页：<https://github.com/MoonRiverHeart/hezhou/releases>
 
-当前已发布的最新版本是 **v0.3.0**；0.4.0（含项目模板/包管理器/插件 API）为 Release Candidate，发布后文件名规则不变。
+当前已发布的最新版本是 **v1.0.1**；包含项目模板、包管理器、插件 API、网络与第三人称 Player demo。
 
 ### 2.1 Windows
 
@@ -31,7 +31,7 @@
 |---|---|
 | `HezhouEditor-<version>.msi` | 推荐；开始菜单快捷方式指向 `hezhou_launcher.exe`（无控制台） |
 | `HezhouEditor-<version>.msix` + `HezhouEditor.cer` | MSIX 应用包；安装前需把 `.cer` 导入「受信任的根证书颁发机构」或使用 `-SkipBuild` 本地打包时禁用签名 |
-| `hezhou-capability-player-windows.zip` | 能力演示 Player 包（含 Mono runtime） |
+| `hezhou-third-person-player-windows.zip` | 第三人称 Player demo（含 Mono runtime，WASD/Space） |
 
 ```powershell
 # MSI（示例：0.3.0）
@@ -55,13 +55,13 @@ hezhou-editor
 ```
 
 DEB 安装到 `/opt/hezhou/editor`，内置 Mono runtime；需要系统 Vulkan 驱动与图形桌面会话。
-能力演示 Player：`hezhou-capability-player-linux.tar.gz`（解压后执行 `./hezhou-capability-demo --validate ...`）。
+第三人称 Player：`hezhou-third-person-player-linux.tar.gz`（解压后执行 `./third-person-demo --run --host window ...`）。
 
 ---
 
-## 3. 从源码构建（用于当前 0.4 RC / 模板功能）
+## 3. 从源码构建（1.0.1 开发版）
 
-已发布 v0.3.0 安装包**不含** 0.4 的项目模板/包管理器/插件 Tab；需要模板闭环请用当前仓库（0.4.0 RC）源码构建：
+已发布 1.0.1 安装包包含模板/包管理器/插件 Tab；从源码构建用于开发：
 
 ```bash
 git clone https://github.com/MoonRiverHeart/hezhou.git
@@ -189,11 +189,13 @@ cargo run -p hezhou-player --bin hezhou-player-build -- \
   （不是崩溃；完整游戏循环 host 是 1.0 待完成项，见 [1.0_RELEASE_CHECKLIST.md](1.0_RELEASE_CHECKLIST.md)）；
 - 构建 Player 时启用 `window-host` feature 会创建窗口 host（CI 能力演示包使用），但普通游戏逻辑接入仍未完成。
 
-CI 的能力演示 Player 包可直接验证：
+CI 的第三人称 Player 包可直接运行：
 
 ```bash
-hezhou-capability-demo --validate --player-root <解压目录> --log-dir <日志目录>
+third-person-demo --run --host window --manifest <解压目录>/manifest.json --log-dir <日志目录>
 ```
+
+WASD/方向键移动，Space 跳跃，关闭窗口退出。默认 120 帧；设置 `HEZHOU_PLAYER_WINDOW_FRAMES=100000` 可保持更久。
 
 ---
 
