@@ -1,5 +1,5 @@
-//! Player C# Scene Context ABI（task-32 v1 / task-33 v2 / task-34 v3 / task-35 v4）：
-//! 把 `hezhou_core::Scene`、Player 动画运行时、资产目录与音频运行时以
+//! Player C# Scene Context ABI（task-32 v1 / task-33 v2 / task-34 v3 / task-35 v4 /
+//! task-36 v5）：把 Scene、动画运行时、资产目录、音频运行时与角色控制运行时以
 //! `#[repr(C)]` 函数指针表暴露给 C# `Hezhou.PlayerGame`。
 //!
 //! # ABI 契约（C# `[StructLayout(LayoutKind.Sequential)]` 必须一致）
@@ -64,16 +64,32 @@
 //! | 288 | `audio_is_playing` | `int(IntPtr)`（1/0） |
 //! | 296 | `audio_backend` | `int(IntPtr, u32 unused, u8* buf, uint len)`（UTF-8，如 `null`） |
 //!
+//! v5 tail 追加（task-36；角色控制运行时）：
+//!
+//! | offset | 字段 | 类型 / delegate |
+//! |---|---|---|
+//! | 304 | `gameplay_world` | `IntPtr` → `PlayerGameplayRuntime`（可空） |
+//! | 312 | `character_create` | `int(IntPtr, ulong entity, float radius, float total_height)`（0/-1） |
+//! | 320 | `character_step` | `int(IntPtr, ulong entity, float input_x, float input_z, int jump, float dt)`（0/-1） |
+//! | 328 | `character_grounded` | `int(IntPtr, ulong entity)`（1/0） |
+//! | 336 | `character_position` | `int(IntPtr, ulong entity, out float x, out float y, out float z)`（0/-1） |
+//! | 344 | `character_remove` | `int(IntPtr, ulong entity)`（0/-1） |
+//!
+//! 角色运行时内部为 `hezhou_physics::PhysicsWorld` + y=0 地面 `Plane` + 每 entity 一个
+//! `CharacterMotor`；`character_step` 的 input_x/input_z 是水平期望速度（m/s），
+//! y 由重力/跳跃接管，结果脚底位置写回 Scene transform。
+//!
 //! 所有函数均为 `extern "C"`、内部 `catch_unwind`；`scene == null`、实体不存在、
 //! 输出指针为空时返回 0/-1 且绝不 panic（panic 跨 FFI 是 UB）。rotation 使用
 //! **欧拉角（度）**，与 core `Quaternion::from_euler_degrees`/`to_euler_degrees` 对应。
 //!
 //! # 版本兼容策略
 //!
-//! v2/v3/v4 只在尾部追加字段、不改旧布局；C# 侧读取 `Version`：
-//! - `>= 4`：解析全部字段（资产/音频 API 可用）；
-//! - `== 3`：解析 v1/v2/v3，资产/音频跳过；
-//! - `== 2`：解析 v1+v2，动画/资产/音频跳过；
+//! v2/v3/v4/v5 只在尾部追加字段、不改旧布局；C# 侧读取 `Version`：
+//! - `>= 5` 且对应指针非 0：解析全部字段（角色控制 API 可用）；
+//! - `== 4`：解析 v1..v4，角色控制跳过；
+//! - `== 3`：解析 v1..v3，资产/音频/角色跳过；
+//! - `== 2`：解析 v1+v2，动画/资产/音频/角色跳过；
 //! - `== 1`：只解析 v1（兼容旧 Player/DLL）；
 //! - 其他：记录日志后回退空转。
 //!
@@ -94,9 +110,10 @@ use hezhou_core::math::{Quaternion, Vec3};
 use crate::animation_control::PlayerAnimationState;
 use crate::asset_catalog::{PlayerAssetCatalog, PlayerAssetEntry};
 use crate::audio_runtime::PlayerAudioRuntime;
+use crate::gameplay_runtime::PlayerGameplayRuntime;
 
 /// 当前 Player C# Context ABI 版本。
-pub const PLAYER_CSHARP_CONTEXT_VERSION: u32 = 4;
+pub const PLAYER_CSHARP_CONTEXT_VERSION: u32 = 5;
 
 /// C# 侧函数指针：`scene_entity_count(scene) -> u32`。
 pub type SceneEntityCountFn = unsafe extern "C" fn(*mut Scene) -> u32;
@@ -173,6 +190,21 @@ pub type AudioSetVolumeFn = unsafe extern "C" fn(*mut PlayerAudioRuntime, f32) -
 pub type AudioIsPlayingFn = unsafe extern "C" fn(*mut PlayerAudioRuntime) -> i32;
 /// C# 侧函数指针：`audio_backend(audio, unused, buf, len) -> i32`（UTF-8）。
 pub type AudioBackendFn = unsafe extern "C" fn(*mut PlayerAudioRuntime, u32, *mut u8, u32) -> i32;
+
+// ==== v5：角色控制运行时（task-36）====
+/// C# 侧函数指针：`character_create(world, entity, radius, total_height) -> 0/-1`。
+pub type CharacterCreateFn =
+    unsafe extern "C" fn(*mut PlayerGameplayRuntime, u64, f32, f32) -> i32;
+/// C# 侧函数指针：`character_step(world, entity, input_x, input_z, jump, dt) -> 0/-1`。
+pub type CharacterStepFn =
+    unsafe extern "C" fn(*mut PlayerGameplayRuntime, u64, f32, f32, i32, f32) -> i32;
+/// C# 侧函数指针：`character_grounded(world, entity) -> 1/0`。
+pub type CharacterGroundedFn = unsafe extern "C" fn(*mut PlayerGameplayRuntime, u64) -> i32;
+/// C# 侧函数指针：`character_position(world, entity, out x, out y, out z) -> 0/-1`。
+pub type CharacterPositionFn =
+    unsafe extern "C" fn(*mut PlayerGameplayRuntime, u64, *mut f32, *mut f32, *mut f32) -> i32;
+/// C# 侧函数指针：`character_remove(world, entity) -> 0/-1`。
+pub type CharacterRemoveFn = unsafe extern "C" fn(*mut PlayerGameplayRuntime, u64) -> i32;
 
 /// `#[repr(C)]` Player C# Context：版本 + Scene 指针 + 6 个函数指针。
 #[repr(C)]
@@ -258,6 +290,19 @@ pub struct PlayerCSharpContext {
     pub audio_is_playing: Option<AudioIsPlayingFn>,
     /// 音频后端名称（UTF-8，如 `null`/`cpal`）。
     pub audio_backend: Option<AudioBackendFn>,
+    // ==== v5 tail 追加（task-36）：角色控制运行时 ====
+    /// 角色控制运行时指针（host 栈上；可空）。
+    pub gameplay_world: *mut PlayerGameplayRuntime,
+    /// 为实体创建胶囊角色。
+    pub character_create: Option<CharacterCreateFn>,
+    /// 步进角色（水平输入速度 + 跳跃 + dt）。
+    pub character_step: Option<CharacterStepFn>,
+    /// 角色是否着地。
+    pub character_grounded: Option<CharacterGroundedFn>,
+    /// 角色脚底位置。
+    pub character_position: Option<CharacterPositionFn>,
+    /// 移除角色。
+    pub character_remove: Option<CharacterRemoveFn>,
 }
 
 impl PlayerCSharpContext {
@@ -331,7 +376,26 @@ impl PlayerCSharpContext {
             audio_set_volume: Some(audio_set_volume),
             audio_is_playing: Some(audio_is_playing),
             audio_backend: Some(audio_backend),
+            gameplay_world: std::ptr::null_mut(),
+            character_create: Some(character_create),
+            character_step: Some(character_step),
+            character_grounded: Some(character_grounded),
+            character_position: Some(character_position),
+            character_remove: Some(character_remove),
         }
+    }
+
+    /// 为场景 + 动画 + 资产 + 音频 + 角色运行时创建 context（v5）。
+    pub fn new_with_gameplay(
+        scene: *mut Scene,
+        animation_state: *mut PlayerAnimationState,
+        assets: *mut PlayerAssetCatalog,
+        audio: *mut PlayerAudioRuntime,
+        gameplay: *mut PlayerGameplayRuntime,
+    ) -> Self {
+        let mut context = Self::new_with_runtime(scene, animation_state, assets, audio);
+        context.gameplay_world = gameplay;
+        context
     }
 
     /// `context` 的裸指针（传给 C# `Initialize(IntPtr)`）。
@@ -817,6 +881,106 @@ pub unsafe extern "C" fn audio_backend(
     })
 }
 
+/// 在 `catch_unwind` + 空指针保护下访问角色控制运行时。
+fn with_gameplay<R>(
+    gameplay: *mut PlayerGameplayRuntime,
+    default: R,
+    f: impl FnOnce(&mut PlayerGameplayRuntime) -> R,
+) -> R {
+    if gameplay.is_null() {
+        return default;
+    }
+    match catch_unwind(AssertUnwindSafe(|| f(unsafe { &mut *gameplay }))) {
+        Ok(value) => value,
+        Err(_) => default,
+    }
+}
+
+/// `character_create(world, entity, radius, total_height)`：0 成功 / -1 失败。
+pub unsafe extern "C" fn character_create(
+    gameplay: *mut PlayerGameplayRuntime,
+    entity_id: u64,
+    radius: f32,
+    total_height: f32,
+) -> i32 {
+    with_gameplay(gameplay, -1, |gameplay| {
+        if gameplay.create(entity_id, radius, total_height).is_ok() {
+            0
+        } else {
+            -1
+        }
+    })
+}
+
+/// `character_step(world, entity, input_x, input_z, jump, dt)`：0 成功 / -1 失败。
+pub unsafe extern "C" fn character_step(
+    gameplay: *mut PlayerGameplayRuntime,
+    entity_id: u64,
+    input_x: f32,
+    input_z: f32,
+    jump: i32,
+    dt: f32,
+) -> i32 {
+    with_gameplay(gameplay, -1, |gameplay| {
+        if gameplay
+            .step(entity_id, input_x, input_z, jump != 0, dt)
+            .is_ok()
+        {
+            0
+        } else {
+            -1
+        }
+    })
+}
+
+/// `character_grounded(world, entity)`：1 着地 / 0 其他。
+pub unsafe extern "C" fn character_grounded(
+    gameplay: *mut PlayerGameplayRuntime,
+    entity_id: u64,
+) -> i32 {
+    with_gameplay(gameplay, 0, |gameplay| {
+        i32::from(gameplay.grounded(entity_id))
+    })
+}
+
+/// `character_position(world, entity, out x, out y, out z)`：0 成功 / -1 失败。
+pub unsafe extern "C" fn character_position(
+    gameplay: *mut PlayerGameplayRuntime,
+    entity_id: u64,
+    out_x: *mut f32,
+    out_y: *mut f32,
+    out_z: *mut f32,
+) -> i32 {
+    if out_x.is_null() || out_y.is_null() || out_z.is_null() {
+        return -1;
+    }
+    with_gameplay(gameplay, -1, |gameplay| {
+        let Some(position) = gameplay.position(entity_id) else {
+            return -1;
+        };
+        unsafe {
+            *out_x = position.x;
+            *out_y = position.y;
+            *out_z = position.z;
+        }
+        0
+    })
+}
+
+/// `character_remove(world, entity)`：0 成功 / -1 失败。
+pub unsafe extern "C" fn character_remove(
+    gameplay: *mut PlayerGameplayRuntime,
+    entity_id: u64,
+) -> i32 {
+    with_gameplay(gameplay, -1, |gameplay| {
+        if gameplay.remove(entity_id) {
+            0
+        } else {
+            -1
+        }
+    })
+}
+
 /// `log(ptr)`：把 C 字符串写到 stderr（Player 日志/控制台）；空指针/panic 安全。
 ///
 /// 该函数仅用于 C# 侧需要把消息回传 Rust 日志时；C# 也可以直接 Console.Error。
@@ -837,11 +1001,11 @@ mod tests {
 
     #[test]
     fn context_layout_matches_csharp_contract() {
-        assert_eq!(PLAYER_CSHARP_CONTEXT_VERSION, 4);
-        // 8 字节头 + scene 指针 + v1 6 + v2 6 + v3 11 + v4 13 = 37 个 8 字节槽。
+        assert_eq!(PLAYER_CSHARP_CONTEXT_VERSION, 5);
+        // 8 字节头 + scene 指针 + v1 6 + v2 6 + v3 11 + v4 13 + v5 6 = 43 个 8 字节槽。
         assert_eq!(
             std::mem::size_of::<PlayerCSharpContext>(),
-            8 + std::mem::size_of::<usize>() * 37
+            8 + std::mem::size_of::<usize>() * 43
         );
         assert_eq!(std::mem::align_of::<PlayerCSharpContext>(), 8);
         let scene = Scene::new();
@@ -886,6 +1050,13 @@ mod tests {
         assert!(context.audio_set_volume.is_some());
         assert!(context.audio_is_playing.is_some());
         assert!(context.audio_backend.is_some());
+        // v5 tail：默认无角色运行时指针。
+        assert!(context.gameplay_world.is_null());
+        assert!(context.character_create.is_some());
+        assert!(context.character_step.is_some());
+        assert!(context.character_grounded.is_some());
+        assert!(context.character_position.is_some());
+        assert!(context.character_remove.is_some());
         // 通过 context 里的函数指针调用，验证 ABI 字段可执行。
         let scene_ptr = context.scene;
         let count = unsafe { context.scene_entity_count.unwrap()(scene_ptr) };
@@ -1007,6 +1178,71 @@ mod tests {
     }
 
     #[test]
+    fn v5_character_control_api() {
+        let mut scene = Scene::new();
+        let cube = scene.create_cube();
+        scene.set_entity_position(cube, Vec3::new(0.0, 0.5, 0.0));
+        let entity_id = cube.id;
+        let mut gameplay = PlayerGameplayRuntime::new(&mut scene as *mut Scene);
+        let mut animation = PlayerAnimationState::empty();
+        let context = PlayerCSharpContext::new_with_gameplay(
+            &mut scene as *mut Scene,
+            &mut animation as *mut PlayerAnimationState,
+            std::ptr::null_mut(),
+            std::ptr::null_mut(),
+            &mut gameplay as *mut PlayerGameplayRuntime,
+        );
+        assert!(!context.gameplay_world.is_null());
+        let world = context.gameplay_world;
+
+        assert_eq!(unsafe { character_create(world, entity_id, 0.3, 1.8) }, 0);
+        // 非法实体/参数安全失败。
+        assert_eq!(
+            unsafe { character_create(world, 0xDEAD_BEEF, 0.3, 1.8) },
+            -1
+        );
+        assert_eq!(unsafe { character_create(world, entity_id, 0.0, 1.8) }, -1);
+        assert_eq!(
+            unsafe { character_step(world, entity_id, 1.0, 0.0, 0, 0.0) },
+            -1
+        );
+
+        // 落地 + 向 +X 前进。
+        for _ in 0..120 {
+            assert_eq!(
+                unsafe { character_step(world, entity_id, 1.0, 0.0, 0, 1.0 / 60.0) },
+                0
+            );
+        }
+        assert_eq!(unsafe { character_grounded(world, entity_id) }, 1);
+        let mut x = 0.0f32;
+        let mut y = 0.0f32;
+        let mut z = 0.0f32;
+        assert_eq!(
+            unsafe { character_position(world, entity_id, &mut x, &mut y, &mut z) },
+            0
+        );
+        assert!(x > 0.5, "x={x}");
+        assert!(y.abs() < 0.05, "y={y}");
+        assert!((z - 0.0).abs() < 1e-3);
+        assert!(matches!(
+            unsafe {
+                character_position(
+                    world,
+                    0xDEAD_BEEF,
+                    &mut x,
+                    &mut y,
+                    &mut z
+                )
+            },
+            -1
+        ));
+        assert_eq!(unsafe { character_remove(world, entity_id) }, 0);
+        assert_eq!(unsafe { character_remove(world, entity_id) }, -1);
+        assert_eq!(unsafe { character_grounded(world, entity_id) }, 0);
+    }
+
+    #[test]
     fn null_scene_functions_are_safe() {
         unsafe {
             assert_eq!(scene_entity_count(std::ptr::null_mut()), 0);
@@ -1109,6 +1345,24 @@ mod tests {
                 ),
                 -1
             );
+            // v5：空角色运行时安全返回。
+            assert_eq!(character_create(std::ptr::null_mut(), 1, 0.3, 1.8), -1);
+            assert_eq!(
+                character_step(std::ptr::null_mut(), 1, 1.0, 0.0, 0, 0.016),
+                -1
+            );
+            assert_eq!(character_grounded(std::ptr::null_mut(), 1), 0);
+            assert_eq!(
+                character_position(
+                    std::ptr::null_mut(),
+                    1,
+                    &mut x,
+                    &mut y,
+                    &mut z
+                ),
+                -1
+            );
+            assert_eq!(character_remove(std::ptr::null_mut(), 1), -1);
             player_context_log(std::ptr::null());
         }
     }

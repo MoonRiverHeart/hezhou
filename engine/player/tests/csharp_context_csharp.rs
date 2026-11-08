@@ -15,6 +15,7 @@ use hezhou_player::animation_control::{AnimationClipEntry, PlayerAnimationState}
 use hezhou_player::asset_catalog::{PlayerAssetCatalog, PlayerAssetEntry};
 use hezhou_player::audio_runtime::PlayerAudioRuntime;
 use hezhou_player::csharp_context::PlayerCSharpContext;
+use hezhou_player::gameplay_runtime::PlayerGameplayRuntime;
 use hezhou_player::mono_host::PlayerGameScript;
 
 #[test]
@@ -57,11 +58,13 @@ fn csharp_creates_and_positions_entity_through_context() {
     let wav = write_test_wav(&temp, "audio/test.wav");
     let mut audio = PlayerAudioRuntime::null();
     audio.load_wav_file("test", &wav).expect("加载测试 WAV");
-    let mut context = PlayerCSharpContext::new_with_runtime(
+    let mut gameplay = PlayerGameplayRuntime::new(&mut scene as *mut Scene);
+    let mut context = PlayerCSharpContext::new_with_gameplay(
         &mut scene as *mut Scene,
         &mut animation as *mut PlayerAnimationState,
         &catalog as *const PlayerAssetCatalog as *mut PlayerAssetCatalog,
         &mut audio as *mut PlayerAudioRuntime,
+        &mut gameplay as *mut PlayerGameplayRuntime,
     );
     assert!(context.is_supported());
 
@@ -96,9 +99,29 @@ fn csharp_creates_and_positions_entity_through_context() {
     // context ABI v4 音频：C# play→pause→resume→volume=0.5，最终 playing。
     assert!(audio.is_playing(), "C# Initialize 后应恢复播放");
     assert!((audio.volume() - 0.5).abs() < 1e-6);
+    // context ABI v5 角色：C# 已对创建的 cube 调用 character_create。
+    assert!(gameplay.has_character(created.id));
+    assert_eq!(
+        gameplay.position(created.id).map(|p| (p.x, p.y, p.z)),
+        Some((2.5, 0.5, -1.5))
+    );
 
-    script.update(0.016).expect("Update");
-    script.update(0.032).expect("Update");
+    // 每帧 C# Update 调用 character_step(+X 1m/s) 并写回 Scene。
+    for _ in 0..90 {
+        script.update(1.0 / 60.0).expect("Update");
+    }
+    let gameplay_position = gameplay.position(created.id).expect("角色位置");
+    assert!(
+        gameplay_position.x > 2.5 + 0.2,
+        "角色应沿 +X 位移：{gameplay_position:?}"
+    );
+    assert!(gameplay_position.y.abs() < 0.05, "应贴地：{gameplay_position:?}");
+    assert!(gameplay.grounded(created.id), "应处于 grounded");
+    let scene_position = scene.get_entity_position(created).expect("Scene 位置");
+    assert!(
+        (scene_position.x - gameplay_position.x).abs() < 1e-5,
+        "Scene 位置应与角色位置同步"
+    );
     script.shutdown();
     // C# Shutdown 销毁自己创建的 cube：实体数回到 2，exists=false。
     assert_eq!(scene.entity_count(), 2, "C# Shutdown 应销毁创建的 cube");
@@ -106,6 +129,7 @@ fn csharp_creates_and_positions_entity_through_context() {
         unsafe { hezhou_player::scene_entity_exists(context.scene, created.id) },
         0
     );
+    assert!(!gameplay.has_character(created.id), "Shutdown 应移除角色");
     std::env::remove_var("HEZHOU_PLAYER_MONO_LOG");
 
     let log = std::fs::read_to_string(&log_path).expect("读取 C# 日志");
@@ -181,8 +205,25 @@ fn csharp_creates_and_positions_entity_through_context() {
         log.contains("Audio: Shutdown isPlaying=1 stopResult=0 isPlayingAfterStop=0"),
         "C# 日志：{log}"
     );
-    // Rust 侧统计：Initialize/Update×2/Shutdown 各调用成功。
+    // v5 角色控制日志。
+    assert!(
+        log.contains("Character: create entity=")
+            && log.contains("radius=0.300 height=1.800 result=0"),
+        "C# 日志：{log}"
+    );
+    assert!(
+        log.contains("Character: frame=1 stepResult=0")
+            && log.contains("position=("),
+        "C# 日志：{log}"
+    );
+    assert!(
+        log.contains("Character: Shutdown posResult=0")
+            && log.contains("grounded=1")
+            && log.contains("removeResult=0"),
+        "C# 日志：{log}"
+    );
+    // Rust 侧统计：Initialize/Update×90/Shutdown 各调用成功。
     let stats = script.stats();
     assert_eq!(stats.initialize_calls, 1);
-    assert_eq!(stats.update_calls, 2);
+    assert_eq!(stats.update_calls, 90);
 }

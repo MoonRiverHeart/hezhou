@@ -37,6 +37,7 @@ use crate::logging::LogLevel;
 use crate::animation_control::PlayerAnimationState;
 use crate::asset_catalog::PlayerAssetCatalog;
 use crate::audio_runtime::PlayerAudioRuntime;
+use crate::gameplay_runtime::PlayerGameplayRuntime;
 #[cfg(feature = "mono-host")]
 use crate::mono_host::{find_player_game_script, PlayerGameScript};
 use crate::skinned_asset::{select_first_skinned_asset, SelectedSkinnedAsset};
@@ -297,16 +298,25 @@ impl PlayerHost for WindowPlayerHost {
         }
         let mut last_audio_tick = Instant::now();
 
+        // 角色控制运行时（task-36）：y=0 地面 Plane + 每实体 CharacterMotor。
+        let mut gameplay_runtime =
+            PlayerGameplayRuntime::new(context.start_scene as *mut Scene);
+        context.log.host_log(
+            LogLevel::Info,
+            &format!("{}", gameplay_runtime.summary()),
+        );
+
         // ---- 可选 C# PlayerGame 入口（feature = mono-host）----
         #[cfg(feature = "mono-host")]
         let mut mono_state: Option<MonoHostState> = None;
         // PlayerCSharpContext 必须覆盖整个帧循环（C# 只在 Initialize/Update/Shutdown 内调用）。
         #[cfg(feature = "mono-host")]
-        let csharp_context = crate::csharp_context::PlayerCSharpContext::new_with_runtime(
+        let csharp_context = crate::csharp_context::PlayerCSharpContext::new_with_gameplay(
             context.start_scene as *mut Scene,
             &mut animation_state as *mut PlayerAnimationState,
             &asset_catalog as *const PlayerAssetCatalog as *mut PlayerAssetCatalog,
             &mut audio_runtime as *mut PlayerAudioRuntime,
+            &mut gameplay_runtime as *mut PlayerGameplayRuntime,
         );
         #[cfg(feature = "mono-host")]
         match find_player_game_script(context.manifest, context.root) {
@@ -461,6 +471,7 @@ impl PlayerHost for WindowPlayerHost {
             let audio_dt = last_audio_tick.elapsed().as_secs_f32();
             last_audio_tick = Instant::now();
             audio_runtime.update(audio_dt);
+            gameplay_runtime.update(audio_dt);
 
             // 可选：每帧驱动 C# PlayerGame.Update(dt)。
             #[cfg(feature = "mono-host")]
@@ -530,6 +541,10 @@ impl PlayerHost for WindowPlayerHost {
             &format!("音频统计：{}", audio_runtime.summary()),
         );
         audio_runtime.stop();
+        context.log.host_log(
+            LogLevel::Info,
+            &format!("角色统计：{}", gameplay_runtime.summary()),
+        );
 
         // 不调用 renderer.cleanup()：见模块文档"已知限制（上游 rhi-vulkan）"。
         let elapsed_ms = started.elapsed().as_secs_f64() * 1000.0;

@@ -266,7 +266,7 @@ fn actual_window_host_calls_csharp_scene_context() {
 
     let log = std::fs::read_to_string(log_dir.join("player.log")).expect("读取 player.log");
     assert!(
-        log.contains("mono-host：Scene context 已提供（初始 3 实体，ABI v4"),
+        log.contains("mono-host：Scene context 已提供（初始 3 实体，ABI v5"),
         "日志：{log}"
     );
     assert!(
@@ -447,6 +447,62 @@ fn actual_window_host_calls_csharp_assets_and_audio() {
     );
     assert!(
         csharp_log.contains("Audio: Shutdown isPlaying=1 stopResult=0 isPlayingAfterStop=0"),
+        "C# 日志：{csharp_log}"
+    );
+}
+
+/// 真实窗口 + C# 角色控制（feature = mono-host，task-36）：C# 对 cube 建立胶囊角色，
+/// 每帧 step(+X 1m/s)，读取位置/grounded；30 帧后报告位移。
+#[cfg(feature = "mono-host")]
+#[ignore = "需要显示环境 + Vulkan GPU + Mono；CI 默认跳过，本机手工验证"]
+#[test]
+fn actual_window_host_calls_csharp_character_control() {
+    use common::compile_engine_player_game;
+
+    let temp = TempDir::new("window-host-csharp-character");
+    let fixture = cooked_fixture_dir();
+    let Some(dll) = compile_engine_player_game(&temp) else {
+        return;
+    };
+    let scripts = vec![ScriptAssembly::with_source("PlayerGame.dll", &dll)];
+    let (package, stem) = build_fixture_package_with_scripts(&temp, &fixture, Some(scripts));
+    let log_dir = temp.join("logs");
+    let mono_log = temp.join("mono-character.log");
+
+    let result = run_window_host_with_env(
+        &package,
+        &stem,
+        "30",
+        &log_dir,
+        &[("HEZHOU_PLAYER_MONO_LOG", mono_log.to_str().unwrap())],
+    );
+    assert!(
+        result.status.success(),
+        "角色控制窗口 host 失败\nstdout: {}\nstderr: {}",
+        String::from_utf8_lossy(&result.stdout),
+        String::from_utf8_lossy(&result.stderr)
+    );
+    assert_eq!(result.status.code(), Some(0));
+
+    let log = std::fs::read_to_string(log_dir.join("player.log")).expect("读取 player.log");
+    assert!(log.contains("角色运行时："), "日志：{log}");
+    assert!(log.contains("窗口 host 结束：30 帧"), "日志：{log}");
+
+    let csharp_log = std::fs::read_to_string(&mono_log).expect("读取 C# 调用日志");
+    assert!(
+        csharp_log.contains("Character: create entity=")
+            && csharp_log.contains("radius=0.300 height=1.800 result=0"),
+        "C# 日志：{csharp_log}"
+    );
+    assert!(
+        csharp_log.contains("Character: frame=1 stepResult=0")
+            && csharp_log.contains("grounded="),
+        "C# 日志：{csharp_log}"
+    );
+    assert!(
+        csharp_log.contains("Character: Shutdown posResult=0")
+            && csharp_log.contains("grounded=1")
+            && csharp_log.contains("removeResult=0"),
         "C# 日志：{csharp_log}"
     );
 }

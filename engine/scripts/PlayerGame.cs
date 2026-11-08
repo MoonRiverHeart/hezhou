@@ -28,7 +28,7 @@ namespace Hezhou
     /// <summary>Player C# 游戏入口（Rust Player host 静态调用）。</summary>
     public static class PlayerGame
     {
-        private const uint PlayerContextVersion = 4;
+        private const uint PlayerContextVersion = 5;
         private const float CubeX = 2.5f;
         private const float CubeY = 0.5f;
         private const float CubeZ = -1.5f;
@@ -53,6 +53,7 @@ namespace Hezhou
         private static int _lastAnimationClip = -1;
         private static float _lastAnimationTime;
         private static float _lastAnimationSpeed = 1.0f;
+        private static bool _characterCreated;
         private static long _frameCount;
         private static double _elapsedSeconds;
         private static long _lastLogFrame = -1;
@@ -111,6 +112,7 @@ namespace Hezhou
             _lastAnimationClip = -1;
             _lastAnimationTime = 0.0f;
             _lastAnimationSpeed = 1.0f;
+            _characterCreated = false;
 
             if (context == IntPtr.Zero)
             {
@@ -272,6 +274,29 @@ namespace Hezhou
                 {
                     SafeLog("Audio: context 无 v4 音频 API");
                 }
+
+                // v5：为创建的 cube 建立胶囊角色（地面 y=0）。
+                if (api.HasGameplay)
+                {
+                    int createResult = api.CharacterCreate(
+                        _createdEntityId, 0.3f, 1.8f);
+                    _characterCreated = createResult == 0;
+                    float cx, cy, cz;
+                    int posResult = api.CharacterPosition(
+                        _createdEntityId, out cx, out cy, out cz);
+                    int grounded = api.CharacterGrounded(_createdEntityId);
+                    SafeLog("Character: create entity="
+                        + _createdEntityId.ToString(CultureInfo.InvariantCulture)
+                        + " radius=0.300 height=1.800 result="
+                        + createResult.ToString(CultureInfo.InvariantCulture)
+                        + " posResult=" + posResult.ToString(CultureInfo.InvariantCulture)
+                        + " position=(" + Fmt(cx) + "," + Fmt(cy) + "," + Fmt(cz) + ")"
+                        + " grounded=" + grounded.ToString(CultureInfo.InvariantCulture));
+                }
+                else
+                {
+                    SafeLog("Character: context 无 v5 角色 API");
+                }
             }
             catch (Exception exception)
             {
@@ -357,6 +382,25 @@ namespace Hezhou
                             + _frameCount.ToString(CultureInfo.InvariantCulture)
                             + " isPlaying=" + _sceneContext.AudioIsPlaying().ToString(CultureInfo.InvariantCulture));
                     }
+                    if (_sceneContext.HasGameplay && _characterCreated)
+                    {
+                        // 每帧 step：+X 1m/s，无跳跃；结果位置写回 Scene。
+                        int stepResult = _sceneContext.CharacterStep(
+                            _createdEntityId, 1.0f, 0.0f, false, dt);
+                        float x, y, z;
+                        int posResult = _sceneContext.CharacterPosition(
+                            _createdEntityId, out x, out y, out z);
+                        int grounded = _sceneContext.CharacterGrounded(_createdEntityId);
+                        if (_frameCount == 1 || _frameCount % 60 == 0)
+                        {
+                            SafeLog("Character: frame="
+                                + _frameCount.ToString(CultureInfo.InvariantCulture)
+                                + " stepResult=" + stepResult.ToString(CultureInfo.InvariantCulture)
+                                + " posResult=" + posResult.ToString(CultureInfo.InvariantCulture)
+                                + " position=(" + Fmt(x) + "," + Fmt(y) + "," + Fmt(z) + ")"
+                                + " grounded=" + grounded.ToString(CultureInfo.InvariantCulture));
+                        }
+                    }
                 }
                 catch (Exception exception)
                 {
@@ -385,6 +429,28 @@ namespace Hezhou
             {
                 SafeLog("PlayerGame: 未初始化，忽略 Shutdown");
                 return;
+            }
+
+            if (_sceneContext != null && _sceneContext.HasGameplay && _characterCreated)
+            {
+                try
+                {
+                    float cx, cy, cz;
+                    int posResult = _sceneContext.CharacterPosition(
+                        _createdEntityId, out cx, out cy, out cz);
+                    int grounded = _sceneContext.CharacterGrounded(_createdEntityId);
+                    int removeResult = _sceneContext.CharacterRemove(_createdEntityId);
+                    SafeLog("Character: Shutdown posResult="
+                        + posResult.ToString(CultureInfo.InvariantCulture)
+                        + " position=(" + Fmt(cx) + "," + Fmt(cy) + "," + Fmt(cz) + ")"
+                        + " grounded=" + grounded.ToString(CultureInfo.InvariantCulture)
+                        + " removeResult=" + removeResult.ToString(CultureInfo.InvariantCulture));
+                }
+                catch (Exception exception)
+                {
+                    SafeLog("Character: Shutdown 异常：" + exception.Message);
+                }
+                _characterCreated = false;
             }
 
             if (_sceneContext != null)
@@ -563,6 +629,13 @@ namespace Hezhou
             public IntPtr AudioSetVolume;
             public IntPtr AudioIsPlaying;
             public IntPtr AudioBackend;
+            // v5 tail（task-36）：角色控制。
+            public IntPtr GameplayWorld;
+            public IntPtr CharacterCreate;
+            public IntPtr CharacterStep;
+            public IntPtr CharacterGrounded;
+            public IntPtr CharacterPosition;
+            public IntPtr CharacterRemove;
         }
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
@@ -666,6 +739,25 @@ namespace Hezhou
         private delegate int AudioBackendDelegate(
             IntPtr audio, uint unused, IntPtr buffer, uint bufferLength);
 
+        // v5：角色控制（task-36）。
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        private delegate int CharacterCreateDelegate(
+            IntPtr world, ulong entityId, float radius, float totalHeight);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        private delegate int CharacterStepDelegate(
+            IntPtr world, ulong entityId, float inputX, float inputZ, int jump, float dt);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        private delegate int CharacterGroundedDelegate(IntPtr world, ulong entityId);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        private delegate int CharacterPositionDelegate(
+            IntPtr world, ulong entityId, out float x, out float y, out float z);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        private delegate int CharacterRemoveDelegate(IntPtr world, ulong entityId);
+
         /// <summary>已解析的 PlayerContext（函数指针 + scene）；GC 期间保持委托存活。</summary>
         private sealed class ContextApi
         {
@@ -711,6 +803,14 @@ namespace Hezhou
             public AudioSetVolumeDelegate AudioSetVolumeFn;
             public AudioIsPlayingDelegate AudioIsPlayingFn;
             public AudioBackendDelegate AudioBackendFn;
+            // v5 角色控制。
+            public bool HasGameplay;
+            public IntPtr GameplayWorld;
+            public CharacterCreateDelegate CharacterCreateFn;
+            public CharacterStepDelegate CharacterStepFn;
+            public CharacterGroundedDelegate CharacterGroundedFn;
+            public CharacterPositionDelegate CharacterPositionFn;
+            public CharacterRemoveDelegate CharacterRemoveFn;
 
             public uint EntityCount()
             {
@@ -867,6 +967,34 @@ namespace Hezhou
                 return AudioIsPlayingFn(Audio);
             }
 
+            public int CharacterCreate(ulong entityId, float radius, float totalHeight)
+            {
+                return CharacterCreateFn(GameplayWorld, entityId, radius, totalHeight);
+            }
+
+            public int CharacterStep(
+                ulong entityId, float inputX, float inputZ, bool jump, float dt)
+            {
+                return CharacterStepFn(
+                    GameplayWorld, entityId, inputX, inputZ, jump ? 1 : 0, dt);
+            }
+
+            public int CharacterGrounded(ulong entityId)
+            {
+                return CharacterGroundedFn(GameplayWorld, entityId);
+            }
+
+            public int CharacterPosition(
+                ulong entityId, out float x, out float y, out float z)
+            {
+                return CharacterPositionFn(GameplayWorld, entityId, out x, out y, out z);
+            }
+
+            public int CharacterRemove(ulong entityId)
+            {
+                return CharacterRemoveFn(GameplayWorld, entityId);
+            }
+
             public string AudioBackendString()
             {
                 int needed = AudioBackendFn(Audio, 0, IntPtr.Zero, 0);
@@ -932,8 +1060,8 @@ namespace Hezhou
                     return null;
                 }
 
-                // v4 兼容策略：接受 v1（position）/v2（Transform/生命周期）/
-                // v3（+动画）/v4（+资产/音频）；旧 Player 版本低时跳过对应 API。
+                // v5 兼容策略：接受 v1（position）/v2（Transform/生命周期）/
+                // v3（+动画）/v4（+资产/音频）/v5（+角色控制）；旧 Player 版本低时跳过。
                 if (native.Version < 1 || native.Version > PlayerContextVersion)
                 {
                     error = "ABI 版本不支持：native=" + native.Version
@@ -944,6 +1072,7 @@ namespace Hezhou
                 bool hasAnimation = native.Version >= 3 && native.AnimationState != IntPtr.Zero;
                 bool hasAssets = native.Version >= 4 && native.Assets != IntPtr.Zero;
                 bool hasAudio = native.Version >= 4 && native.Audio != IntPtr.Zero;
+                bool hasGameplay = native.Version >= 5 && native.GameplayWorld != IntPtr.Zero;
                 if (native.Scene == IntPtr.Zero)
                 {
                     error = "scene 指针为 0";
@@ -1003,6 +1132,16 @@ namespace Hezhou
                         || native.AudioBackend == IntPtr.Zero))
                 {
                     error = "v4 音频函数指针缺失";
+                    return null;
+                }
+                if (hasGameplay
+                    && (native.CharacterCreate == IntPtr.Zero
+                        || native.CharacterStep == IntPtr.Zero
+                        || native.CharacterGrounded == IntPtr.Zero
+                        || native.CharacterPosition == IntPtr.Zero
+                        || native.CharacterRemove == IntPtr.Zero))
+                {
+                    error = "v5 角色函数指针缺失";
                     return null;
                 }
 
@@ -1094,6 +1233,21 @@ namespace Hezhou
                             native.AudioIsPlaying);
                         api.AudioBackendFn = Marshal.GetDelegateForFunctionPointer<AudioBackendDelegate>(
                             native.AudioBackend);
+                    }
+                    if (hasGameplay)
+                    {
+                        api.HasGameplay = true;
+                        api.GameplayWorld = native.GameplayWorld;
+                        api.CharacterCreateFn = Marshal.GetDelegateForFunctionPointer<CharacterCreateDelegate>(
+                            native.CharacterCreate);
+                        api.CharacterStepFn = Marshal.GetDelegateForFunctionPointer<CharacterStepDelegate>(
+                            native.CharacterStep);
+                        api.CharacterGroundedFn = Marshal.GetDelegateForFunctionPointer<CharacterGroundedDelegate>(
+                            native.CharacterGrounded);
+                        api.CharacterPositionFn = Marshal.GetDelegateForFunctionPointer<CharacterPositionDelegate>(
+                            native.CharacterPosition);
+                        api.CharacterRemoveFn = Marshal.GetDelegateForFunctionPointer<CharacterRemoveDelegate>(
+                            native.CharacterRemove);
                     }
                     return api;
                 }

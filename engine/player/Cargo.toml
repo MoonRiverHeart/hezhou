@@ -23,6 +23,9 @@ hezhou-animation = { path = "../animation" }
 # hezhou-audio：Player 音频运行时（默认 null backend，无声卡/CI 安全；可选 cpal feature）。
 hezhou-audio = { path = "../audio", default-features = false }
 
+# hezhou-physics：Player 角色控制运行时（地面 Plane + CharacterMotor，task-36）。
+hezhou-physics = { path = "../physics" }
+
 # 可选：真实窗口渲染 host（feature = window-host）。默认构建不编译这些依赖。
 # - rhi-vulkan 内部通过 GLFW + Vulkan 创建窗口/渲染器（UIVulkanRenderer）；
 # - platform 作为窗口/输入抽象的契约依赖保留（当前窗口由 UIVulkanRenderer 管理，
