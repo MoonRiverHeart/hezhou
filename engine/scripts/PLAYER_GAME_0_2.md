@@ -1,7 +1,8 @@
 # PlayerGame 0.2 — Player C# 入口与 PlayerCSharpContext ABI
 
 **状态**：0.2 task-32（v1 Scene Context）/ task-33（v2 Transform/生命周期）/
-task-34（v3 动画控制）/ task-35（v4 资产/音频）/ task-36（v5 角色控制）  
+task-34（v3 动画控制）/ task-35（v4 资产/音频）/ task-36（v5 角色控制）/
+task-37（v6 9 状态动画状态机）  
 **文件**：`engine/scripts/PlayerGame.cs`、`engine/player/src/csharp_context.rs`  
 **Rust host**：`hezhou-player --features mono-host`（`WindowPlayerHost`）
 
@@ -25,7 +26,7 @@ namespace Hezhou
 - `context == IntPtr.Zero`（旧 Player/无 Scene）时保持安全空转，不抛异常；
 - 所有日志走 `Console.Error`，并可选追加到环境变量 `HEZHOU_PLAYER_MONO_LOG`。
 
-## 2. PlayerCSharpContext ABI（version = 5）
+## 2. PlayerCSharpContext ABI（version = 6）
 
 Rust：`#[repr(C)] PlayerCSharpContext`（`engine/player/src/csharp_context.rs`）  
 C#：`[StructLayout(LayoutKind.Sequential)] PlayerCSharpContextNative`
@@ -123,17 +124,35 @@ clip/time/speed 后下一帧 palette 即由新状态驱动。
 `CharacterMotor`（胶囊）；`create` 从 Scene transform 取脚底位置，`step` 的
 input_x/input_z 是水平期望速度（m/s）、y 由重力/跳跃接管，结果脚底位置写回 Scene。
 
-### 2.6 版本兼容策略
+### 2.6 v6 tail 追加（task-37，保持 v1..v5 布局）
 
-- v2..v5 只在尾部追加字段，不改旧布局；C# 侧读取 `Version`：
-  - `>= 5` 且 `gameplay_world != 0`：全部 API（含角色控制）；
-  - `== 4`：v1..v4，角色控制跳过；
-  - `== 3`：v1..v3，资产/音频/角色跳过；
-  - `== 2`：v1+v2，动画/资产/音频/角色跳过；
+| offset | Rust 字段 | 类型 / delegate |
+|---|---|---|
+| 352 | `animation_state_machine` | `IntPtr` → `PlayerAnimationGraph`（可空） |
+| 360 | `animation_set_state` | `int(IntPtr, const char* name)`（0/-1） |
+| 368 | `animation_trigger` | `int(IntPtr, const char* name)`（0/-1；同状态 restart） |
+| 376 | `animation_current_state` | `int(IntPtr, u8* buf, uint len)`（UTF-8 状态名） |
+| 384 | `animation_is_transitioning` | `int(IntPtr)`（1/0） |
+| 392 | `animation_transition_alpha` | `float(IntPtr)`（失败 NaN） |
+
+`PlayerAnimationGraph` 启用 `hezhou-asset/animation-bridge`：`imported_scene_to_gltf_asset`
+→ `into_runtime()` 得到运行时 Skeleton/Skin/AnimationClip，按 clip 名（大小写不敏感）
+映射 9 状态（Idle/Run/Jump/Attack/Hit/Death/Land/Dodge/Block）；无匹配时 Idle 用首个
+clip、其余状态空 clip → 绑定姿态。窗口 host 每帧 `graph.update(dt)` → `sample()` →
+`JointPalette::from_pose` → 上传 palette。
+
+### 2.7 版本兼容策略
+
+- v2..v6 只在尾部追加字段，不改旧布局；C# 侧读取 `Version`：
+  - `>= 6` 且 `animation_state_machine != 0`：全部 API（含状态机）；
+  - `== 5`：v1..v5，状态机跳过；
+  - `== 4`：v1..v4，角色/状态机跳过；
+  - `== 3`：v1..v3，资产/音频/角色/状态机跳过；
+  - `== 2`：v1+v2，动画/资产/音频/角色/状态机跳过；
   - `== 1`：只解析 v1（兼容旧 Player/DLL）；
   - 其他：记录日志后回退空转。
 - 旧 DLL 遇到更高 version 属于“版本 > 支持范围”，会记录日志并安全回退
-  （不崩溃、不误用尾部指针）；新 C# 对旧 v1..v4 context 自动降级。
+  （不崩溃、不误用尾部指针）；新 C# 对旧 v1..v5 context 自动降级。
 - 未来扩展：**尾部追加函数指针 + version 递增**，旧读取方忽略新字段。
 
 ## 3. C# 用法（当前实现）
@@ -157,24 +176,28 @@ input_x/input_z 是水平期望速度（m/s）、y 由重力/跳跃接管，结�
    日志 `Audio: backend=null playResult=0 … isPlayingAfterResume=1 volume=0.500`；
 7. v5 角色：`CharacterCreate(cube, 0.3, 1.8)`（地面 y=0 胶囊角色），日志
    `Character: create entity=… radius=0.300 height=1.800 result=0 position=(…) grounded=…`；
-8. 日志输出 `SceneContext: Initialize 创建 …`、`Animation: clips=N`、
-   `Assets: count=…`、`Audio: backend=…`、`Character: create …`。
+8. v6 状态机：读取 `AnimationCurrentStateString()`/`AnimationIsTransitioning()`/
+   `AnimationTransitionAlpha()`，日志 `AnimGraph: initial state=Idle …`；
+9. 日志输出 `SceneContext: Initialize 创建 …`、`Animation: clips=N`、
+   `Assets: count=…`、`Audio: backend=…`、`Character: create …`、`AnimGraph: initial …`。
 
 `Update(dt)`：每帧读取 `EntityCount()`/`GetPosition()`；v2 读取 `GetRotation()/GetScale()`
 与 `EntityExists()`；v3 读取 `AnimationCurrent()/AnimationGetTime()/AnimationGetSpeed()`；
 v4 读取 `AudioIsPlaying()`；v5 每帧调用 `CharacterStep(cube, 1.0, 0.0, false, dt)`
-（+X 1m/s，无跳跃）并读取 `CharacterPosition/CharacterGrounded`；首帧与每 60 帧输出
-`SceneContext: frame=…`、`Animation: frame=…`、`Audio: frame=…`、
-`Character: frame=… stepResult=0 position=(…) grounded=…`。
+（+X 1m/s，无跳跃）并读取 `CharacterPosition/CharacterGrounded`；v6 在 frame1 触发
+`Run`、frame15/每 60 帧触发 `Attack`，读取 current/transitioning/alpha；首帧与每 60 帧
+输出 `SceneContext: frame=…`、`Animation: frame=…`、`Audio: frame=…`、
+`Character: frame=…`、`AnimGraph: trigger=…` / `AnimGraph: frame=… state=… alpha=…`。
 
 `Shutdown()`：
 
-1. v5：读取角色位置/grounded → `CharacterRemove`，日志 `Character: Shutdown … removeResult=0`；
-2. 读取最终实体数/位置；
-3. v2：`EntityExists(cube)` → `DestroyEntity(cube)` → `EntityExists(cube)`；
-4. v3：读取并输出最终 `Animation: Shutdown …`；
-5. v4：`AudioIsPlaying()` → `AudioStop()` → `AudioIsPlaying()`，日志 `Audio: Shutdown …`；
-6. 输出 `SceneContext: Shutdown entities=… existsBefore=1 destroyResult=0 existsAfter=0 …`，
+1. v6：读取并输出 `AnimGraph: Shutdown state=… transitioning=… alpha=…`；
+2. v5：读取角色位置/grounded → `CharacterRemove`，日志 `Character: Shutdown … removeResult=0`；
+3. 读取最终实体数/位置；
+4. v2：`EntityExists(cube)` → `DestroyEntity(cube)` → `EntityExists(cube)`；
+5. v3：读取并输出最终 `Animation: Shutdown …`；
+6. v4：`AudioIsPlaying()` → `AudioStop()` → `AudioIsPlaying()`，日志 `Audio: Shutdown …`；
+7. 输出 `SceneContext: Shutdown entities=… existsBefore=1 destroyResult=0 existsAfter=0 …`，
    重置静态状态。
 
 ## 4. 构建/运行
@@ -262,6 +285,26 @@ run_exit=0
 即 C# 通过 v5 为 cube 建立胶囊角色，每帧 `step(+X 1m/s)` 并写回 Scene；
 30 帧内从 (2.5,0.5,-1.5) 移动到 (3.169,0.006,-1.5)（落地 grounded=1，位移 +0.669m）。
 
+本机实测（task-37，debug mono-host，skinned fixture 3 clip（Idle/Run/Attack），30 帧，
+ABI v6 9 状态机）：
+
+```text
+player.log: 动画状态图：3 个 clip / 9 状态（映射 3），current=Idle ...
+C# [PlayerGame] AnimGraph: initial state=Idle transitioning=0 alpha=1.000
+C# [PlayerGame] AnimGraph: trigger=Run result=0
+C# [PlayerGame] AnimGraph: frame=1 state=Run transitioning=1 alpha=0.000
+C# [PlayerGame] AnimGraph: trigger=Attack result=0
+C# [PlayerGame] AnimGraph: frame=15 state=Attack transitioning=1 alpha=0.000
+C# [PlayerGame] AnimGraph: Shutdown state=Attack transitioning=0 alpha=1.000
+player.log: 动画状态图统计：... current=Attack time=0.253s ... transitions=4
+player.log: 蒙皮绘制统计：... palette 更新 30 次（动画驱动）；动画 clip 0/3 `Idle` ...
+            窗口 host 结束：30 帧，723.4 ms
+run_exit=0
+```
+
+即 9 状态状态机按 clip 名映射 3 个状态，C# 触发 Run→Attack，每帧 update/sample/palette
+由状态图驱动；真实窗口渲染退出 0。
+
 ## 5. 扩展点（后续 gameplay/animation/audio）
 
 - **只加函数指针、不改已有布局**：在结构体尾部追加字段，`version` 递增；
@@ -271,8 +314,8 @@ run_exit=0
     `scene_set_entity_pbr_material`、`scene_get_entity_name/set_entity_name`
   - `scene_create_primitive`（cube/plane/sphere 等）、`scene_get_entity_count` 之外
     的层级/父子 API
-  - 动画状态机/混合/事件（当前只有单 clip `play/set_time/set_speed`）、
-    `animation_get_pose`/骨骼查询、`gameplay_*`；
+  - 动画事件消费/自定义混合树/遮罩/IK/根运动（当前 9 状态机仅状态切换+过渡，
+    未把 clip 事件接入 gameplay）；
   - 角色扩展：斜坡/台阶（0.2 已含基础 step height）/多地形/输入加速度/
     相机方向/跳跃参数/动画混合；
   - `audio_play_named`/3D 位置/总线/循环（当前仅首个音频 2D play_first）；
@@ -283,16 +326,18 @@ run_exit=0
 
 - 本轮 context 覆盖 scene 的 count/create（cube/空实体）/position/rotation/scale/
   exists/destroy + v3 单 clip 动画 + v4 资产目录枚举/音频控制 + v5 角色控制
-  （create/step/grounded/position/remove）+ log；无材质/组件/层级/动画混合/状态机 API；
+  + v6 9 状态动画状态机（set_state/trigger/current/transitioning/alpha）+ log；
+  无材质/组件/层级/物理 API；
+- 状态机按 clip 名称关键词映射 9 状态；无匹配 clip 时 Idle 用首个 clip、其余状态
+  空 clip 回退绑定姿态；无动画事件消费/自定义混合树/遮罩/IK/根运动；
 - 角色为单个无限地面 Plane + 直立胶囊，input_x/input_z 为直接速度（无加速度/相机方向），
   无复杂地形/斜坡限制之外的碰撞体；每帧 step 的 dt ≤ 0/非有限值安全返回错误；
 - 音频仅加载/播放第一个 WAV/OGG（2D，无循环/3D 位置/总线）；默认 null backend
   （无真实声音），启用 `audio-cpal` feature 才尝试真实输出设备；加载失败安全空转；
-- 动画为**单 clip 切换**，无交叉淡化/混合/事件；时间循环 [0,duration]；
-  speed 限制 [-8,8]；
+- 单 clip 时间/速度 API（v3）仍保留用于诊断；状态图驱动 palette 时以 v6 状态为准；
 - `Shutdown()` 默认移除角色、销毁自己创建的 cube、停止音频；
-- `scene`/`animation_state`/`assets`/`audio`/`gameplay_world` 指针生命周期仅覆盖
-  Player 帧循环；C# 不得缓存到 `Shutdown()` 之后；
+- `scene`/`animation_state`/`assets`/`audio`/`gameplay_world`/`animation_state_machine`
+  指针生命周期仅覆盖 Player 帧循环；C# 不得缓存到 `Shutdown()` 之后；
   `Shutdown()` 之后；
 - C# 侧异常/context 版本不符/函数指针缺失 → 记录日志后回退纯 Rust/空转，不崩溃；
   旧 v2 DLL 遇到 v3 context 会安全回退（不误用 v3 尾部）；

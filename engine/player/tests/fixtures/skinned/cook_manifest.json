@@ -62,6 +62,24 @@
       "dependencies": [],
       "source_size": 88244,
       "source_hash": "31e049106eeda10f"
+    },
+    {
+      "kind": "animation",
+      "output": "imported/33333333333343338333333333333333.json",
+      "dependencies": [],
+      "source_size": 4096,
+      "source_hash": "0123456789abcdef",
+      "locator": "assets/models/hero.gltf#animation:1",
+      "id": "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee"
+    },
+    {
+      "kind": "animation",
+      "output": "imported/33333333333343338333333333333333.json",
+      "dependencies": [],
+      "source_size": 4096,
+      "source_hash": "0123456789abcdef",
+      "locator": "assets/models/hero.gltf#animation:2",
+      "id": "ffffffff-ffff-4fff-8fff-ffffffffffff"
     }
   ]
 }

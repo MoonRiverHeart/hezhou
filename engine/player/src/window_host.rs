@@ -35,6 +35,7 @@ use hezhou_rhi_vulkan::UIVulkanRenderer;
 use crate::host::{HostError, HostOutcome, PlayerHost, PlayerHostContext};
 use crate::logging::LogLevel;
 use crate::animation_control::PlayerAnimationState;
+use crate::animation_graph::PlayerAnimationGraph;
 use crate::asset_catalog::PlayerAssetCatalog;
 use crate::audio_runtime::PlayerAudioRuntime;
 use crate::gameplay_runtime::PlayerGameplayRuntime;
@@ -262,6 +263,23 @@ impl PlayerHost for WindowPlayerHost {
             &format!("蒙皮动画运行时：{}", animation_state.summary()),
         );
 
+        // 9 状态动画状态图（task-37）：ImportedScene → 运行时 Skeleton/Clip → 状态机。
+        let mut animation_graph = match PlayerAnimationGraph::from_selected_asset(
+            skinned.as_ref().map(|state| &state.asset),
+        ) {
+            Ok(graph) => {
+                context.log.host_log(LogLevel::Info, &graph.summary());
+                Some(graph)
+            }
+            Err(error) => {
+                context.log.host_log(
+                    LogLevel::Warn,
+                    &format!("动画状态图构建失败：{error}；回退单 clip palette 路径"),
+                );
+                None
+            }
+        };
+
         // 资产目录 + 音频运行时（task-35）：默认 null backend，可选 audio-cpal。
         let asset_catalog = PlayerAssetCatalog::from_index(&context.index);
         context.log.host_log(LogLevel::Info, &asset_catalog.summary());
@@ -311,12 +329,16 @@ impl PlayerHost for WindowPlayerHost {
         let mut mono_state: Option<MonoHostState> = None;
         // PlayerCSharpContext 必须覆盖整个帧循环（C# 只在 Initialize/Update/Shutdown 内调用）。
         #[cfg(feature = "mono-host")]
-        let csharp_context = crate::csharp_context::PlayerCSharpContext::new_with_gameplay(
+        let csharp_context = crate::csharp_context::PlayerCSharpContext::new_with_animation_graph(
             context.start_scene as *mut Scene,
             &mut animation_state as *mut PlayerAnimationState,
             &asset_catalog as *const PlayerAssetCatalog as *mut PlayerAssetCatalog,
             &mut audio_runtime as *mut PlayerAudioRuntime,
             &mut gameplay_runtime as *mut PlayerGameplayRuntime,
+            animation_graph
+                .as_mut()
+                .map(|graph| graph as *mut PlayerAnimationGraph)
+                .unwrap_or(std::ptr::null_mut()),
         );
         #[cfg(feature = "mono-host")]
         match find_player_game_script(context.manifest, context.root) {
@@ -439,14 +461,20 @@ impl PlayerHost for WindowPlayerHost {
                 );
             }
 
-            // 每帧推进动画状态并上传当前 clip/time 的 joint palette（无动画时静态姿态）。
+            // 每帧推进动画时间/状态机并上传当前 clip/time 或状态图采样的 joint palette。
             if let Some(state) = &skinned {
                 let frame_dt = last_animation_tick.elapsed().as_secs_f32();
                 last_animation_tick = Instant::now();
                 animation_state.advance(frame_dt);
-                let clip = animation_state.current_index();
-                let time = animation_state.time();
-                match state.asset.palette_for_clip(clip, time) {
+                let palette = if let Some(graph) = &mut animation_graph {
+                    graph.update(frame_dt);
+                    Ok(graph.sample_palette())
+                } else {
+                    let clip = animation_state.current_index();
+                    let time = animation_state.time();
+                    state.asset.palette_for_clip(clip, time)
+                };
+                match palette {
                     Ok(palette) => {
                         if let Err(error) = renderer.upload_skin_palette(
                             PLAYER_SKINNED_ENTITY_ID,
@@ -545,6 +573,12 @@ impl PlayerHost for WindowPlayerHost {
             LogLevel::Info,
             &format!("角色统计：{}", gameplay_runtime.summary()),
         );
+        if let Some(graph) = &animation_graph {
+            context.log.host_log(
+                LogLevel::Info,
+                &format!("动画状态图统计：{}", graph.summary()),
+            );
+        }
 
         // 不调用 renderer.cleanup()：见模块文档"已知限制（上游 rhi-vulkan）"。
         let elapsed_ms = started.elapsed().as_secs_f64() * 1000.0;

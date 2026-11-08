@@ -20,6 +20,7 @@
 pub mod asset_index;
 pub mod animation_control;
 pub mod asset_catalog;
+pub mod animation_graph;
 pub mod audio_runtime;
 pub mod builder;
 pub mod gameplay_runtime;
@@ -51,6 +52,9 @@ pub use mono_host::{
 
 pub use asset_index::{AssetIndexEntry, AssetIndexError, PlayerAssetIndex};
 pub use asset_catalog::{PlayerAssetCatalog, PlayerAssetEntry};
+pub use animation_graph::{
+    AnimationGraphClip, AnimationGraphError, PlayerAnimationGraph,
+};
 pub use audio_runtime::PlayerAudioRuntime;
 pub use gameplay_runtime::{
     GameplayRuntimeError, PlayerCharacterState, PlayerGameplayRuntime,

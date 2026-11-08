@@ -9,8 +9,9 @@ default-run = "hezhou-player"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 # 复用 asset crate 的 CookManifest/AssetId/AssetKind 契约，不另写不兼容 schema。
-# 关闭默认 gltf feature：Player 只消费 cook 产物（JSON/原始资产），不需要 glTF 解析器。
-hezhou-asset = { path = "../asset", default-features = false }
+# 关闭默认 gltf feature：Player 只消费 cook 产物（JSON/原始资产），不需要 glTF 解析器；
+# 启用 animation-bridge（task-37）：ImportedScene → hezhou-animation 运行时 Skeleton/Clip。
+hezhou-asset = { path = "../asset", default-features = false, features = ["animation-bridge"] }
 
 # hezhou-core：起始场景加载（manifest.start_scene 的 Project JSON → Scene）。
 # 默认构建就需要（`--validate` 也会校验/加载起始场景），因此不作为可选依赖。

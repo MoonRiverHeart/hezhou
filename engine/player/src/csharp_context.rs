@@ -1,6 +1,6 @@
 //! Player C# Scene Context ABI（task-32 v1 / task-33 v2 / task-34 v3 / task-35 v4 /
-//! task-36 v5）：把 Scene、动画运行时、资产目录、音频运行时与角色控制运行时以
-//! `#[repr(C)]` 函数指针表暴露给 C# `Hezhou.PlayerGame`。
+//! task-36 v5 / task-37 v6）：把 Scene、动画运行时/状态图、资产目录、音频运行时与
+//! 角色控制运行时以 `#[repr(C)]` 函数指针表暴露给 C# `Hezhou.PlayerGame`。
 //!
 //! # ABI 契约（C# `[StructLayout(LayoutKind.Sequential)]` 必须一致）
 //!
@@ -75,6 +75,22 @@
 //! | 336 | `character_position` | `int(IntPtr, ulong entity, out float x, out float y, out float z)`（0/-1） |
 //! | 344 | `character_remove` | `int(IntPtr, ulong entity)`（0/-1） |
 //!
+//! v6 tail 追加（task-37；9 状态动画状态机）：
+//!
+//! | offset | 字段 | 类型 / delegate |
+//! |---|---|---|
+//! | 352 | `animation_state_machine` | `IntPtr` → `PlayerAnimationGraph`（可空） |
+//! | 360 | `animation_set_state` | `int(IntPtr, const char* name)`（0/-1） |
+//! | 368 | `animation_trigger` | `int(IntPtr, const char* name)`（0/-1；同状态 restart） |
+//! | 376 | `animation_current_state` | `int(IntPtr, u8* buf, uint len)`（UTF-8 状态名） |
+//! | 384 | `animation_is_transitioning` | `int(IntPtr)`（1/0） |
+//! | 392 | `animation_transition_alpha` | `float(IntPtr)`（失败 NaN） |
+//!
+//! 状态图用 `hezhou-asset/animation-bridge` 把 ImportedScene 转运行时
+//! Skeleton/Skin/AnimationClip，按 clip 名称（大小写不敏感）映射 9 状态：Idle/Run/
+//! Jump/Attack/Hit/Death/Land/Dodge/Block；无匹配时 Idle 用首个 clip，其余状态空
+//! clip 返回绑定姿态。每帧 update → sample Pose → JointPalette 上传。
+//!
 //! 角色运行时内部为 `hezhou_physics::PhysicsWorld` + y=0 地面 `Plane` + 每 entity 一个
 //! `CharacterMotor`；`character_step` 的 input_x/input_z 是水平期望速度（m/s），
 //! y 由重力/跳跃接管，结果脚底位置写回 Scene transform。
@@ -85,11 +101,12 @@
 //!
 //! # 版本兼容策略
 //!
-//! v2/v3/v4/v5 只在尾部追加字段、不改旧布局；C# 侧读取 `Version`：
-//! - `>= 5` 且对应指针非 0：解析全部字段（角色控制 API 可用）；
-//! - `== 4`：解析 v1..v4，角色控制跳过；
-//! - `== 3`：解析 v1..v3，资产/音频/角色跳过；
-//! - `== 2`：解析 v1+v2，动画/资产/音频/角色跳过；
+//! v2..v6 只在尾部追加字段、不改旧布局；C# 侧读取 `Version`：
+//! - `>= 6` 且对应指针非 0：解析全部字段（状态机 API 可用）；
+//! - `== 5`：v1..v5，状态机跳过；
+//! - `== 4`：v1..v4，角色/状态机跳过；
+//! - `== 3`：v1..v3，资产/音频/角色/状态机跳过；
+//! - `== 2`：v1+v2，动画/资产/音频/角色/状态机跳过；
 //! - `== 1`：只解析 v1（兼容旧 Player/DLL）；
 //! - 其他：记录日志后回退空转。
 //!
@@ -108,12 +125,13 @@ use hezhou_core::ecs::{Entity, Scene};
 use hezhou_core::math::{Quaternion, Vec3};
 
 use crate::animation_control::PlayerAnimationState;
+use crate::animation_graph::PlayerAnimationGraph;
 use crate::asset_catalog::{PlayerAssetCatalog, PlayerAssetEntry};
 use crate::audio_runtime::PlayerAudioRuntime;
 use crate::gameplay_runtime::PlayerGameplayRuntime;
 
 /// 当前 Player C# Context ABI 版本。
-pub const PLAYER_CSHARP_CONTEXT_VERSION: u32 = 5;
+pub const PLAYER_CSHARP_CONTEXT_VERSION: u32 = 6;
 
 /// C# 侧函数指针：`scene_entity_count(scene) -> u32`。
 pub type SceneEntityCountFn = unsafe extern "C" fn(*mut Scene) -> u32;
@@ -205,6 +223,21 @@ pub type CharacterPositionFn =
     unsafe extern "C" fn(*mut PlayerGameplayRuntime, u64, *mut f32, *mut f32, *mut f32) -> i32;
 /// C# 侧函数指针：`character_remove(world, entity) -> 0/-1`。
 pub type CharacterRemoveFn = unsafe extern "C" fn(*mut PlayerGameplayRuntime, u64) -> i32;
+
+// ==== v6：9 状态动画状态机（task-37）====
+/// C# 侧函数指针：`animation_set_state(graph, name) -> 0/-1`。
+pub type AnimationSetStateFn =
+    unsafe extern "C" fn(*mut PlayerAnimationGraph, *const c_char) -> i32;
+/// C# 侧函数指针：`animation_trigger(graph, name) -> 0/-1`。
+pub type AnimationTriggerFn =
+    unsafe extern "C" fn(*mut PlayerAnimationGraph, *const c_char) -> i32;
+/// C# 侧函数指针：`animation_current_state(graph, buf, len) -> i32`（UTF-8）。
+pub type AnimationCurrentStateFn =
+    unsafe extern "C" fn(*mut PlayerAnimationGraph, *mut u8, u32) -> i32;
+/// C# 侧函数指针：`animation_is_transitioning(graph) -> 1/0`。
+pub type AnimationIsTransitioningFn = unsafe extern "C" fn(*mut PlayerAnimationGraph) -> i32;
+/// C# 侧函数指针：`animation_transition_alpha(graph) -> f32`（失败 NaN）。
+pub type AnimationTransitionAlphaFn = unsafe extern "C" fn(*mut PlayerAnimationGraph) -> f32;
 
 /// `#[repr(C)]` Player C# Context：版本 + Scene 指针 + 6 个函数指针。
 #[repr(C)]
@@ -303,6 +336,19 @@ pub struct PlayerCSharpContext {
     pub character_position: Option<CharacterPositionFn>,
     /// 移除角色。
     pub character_remove: Option<CharacterRemoveFn>,
+    // ==== v6 tail 追加（task-37）：9 状态动画状态机 ====
+    /// 动画状态图指针（host 栈上；可空）。
+    pub animation_state_machine: *mut PlayerAnimationGraph,
+    /// 切换动画状态（按名称）。
+    pub animation_set_state: Option<AnimationSetStateFn>,
+    /// 触发动画状态（同状态 restart）。
+    pub animation_trigger: Option<AnimationTriggerFn>,
+    /// 读取当前状态名（UTF-8）。
+    pub animation_current_state: Option<AnimationCurrentStateFn>,
+    /// 是否正在过渡。
+    pub animation_is_transitioning: Option<AnimationIsTransitioningFn>,
+    /// 过渡 alpha。
+    pub animation_transition_alpha: Option<AnimationTransitionAlphaFn>,
 }
 
 impl PlayerCSharpContext {
@@ -382,7 +428,33 @@ impl PlayerCSharpContext {
             character_grounded: Some(character_grounded),
             character_position: Some(character_position),
             character_remove: Some(character_remove),
+            animation_state_machine: std::ptr::null_mut(),
+            animation_set_state: Some(animation_set_state),
+            animation_trigger: Some(animation_trigger),
+            animation_current_state: Some(animation_current_state),
+            animation_is_transitioning: Some(animation_is_transitioning),
+            animation_transition_alpha: Some(animation_transition_alpha),
         }
+    }
+
+    /// 为场景 + 动画 + 资产 + 音频 + 角色 + 9 状态动画图创建 context（v6）。
+    pub fn new_with_animation_graph(
+        scene: *mut Scene,
+        animation_state: *mut PlayerAnimationState,
+        assets: *mut PlayerAssetCatalog,
+        audio: *mut PlayerAudioRuntime,
+        gameplay: *mut PlayerGameplayRuntime,
+        graph: *mut PlayerAnimationGraph,
+    ) -> Self {
+        let mut context = Self::new_with_gameplay(
+            scene,
+            animation_state,
+            assets,
+            audio,
+            gameplay,
+        );
+        context.animation_state_machine = graph;
+        context
     }
 
     /// 为场景 + 动画 + 资产 + 音频 + 角色运行时创建 context（v5）。
@@ -981,6 +1053,91 @@ pub unsafe extern "C" fn character_remove(
     })
 }
 
+/// 在 `catch_unwind` + 空指针保护下访问动画状态图。
+fn with_graph<R>(
+    graph: *mut PlayerAnimationGraph,
+    default: R,
+    f: impl FnOnce(&mut PlayerAnimationGraph) -> R,
+) -> R {
+    if graph.is_null() {
+        return default;
+    }
+    match catch_unwind(AssertUnwindSafe(|| f(unsafe { &mut *graph }))) {
+        Ok(value) => value,
+        Err(_) => default,
+    }
+}
+
+/// 读取 C 字符串状态名；空指针/非法 UTF-8 → None。
+unsafe fn state_name_from_ptr(name: *const c_char) -> Option<String> {
+    if name.is_null() {
+        return None;
+    }
+    unsafe { CStr::from_ptr(name) }
+        .to_str()
+        .ok()
+        .map(str::to_string)
+}
+
+/// `animation_set_state(graph, name)`：0 成功 / -1 失败（未知状态/过渡被拒/空图）。
+pub unsafe extern "C" fn animation_set_state(
+    graph: *mut PlayerAnimationGraph,
+    name: *const c_char,
+) -> i32 {
+    if !graph.is_null() && !name.is_null() {
+        if let Some(state) = unsafe { state_name_from_ptr(name) } {
+            return with_graph(graph, -1, |graph| {
+                if graph.set_state(&state).is_ok() {
+                    0
+                } else {
+                    -1
+                }
+            });
+        }
+    }
+    -1
+}
+
+/// `animation_trigger(graph, name)`：0 成功 / -1 失败（同状态会 restart）。
+pub unsafe extern "C" fn animation_trigger(
+    graph: *mut PlayerAnimationGraph,
+    name: *const c_char,
+) -> i32 {
+    if !graph.is_null() && !name.is_null() {
+        if let Some(state) = unsafe { state_name_from_ptr(name) } {
+            return with_graph(graph, -1, |graph| {
+                if graph.trigger(&state).is_ok() {
+                    0
+                } else {
+                    -1
+                }
+            });
+        }
+    }
+    -1
+}
+
+/// `animation_current_state(graph, buf, len)`：UTF-8 状态名；空图 -1。
+pub unsafe extern "C" fn animation_current_state(
+    graph: *mut PlayerAnimationGraph,
+    buf: *mut u8,
+    len: u32,
+) -> i32 {
+    with_graph(graph, -1, |graph| {
+        write_utf8(graph.current_state_name(), buf, len)
+    })
+}
+
+/// `animation_is_transitioning(graph)`：1 过渡中 / 0 其他。
+pub unsafe extern "C" fn animation_is_transitioning(graph: *mut PlayerAnimationGraph) -> i32 {
+    with_graph(graph, 0, |graph| i32::from(graph.is_transitioning()))
+}
+
+/// `animation_transition_alpha(graph)`：过渡 alpha；空图 NaN。
+pub unsafe extern "C" fn animation_transition_alpha(graph: *mut PlayerAnimationGraph) -> f32 {
+    with_graph(graph, f32::NAN, |graph| graph.transition_alpha())
+}
+
 /// `log(ptr)`：把 C 字符串写到 stderr（Player 日志/控制台）；空指针/panic 安全。
 ///
 /// 该函数仅用于 C# 侧需要把消息回传 Rust 日志时；C# 也可以直接 Console.Error。
@@ -998,14 +1155,45 @@ pub unsafe extern "C" fn player_context_log(message: *const c_char) {
 mod tests {
     use super::*;
     use hezhou_asset::{AssetId, AssetKind};
+    use hezhou_animation::gltf::AnimationAssetData;
+    use hezhou_animation::{
+        AnimationClip, Quat, Skin, Skeleton, Transform, Vec3 as AnimVec3,
+    };
+
+    fn test_animation_graph() -> PlayerAnimationGraph {
+        let mut skeleton = Skeleton::new("hero");
+        let root = skeleton.add_root_joint("root", Transform::IDENTITY);
+        skeleton
+            .add_joint(
+                "hand",
+                root,
+                Transform::from_trs(AnimVec3::new(0.0, 1.0, 0.0), Quat::IDENTITY),
+            )
+            .unwrap();
+        skeleton.rebuild_inverse_bind_matrices().unwrap();
+        let skin = Skin::from_skeleton(&skeleton);
+        let clips = ["Idle", "Run", "Attack"]
+            .iter()
+            .map(|name| AnimationClip::new(*name, 1.0))
+            .collect();
+        PlayerAnimationGraph::from_asset_data(
+            AnimationAssetData {
+                skeleton,
+                skins: vec![skin],
+                clips,
+            },
+            Vec::new(),
+        )
+        .expect("graph")
+    }
 
     #[test]
     fn context_layout_matches_csharp_contract() {
-        assert_eq!(PLAYER_CSHARP_CONTEXT_VERSION, 5);
-        // 8 字节头 + scene 指针 + v1 6 + v2 6 + v3 11 + v4 13 + v5 6 = 43 个 8 字节槽。
+        assert_eq!(PLAYER_CSHARP_CONTEXT_VERSION, 6);
+        // 8 + scene 指针 + v1 6 + v2 6 + v3 11 + v4 13 + v5 6 + v6 6 = 49 个槽。
         assert_eq!(
             std::mem::size_of::<PlayerCSharpContext>(),
-            8 + std::mem::size_of::<usize>() * 43
+            8 + std::mem::size_of::<usize>() * 49
         );
         assert_eq!(std::mem::align_of::<PlayerCSharpContext>(), 8);
         let scene = Scene::new();
@@ -1057,6 +1245,13 @@ mod tests {
         assert!(context.character_grounded.is_some());
         assert!(context.character_position.is_some());
         assert!(context.character_remove.is_some());
+        // v6 tail：默认无动画状态图指针。
+        assert!(context.animation_state_machine.is_null());
+        assert!(context.animation_set_state.is_some());
+        assert!(context.animation_trigger.is_some());
+        assert!(context.animation_current_state.is_some());
+        assert!(context.animation_is_transitioning.is_some());
+        assert!(context.animation_transition_alpha.is_some());
         // 通过 context 里的函数指针调用，验证 ABI 字段可执行。
         let scene_ptr = context.scene;
         let count = unsafe { context.scene_entity_count.unwrap()(scene_ptr) };
@@ -1243,6 +1438,61 @@ mod tests {
     }
 
     #[test]
+    fn v6_animation_state_machine_api() {
+        use std::ffi::CString;
+
+        let mut scene = Scene::new();
+        let mut graph = test_animation_graph();
+        let context = PlayerCSharpContext::new_with_animation_graph(
+            &mut scene as *mut Scene,
+            std::ptr::null_mut(),
+            std::ptr::null_mut(),
+            std::ptr::null_mut(),
+            std::ptr::null_mut(),
+            &mut graph as *mut PlayerAnimationGraph,
+        );
+        assert!(!context.animation_state_machine.is_null());
+        let graph_ptr = context.animation_state_machine;
+        let mut buffer = vec![0u8; 32];
+
+        // 初始 Idle。
+        let len = unsafe {
+            animation_current_state(graph_ptr, buffer.as_mut_ptr(), buffer.len() as u32)
+        };
+        assert_eq!(std::str::from_utf8(&buffer[..len as usize]).unwrap(), "Idle");
+
+        let run = CString::new("Run").unwrap();
+        assert_eq!(unsafe { animation_set_state(graph_ptr, run.as_ptr()) }, 0);
+        assert_eq!(unsafe { animation_is_transitioning(graph_ptr) }, 1);
+        assert!(unsafe { animation_transition_alpha(graph_ptr) } < 1.0);
+        let len = unsafe {
+            animation_current_state(graph_ptr, buffer.as_mut_ptr(), buffer.len() as u32)
+        };
+        assert_eq!(std::str::from_utf8(&buffer[..len as usize]).unwrap(), "Run");
+
+        graph.update(0.3);
+        assert_eq!(unsafe { animation_is_transitioning(graph_ptr) }, 0);
+        assert!((unsafe { animation_transition_alpha(graph_ptr) } - 1.0).abs() < 1e-6);
+
+        let attack = CString::new("Attack").unwrap();
+        assert_eq!(unsafe { animation_trigger(graph_ptr, attack.as_ptr()) }, 0);
+        let len = unsafe {
+            animation_current_state(graph_ptr, buffer.as_mut_ptr(), buffer.len() as u32)
+        };
+        assert_eq!(
+            std::str::from_utf8(&buffer[..len as usize]).unwrap(),
+            "Attack"
+        );
+        // 未知状态/空图安全失败。
+        let bogus = CString::new("Nope").unwrap();
+        assert_eq!(unsafe { animation_set_state(graph_ptr, bogus.as_ptr()) }, -1);
+        assert_eq!(
+            unsafe { animation_current_state(std::ptr::null_mut(), buffer.as_mut_ptr(), 32) },
+            -1
+        );
+    }
+
+    #[test]
     fn null_scene_functions_are_safe() {
         unsafe {
             assert_eq!(scene_entity_count(std::ptr::null_mut()), 0);
@@ -1363,6 +1613,25 @@ mod tests {
                 -1
             );
             assert_eq!(character_remove(std::ptr::null_mut(), 1), -1);
+            // v6：空状态图安全返回。
+            assert_eq!(
+                animation_set_state(std::ptr::null_mut(), std::ptr::null()),
+                -1
+            );
+            assert_eq!(
+                animation_trigger(std::ptr::null_mut(), std::ptr::null()),
+                -1
+            );
+            assert_eq!(
+                animation_current_state(
+                    std::ptr::null_mut(),
+                    std::ptr::null_mut(),
+                    0
+                ),
+                -1
+            );
+            assert_eq!(animation_is_transitioning(std::ptr::null_mut()), 0);
+            assert!(animation_transition_alpha(std::ptr::null_mut()).is_nan());
             player_context_log(std::ptr::null());
         }
     }

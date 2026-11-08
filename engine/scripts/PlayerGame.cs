@@ -28,7 +28,7 @@ namespace Hezhou
     /// <summary>Player C# 游戏入口（Rust Player host 静态调用）。</summary>
     public static class PlayerGame
     {
-        private const uint PlayerContextVersion = 5;
+        private const uint PlayerContextVersion = 6;
         private const float CubeX = 2.5f;
         private const float CubeY = 0.5f;
         private const float CubeZ = -1.5f;
@@ -54,6 +54,7 @@ namespace Hezhou
         private static float _lastAnimationTime;
         private static float _lastAnimationSpeed = 1.0f;
         private static bool _characterCreated;
+        private static string _lastGraphState = "";
         private static long _frameCount;
         private static double _elapsedSeconds;
         private static long _lastLogFrame = -1;
@@ -297,6 +298,19 @@ namespace Hezhou
                 {
                     SafeLog("Character: context 无 v5 角色 API");
                 }
+
+                // v6：9 状态动画状态机初始状态。
+                if (api.HasAnimationGraph)
+                {
+                    _lastGraphState = api.AnimationCurrentStateString();
+                    SafeLog("AnimGraph: initial state=" + _lastGraphState
+                        + " transitioning=" + api.AnimationIsTransitioning().ToString(CultureInfo.InvariantCulture)
+                        + " alpha=" + Fmt(api.AnimationTransitionAlpha()));
+                }
+                else
+                {
+                    SafeLog("AnimGraph: context 无 v6 状态机 API");
+                }
             }
             catch (Exception exception)
             {
@@ -401,6 +415,35 @@ namespace Hezhou
                                 + " grounded=" + grounded.ToString(CultureInfo.InvariantCulture));
                         }
                     }
+                    if (_sceneContext.HasAnimationGraph)
+                    {
+                        // 首帧触发 Run，第 15 帧/每 60 帧触发 Attack（可配置）。
+                        if (_frameCount == 1)
+                        {
+                            int triggerResult = _sceneContext.TriggerAnimationState("Run");
+                            SafeLog("AnimGraph: trigger=Run result="
+                                + triggerResult.ToString(CultureInfo.InvariantCulture));
+                        }
+                        else if (_frameCount == 15 || _frameCount % 60 == 0)
+                        {
+                            int triggerResult = _sceneContext.TriggerAnimationState("Attack");
+                            SafeLog("AnimGraph: trigger=Attack result="
+                                + triggerResult.ToString(CultureInfo.InvariantCulture));
+                        }
+                        string current = _sceneContext.AnimationCurrentStateString();
+                        int transitioning = _sceneContext.AnimationIsTransitioning();
+                        float alpha = _sceneContext.AnimationTransitionAlpha();
+                        if (_frameCount == 1 || _frameCount == 15 || _frameCount % 60 == 0
+                            || current != _lastGraphState)
+                        {
+                            SafeLog("AnimGraph: frame="
+                                + _frameCount.ToString(CultureInfo.InvariantCulture)
+                                + " state=" + current
+                                + " transitioning=" + transitioning.ToString(CultureInfo.InvariantCulture)
+                                + " alpha=" + Fmt(alpha));
+                            _lastGraphState = current;
+                        }
+                    }
                 }
                 catch (Exception exception)
                 {
@@ -429,6 +472,21 @@ namespace Hezhou
             {
                 SafeLog("PlayerGame: 未初始化，忽略 Shutdown");
                 return;
+            }
+
+            if (_sceneContext != null && _sceneContext.HasAnimationGraph)
+            {
+                try
+                {
+                    SafeLog("AnimGraph: Shutdown state="
+                        + _sceneContext.AnimationCurrentStateString()
+                        + " transitioning=" + _sceneContext.AnimationIsTransitioning().ToString(CultureInfo.InvariantCulture)
+                        + " alpha=" + Fmt(_sceneContext.AnimationTransitionAlpha()));
+                }
+                catch (Exception exception)
+                {
+                    SafeLog("AnimGraph: Shutdown 异常：" + exception.Message);
+                }
             }
 
             if (_sceneContext != null && _sceneContext.HasGameplay && _characterCreated)
@@ -636,6 +694,13 @@ namespace Hezhou
             public IntPtr CharacterGrounded;
             public IntPtr CharacterPosition;
             public IntPtr CharacterRemove;
+            // v6 tail（task-37）：9 状态动画状态机。
+            public IntPtr AnimationStateMachine;
+            public IntPtr AnimationSetState;
+            public IntPtr AnimationTrigger;
+            public IntPtr AnimationCurrentState;
+            public IntPtr AnimationIsTransitioning;
+            public IntPtr AnimationTransitionAlpha;
         }
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
@@ -758,6 +823,23 @@ namespace Hezhou
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         private delegate int CharacterRemoveDelegate(IntPtr world, ulong entityId);
 
+        // v6：9 状态动画状态机（task-37）。
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        private delegate int AnimationSetStateDelegate(IntPtr graph, IntPtr name);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        private delegate int AnimationTriggerDelegate(IntPtr graph, IntPtr name);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        private delegate int AnimationCurrentStateDelegate(
+            IntPtr graph, IntPtr buffer, uint bufferLength);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        private delegate int AnimationIsTransitioningDelegate(IntPtr graph);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        private delegate float AnimationTransitionAlphaDelegate(IntPtr graph);
+
         /// <summary>已解析的 PlayerContext（函数指针 + scene）；GC 期间保持委托存活。</summary>
         private sealed class ContextApi
         {
@@ -811,6 +893,14 @@ namespace Hezhou
             public CharacterGroundedDelegate CharacterGroundedFn;
             public CharacterPositionDelegate CharacterPositionFn;
             public CharacterRemoveDelegate CharacterRemoveFn;
+            // v6 动画状态机。
+            public bool HasAnimationGraph;
+            public IntPtr AnimationStateMachine;
+            public AnimationSetStateDelegate AnimationSetStateFn;
+            public AnimationTriggerDelegate AnimationTriggerFn;
+            public AnimationCurrentStateDelegate AnimationCurrentStateFn;
+            public AnimationIsTransitioningDelegate AnimationIsTransitioningFn;
+            public AnimationTransitionAlphaDelegate AnimationTransitionAlphaFn;
 
             public uint EntityCount()
             {
@@ -995,6 +1085,81 @@ namespace Hezhou
                 return CharacterRemoveFn(GameplayWorld, entityId);
             }
 
+            public int SetAnimationState(string stateName)
+            {
+                return CallWithAnsiString(AnimationSetStateFn, stateName);
+            }
+
+            public int TriggerAnimationState(string stateName)
+            {
+                return CallWithAnsiString(AnimationTriggerFn, stateName);
+            }
+
+            public string AnimationCurrentStateString()
+            {
+                int needed = AnimationCurrentStateFn(
+                    AnimationStateMachine, IntPtr.Zero, 0);
+                if (needed <= 0)
+                {
+                    return "";
+                }
+                IntPtr buffer = Marshal.AllocHGlobal(needed);
+                try
+                {
+                    int written = AnimationCurrentStateFn(
+                        AnimationStateMachine, buffer, (uint)needed);
+                    if (written <= 0)
+                    {
+                        return "";
+                    }
+                    byte[] bytes = new byte[written];
+                    Marshal.Copy(buffer, bytes, 0, written);
+                    return System.Text.Encoding.UTF8.GetString(bytes);
+                }
+                finally
+                {
+                    Marshal.FreeHGlobal(buffer);
+                }
+            }
+
+            public int AnimationIsTransitioning()
+            {
+                return AnimationIsTransitioningFn(AnimationStateMachine);
+            }
+
+            public float AnimationTransitionAlpha()
+            {
+                return AnimationTransitionAlphaFn(AnimationStateMachine);
+            }
+
+            private int CallWithAnsiString(
+                AnimationSetStateDelegate function, string stateName)
+            {
+                return CallWithAnsiStringCore(
+                    (graph, name) => function(graph, name), stateName);
+            }
+
+            private int CallWithAnsiString(
+                AnimationTriggerDelegate function, string stateName)
+            {
+                return CallWithAnsiStringCore(
+                    (graph, name) => function(graph, name), stateName);
+            }
+
+            private int CallWithAnsiStringCore(
+                Func<IntPtr, IntPtr, int> function, string stateName)
+            {
+                IntPtr name = Marshal.StringToHGlobalAnsi(stateName);
+                try
+                {
+                    return function(AnimationStateMachine, name);
+                }
+                finally
+                {
+                    Marshal.FreeHGlobal(name);
+                }
+            }
+
             public string AudioBackendString()
             {
                 int needed = AudioBackendFn(Audio, 0, IntPtr.Zero, 0);
@@ -1060,8 +1225,8 @@ namespace Hezhou
                     return null;
                 }
 
-                // v5 兼容策略：接受 v1（position）/v2（Transform/生命周期）/
-                // v3（+动画）/v4（+资产/音频）/v5（+角色控制）；旧 Player 版本低时跳过。
+                // v6 兼容策略：接受 v1（position）/v2（Transform）/v3（动画）/
+                // v4（资产/音频）/v5（角色）/v6（9 状态机）。
                 if (native.Version < 1 || native.Version > PlayerContextVersion)
                 {
                     error = "ABI 版本不支持：native=" + native.Version
@@ -1073,6 +1238,8 @@ namespace Hezhou
                 bool hasAssets = native.Version >= 4 && native.Assets != IntPtr.Zero;
                 bool hasAudio = native.Version >= 4 && native.Audio != IntPtr.Zero;
                 bool hasGameplay = native.Version >= 5 && native.GameplayWorld != IntPtr.Zero;
+                bool hasAnimationGraph =
+                    native.Version >= 6 && native.AnimationStateMachine != IntPtr.Zero;
                 if (native.Scene == IntPtr.Zero)
                 {
                     error = "scene 指针为 0";
@@ -1142,6 +1309,16 @@ namespace Hezhou
                         || native.CharacterRemove == IntPtr.Zero))
                 {
                     error = "v5 角色函数指针缺失";
+                    return null;
+                }
+                if (hasAnimationGraph
+                    && (native.AnimationSetState == IntPtr.Zero
+                        || native.AnimationTrigger == IntPtr.Zero
+                        || native.AnimationCurrentState == IntPtr.Zero
+                        || native.AnimationIsTransitioning == IntPtr.Zero
+                        || native.AnimationTransitionAlpha == IntPtr.Zero))
+                {
+                    error = "v6 动画状态机函数指针缺失";
                     return null;
                 }
 
@@ -1248,6 +1425,21 @@ namespace Hezhou
                             native.CharacterPosition);
                         api.CharacterRemoveFn = Marshal.GetDelegateForFunctionPointer<CharacterRemoveDelegate>(
                             native.CharacterRemove);
+                    }
+                    if (hasAnimationGraph)
+                    {
+                        api.HasAnimationGraph = true;
+                        api.AnimationStateMachine = native.AnimationStateMachine;
+                        api.AnimationSetStateFn = Marshal.GetDelegateForFunctionPointer<AnimationSetStateDelegate>(
+                            native.AnimationSetState);
+                        api.AnimationTriggerFn = Marshal.GetDelegateForFunctionPointer<AnimationTriggerDelegate>(
+                            native.AnimationTrigger);
+                        api.AnimationCurrentStateFn = Marshal.GetDelegateForFunctionPointer<AnimationCurrentStateDelegate>(
+                            native.AnimationCurrentState);
+                        api.AnimationIsTransitioningFn = Marshal.GetDelegateForFunctionPointer<AnimationIsTransitioningDelegate>(
+                            native.AnimationIsTransitioning);
+                        api.AnimationTransitionAlphaFn = Marshal.GetDelegateForFunctionPointer<AnimationTransitionAlphaDelegate>(
+                            native.AnimationTransitionAlpha);
                     }
                     return api;
                 }

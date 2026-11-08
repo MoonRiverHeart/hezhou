@@ -12,15 +12,46 @@ use common::{compile_engine_player_game, write_test_wav, TempDir};
 use hezhou_asset::{AssetId, AssetKind};
 use hezhou_core::ecs::Scene;
 use hezhou_player::animation_control::{AnimationClipEntry, PlayerAnimationState};
+use hezhou_animation::gltf::AnimationAssetData;
+use hezhou_animation::{
+    AnimationClip, Quat, Skin, Skeleton, Transform, Vec3 as AnimVec3,
+};
+use hezhou_player::animation_graph::PlayerAnimationGraph;
 use hezhou_player::asset_catalog::{PlayerAssetCatalog, PlayerAssetEntry};
 use hezhou_player::audio_runtime::PlayerAudioRuntime;
 use hezhou_player::csharp_context::PlayerCSharpContext;
 use hezhou_player::gameplay_runtime::PlayerGameplayRuntime;
 use hezhou_player::mono_host::PlayerGameScript;
 
+fn test_animation_graph() -> PlayerAnimationGraph {
+    let mut skeleton = Skeleton::new("hero");
+    let root = skeleton.add_root_joint("root", Transform::IDENTITY);
+    skeleton
+        .add_joint(
+            "hand",
+            root,
+            Transform::from_trs(AnimVec3::new(0.0, 1.0, 0.0), Quat::IDENTITY),
+        )
+        .unwrap();
+    skeleton.rebuild_inverse_bind_matrices().unwrap();
+    let skin = Skin::from_skeleton(&skeleton);
+    let clips = ["Idle", "Run", "Attack"]
+        .iter()
+        .map(|name| AnimationClip::new(*name, 1.0))
+        .collect();
+    PlayerAnimationGraph::from_asset_data(
+        AnimationAssetData {
+            skeleton,
+            skins: vec![skin],
+            clips,
+        },
+        Vec::new(),
+    )
+    .expect("animation graph")
+}
+
 #[test]
-fn csharp_creates_and_positions_entity_through_context() {
-    let temp = TempDir::new("csharp-context-e2e");
+fn csharp_creates_and_positions_entity_through_context() {    let temp = TempDir::new("csharp-context-e2e");
     let Some(dll) = compile_engine_player_game(&temp) else {
         return;
     };
@@ -59,12 +90,14 @@ fn csharp_creates_and_positions_entity_through_context() {
     let mut audio = PlayerAudioRuntime::null();
     audio.load_wav_file("test", &wav).expect("加载测试 WAV");
     let mut gameplay = PlayerGameplayRuntime::new(&mut scene as *mut Scene);
-    let mut context = PlayerCSharpContext::new_with_gameplay(
+    let mut graph = test_animation_graph();
+    let mut context = PlayerCSharpContext::new_with_animation_graph(
         &mut scene as *mut Scene,
         &mut animation as *mut PlayerAnimationState,
         &catalog as *const PlayerAssetCatalog as *mut PlayerAssetCatalog,
         &mut audio as *mut PlayerAudioRuntime,
         &mut gameplay as *mut PlayerGameplayRuntime,
+        &mut graph as *mut PlayerAnimationGraph,
     );
     assert!(context.is_supported());
 
@@ -105,10 +138,13 @@ fn csharp_creates_and_positions_entity_through_context() {
         gameplay.position(created.id).map(|p| (p.x, p.y, p.z)),
         Some((2.5, 0.5, -1.5))
     );
+    // context ABI v6 状态机：Initialize 后初始 Idle。
+    assert_eq!(graph.current_state().name(), "Idle");
 
-    // 每帧 C# Update 调用 character_step(+X 1m/s) 并写回 Scene。
+    // 每帧 C# Update 调用 character_step(+X 1m/s) 并写回 Scene；窗口 host 同时推进状态图。
     for _ in 0..90 {
         script.update(1.0 / 60.0).expect("Update");
+        graph.update(1.0 / 60.0);
     }
     let gameplay_position = gameplay.position(created.id).expect("角色位置");
     assert!(
@@ -130,6 +166,9 @@ fn csharp_creates_and_positions_entity_through_context() {
         0
     );
     assert!(!gameplay.has_character(created.id), "Shutdown 应移除角色");
+    // C# 在 frame1 触发 Run、frame15 触发 Attack；最终状态 Attack。
+    assert_eq!(graph.current_state().name(), "Attack");
+    assert!(graph.transition_count() >= 2);
     std::env::remove_var("HEZHOU_PLAYER_MONO_LOG");
 
     let log = std::fs::read_to_string(&log_path).expect("读取 C# 日志");
@@ -220,6 +259,23 @@ fn csharp_creates_and_positions_entity_through_context() {
         log.contains("Character: Shutdown posResult=0")
             && log.contains("grounded=1")
             && log.contains("removeResult=0"),
+        "C# 日志：{log}"
+    );
+    // v6 状态机日志。
+    assert!(
+        log.contains("AnimGraph: initial state=Idle"),
+        "C# 日志：{log}"
+    );
+    assert!(
+        log.contains("AnimGraph: trigger=Run result=0"),
+        "C# 日志：{log}"
+    );
+    assert!(
+        log.contains("AnimGraph: trigger=Attack result=0"),
+        "C# 日志：{log}"
+    );
+    assert!(
+        log.contains("AnimGraph: Shutdown state=Attack"),
         "C# 日志：{log}"
     );
     // Rust 侧统计：Initialize/Update×90/Shutdown 各调用成功。
