@@ -2,7 +2,7 @@ use crate::collider::{layers_interact, Collider};
 use crate::dynamics::{Contact, SolverConfig};
 use crate::fixed::FixedTimestep;
 use crate::intersect::aabb_overlap;
-use crate::joint::DistanceJoint;
+use crate::joint::{DistanceJoint, FixedJoint};
 use crate::rigid_body::{RigidBody, RigidBodyType};
 use hezhou_core::math::Vec3;
 use std::collections::{HashMap, HashSet};
@@ -99,6 +99,7 @@ pub struct PhysicsWorld {
     pub(crate) trigger_events: Vec<TriggerEvent>,
     pub(crate) active_triggers: HashSet<(u64, u64)>,
     pub(crate) joints: Vec<DistanceJoint>,
+    pub(crate) fixed_joints: Vec<FixedJoint>,
     pub(crate) solver_config: SolverConfig,
     pub(crate) ccd_enabled: bool,
     pub(crate) auto_sleep: bool,
@@ -118,6 +119,7 @@ impl PhysicsWorld {
             trigger_events: Vec::new(),
             active_triggers: HashSet::new(),
             joints: Vec::new(),
+            fixed_joints: Vec::new(),
             solver_config: SolverConfig::default(),
             ccd_enabled: false,
             auto_sleep: false,
@@ -191,6 +193,8 @@ impl PhysicsWorld {
         }
         self.bodies.remove(&id);
         self.joints
+            .retain(|joint| joint.body_a != id && joint.body_b != id);
+        self.fixed_joints
             .retain(|joint| joint.body_a != id && joint.body_b != id);
         // 清理事件跟踪状态，避免删除后产生残留 Exit 事件。
         self.active_collisions.retain(|(a, b)| *a != id && *b != id);

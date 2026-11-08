@@ -105,7 +105,7 @@ impl PhysicsWorld {
         let ccd_global = self.ccd_enabled;
 
         for id in ids {
-            let (displacement, ccd, restitution) = {
+            let (displacement, ccd, restitution, own_inv_mass) = {
                 let Some(body) = self.bodies.get(&id) else {
                     continue;
                 };
@@ -117,33 +117,64 @@ impl PhysicsWorld {
                     .map(|collider| collider.restitution())
                     .unwrap_or(0.0);
                 let ccd = if ccd_global && body.ccd_enabled() {
-                    self.ccd_sweep(id, displacement)
+                    self.ccd_sweep(id, displacement, dt)
                 } else {
                     None
                 };
-                (displacement, ccd, restitution)
+                let own_inv_mass = if body.is_movable() {
+                    body.inverse_mass()
+                } else {
+                    0.0
+                };
+                (displacement, ccd, restitution, own_inv_mass)
             };
 
-            let Some(body) = self.bodies.get_mut(&id) else {
-                continue;
-            };
-            if let Some(hit) = ccd {
-                // 停在接触点前一点点，避免离散检测再次判定为穿透。
-                let advance = (hit.t - 1e-4).max(0.0);
-                let position = *body.position() + displacement * advance + hit.normal * 1e-3;
-                body.set_position(position);
-
-                let mut velocity = *body.velocity();
-                let vn = Vec3::dot(&velocity, &hit.normal);
-                if vn < 0.0 {
-                    // 去掉法向接近速度；有恢复系数时反弹。
-                    velocity = velocity - hit.normal * (vn * (1.0 + restitution));
-                    body.set_velocity(velocity);
+            // CCD 冲量在可变借用前算好（需要读取目标速度/逆质量）。
+            let mut ccd_impulse = Vec3::zero();
+            if let Some(hit) = &ccd {
+                let own_velocity = self
+                    .bodies
+                    .get(&id)
+                    .map(|body| *body.velocity())
+                    .unwrap_or(Vec3::zero());
+                let relative_velocity = own_velocity - hit.target_velocity;
+                let normal_speed = Vec3::dot(&relative_velocity, &hit.normal);
+                if normal_speed < 0.0 {
+                    let inv_sum = own_inv_mass + hit.target_inv_mass;
+                    if inv_sum > 0.0 {
+                        let restitution = restitution.clamp(0.0, 1.0);
+                        let normal_impulse = -(1.0 + restitution) * normal_speed / inv_sum;
+                        ccd_impulse = hit.normal * normal_impulse;
+                    }
                 }
-            } else {
-                body.set_position(*body.position() + displacement);
             }
-            body.integrate_rotation(dt);
+
+            {
+                let Some(body) = self.bodies.get_mut(&id) else {
+                    continue;
+                };
+                if let Some(hit) = ccd {
+                    // 停在接触点前一点点，避免离散检测再次判定为穿透。
+                    let advance = (hit.t - 1e-4).max(0.0);
+                    let position = *body.position() + displacement * advance + hit.normal * 1e-3;
+                    body.set_position(position);
+                    if own_inv_mass > 0.0 {
+                        body.set_velocity(*body.velocity() + ccd_impulse * own_inv_mass);
+                    }
+                } else {
+                    body.set_position(*body.position() + displacement);
+                }
+                body.integrate_rotation(dt);
+            }
+
+            // 动态-动态：对命中的动态目标施加反向冲量（动量守恒）。
+            if let Some(hit) = ccd {
+                if hit.target_inv_mass > 0.0 {
+                    if let Some(target) = self.bodies.get_mut(&hit.target_body) {
+                        target.set_velocity(*target.velocity() - ccd_impulse * hit.target_inv_mass);
+                    }
+                }
+            }
         }
     }
 
