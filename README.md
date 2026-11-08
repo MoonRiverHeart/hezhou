@@ -1,5 +1,22 @@
 # Hezhou Engine Demo Programs
 
+> 当前仓库版本：**0.4.0 RC**（最近发布版本 **v0.3.0**；1.0 尚未发布）。
+> 发布页：<https://github.com/MoonRiverHeart/hezhou/releases>
+
+## 文档入口
+
+| 文档 | 内容 |
+|---|---|
+| [docs/GETTING_STARTED_1_0.md](docs/GETTING_STARTED_1_0.md) | 安装（MSI/MSIX/DEB）→ 启动编辑器 → 模板新建工程 → 场景/PBR/材质 → Build Settings → 导出/运行 Player → 诊断包 |
+| [docs/PLATFORM_SUPPORT_1_0.md](docs/PLATFORM_SUPPORT_1_0.md) | Windows/Linux 发布支持；macOS/Android/Web 未实现；HarmonyOS 实验；构建依赖与限制 |
+| [docs/API_STABILITY_1_0.md](docs/API_STABILITY_1_0.md) | `Hezhou.Engine`/UI/FFI 稳定性、FfiContext/PlayerCSharpContext 追加规则、格式版本与弃用流程 |
+| [docs/1.0_RELEASE_CHECKLIST.md](docs/1.0_RELEASE_CHECKLIST.md) | 1.0 发版门禁（版本/CI/双平台安装包/Player/soak/perf/诊断/回滚/已知问题） |
+| [docs/DIAGNOSTICS_1_0.md](docs/DIAGNOSTICS_1_0.md) | 诊断包导出（日志/崩溃/系统/工程/Player，脱敏 + zip） |
+| [docs/SOAK_TEST_1_0.md](docs/SOAK_TEST_1_0.md) | 长时间稳定性 soak（60s/300s/1800s，RSS/帧时间报告） |
+| [docs/PERF_BASELINE_0_3.md](docs/PERF_BASELINE_0_3.md) | headless 性能基线门禁（ECS/物理/动画/音频/资产） |
+| [docs/PROJECT_PLAN.md](docs/PROJECT_PLAN.md) | 路线图、阶段目标、当前进度 |
+| [engine/scripts/CSHARP_ENGINE_API_0_3.md](engine/scripts/CSHARP_ENGINE_API_0_3.md) | C# `Hezhou.Engine` 类型表与示例 |
+
 ## 概述
 
 Hezhou是一个跨平台游戏引擎，支持Rust原生代码和C#脚本（通过Mono JIT或NativeAOT）。以下是所有演示程序及其功能说明。

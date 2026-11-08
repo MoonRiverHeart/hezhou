@@ -29,6 +29,7 @@
 - ✅ 0.4 网络第一批：std-only hezhou-net（Transport/UDP/TCP/framing/Session/Room/NetServer/NetClient），39 tests；loopback 3 客户端/心跳/超时/房间广播通过。
 - ✅ 0.4 网络第二批：WorldSnapshot 全量/delta、baseline ack、ReplicationServer/Client、SnapshotBuffer 插值、RpcRegistry；58 tests；CI run 42480451129 全绿。
 - ✅ 0.4 插件 API：hezhou-plugin（manifest/registry/启用/action 白名单）+ 编辑器插件 Tab/Command Palette；FFI 343，启动自检 **PASS=117**。
+- ✅ 1.0 文档第一批（2026-11-08）：`docs/GETTING_STARTED_1_0.md`（入门闭环、命令核对）、`docs/PLATFORM_SUPPORT_1_0.md`（平台矩阵/边界）、`docs/API_STABILITY_1_0.md`（稳定性等级/FfiContext 追加规则/格式版本）、`docs/1.0_RELEASE_CHECKLIST.md`（发版门禁）；README 增加文档入口。
 - ✅ 0.4.0 版本号/发布说明已准备（Cargo/DEB/MSIX/Player demo），待网络恢复推送、CI、tag v0.4.0。
 - ⏳ 下一阶段：0.4 平台扩展、网络、插件/包管理器、稳定性 30min+；0.3 已知限制见 RELEASE_NOTES_0.3.0.md。
 
